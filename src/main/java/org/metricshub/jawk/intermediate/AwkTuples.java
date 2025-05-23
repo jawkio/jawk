@@ -3066,17 +3066,72 @@ public class AwkTuples implements Serializable {
 	 * properly.
 	 * </ul>
 	 */
-	public void postProcess() {
-		assert queue.isEmpty() || !queue.get(0).hasNext() : "postProcess() already executed";
-		// allocate nexts
-		for (int i = 0; i < queue.size() - 1; i++) {
-			queue.get(i).setNext(queue.get(i + 1));
-		}
-		// touch per element
-		for (Tuple tuple : queue) {
-			tuple.touch(queue);
-		}
-	}
+        public void postProcess() {
+                assert queue.isEmpty() || !queue.get(0).hasNext() : "postProcess() already executed";
+                // allocate nexts
+                for (int i = 0; i < queue.size() - 1; i++) {
+                        queue.get(i).setNext(queue.get(i + 1));
+                }
+                // touch per element
+                for (Tuple tuple : queue) {
+                        tuple.touch(queue);
+                }
+        }
+
+        /**
+         * Merge tuples and metadata from another {@link AwkTuples} instance into
+         * this one.  Address indexes of the appended tuples are shifted
+         * accordingly and queue links are fixed.
+         *
+         * @param other The {@link AwkTuples} instance whose content should be
+         *            appended to this instance.
+         */
+        public void mergeFrom(AwkTuples other) {
+                if (other == null || other.queue.isEmpty()) {
+                        return;
+                }
+
+                int offset = queue.size();
+
+                // fix next pointer of the last tuple in this queue
+                if (!queue.isEmpty()) {
+                        queue.get(queue.size() - 1).setNext(other.queue.get(0));
+                }
+
+                // shift indexes in address maps
+                for (Map.Entry<Integer, Address> e : other.address_indexes.entrySet()) {
+                        Address addr = e.getValue();
+                        if (addr.index() >= 0) {
+                                addr.assignIndex(addr.index() + offset);
+                        }
+                        address_indexes.put(e.getKey() + offset, addr);
+                }
+
+                // append tuples adjusting embedded addresses
+                for (Tuple t : other.queue) {
+                        if (t.address != null) {
+                                t.address.assignIndex(t.address.index() + offset);
+                        }
+                        if (t.hasFuncAddr != null) {
+                                Address a = t.hasFuncAddr.getFunctionAddress();
+                                if (a != null && a.index() >= 0) {
+                                        a.assignIndex(a.index() + offset);
+                                }
+                        }
+                        queue.add(t);
+                }
+
+                unresolved_addresses.addAll(other.unresolved_addresses);
+                address_label_counts.putAll(other.address_label_counts);
+                global_var_offset_map.putAll(other.global_var_offset_map);
+                global_var_aarray_map.putAll(other.global_var_aarray_map);
+                if (other.function_names != null) {
+                        if (function_names == null) {
+                                function_names = new HashSet<String>();
+                        }
+                        function_names.addAll(other.function_names);
+                }
+        }
 
 	/** Map of global variables offsets */
 	private Map<String, Integer> global_var_offset_map = new HashMap<String, Integer>();

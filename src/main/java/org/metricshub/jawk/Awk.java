@@ -124,18 +124,18 @@ public class Awk {
 				LOG.trace("user extensions not enabled");
 			}
 
-			AwkTuples tuples = new AwkTuples();
-			// to be defined below
+                        AwkTuples tuples = new AwkTuples();
 
-			List<ScriptSource> notIntermediateScriptSources = new ArrayList<ScriptSource>(settings.getScriptSources().size());
-			for (ScriptSource scriptSource : settings.getScriptSources()) {
-				if (scriptSource.isIntermediate()) {
-					// read the intermediate file, bypassing frontend processing
-					tuples = (AwkTuples) readObjectFromInputStream(scriptSource.getInputStream()); // FIXME only the last intermediate file is used!
-				} else {
-					notIntermediateScriptSources.add(scriptSource);
-				}
-			}
+                        List<ScriptSource> notIntermediateScriptSources = new ArrayList<ScriptSource>(settings.getScriptSources().size());
+                        for (ScriptSource scriptSource : settings.getScriptSources()) {
+                                if (scriptSource.isIntermediate()) {
+                                        // read the intermediate file, bypassing frontend processing
+                                        AwkTuples partial = (AwkTuples) readObjectFromInputStream(scriptSource.getInputStream());
+                                        tuples.mergeFrom(partial);
+                                } else {
+                                        notIntermediateScriptSources.add(scriptSource);
+                                }
+                        }
 			if (!notIntermediateScriptSources.isEmpty()) {
 				AwkParser parser = new AwkParser(
 						settings.isAdditionalFunctions(),

@@ -109,8 +109,8 @@ public class AwkParameters {
 	 * <p>
 	 * The command-line argument semantics are as follows:
 	 * <ul>
-	 * <li>First, "-" arguments are processed until first non-"-" argument
-	 *   is encountered, or the "-" itself is provided.
+         * <li>First, "-" arguments are processed until the first non-option argument
+         *   is encountered, or the "--" argument is provided.
 	 * <li>Next, a script is expected (unless the -f argument was provided).
 	 * <li>Then, subsequent parameters are passed into the script
 	 *   via the ARGC/ARGV variables.
@@ -135,10 +135,10 @@ public class AwkParameters {
 				if (args[argIdx].charAt(0) != '-') {
 					// no more -X arguments
 					break;
-				} else if (args[argIdx].equals("-")) {
-					// no more -X arguments
-					++argIdx;
-					break;
+                                } else if (args[argIdx].equals("--")) {
+                                        // no more -X arguments
+                                        ++argIdx;
+                                        break;
 				} else if (args[argIdx].equals("-v")) {
 					checkParameterHasArgument(args, argIdx);
 					++argIdx;

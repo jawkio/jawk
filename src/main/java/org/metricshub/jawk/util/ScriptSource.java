@@ -29,7 +29,8 @@ import java.io.Reader;
 /**
  * Represents one AWK-script content source.
  * This is usually either a string,
- * given on the command line with the first non-"-" parameter,
+ * given on the command line with the first non-option parameter,
+ * or after the "--" argument,
  * or an "*.awk" (normal) or "*.ai" (intermediate) script,
  * given as a path with a "-f" command line switch.
  *

@@ -64,8 +64,9 @@ public class AwkSettings {
 	/**
 	 * Script sources meta info.
 	 * This will usually be either one String container,
-	 * made up of the script given on the command line directly,
-	 * with the first non-"-" parameter,
+         * made up of the script given on the command line directly,
+         * with the first non-option parameter,
+         * or after the "--" argument,
 	 * or one or multiple script file names (if provided with -f switches).
 	 */
 	private List<ScriptSource> scriptSources = new ArrayList<ScriptSource>();
@@ -278,8 +279,9 @@ public class AwkSettings {
 	 *
 	 * @return the script sources meta info.
 	 * This will usually be either one String container,
-	 * made up of the script given on the command line directly,
-	 * with the first non-"-" parameter,
+         * made up of the script given on the command line directly,
+         * with the first non-option parameter,
+         * or after the "--" argument,
 	 * or one or multiple script file names (if provided with -f switches).
 	 */
 	public List<ScriptSource> getScriptSources() {
@@ -364,8 +366,9 @@ public class AwkSettings {
 	/**
 	 * Script sources meta info.
 	 * This will usually be either one String container,
-	 * made up of the script given on the command line directly,
-	 * with the first non-"-" parameter,
+         * made up of the script given on the command line directly,
+         * with the first non-option parameter,
+         * or after the "--" argument,
 	 * or one or multiple script file names (if provided with -f switches).
 	 *
 	 * @param scriptSources the scriptSources to set

@@ -3133,7 +3133,7 @@ public class AwkTuples implements Serializable {
 	 * @return a {@link java.util.Map} object
 	 */
 	public Map<String, Integer> getGlobalVariableOffsetMap() {
-		return global_var_offset_map;
+		return new HashMap<String, Integer>(global_var_offset_map);
 	}
 
 	/**
@@ -3142,7 +3142,7 @@ public class AwkTuples implements Serializable {
 	 * @return a {@link java.util.Map} object
 	 */
 	public Map<String, Boolean> getGlobalVariableAarrayMap() {
-		return global_var_aarray_map;
+		return new HashMap<String, Boolean>(global_var_aarray_map);
 	}
 
 	/**
@@ -3152,7 +3152,7 @@ public class AwkTuples implements Serializable {
 	 */
 	public Set<String> getFunctionNameSet() {
 		assert function_names != null;
-		return function_names;
+		return new HashSet<String>(function_names);
 	}
 
 	/** linenumber stack ... */

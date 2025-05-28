@@ -47,15 +47,33 @@ public final class Main {
 
 	/**
 	 * Class constructor to support the JSR 223 scripting interface
-	 * already provided by Java SE 6.
+	 * already provided by Java SE 6. No work is performed here
+	 * to avoid SpotBugs CT_CONSTRUCTOR_THROW warnings.
 	 *
 	 * @param args String arguments from the command-line.
 	 * @param is The input stream to use as stdin.
 	 * @param os The output stream to use as stdout.
 	 * @param es The output stream to use as stderr.
-	 * @throws java.lang.Exception enables exceptions to propagate to the callee.
 	 */
-	public Main(String[] args, InputStream is, PrintStream os, PrintStream es) throws Exception {
+	public Main(String[] args, InputStream is, PrintStream os, PrintStream es) {
+		this.args = args;
+		this.is = is;
+		this.os = os;
+		this.es = es;
+	}
+
+	private String[] args;
+	private InputStream is;
+	private PrintStream os;
+	private PrintStream es;
+
+	/**
+	 * Executes the awk engine using the parameters configured in the
+	 * constructor.
+	 *
+	 * @throws Exception enables exceptions to propagate to the caller.
+	 */
+	public void invoke() throws Exception {
 		System.setIn(is);
 		System.setOut(os);
 		System.setErr(es);
@@ -63,6 +81,23 @@ public final class Main {
 		AwkSettings settings = AwkParameters.parseCommandLineArguments(args);
 		Awk awk = new Awk();
 		awk.invoke(settings);
+	}
+
+	/**
+	 * Convenience factory that replicates the previous constructor
+	 * behaviour.
+	 *
+	 * @param args String arguments from the command-line.
+	 * @param is The input stream to use as stdin.
+	 * @param os The output stream to use as stdout.
+	 * @param es The output stream to use as stderr.
+	 * @return An initialised {@code Main} instance.
+	 * @throws Exception enables exceptions to propagate to the caller.
+	 */
+	public static Main create(String[] args, InputStream is, PrintStream os, PrintStream es) throws Exception {
+		Main main = new Main(args, is, os, es);
+		main.invoke();
+		return main;
 	}
 
 	/**
@@ -78,7 +113,7 @@ public final class Main {
 	 *
 	 * @param args Command line arguments to the VM.
 	 */
-	@SuppressFBWarnings(value = "VA_FORMAT_STRING_USES_NEWLINE", justification = "let PrintStream decide line separator")
+	@SuppressFBWarnings("VA_FORMAT_STRING_USES_NEWLINE")
 	public static void main(String[] args) {
 		try {
 			AwkSettings settings = AwkParameters.parseCommandLineArguments(args);

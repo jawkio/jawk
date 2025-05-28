@@ -27,7 +27,9 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.io.StringReader;
 import java.net.URISyntaxException;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.slf4j.Logger;
 
 /**
@@ -218,7 +220,9 @@ public class AwkParameters {
 		// name=val or filename mode
 		while (argIdx < args.length) {
 			String nameValueOrFileName = args[argIdx++];
-			settings.getNameValueOrFileNames().add(nameValueOrFileName);
+			List<String> list = settings.getNameValueOrFileNames();
+			list.add(nameValueOrFileName);
+			settings.setNameValueOrFileNames(list);
 		}
 
 		return settings;
@@ -319,6 +323,8 @@ public class AwkParameters {
 			}
 		}
 		// note: this can overwrite previously defined variables
-		settings.getVariables().put(name, value);
+		Map<String, Object> vars = settings.getVariables();
+		vars.put(name, value);
+		settings.setVariables(vars);
 	}
 }

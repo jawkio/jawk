@@ -238,7 +238,7 @@ public class AwkSettings {
 			}
 		}
 		// note: can overwrite previously defined variables
-		getVariables().put(name, value);
+		variables.put(name, value);
 	}
 
 	/**
@@ -267,7 +267,7 @@ public class AwkSettings {
 	 * or one or multiple script file names (if provided with -f switches).
 	 */
 	public List<ScriptSource> getScriptSources() {
-		return scriptSources;
+		return new ArrayList<ScriptSource>(scriptSources);
 	}
 
 	/**
@@ -308,7 +308,7 @@ public class AwkSettings {
 	 * @return the variables
 	 */
 	public Map<String, Object> getVariables() {
-		return variables;
+		return new HashMap<String, Object>(variables);
 	}
 
 	/**
@@ -320,7 +320,11 @@ public class AwkSettings {
 	 * @param variables the variables to set
 	 */
 	public void setVariables(Map<String, Object> variables) {
-		this.variables = variables;
+		if (variables == null) {
+			this.variables = new HashMap<String, Object>();
+		} else {
+			this.variables = new HashMap<String, Object>(variables);
+		}
 	}
 
 	/**
@@ -331,7 +335,7 @@ public class AwkSettings {
 	 * @return the nameValueOrFileNames
 	 */
 	public List<String> getNameValueOrFileNames() {
-		return nameValueOrFileNames;
+		return new ArrayList<String>(nameValueOrFileNames);
 	}
 
 	/**
@@ -342,7 +346,11 @@ public class AwkSettings {
 	 * @param nameValueOrFileNames the nameValueOrFileNames to set
 	 */
 	public void setNameValueOrFileNames(List<String> nameValueOrFileNames) {
-		this.nameValueOrFileNames = nameValueOrFileNames;
+		if (nameValueOrFileNames == null) {
+			this.nameValueOrFileNames = new ArrayList<String>();
+		} else {
+			this.nameValueOrFileNames = new ArrayList<String>(nameValueOrFileNames);
+		}
 	}
 
 	/**
@@ -355,7 +363,11 @@ public class AwkSettings {
 	 * @param scriptSources the scriptSources to set
 	 */
 	public void setScriptSources(List<ScriptSource> scriptSources) {
-		this.scriptSources = scriptSources;
+		if (scriptSources == null) {
+			this.scriptSources = new ArrayList<ScriptSource>();
+		} else {
+			this.scriptSources = new ArrayList<ScriptSource>(scriptSources);
+		}
 	}
 
 	/**

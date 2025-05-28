@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.metricshub.jawk.util.AwkSettings;
 import org.metricshub.jawk.util.ScriptFileSource;
@@ -89,11 +90,15 @@ public class AwkTestHelper {
 		settings.setDefaultORS("\n");
 
 		// Set the input files
-		settings.getNameValueOrFileNames().addAll(inputFileList.stream().map(File::getAbsolutePath).collect(Collectors.toList()));
+		List<String> files = settings.getNameValueOrFileNames();
+		files.addAll(inputFileList.stream().map(File::getAbsolutePath).collect(Collectors.toList()));
+		settings.setNameValueOrFileNames(files);
 
 		// Set TEMPDIR so the AWK scripts can "play" with it
 		if (setTempDir) {
-			settings.getVariables().put("TEMPDIR", tempDirectory);
+			Map<String, Object> vars = settings.getVariables();
+			vars.put("TEMPDIR", tempDirectory);
+			settings.setVariables(vars);
 		}
 
 		// Create the OutputStream, to collect the result as a String
@@ -161,7 +166,9 @@ public class AwkTestHelper {
 
 		// Set TEMPDIR so the AWK scripts can "play" with it
 		if (setTempDir) {
-			settings.getVariables().put("TEMPDIR", tempDirectory);
+			Map<String, Object> vars = settings.getVariables();
+			vars.put("TEMPDIR", tempDirectory);
+			settings.setVariables(vars);
 		}
 
 		// Sets the AWK script to execute

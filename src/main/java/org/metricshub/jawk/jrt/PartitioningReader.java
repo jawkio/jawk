@@ -132,6 +132,15 @@ public class PartitioningReader extends FilterReader {
 		return fromFileNameList;
 	}
 
+	/**
+	 * Create a new {@link PartitioningReader} using the same underlying reader.
+	 *
+	 * @return a copy of this reader
+	 */
+	public PartitioningReader copy() {
+		return new PartitioningReader(in, recordSeparator, fromFileNameList);
+	}
+
 	private StringBuilder remaining = new StringBuilder();
 	private char[] readBuffer = new char[4096];
 

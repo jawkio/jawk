@@ -1,5 +1,6 @@
 package org.metricshub.jawk.jrt;
 
+import java.io.FileInputStream;
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
@@ -29,11 +30,11 @@ package org.metricshub.jawk.jrt;
 // not have to refer to jawk.jar!
 
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Enumeration;
@@ -113,6 +114,7 @@ public class JRT {
 	private static final Integer ONE = Integer.valueOf(1);
 	private static final Integer ZERO = Integer.valueOf(0);
 	private static final Integer MINUS_ONE = Integer.valueOf(-1);
+	private static final double EPSILON = 1e-9;
 	private String jrt_input_string;
 
 	private Map<String, PartitioningReader> file_readers = new HashMap<String, PartitioningReader>();
@@ -126,6 +128,9 @@ public class JRT {
 	 * @param vm The VariableManager to use with this JRT.
 	 */
 	public JRT(VariableManager vm) {
+		if (vm == null) {
+			throw new IllegalArgumentException("vm cannot be null");
+		}
 		this.vm = vm;
 	}
 
@@ -172,7 +177,7 @@ public class JRT {
 		if (o instanceof Number) {
 			// It is a number, some processing is required here
 			double d = ((Number) o).doubleValue();
-			if (d == (long) d) {
+			if (Math.abs(d - (long) d) < EPSILON) {
 				// If an integer, represent it as an integer (no floating point and decimals)
 				return Long.toString((long) d);
 			} else {
@@ -377,7 +382,7 @@ public class JRT {
 			if (mode < 0) {
 				return ((Number) o1).doubleValue() < ((Number) o2).doubleValue();
 			} else if (mode == 0) {
-				return ((Number) o1).doubleValue() == ((Number) o2).doubleValue();
+				return Math.abs(((Number) o1).doubleValue() - ((Number) o2).doubleValue()) <= EPSILON;
 			} else {
 				return ((Number) o1).doubleValue() > ((Number) o2).doubleValue();
 			}
@@ -557,7 +562,10 @@ public class JRT {
 	 * @return a {@link org.metricshub.jawk.jrt.PartitioningReader} object
 	 */
 	public PartitioningReader getPartitioningReader() {
-		return partitioningReader;
+		if (partitioningReader == null) {
+			return null;
+		}
+		return partitioningReader.copy();
 	}
 
 	/**
@@ -639,21 +647,22 @@ public class JRT {
 					if (!(o instanceof UninitializedObject || o.toString().isEmpty())) {
 						String name_value_or_filename = toAwkString(o, vm.getCONVFMT().toString(), locale);
 						if (name_value_or_filename.indexOf('=') == -1) {
-							partitioningReader = new PartitioningReader(new FileReader(name_value_or_filename), vm.getRS().toString(), true);
+							partitioningReader =
+								new PartitioningReader(new InputStreamReader(new FileInputStream(name_value_or_filename), StandardCharsets.UTF_8), vm.getRS().toString(), true);
 							vm.setFILENAME(name_value_or_filename);
 							vm.resetFNR();
 						} else {
 							setFilelistVariable(name_value_or_filename);
 							if (!has_filenames) {
 								// stdin with a variable!
-								partitioningReader = new PartitioningReader(new InputStreamReader(input), vm.getRS().toString());
+								partitioningReader = new PartitioningReader(new InputStreamReader(input, StandardCharsets.UTF_8), vm.getRS().toString());
 								vm.setFILENAME("");
 							} else {
 								continue;
 							}
 						}
 					} else if (!has_filenames) {
-						partitioningReader = new PartitioningReader(new InputStreamReader(input), vm.getRS().toString());
+						partitioningReader = new PartitioningReader(new InputStreamReader(input, StandardCharsets.UTF_8), vm.getRS().toString());
 						vm.setFILENAME("");
 					} else {
 						return false;
@@ -673,7 +682,12 @@ public class JRT {
 							String name_value_or_filename = toAwkString(o, vm.getCONVFMT().toString(), locale);
 							if (name_value_or_filename.indexOf('=') == -1) {
 								// true = from filename list
-								partitioningReader = new PartitioningReader(new FileReader(name_value_or_filename), vm.getRS().toString(), true);
+								partitioningReader =
+									new PartitioningReader(
+										new InputStreamReader(new FileInputStream(name_value_or_filename), StandardCharsets.UTF_8),
+										vm.getRS().toString(),
+										true
+									);
 								vm.setFILENAME(name_value_or_filename);
 								vm.resetFNR();
 							} else {
@@ -908,7 +922,7 @@ public class JRT {
 	 * @return a {@link java.util.Map} object
 	 */
 	public Map<String, PrintStream> getOutputFiles() {
-		return outputFiles;
+		return new HashMap<String, PrintStream>(outputFiles);
 	}
 
 	/**
@@ -943,7 +957,10 @@ public class JRT {
 		PartitioningReader pr = file_readers.get(filename);
 		if (pr == null) {
 			try {
-				file_readers.put(filename, pr = new PartitioningReader(new FileReader(filename), vm.getRS().toString()));
+				file_readers.put(
+					filename,
+					pr = new PartitioningReader(new InputStreamReader(new FileInputStream(filename), StandardCharsets.UTF_8), vm.getRS().toString())
+				);
 				vm.setFILENAME(filename);
 			} catch (IOException ioe) {
 				LOG.warn("IO Exception", ioe);
@@ -994,7 +1011,7 @@ public class JRT {
 				p.getOutputStream().close();
 				DataPump.dump(cmd, p.getErrorStream(), System.err);
 				command_processes.put(cmd, p);
-				command_readers.put(cmd, pr = new PartitioningReader(new InputStreamReader(p.getInputStream()), vm.getRS().toString()));
+				command_readers.put(cmd, pr = new PartitioningReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8), vm.getRS().toString()));
 				vm.setFILENAME("");
 			} catch (IOException ioe) {
 				LOG.warn("IO Exception", ioe);

@@ -25,7 +25,6 @@ package org.metricshub.jawk.jrt;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
 import org.metricshub.jawk.util.AwkLogger;
 import org.slf4j.Logger;
 
@@ -56,9 +55,10 @@ public class DataPump implements Runnable {
 	public DataPump(InputStream in, PrintStream out) {
 		PrintStream ps;
 		try {
-			ps = new PrintStream(out, false, StandardCharsets.UTF_8.name());
+			ps = new PrintStream(out, false, java.nio.charset.StandardCharsets.UTF_8.name());
 		} catch (java.io.UnsupportedEncodingException e) {
-			throw new IllegalStateException(e);
+			LOG.debug("UTF-8 encoding not available, using default", e);
+			ps = new PrintStream(out);
 		}
 		this.is = in;
 		this.os = ps;

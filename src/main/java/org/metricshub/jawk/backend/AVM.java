@@ -157,19 +157,28 @@ public class AVM implements AwkInterpreter, VariableManager {
 	 * @param extensions Map of the extensions to load
 	 */
 	public AVM(final AwkSettings parameters, final Map<String, JawkExtension> extensions) {
-		if (parameters == null) {
-			throw new IllegalArgumentException("AwkSettings can not be null");
+		if (parameters != null) {
+			this.settings = parameters;
+			locale = settings.getLocale();
+			arguments = parameters.getNameValueOrFileNames();
+			sorted_array_keys = parameters.isUseSortedArrayKeys();
+			initial_variables = parameters.getVariables();
+			initial_fs_value = parameters.getFieldSeparator();
+			trap_illegal_format_exceptions = parameters.isCatchIllegalFormatExceptions();
+			this.extensions = extensions;
+		} else {
+			this.settings = null;
+			locale = Locale.getDefault();
+			arguments = new ArrayList<String>();
+			sorted_array_keys = false;
+			initial_variables = new HashMap<String, Object>();
+			initial_fs_value = null;
+			trap_illegal_format_exceptions = false;
+			this.extensions = Collections.emptyMap();
 		}
-		this.settings = parameters;
-		locale = settings.getLocale();
-		arguments = parameters.getNameValueOrFileNames();
-		sorted_array_keys = parameters.isUseSortedArrayKeys();
-		initial_variables = parameters.getVariables();
-		initial_fs_value = parameters.getFieldSeparator();
-		trap_illegal_format_exceptions = parameters.isCatchIllegalFormatExceptions();
+
 		jrt = new JRT(this); // this = VariableManager
-		this.extensions = extensions;
-		for (JawkExtension ext : extensions.values()) {
+		for (JawkExtension ext : this.extensions.values()) {
 			ext.init(this, jrt, settings); // this = VariableManager
 		}
 	}

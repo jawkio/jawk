@@ -28,6 +28,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import org.metricshub.jawk.util.AwkLogger;
 import org.slf4j.Logger;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 /**
  * Relay data from an input stream to an output stream.
@@ -53,15 +54,10 @@ public class DataPump implements Runnable {
 	 * @param in The input stream.
 	 * @param out The output stream.
 	 */
+	@SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "Caller provides streams; object uses them directly")
 	public DataPump(InputStream in, PrintStream out) {
-		PrintStream ps;
-		try {
-			ps = new PrintStream(out, false, StandardCharsets.UTF_8.name());
-		} catch (java.io.UnsupportedEncodingException e) {
-			throw new IllegalStateException(e);
-		}
 		this.is = in;
-		this.os = ps;
+		this.os = out;
 		// setDaemon(true);
 	}
 

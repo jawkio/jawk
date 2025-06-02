@@ -276,10 +276,10 @@ public class AwkParser {
 	 * interface reference) as to not clutter the interface
 	 * with methods appropriate for private access, only.
 	 */
-	private final AwkSymbolTableImpl symbol_table = new AwkSymbolTableImpl();
+	private final AwkSymbolTableImpl symbolTable = new AwkSymbolTableImpl();
 
-	private final boolean additional_functions;
-	private final boolean additional_type_functions;
+	private final boolean additionalFunctions;
+	private final boolean additionalTypeFunctions;
 	private final Map<String, JawkExtension> extensions;
 
 	/**
@@ -287,14 +287,14 @@ public class AwkParser {
 	 * Constructor for AwkParser.
 	 * </p>
 	 *
-	 * @param additional_functions a boolean
-	 * @param additional_type_functions a boolean
+	 * @param additionalFunctions a boolean
+	 * @param additionalTypeFunctions a boolean
 	 * @param extensions a {@link java.util.Map} object
 	 */
-	public AwkParser(boolean additional_functions, boolean additional_type_functions,
+	public AwkParser(boolean additionalFunctions, boolean additionalTypeFunctions,
 			Map<String, JawkExtension> extensions) {
-		this.additional_functions = additional_functions;
-		this.additional_type_functions = additional_type_functions;
+		this.additionalFunctions = additionalFunctions;
+		this.additionalTypeFunctions = additionalTypeFunctions;
 		this.extensions = extensions == null ? Collections.emptyMap() : new HashMap<>(extensions);
 	}
 
@@ -823,9 +823,9 @@ public class AwkParser {
 			Integer kwToken = KEYWORDS.get(text.toString());
 			if (kwToken != null) {
 				int kw = kwToken.intValue();
-				boolean treatAsIdentifier = (!additional_functions && (kw == _KW_SLEEP_ || kw == _KW_DUMP_))
+				boolean treatAsIdentifier = (!additionalFunctions && (kw == _KW_SLEEP_ || kw == _KW_DUMP_))
 						||
-						(!additional_type_functions && (kw == _KW_INTEGER_ || kw == _KW_DOUBLE_ || kw == _KW_STRING_));
+						(!additionalTypeFunctions && (kw == _KW_INTEGER_ || kw == _KW_DOUBLE_ || kw == _KW_STRING_));
 				if (!treatAsIdentifier) {
 					token = kw;
 					return token;
@@ -835,7 +835,7 @@ public class AwkParser {
 			Integer builtinIdx = BUILTIN_FUNC_NAMES.get(text.toString());
 			if (builtinIdx != null) {
 				int idx = builtinIdx.intValue();
-				if (additional_functions || idx != F_EXEC) {
+				if (additionalFunctions || idx != F_EXEC) {
 					token = _BUILTIN_FUNC_NAME_;
 					return token;
 				}
@@ -977,7 +977,7 @@ public class AwkParser {
 		} else {
 			throw new ParserException("Expecting function name. Got " + toTokenString(token) + ": " + text);
 		}
-		symbol_table.setFunctionName(functionName);
+		symbolTable.setFunctionName(functionName);
 		lexer(_OPEN_PAREN_);
 		AST formal_param_list;
 		if (token == _CLOSE_PAREN_) {
@@ -991,14 +991,14 @@ public class AwkParser {
 		lexer(_OPEN_BRACE_);
 		AST function_block = STATEMENT_LIST();
 		lexer(_CLOSE_BRACE_);
-		symbol_table.clearFunctionName(functionName);
-		return symbol_table.addFunctionDef(functionName, formal_param_list, function_block);
+		symbolTable.clearFunctionName(functionName);
+		return symbolTable.addFunctionDef(functionName, formal_param_list, function_block);
 	}
 
 	AST FORMAL_PARAM_LIST(String functionName) throws IOException {
 		if (token == _ID_) {
 			String id = text.toString();
-			symbol_table.addFunctionParameter(functionName, id);
+			symbolTable.addFunctionParameter(functionName, id);
 			lexer();
 			if (token == _COMMA_) {
 				lexer();
@@ -1023,10 +1023,10 @@ public class AwkParser {
 		AST opt_stmts;
 		if (token == KEYWORDS.get("BEGIN")) {
 			lexer();
-			opt_expr = symbol_table.addBEGIN();
+			opt_expr = symbolTable.addBEGIN();
 		} else if (token == KEYWORDS.get("END")) {
 			lexer();
-			opt_expr = symbol_table.addEND();
+			opt_expr = symbolTable.addEND();
 		} else if (token != _OPEN_BRACE_ && token != _SEMICOLON_ && token != _NEWLINE_ && token != _EOF_) {
 			// true = allow comparators, allow IN keyword, do NOT allow multidim indices expressions
 			opt_expr = ASSIGNMENT_EXPRESSION(true, true, false);
@@ -1285,7 +1285,7 @@ public class AwkParser {
 					te,
 					CONCAT_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices));
 		} else
-			if (additional_type_functions
+			if (additionalTypeFunctions
 					&& (token == KEYWORDS.get("_INTEGER")
 							|| token == KEYWORDS.get("_DOUBLE")
 							|| token == KEYWORDS.get("_STRING"))) {
@@ -1432,15 +1432,15 @@ public class AwkParser {
 			lexer(_CLOSE_PAREN_);
 			return assignment_expression;
 		} else if (token == _INTEGER_) {
-			AST integer = symbol_table.addINTEGER(text.toString());
+			AST integer = symbolTable.addINTEGER(text.toString());
 			lexer();
 			return integer;
 		} else if (token == _DOUBLE_) {
-			AST dbl = symbol_table.addDOUBLE(text.toString());
+			AST dbl = symbolTable.addDOUBLE(text.toString());
 			lexer();
 			return dbl;
 		} else if (token == _STRING_) {
-			AST str = symbol_table.addSTRING(string.toString());
+			AST str = symbolTable.addSTRING(string.toString());
 			lexer();
 			return str;
 		} else if (token == KEYWORDS.get("getline")) {
@@ -1450,14 +1450,14 @@ public class AwkParser {
 			if (token == _DIV_EQ_) {
 				regexp.insert(0, '=');
 			}
-			AST regexp_ast = symbol_table.addREGEXP(regexp.toString());
+			AST regexp_ast = symbolTable.addREGEXP(regexp.toString());
 			lexer();
 			return regexp_ast;
-		} else if (additional_type_functions && token == KEYWORDS.get("_INTEGER")) {
+		} else if (additionalTypeFunctions && token == KEYWORDS.get("_INTEGER")) {
 			return INTEGER_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
-		} else if (additional_type_functions && token == KEYWORDS.get("_DOUBLE")) {
+		} else if (additionalTypeFunctions && token == KEYWORDS.get("_DOUBLE")) {
 			return DOUBLE_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
-		} else if (additional_type_functions && token == KEYWORDS.get("_STRING")) {
+		} else if (additionalTypeFunctions && token == KEYWORDS.get("_STRING")) {
 			return STRING_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
 		} else {
 			if (token == _DOLLAR_) {
@@ -1638,7 +1638,7 @@ public class AwkParser {
 			if (idToken == _BUILTIN_FUNC_NAME_) {
 				return new BuiltinFunctionCall_AST(id, params);
 			} else {
-				return symbol_table.addFunctionCall(id, params);
+				return symbolTable.addFunctionCall(id, params);
 			}
 		}
 		if (token == _OPEN_BRACKET_) {
@@ -1648,9 +1648,9 @@ public class AwkParser {
 			if (token == _OPEN_BRACKET_) {
 				throw new ParserException("Use [a,b,c,...] instead of [a][b][c]... for multi-dimensional arrays.");
 			}
-			return symbol_table.addArrayReference(id, idx_ast);
+			return symbolTable.addArrayReference(id, idx_ast);
 		}
-		return symbol_table.addID(id);
+		return symbolTable.addID(id);
 	}
 
 	// ARRAY_INDEX : ASSIGNMENT_EXPRESSION [, ARRAY_INDEX]
@@ -1705,9 +1705,9 @@ public class AwkParser {
 				stmt = CONTINUE_STATEMENT();
 			} else if (token == KEYWORDS.get("break")) {
 				stmt = BREAK_STATEMENT();
-			} else if (additional_functions && token == KEYWORDS.get("_sleep")) {
+			} else if (additionalFunctions && token == KEYWORDS.get("_sleep")) {
 				stmt = SLEEP_STATEMENT();
-			} else if (additional_functions && token == KEYWORDS.get("_dump")) {
+			} else if (additionalFunctions && token == KEYWORDS.get("_dump")) {
 				stmt = DUMP_STATEMENT();
 			} else {
 				stmt = EXPRESSION_STATEMENT(true, false); // allow in keyword, do NOT allow NonStatement_ASTs
@@ -1846,7 +1846,7 @@ public class AwkParser {
 			String arr_id = text.toString();
 
 			// not an indexed array reference!
-			AST array_id_ast = symbol_table.addArrayID(arr_id);
+			AST array_id_ast = symbolTable.addArrayID(arr_id);
 
 			lexer();
 			// close paren ...
@@ -2290,10 +2290,10 @@ public class AwkParser {
 			tuples.popSourceLineNumber(lineNo);
 		}
 
-		protected boolean is_begin = isBegin();
+		protected boolean begin = isBegin();
 
 		private boolean isBegin() {
-			boolean result = is_begin;
+			boolean result = begin;
 			if (!result && ast1 != null) {
 				result = ast1.isBegin();
 			}
@@ -2309,10 +2309,10 @@ public class AwkParser {
 			return result;
 		}
 
-		protected boolean is_end = isEnd();
+		protected boolean end = isEnd();
 
 		private boolean isEnd() {
-			boolean result = is_end;
+			boolean result = end;
 			if (!result && ast1 != null) {
 				result = ast1.isEnd();
 			}
@@ -2328,10 +2328,10 @@ public class AwkParser {
 			return result;
 		}
 
-		protected boolean is_function = isFunction();
+		protected boolean function = isFunction();
 
 		private boolean isFunction() {
-			boolean result = is_function;
+			boolean result = function;
 			if (!result && ast1 != null) {
 				result = ast1.isFunction();
 			}
@@ -2462,7 +2462,7 @@ public class AwkParser {
 				|| containsASTType(ast.ast4, cls_array);
 	}
 
-	private Address next_address;
+	private Address nextAddress;
 
 	private final class RuleList_AST extends AST {
 
@@ -2474,7 +2474,7 @@ public class AwkParser {
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 
-			next_address = tuples.createAddress("next_address");
+			nextAddress = tuples.createAddress("nextAddress");
 
 			Address exit_addr = tuples.createAddress("end blocks start address");
 
@@ -2505,27 +2505,27 @@ public class AwkParser {
 			tuples.address(start_address);
 
 			// initialze special variables
-			ID_AST nr_ast = symbol_table.getID("NR");
-			ID_AST fnr_ast = symbol_table.getID("FNR");
-			ID_AST nf_ast = symbol_table.getID("NF");
-			ID_AST fs_ast = symbol_table.getID("FS");
-			ID_AST rs_ast = symbol_table.getID("RS");
-			ID_AST ofs_ast = symbol_table.getID("OFS");
-			ID_AST ors_ast = symbol_table.getID("ORS");
-			ID_AST rstart_ast = symbol_table.getID("RSTART");
-			ID_AST rlength_ast = symbol_table.getID("RLENGTH");
-			ID_AST filename_ast = symbol_table.getID("FILENAME");
-			ID_AST subsep_ast = symbol_table.getID("SUBSEP");
-			ID_AST convfmt_ast = symbol_table.getID("CONVFMT");
-			ID_AST ofmt_ast = symbol_table.getID("OFMT");
-			ID_AST environ_ast = symbol_table.getID("ENVIRON");
-			ID_AST argc_ast = symbol_table.getID("ARGC");
-			ID_AST argv_ast = symbol_table.getID("ARGV");
+			ID_AST nr_ast = symbolTable.getID("NR");
+			ID_AST fnr_ast = symbolTable.getID("FNR");
+			ID_AST nf_ast = symbolTable.getID("NF");
+			ID_AST fs_ast = symbolTable.getID("FS");
+			ID_AST rs_ast = symbolTable.getID("RS");
+			ID_AST ofs_ast = symbolTable.getID("OFS");
+			ID_AST ors_ast = symbolTable.getID("ORS");
+			ID_AST rstart_ast = symbolTable.getID("RSTART");
+			ID_AST rlength_ast = symbolTable.getID("RLENGTH");
+			ID_AST filename_ast = symbolTable.getID("FILENAME");
+			ID_AST subsep_ast = symbolTable.getID("SUBSEP");
+			ID_AST convfmt_ast = symbolTable.getID("CONVFMT");
+			ID_AST ofmt_ast = symbolTable.getID("OFMT");
+			ID_AST environ_ast = symbolTable.getID("ENVIRON");
+			ID_AST argc_ast = symbolTable.getID("ARGC");
+			ID_AST argv_ast = symbolTable.getID("ARGV");
 
 			// MUST BE DONE AFTER FUNCTIONS ARE COMPILED,
 			// and after special variables are made known to the symbol table
 			// (see above)!
-			tuples.setNumGlobals(symbol_table.numGlobals());
+			tuples.setNumGlobals(symbolTable.numGlobals());
 
 			tuples.nfOffset(nf_ast.offset);
 			tuples.nrOffset(nr_ast.offset);
@@ -2597,7 +2597,7 @@ public class AwkParser {
 					}
 					ptr = ptr.ast2;
 				}
-				tuples.address(next_address);
+				tuples.address(nextAddress);
 
 				tuples.gotoAddress(input_loop_address);
 
@@ -2631,7 +2631,7 @@ public class AwkParser {
 		}
 	}
 
-	// made non-static to access the "next_address" field of the frontend
+	// made non-static to access the "nextAddress" field of the frontend
 	private final class Rule_AST extends AST implements Nextable {
 
 		private Rule_AST(AST opt_expression, AST opt_rule) {
@@ -2674,10 +2674,10 @@ public class AwkParser {
 			if (!isRule(this)) {
 				throw new SemanticException("Must call next within an input rule.");
 			}
-			if (next_address == null) {
+			if (nextAddress == null) {
 				throw new SemanticException("Cannot call next here.");
 			}
-			return next_address;
+			return nextAddress;
 		}
 	}
 
@@ -2752,8 +2752,8 @@ public class AwkParser {
 
 	private final class WhileStatement_AST extends AST implements Breakable, Continueable {
 
-		private Address break_address;
-		private Address continue_address;
+		private Address breakAddress;
+		private Address continueAddress;
 
 		private WhileStatement_AST(AST expr, AST block) {
 			super(expr, block);
@@ -2761,34 +2761,34 @@ public class AwkParser {
 
 		@Override
 		public Address breakAddress() {
-			assert break_address != null;
-			return break_address;
+			assert breakAddress != null;
+			return breakAddress;
 		}
 
 		@Override
 		public Address continueAddress() {
-			assert continue_address != null;
-			return continue_address;
+			assert continueAddress != null;
+			return continueAddress;
 		}
 
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 
-			break_address = tuples.createAddress("break_address");
+			breakAddress = tuples.createAddress("breakAddress");
 
 			// LOOP
 			Address loop = tuples.createAddress("loop");
 			tuples.address(loop);
 
 			// for while statements, the start-of-loop is the continue jump address
-			continue_address = loop;
+			continueAddress = loop;
 
 			// condition
 			assert ast1 != null;
 			int ast1_result = ast1.populateTuples(tuples);
 			assert ast1_result == 1;
-			tuples.ifFalse(break_address);
+			tuples.ifFalse(breakAddress);
 
 			if (ast2 != null) {
 				int ast2_result = ast2.populateTuples(tuples);
@@ -2797,7 +2797,7 @@ public class AwkParser {
 
 			tuples.gotoAddress(loop);
 
-			tuples.address(break_address);
+			tuples.address(breakAddress);
 
 			popSourceLineNumber(tuples);
 			return 0;
@@ -2806,8 +2806,8 @@ public class AwkParser {
 
 	private final class DoStatement_AST extends AST implements Breakable, Continueable {
 
-		private Address break_address;
-		private Address continue_address;
+		private Address breakAddress;
+		private Address continueAddress;
 
 		private DoStatement_AST(AST block, AST expr) {
 			super(block, expr);
@@ -2815,22 +2815,22 @@ public class AwkParser {
 
 		@Override
 		public Address breakAddress() {
-			assert break_address != null;
-			return break_address;
+			assert breakAddress != null;
+			return breakAddress;
 		}
 
 		@Override
 		public Address continueAddress() {
-			assert continue_address != null;
-			return continue_address;
+			assert continueAddress != null;
+			return continueAddress;
 		}
 
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 
-			break_address = tuples.createAddress("break_address");
-			continue_address = tuples.createAddress("continue_address");
+			breakAddress = tuples.createAddress("breakAddress");
+			continueAddress = tuples.createAddress("continueAddress");
 
 			// LOOP
 			Address loop = tuples.createAddress("loop");
@@ -2842,7 +2842,7 @@ public class AwkParser {
 			}
 
 			// for do-while statements, the continue jump address is the loop condition
-			tuples.address(continue_address);
+			tuples.address(continueAddress);
 
 			// condition
 			assert ast2 != null;
@@ -2852,7 +2852,7 @@ public class AwkParser {
 
 			// tuples.gotoAddress(loop);
 
-			tuples.address(break_address);
+			tuples.address(breakAddress);
 
 			popSourceLineNumber(tuples);
 			return 0;
@@ -2861,8 +2861,8 @@ public class AwkParser {
 
 	private final class ForStatement_AST extends AST implements Breakable, Continueable {
 
-		private Address break_address;
-		private Address continue_address;
+		private Address breakAddress;
+		private Address continueAddress;
 
 		private ForStatement_AST(AST expr1, AST expr2, AST expr3, AST block) {
 			super(expr1, expr2, expr3, block);
@@ -2870,22 +2870,22 @@ public class AwkParser {
 
 		@Override
 		public Address breakAddress() {
-			assert break_address != null;
-			return break_address;
+			assert breakAddress != null;
+			return breakAddress;
 		}
 
 		@Override
 		public Address continueAddress() {
-			assert continue_address != null;
-			return continue_address;
+			assert continueAddress != null;
+			return continueAddress;
 		}
 
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 
-			break_address = tuples.createAddress("break_address");
-			continue_address = tuples.createAddress("continue_address");
+			breakAddress = tuples.createAddress("breakAddress");
+			continueAddress = tuples.createAddress("continueAddress");
 
 			// initial actions
 			if (ast1 != null) {
@@ -2903,7 +2903,7 @@ public class AwkParser {
 				// assert(ast2 != null);
 				int ast2_result = ast2.populateTuples(tuples);
 				assert ast2_result == 1;
-				tuples.ifFalse(break_address);
+				tuples.ifFalse(breakAddress);
 			}
 
 			if (ast4 != null) {
@@ -2913,7 +2913,7 @@ public class AwkParser {
 			}
 
 			// for for-loops, the continue jump address is the post-loop-action
-			tuples.address(continue_address);
+			tuples.address(continueAddress);
 
 			// post-loop action
 			if (ast3 != null) {
@@ -2925,7 +2925,7 @@ public class AwkParser {
 
 			tuples.gotoAddress(loop);
 
-			tuples.address(break_address);
+			tuples.address(breakAddress);
 
 			popSourceLineNumber(tuples);
 			return 0;
@@ -2934,8 +2934,8 @@ public class AwkParser {
 
 	private final class ForInStatement_AST extends AST implements Breakable, Continueable {
 
-		private Address break_address;
-		private Address continue_address;
+		private Address breakAddress;
+		private Address continueAddress;
 
 		private ForInStatement_AST(AST key_id_ast, AST array_id_ast, AST block) {
 			super(key_id_ast, array_id_ast, block);
@@ -2943,14 +2943,14 @@ public class AwkParser {
 
 		@Override
 		public Address breakAddress() {
-			assert break_address != null;
-			return break_address;
+			assert breakAddress != null;
+			return breakAddress;
 		}
 
 		@Override
 		public Address continueAddress() {
-			assert continue_address != null;
-			return continue_address;
+			assert continueAddress != null;
+			return continueAddress;
 		}
 
 		@Override
@@ -2965,7 +2965,7 @@ public class AwkParser {
 			}
 			array_id_ast.setArray(true);
 
-			break_address = tuples.createAddress("break_address");
+			breakAddress = tuples.createAddress("breakAddress");
 
 			ast2.populateTuples(tuples);
 			// pops the array and pushes the keyset
@@ -2979,13 +2979,13 @@ public class AwkParser {
 			tuples.address(loop);
 
 			// for for-in loops, the continue jump address is the start-of-loop address
-			continue_address = loop;
+			continueAddress = loop;
 
 			assert tuples.checkClass(KeyList.class);
 
 			// condition
 			tuples.dup();
-			tuples.isEmptyList(break_address);
+			tuples.isEmptyList(breakAddress);
 
 			assert tuples.checkClass(KeyList.class);
 
@@ -2993,7 +2993,7 @@ public class AwkParser {
 			tuples.dup();
 			tuples.getFirstAndRemoveFromList();
 			// assign it to the id
-			tuples.assign(((ID_AST) ast1).offset, ((ID_AST) ast1).is_global);
+			tuples.assign(((ID_AST) ast1).offset, ((ID_AST) ast1).global);
 			tuples.pop(); // remove the assignment result
 
 			if (ast3 != null) {
@@ -3007,7 +3007,7 @@ public class AwkParser {
 
 			tuples.gotoAddress(loop);
 
-			tuples.address(break_address);
+			tuples.address(breakAddress);
 			tuples.pop(); // keylist
 
 			popSourceLineNumber(tuples);
@@ -3089,19 +3089,19 @@ public class AwkParser {
 				if (op == _EQUALS_) {
 					// Expected side effect:
 					// Upon assignment, if the var is RS, reapply RS to input streams.
-					tuples.assign(id_ast.offset, id_ast.is_global);
+					tuples.assign(id_ast.offset, id_ast.global);
 				} else if (op == _PLUS_EQ_) {
-					tuples.plusEq(id_ast.offset, id_ast.is_global);
+					tuples.plusEq(id_ast.offset, id_ast.global);
 				} else if (op == _MINUS_EQ_) {
-					tuples.minusEq(id_ast.offset, id_ast.is_global);
+					tuples.minusEq(id_ast.offset, id_ast.global);
 				} else if (op == _MULT_EQ_) {
-					tuples.multEq(id_ast.offset, id_ast.is_global);
+					tuples.multEq(id_ast.offset, id_ast.global);
 				} else if (op == _DIV_EQ_) {
-					tuples.divEq(id_ast.offset, id_ast.is_global);
+					tuples.divEq(id_ast.offset, id_ast.global);
 				} else if (op == _MOD_EQ_) {
-					tuples.modEq(id_ast.offset, id_ast.is_global);
+					tuples.modEq(id_ast.offset, id_ast.global);
 				} else if (op == _POW_EQ_) {
-					tuples.powEq(id_ast.offset, id_ast.is_global);
+					tuples.powEq(id_ast.offset, id_ast.global);
 				} else {
 					throw new Error("Unhandled op: " + op + " / " + text);
 				}
@@ -3121,19 +3121,19 @@ public class AwkParser {
 				}
 				id_ast.setArray(true);
 				if (op == _EQUALS_) {
-					tuples.assignArray(id_ast.offset, id_ast.is_global);
+					tuples.assignArray(id_ast.offset, id_ast.global);
 				} else if (op == _PLUS_EQ_) {
-					tuples.plusEqArray(id_ast.offset, id_ast.is_global);
+					tuples.plusEqArray(id_ast.offset, id_ast.global);
 				} else if (op == _MINUS_EQ_) {
-					tuples.minusEqArray(id_ast.offset, id_ast.is_global);
+					tuples.minusEqArray(id_ast.offset, id_ast.global);
 				} else if (op == _MULT_EQ_) {
-					tuples.multEqArray(id_ast.offset, id_ast.is_global);
+					tuples.multEqArray(id_ast.offset, id_ast.global);
 				} else if (op == _DIV_EQ_) {
-					tuples.divEqArray(id_ast.offset, id_ast.is_global);
+					tuples.divEqArray(id_ast.offset, id_ast.global);
 				} else if (op == _MOD_EQ_) {
-					tuples.modEqArray(id_ast.offset, id_ast.is_global);
+					tuples.modEqArray(id_ast.offset, id_ast.global);
 				} else if (op == _POW_EQ_) {
-					tuples.powEqArray(id_ast.offset, id_ast.is_global);
+					tuples.powEqArray(id_ast.offset, id_ast.global);
 				} else {
 					throw new NotImplementedError("Unhandled op: " + op + " / " + text + " for arrays.");
 				}
@@ -3523,46 +3523,46 @@ public class AwkParser {
 	private final class FunctionDef_AST extends AST implements Returnable {
 
 		private String id;
-		private Address function_address;
-		private Address return_address;
+		private Address functionAddress;
+		private Address returnAddress;
 
 		// to satisfy the Returnable interface
 
 		@Override
 		public Address returnAddress() {
-			assert return_address != null;
-			return return_address;
+			assert returnAddress != null;
+			return returnAddress;
 		}
 
 		private FunctionDef_AST(String id, AST params, AST func_body) {
 			super(params, func_body);
 			this.id = id;
-			is_function = true;
+			function = true;
 		}
 
 		public Address getAddress() {
-			assert function_address != null;
-			return function_address;
+			assert functionAddress != null;
+			return functionAddress;
 		}
 
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 
-			function_address = tuples.createAddress("function: " + id);
-			return_address = tuples.createAddress("return_address for " + id);
+			functionAddress = tuples.createAddress("function: " + id);
+			returnAddress = tuples.createAddress("returnAddress for " + id);
 
 			// annotate the tuple list
 			// (useful for compilation,
 			// not necessary for interpretation)
 			tuples.function(id, paramCount());
 
-			// function_address refers to first function body statement
+			// functionAddress refers to first function body statement
 			// rather than to function def opcode because during
 			// interpretation, the function definition is a nop,
 			// and for compilation, the next match of the function
 			// name can be used
-			tuples.address(function_address);
+			tuples.address(functionAddress);
 
 			// the stack contains the parameters to the function call (in rev order, which is good)
 
@@ -3573,7 +3573,7 @@ public class AwkParser {
 				assert ast2_result == 0 || ast2_result == 1;
 			}
 
-			tuples.address(return_address);
+			tuples.address(returnAddress);
 
 			tuples.returnFromFunction();
 
@@ -3600,7 +3600,7 @@ public class AwkParser {
 				// actual parameter
 				AST aparam = a_ptr.ast1;
 				// formal function parameter
-				AST fparam = symbol_table.getFunctionParameterIDAST(id, f_ptr.id);
+				AST fparam = symbolTable.getFunctionParameterIDAST(id, f_ptr.id);
 
 				if (aparam.isArray() && fparam.isScalar()) {
 					aparam
@@ -3632,11 +3632,11 @@ public class AwkParser {
 
 	private final class FunctionCall_AST extends ScalarExpression_AST {
 
-		private FunctionProxy function_proxy;
+		private FunctionProxy functionProxy;
 
-		private FunctionCall_AST(FunctionProxy function_proxy, AST params) {
+		private FunctionCall_AST(FunctionProxy functionProxy, AST params) {
 			super(params);
-			this.function_proxy = function_proxy;
+			this.functionProxy = functionProxy;
 		}
 
 		/**
@@ -3663,8 +3663,8 @@ public class AwkParser {
 		 */
 		@Override
 		public void semanticAnalysis() throws SemanticException {
-			if (!function_proxy.isDefined()) {
-				throw new SemanticException("function " + function_proxy + " not defined");
+			if (!functionProxy.isDefined()) {
+				throw new SemanticException("function " + functionProxy + " not defined");
 			}
 			int actual_param_count;
 			if (ast1 == null) {
@@ -3672,11 +3672,11 @@ public class AwkParser {
 			} else {
 				actual_param_count = actualParamCount();
 			}
-			int formal_param_count = function_proxy.getFunctionParamCount();
+			int formal_param_count = functionProxy.getFunctionParamCount();
 			if (formal_param_count < actual_param_count) {
 				throw new SemanticException(
 						"the "
-								+ function_proxy.getFunctionName()
+								+ functionProxy.getFunctionName()
 								+ " function"
 								+ " only accepts at most "
 								+ formal_param_count
@@ -3684,15 +3684,15 @@ public class AwkParser {
 								+ actual_param_count);
 			}
 			if (ast1 != null) {
-				function_proxy.checkActualToFormalParameters(ast1);
+				functionProxy.checkActualToFormalParameters(ast1);
 			}
 		}
 
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (!function_proxy.isDefined()) {
-				throw new SemanticException("function " + function_proxy + " not defined");
+			if (!functionProxy.isDefined()) {
+				throw new SemanticException("function " + functionProxy + " not defined");
 			}
 			tuples.scriptThis();
 			int actual_param_count;
@@ -3701,11 +3701,11 @@ public class AwkParser {
 			} else {
 				actual_param_count = ast1.populateTuples(tuples);
 			}
-			int formal_param_count = function_proxy.getFunctionParamCount();
+			int formal_param_count = functionProxy.getFunctionParamCount();
 			if (formal_param_count < actual_param_count) {
 				throw new SemanticException(
 						"the "
-								+ function_proxy.getFunctionName()
+								+ functionProxy.getFunctionName()
 								+ " function"
 								+ " only accepts at most "
 								+ formal_param_count
@@ -3713,8 +3713,8 @@ public class AwkParser {
 								+ actual_param_count);
 			}
 
-			function_proxy.checkActualToFormalParameters(ast1);
-			tuples.callFunction(function_proxy, function_proxy.getFunctionName(), formal_param_count, actual_param_count);
+			functionProxy.checkActualToFormalParameters(ast1);
+			tuples.callFunction(functionProxy, functionProxy.getFunctionName(), formal_param_count, actual_param_count);
 			popSourceLineNumber(tuples);
 			return 1;
 		}
@@ -3891,7 +3891,7 @@ public class AwkParser {
 							throw new SemanticException("sub cannot accept an unindexed array as its 3rd argument");
 						}
 						id_ast.setScalar(true);
-						tuples.subForVariable(id_ast.offset, id_ast.is_global, isGsub);
+						tuples.subForVariable(id_ast.offset, id_ast.global, isGsub);
 					} else if (ptr instanceof ArrayReference_AST) {
 						ArrayReference_AST arr_ast = (ArrayReference_AST) ptr;
 						// push the index
@@ -3901,7 +3901,7 @@ public class AwkParser {
 						if (id_ast.isScalar()) {
 							throw new SemanticException("Cannot use " + id_ast + " as an array.");
 						}
-						tuples.subForArrayReference(id_ast.offset, id_ast.is_global, isGsub);
+						tuples.subForArrayReference(id_ast.offset, id_ast.global, isGsub);
 					} else if (ptr instanceof DollarExpression_AST) {
 						// push the field ref
 						DollarExpression_AST dollar_expr = (DollarExpression_AST) ptr;
@@ -4078,15 +4078,15 @@ public class AwkParser {
 
 		private String id;
 		private int offset = AVM.NULL_OFFSET;
-		private boolean is_global;
+		private boolean global;
 
-		private ID_AST(String id, boolean is_global) {
+		private ID_AST(String id, boolean global) {
 			this.id = id;
-			this.is_global = is_global;
+			this.global = global;
 		}
 
-		private boolean is_array = false;
-		private boolean is_scalar = false;
+		private boolean array = false;
+		private boolean scalar = false;
 
 		@Override
 		public String toString() {
@@ -4097,27 +4097,27 @@ public class AwkParser {
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 			assert offset != AVM.NULL_OFFSET : "offset = " + offset + " for " + this;
-			tuples.dereference(offset, isArray(), is_global);
+			tuples.dereference(offset, isArray(), global);
 			popSourceLineNumber(tuples);
 			return 1;
 		}
 
 		@Override
 		public boolean isArray() {
-			return is_array;
+			return array;
 		}
 
 		@Override
 		public boolean isScalar() {
-			return is_scalar;
+			return scalar;
 		}
 
 		private void setArray(boolean b) {
-			is_array = b;
+			array = b;
 		}
 
 		private void setScalar(boolean b) {
-			is_scalar = b;
+			scalar = b;
 		}
 	}
 
@@ -4231,22 +4231,22 @@ public class AwkParser {
 
 	private final class Regexp_AST extends ScalarExpression_AST {
 
-		private String regexp_str;
+		private String regexpStr;
 
-		private Regexp_AST(String regexp_str) {
-			assert regexp_str != null;
-			this.regexp_str = regexp_str;
+		private Regexp_AST(String regexpStr) {
+			assert regexpStr != null;
+			this.regexpStr = regexpStr;
 		}
 
 		@Override
 		public String toString() {
-			return super.toString() + " (" + regexp_str + ")";
+			return super.toString() + " (" + regexpStr + ")";
 		}
 
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			tuples.regexp(regexp_str);
+			tuples.regexp(regexpStr);
 			popSourceLineNumber(tuples);
 			return 1;
 		}
@@ -4328,7 +4328,7 @@ public class AwkParser {
 
 		private Begin_AST() {
 			super();
-			is_begin = true;
+			begin = true;
 		}
 
 		@Override
@@ -4344,7 +4344,7 @@ public class AwkParser {
 
 		private End_AST() {
 			super();
-			is_end = true;
+			end = true;
 		}
 
 		@Override
@@ -4368,7 +4368,7 @@ public class AwkParser {
 			assert ast1 != null;
 			if (ast1 instanceof ID_AST) {
 				ID_AST id_ast = (ID_AST) ast1;
-				tuples.inc(id_ast.offset, id_ast.is_global);
+				tuples.inc(id_ast.offset, id_ast.global);
 			} else if (ast1 instanceof ArrayReference_AST) {
 				ArrayReference_AST arr_ast = (ArrayReference_AST) ast1;
 				ID_AST id_ast = (ID_AST) arr_ast.ast1;
@@ -4376,7 +4376,7 @@ public class AwkParser {
 				assert arr_ast.ast2 != null;
 				int arr_ast2_result = arr_ast.ast2.populateTuples(tuples);
 				assert arr_ast2_result == 1;
-				tuples.incArrayRef(id_ast.offset, id_ast.is_global);
+				tuples.incArrayRef(id_ast.offset, id_ast.global);
 			} else if (ast1 instanceof DollarExpression_AST) {
 				DollarExpression_AST dollar_expr = (DollarExpression_AST) ast1;
 				assert dollar_expr.ast1 != null;
@@ -4418,7 +4418,7 @@ public class AwkParser {
 			assert ast1 != null;
 			if (ast1 instanceof ID_AST) {
 				ID_AST id_ast = (ID_AST) ast1;
-				tuples.dec(id_ast.offset, id_ast.is_global);
+				tuples.dec(id_ast.offset, id_ast.global);
 			} else if (ast1 instanceof ArrayReference_AST) {
 				ArrayReference_AST arr_ast = (ArrayReference_AST) ast1;
 				ID_AST id_ast = (ID_AST) arr_ast.ast1;
@@ -4426,7 +4426,7 @@ public class AwkParser {
 				assert arr_ast.ast2 != null;
 				int arr_ast2_result = arr_ast.ast2.populateTuples(tuples);
 				assert arr_ast2_result == 1;
-				tuples.decArrayRef(id_ast.offset, id_ast.is_global);
+				tuples.decArrayRef(id_ast.offset, id_ast.global);
 			} else if (ast1 instanceof DollarExpression_AST) {
 				DollarExpression_AST dollar_expr = (DollarExpression_AST) ast1;
 				assert dollar_expr.ast1 != null;
@@ -4468,7 +4468,7 @@ public class AwkParser {
 			assert ast1_result == 1;
 			if (ast1 instanceof ID_AST) {
 				ID_AST id_ast = (ID_AST) ast1;
-				tuples.postInc(id_ast.offset, id_ast.is_global);
+				tuples.postInc(id_ast.offset, id_ast.global);
 			} else if (ast1 instanceof ArrayReference_AST) {
 				ArrayReference_AST arr_ast = (ArrayReference_AST) ast1;
 				ID_AST id_ast = (ID_AST) arr_ast.ast1;
@@ -4476,7 +4476,7 @@ public class AwkParser {
 				assert arr_ast.ast2 != null;
 				int arr_ast2_result = arr_ast.ast2.populateTuples(tuples);
 				assert arr_ast2_result == 1;
-				tuples.incArrayRef(id_ast.offset, id_ast.is_global);
+				tuples.incArrayRef(id_ast.offset, id_ast.global);
 			} else if (ast1 instanceof DollarExpression_AST) {
 				DollarExpression_AST dollar_expr = (DollarExpression_AST) ast1;
 				assert dollar_expr.ast1 != null;
@@ -4505,7 +4505,7 @@ public class AwkParser {
 			assert ast1_result == 1;
 			if (ast1 instanceof ID_AST) {
 				ID_AST id_ast = (ID_AST) ast1;
-				tuples.postDec(id_ast.offset, id_ast.is_global);
+				tuples.postDec(id_ast.offset, id_ast.global);
 			} else if (ast1 instanceof ArrayReference_AST) {
 				ArrayReference_AST arr_ast = (ArrayReference_AST) ast1;
 				ID_AST id_ast = (ID_AST) arr_ast.ast1;
@@ -4513,7 +4513,7 @@ public class AwkParser {
 				assert arr_ast.ast2 != null;
 				int arr_ast2_result = arr_ast.ast2.populateTuples(tuples);
 				assert arr_ast2_result == 1;
-				tuples.decArrayRef(id_ast.offset, id_ast.is_global);
+				tuples.decArrayRef(id_ast.offset, id_ast.global);
 			} else if (ast1 instanceof DollarExpression_AST) {
 				DollarExpression_AST dollar_expr = (DollarExpression_AST) ast1;
 				assert dollar_expr.ast1 != null;
@@ -4740,7 +4740,7 @@ public class AwkParser {
 				// (all assignment results are placed on the stack)
 			} else if (ast2 instanceof ID_AST) {
 				ID_AST id_ast = (ID_AST) ast2;
-				tuples.assign(id_ast.offset, id_ast.is_global);
+				tuples.assign(id_ast.offset, id_ast.global);
 				if (id_ast.id.equals("RS")) {
 					tuples.applyRS();
 				}
@@ -4752,7 +4752,7 @@ public class AwkParser {
 				assert arr_ast2_result == 1;
 				// push the array ref itself
 				ID_AST id_ast = (ID_AST) arr.ast1;
-				tuples.assignArray(id_ast.offset, id_ast.is_global);
+				tuples.assignArray(id_ast.offset, id_ast.global);
 			} else if (ast2 instanceof DollarExpression_AST) {
 				DollarExpression_AST dollar_expr = (DollarExpression_AST) ast2;
 				if (dollar_expr.ast2 != null) {
@@ -4839,14 +4839,14 @@ public class AwkParser {
 				int idx_result = ast1.ast2.populateTuples(tuples);
 				assert idx_result == 1;
 				// idx on the stack
-				tuples.deleteArrayElement(id_ast.offset, id_ast.is_global);
+				tuples.deleteArrayElement(id_ast.offset, id_ast.global);
 			} else if (ast1 instanceof ID_AST) {
 				ID_AST id_ast = (ID_AST) ast1;
 				if (id_ast.isScalar()) {
 					throw new SemanticException("delete: Cannot delete a scalar.");
 				}
 				id_ast.setArray(true);
-				tuples.deleteArray(id_ast.offset, id_ast.is_global);
+				tuples.deleteArray(id_ast.offset, id_ast.global);
 			} else {
 				throw new Error("Should never reach here : delete for " + ast1);
 			}
@@ -4966,7 +4966,7 @@ public class AwkParser {
 	// made non-static to throw a meaningful ParserException when necessary
 	private final class FunctionProxy implements HasFunctionAddress {
 
-		private FunctionDef_AST function_def_ast;
+		private FunctionDef_AST functionDefAst;
 		private String id;
 
 		private FunctionProxy(String id) {
@@ -4974,20 +4974,20 @@ public class AwkParser {
 		}
 
 		private void setFunctionDefinition(FunctionDef_AST function_def) {
-			if (function_def_ast != null) {
+			if (functionDefAst != null) {
 				throw new ParserException("function " + function_def + " already defined");
 			} else {
-				function_def_ast = function_def;
+				functionDefAst = function_def;
 			}
 		}
 
 		private boolean isDefined() {
-			return function_def_ast != null;
+			return functionDefAst != null;
 		}
 
 		@Override
 		public Address getFunctionAddress() {
-			return function_def_ast.getAddress();
+			return functionDefAst.getAddress();
 		}
 
 		private String getFunctionName() {
@@ -4995,7 +4995,7 @@ public class AwkParser {
 		}
 
 		private int getFunctionParamCount() {
-			return function_def_ast.paramCount();
+			return functionDefAst.paramCount();
 		}
 
 		@Override
@@ -5004,7 +5004,7 @@ public class AwkParser {
 		}
 
 		private void checkActualToFormalParameters(AST actual_params) {
-			function_def_ast.checkActualToFormalParameters(actual_params);
+			functionDefAst.checkActualToFormalParameters(actual_params);
 		}
 	}
 
@@ -5019,33 +5019,33 @@ public class AwkParser {
 	 * @param tuples The tuples to add the mapping to.
 	 */
 	public void populateGlobalVariableNameToOffsetMappings(AwkTuples tuples) {
-		for (String varname : symbol_table.global_ids.keySet()) {
-			ID_AST id_ast = symbol_table.global_ids.get(varname);
-			// The last arg originally was ", id_ast.is_scalar", but this is not set true
+		for (String varname : symbolTable.globalIds.keySet()) {
+			ID_AST id_ast = symbolTable.globalIds.get(varname);
+			// The last arg originally was ", id_ast.scalar", but this is not set true
 			// if the variable use is ambiguous. Therefore, assume it is a scalar
 			// if it's NOT used as an array.
-			tuples.addGlobalVariableNameToOffsetMapping(varname, id_ast.offset, id_ast.is_array);
+			tuples.addGlobalVariableNameToOffsetMapping(varname, id_ast.offset, id_ast.array);
 		}
-		tuples.setFunctionNameSet(symbol_table.function_proxies.keySet());
+		tuples.setFunctionNameSet(symbolTable.functionProxies.keySet());
 	}
 
 	private class AwkSymbolTableImpl {
 
 		int numGlobals() {
-			return global_ids.size();
+			return globalIds.size();
 		}
 
 		// "constants"
-		private Begin_AST begin_ast = null;
-		private End_AST end_ast = null;
+		private Begin_AST beginAst = null;
+		private End_AST endAst = null;
 
 		// functions (proxies)
-		private Map<String, FunctionProxy> function_proxies = new HashMap<String, FunctionProxy>();
+		private Map<String, FunctionProxy> functionProxies = new HashMap<String, FunctionProxy>();
 
 		// variable management
-		private Map<String, ID_AST> global_ids = new HashMap<String, ID_AST>();
-		private Map<String, Map<String, ID_AST>> local_ids = new HashMap<String, Map<String, ID_AST>>();
-		private Map<String, Set<String>> function_parameters = new HashMap<String, Set<String>>();
+		private Map<String, ID_AST> globalIds = new HashMap<String, ID_AST>();
+		private Map<String, Map<String, ID_AST>> localIds = new HashMap<String, Map<String, ID_AST>>();
+		private Map<String, Set<String>> functionParameters = new HashMap<String, Set<String>>();
 		private Set<String> ids = new HashSet<String>();
 
 		// current function definition for symbols
@@ -5064,21 +5064,21 @@ public class AwkParser {
 		}
 
 		AST addBEGIN() {
-			if (begin_ast == null) {
-				begin_ast = new Begin_AST();
+			if (beginAst == null) {
+				beginAst = new Begin_AST();
 			}
-			return begin_ast;
+			return beginAst;
 		}
 
 		AST addEND() {
-			if (end_ast == null) {
-				end_ast = new End_AST();
+			if (endAst == null) {
+				endAst = new End_AST();
 			}
-			return end_ast;
+			return endAst;
 		}
 
 		private ID_AST getID(String id) {
-			if (function_proxies.get(id) != null) {
+			if (functionProxies.get(id) != null) {
 				throw new ParserException("cannot use " + id + " as a variable; it is a function");
 			}
 
@@ -5087,25 +5087,25 @@ public class AwkParser {
 
 			Map<String, ID_AST> map;
 			if (currentFunctionName == null) {
-				map = global_ids;
+				map = globalIds;
 			} else {
-				Set<String> set = function_parameters.get(currentFunctionName);
+				Set<String> set = functionParameters.get(currentFunctionName);
 				// we need "set != null && ..." here because if function
 				// is defined with no args (i.e., function f() ...),
 				// then set is null
 				if (set != null && set.contains(id)) {
-					map = local_ids.get(currentFunctionName);
+					map = localIds.get(currentFunctionName);
 					if (map == null) {
-						local_ids.put(currentFunctionName, map = new HashMap<String, ID_AST>());
+						localIds.put(currentFunctionName, map = new HashMap<String, ID_AST>());
 					}
 				} else {
-					map = global_ids;
+					map = globalIds;
 				}
 			}
 			assert map != null;
 			ID_AST id_ast = map.get(id);
 			if (id_ast == null) {
-				id_ast = new ID_AST(id, map == global_ids);
+				id_ast = new ID_AST(id, map == globalIds);
 				id_ast.offset = map.size();
 				assert id_ast.offset != AVM.NULL_OFFSET;
 				map.put(id, id_ast);
@@ -5119,30 +5119,30 @@ public class AwkParser {
 			/// We really don't know if the evaluation is for an array or for a scalar
 			/// here, because we can use an array as a function parameter (passed by reference).
 			/// ***
-			// if (ret_val.is_array)
+			// if (ret_val.array)
 			// throw new ParserException("Cannot use "+ret_val+" as a scalar.");
-			// ret_val.is_scalar = true;
+			// ret_val.scalar = true;
 			return ret_val;
 		}
 
 		int addFunctionParameter(String functionName, String id) {
-			Set<String> set = function_parameters.get(functionName);
+			Set<String> set = functionParameters.get(functionName);
 			if (set == null) {
-				function_parameters.put(functionName, set = new HashSet<String>());
+				functionParameters.put(functionName, set = new HashSet<String>());
 			}
 			if (set.contains(id)) {
 				throw new ParserException("multiply defined parameter " + id + " in function " + functionName);
 			}
 			int retval = set.size();
 			set.add(id);
-			Map<String, ID_AST> map = local_ids.get(functionName);
+			Map<String, ID_AST> map = localIds.get(functionName);
 			if (map == null) {
-				local_ids.put(functionName, map = new HashMap<String, ID_AST>());
+				localIds.put(functionName, map = new HashMap<String, ID_AST>());
 			}
 			assert map != null;
 			ID_AST id_ast = map.get(id);
 			if (id_ast == null) {
-				id_ast = new ID_AST(id, map == global_ids);
+				id_ast = new ID_AST(id, map == globalIds);
 				id_ast.offset = map.size();
 				assert id_ast.offset != AVM.NULL_OFFSET;
 				map.put(id, id_ast);
@@ -5152,7 +5152,7 @@ public class AwkParser {
 		}
 
 		ID_AST getFunctionParameterIDAST(String functionName, String fIdString) {
-			return local_ids.get(functionName).get(fIdString);
+			return localIds.get(functionName).get(fIdString);
 		}
 
 		AST addArrayID(String id) throws ParserException {
@@ -5168,21 +5168,21 @@ public class AwkParser {
 			if (ids.contains(functionName)) {
 				throw new ParserException("cannot use " + functionName + " as a function; it is a variable");
 			}
-			FunctionProxy function_proxy = function_proxies.get(functionName);
-			if (function_proxy == null) {
-				function_proxies.put(functionName, function_proxy = new FunctionProxy(functionName));
+			FunctionProxy functionProxy = functionProxies.get(functionName);
+			if (functionProxy == null) {
+				functionProxies.put(functionName, functionProxy = new FunctionProxy(functionName));
 			}
 			FunctionDef_AST function_def = new FunctionDef_AST(functionName, param_list, block);
-			function_proxy.setFunctionDefinition(function_def);
+			functionProxy.setFunctionDefinition(function_def);
 			return function_def;
 		}
 
 		AST addFunctionCall(String id, AST param_list) {
-			FunctionProxy function_proxy = function_proxies.get(id);
-			if (function_proxy == null) {
-				function_proxies.put(id, function_proxy = new FunctionProxy(id));
+			FunctionProxy functionProxy = functionProxies.get(id);
+			if (functionProxy == null) {
+				functionProxies.put(id, functionProxy = new FunctionProxy(id));
 			}
-			return new FunctionCall_AST(function_proxy, param_list);
+			return new FunctionCall_AST(functionProxy, param_list);
 		}
 
 		AST addArrayReference(String id, AST idx_ast) throws ParserException {

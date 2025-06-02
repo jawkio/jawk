@@ -86,69 +86,69 @@ public class AwkParser {
 
 	// Lexable tokens...
 
-	private static final int _EOF_ = s_idx++;
-	private static final int _NEWLINE_ = s_idx++;
-	private static final int _SEMICOLON_ = s_idx++;
-	private static final int _ID_ = s_idx++;
-	private static final int _FUNC_ID_ = s_idx++;
-	private static final int _INTEGER_ = s_idx++;
-	private static final int _DOUBLE_ = s_idx++;
-	private static final int _STRING_ = s_idx++;
+	private static final int EOF = s_idx++;
+	private static final int NEWLINE = s_idx++;
+	private static final int SEMICOLON = s_idx++;
+	private static final int ID = s_idx++;
+	private static final int FUNC_ID = s_idx++;
+	private static final int INTEGER = s_idx++;
+	private static final int DOUBLE = s_idx++;
+	private static final int STRING = s_idx++;
 
-	private static final int _EQUALS_ = s_idx++;
+	private static final int EQUALS = s_idx++;
 
-	private static final int _AND_ = s_idx++;
-	private static final int _OR_ = s_idx++;
+	private static final int AND = s_idx++;
+	private static final int OR = s_idx++;
 
-	private static final int _EQ_ = s_idx++;
-	private static final int _GT_ = s_idx++;
-	private static final int _GE_ = s_idx++;
-	private static final int _LT_ = s_idx++;
-	private static final int _LE_ = s_idx++;
-	private static final int _NE_ = s_idx++;
-	private static final int _NOT_ = s_idx++;
-	private static final int _PIPE_ = s_idx++;
-	private static final int _QUESTION_MARK_ = s_idx++;
-	private static final int _COLON_ = s_idx++;
-	private static final int _APPEND_ = s_idx++;
+	private static final int EQ = s_idx++;
+	private static final int GT = s_idx++;
+	private static final int GE = s_idx++;
+	private static final int LT = s_idx++;
+	private static final int LE = s_idx++;
+	private static final int NE = s_idx++;
+	private static final int NOT = s_idx++;
+	private static final int PIPE = s_idx++;
+	private static final int QUESTION_MARK = s_idx++;
+	private static final int COLON = s_idx++;
+	private static final int APPEND = s_idx++;
 
-	private static final int _PLUS_ = s_idx++;
-	private static final int _MINUS_ = s_idx++;
-	private static final int _MULT_ = s_idx++;
-	private static final int _DIVIDE_ = s_idx++;
-	private static final int _MOD_ = s_idx++;
-	private static final int _POW_ = s_idx++;
-	private static final int _COMMA_ = s_idx++;
-	private static final int _MATCHES_ = s_idx++;
-	private static final int _NOT_MATCHES_ = s_idx++;
-	private static final int _DOLLAR_ = s_idx++;
+	private static final int PLUS = s_idx++;
+	private static final int MINUS = s_idx++;
+	private static final int MULT = s_idx++;
+	private static final int DIVIDE = s_idx++;
+	private static final int MOD = s_idx++;
+	private static final int POW = s_idx++;
+	private static final int COMMA = s_idx++;
+	private static final int MATCHES = s_idx++;
+	private static final int NOT_MATCHES = s_idx++;
+	private static final int DOLLAR = s_idx++;
 
-	private static final int _INC_ = s_idx++;
-	private static final int _DEC_ = s_idx++;
+	private static final int INC = s_idx++;
+	private static final int DEC = s_idx++;
 
-	private static final int _PLUS_EQ_ = s_idx++;
-	private static final int _MINUS_EQ_ = s_idx++;
-	private static final int _MULT_EQ_ = s_idx++;
-	private static final int _DIV_EQ_ = s_idx++;
-	private static final int _MOD_EQ_ = s_idx++;
-	private static final int _POW_EQ_ = s_idx++;
+	private static final int PLUS_EQ = s_idx++;
+	private static final int MINUS_EQ = s_idx++;
+	private static final int MULT_EQ = s_idx++;
+	private static final int DIV_EQ = s_idx++;
+	private static final int MOD_EQ = s_idx++;
+	private static final int POW_EQ = s_idx++;
 
-	private static final int _OPEN_PAREN_ = s_idx++;
-	private static final int _CLOSE_PAREN_ = s_idx++;
-	private static final int _OPEN_BRACE_ = s_idx++;
-	private static final int _CLOSE_BRACE_ = s_idx++;
-	private static final int _OPEN_BRACKET_ = s_idx++;
-	private static final int _CLOSE_BRACKET_ = s_idx++;
+	private static final int OPEN_PAREN = s_idx++;
+	private static final int CLOSE_PAREN = s_idx++;
+	private static final int OPEN_BRACE = s_idx++;
+	private static final int CLOSE_BRACE = s_idx++;
+	private static final int OPEN_BRACKET = s_idx++;
+	private static final int CLOSE_BRACKET = s_idx++;
 
-	private static final int _BUILTIN_FUNC_NAME_ = s_idx++;
+	private static final int BUILTIN_FUNC_NAME = s_idx++;
 
-	private static final int _EXTENSION_ = s_idx++;
+	private static final int EXTENSION = s_idx++;
 
-	private static final int _KW_SLEEP_ = s_idx++;
-	private static final int _KW_DUMP_ = s_idx++;
-	private static final int _KW_INTEGER_ = s_idx++;
-	private static final int _KW_DOUBLE_ = s_idx++;
-	private static final int _KW_STRING_ = s_idx++;
+	private static final int KW_SLEEP = s_idx++;
+	private static final int KW_DUMP = s_idx++;
+	private static final int KW_INTEGER = s_idx++;
+	private static final int KW_DOUBLE = s_idx++;
+	private static final int KW_STRING = s_idx++;
 
 	/**
 	 * Contains a mapping of Jawk keywords to their
@@ -191,11 +191,11 @@ public class AwkParser {
 		KEYWORDS.put("printf", s_idx++);
 		KEYWORDS.put("getline", s_idx++);
 
-		KEYWORDS.put("_sleep", _KW_SLEEP_);
-		KEYWORDS.put("_dump", _KW_DUMP_);
-		KEYWORDS.put("_INTEGER", _KW_INTEGER_);
-		KEYWORDS.put("_DOUBLE", _KW_DOUBLE_);
-		KEYWORDS.put("_STRING", _KW_STRING_);
+		KEYWORDS.put("_sleep", KW_SLEEP);
+		KEYWORDS.put("_dump", KW_DUMP);
+		KEYWORDS.put("_INTEGER", KW_INTEGER);
+		KEYWORDS.put("_DOUBLE", KW_DOUBLE);
+		KEYWORDS.put("_STRING", KW_STRING);
 	}
 
 	/**
@@ -213,31 +213,31 @@ public class AwkParser {
 	 * values. Lexer token values are for keywords and
 	 * operators.
 	 */
-	private static final Map<String, Integer> BUILTIN_FUNC_NAMES = new HashMap<String, Integer>();
+	private static final Map<String, Integer> BUILTINFUNCNAMES = new HashMap<String, Integer>();
 
 	static {
-		BUILTIN_FUNC_NAMES.put("atan2", f_idx++);
-		BUILTIN_FUNC_NAMES.put("close", f_idx++);
-		BUILTIN_FUNC_NAMES.put("cos", f_idx++);
-		BUILTIN_FUNC_NAMES.put("exp", f_idx++);
-		BUILTIN_FUNC_NAMES.put("index", f_idx++);
-		BUILTIN_FUNC_NAMES.put("int", f_idx++);
-		BUILTIN_FUNC_NAMES.put("length", f_idx++);
-		BUILTIN_FUNC_NAMES.put("log", f_idx++);
-		BUILTIN_FUNC_NAMES.put("match", f_idx++);
-		BUILTIN_FUNC_NAMES.put("rand", f_idx++);
-		BUILTIN_FUNC_NAMES.put("sin", f_idx++);
-		BUILTIN_FUNC_NAMES.put("split", f_idx++);
-		BUILTIN_FUNC_NAMES.put("sprintf", f_idx++);
-		BUILTIN_FUNC_NAMES.put("sqrt", f_idx++);
-		BUILTIN_FUNC_NAMES.put("srand", f_idx++);
-		BUILTIN_FUNC_NAMES.put("sub", f_idx++);
-		BUILTIN_FUNC_NAMES.put("gsub", f_idx++);
-		BUILTIN_FUNC_NAMES.put("substr", f_idx++);
-		BUILTIN_FUNC_NAMES.put("system", f_idx++);
-		BUILTIN_FUNC_NAMES.put("tolower", f_idx++);
-		BUILTIN_FUNC_NAMES.put("toupper", f_idx++);
-		BUILTIN_FUNC_NAMES.put("exec", F_EXEC);
+		BUILTINFUNCNAMES.put("atan2", f_idx++);
+		BUILTINFUNCNAMES.put("close", f_idx++);
+		BUILTINFUNCNAMES.put("cos", f_idx++);
+		BUILTINFUNCNAMES.put("exp", f_idx++);
+		BUILTINFUNCNAMES.put("index", f_idx++);
+		BUILTINFUNCNAMES.put("int", f_idx++);
+		BUILTINFUNCNAMES.put("length", f_idx++);
+		BUILTINFUNCNAMES.put("log", f_idx++);
+		BUILTINFUNCNAMES.put("match", f_idx++);
+		BUILTINFUNCNAMES.put("rand", f_idx++);
+		BUILTINFUNCNAMES.put("sin", f_idx++);
+		BUILTINFUNCNAMES.put("split", f_idx++);
+		BUILTINFUNCNAMES.put("sprintf", f_idx++);
+		BUILTINFUNCNAMES.put("sqrt", f_idx++);
+		BUILTINFUNCNAMES.put("srand", f_idx++);
+		BUILTINFUNCNAMES.put("sub", f_idx++);
+		BUILTINFUNCNAMES.put("gsub", f_idx++);
+		BUILTINFUNCNAMES.put("substr", f_idx++);
+		BUILTINFUNCNAMES.put("system", f_idx++);
+		BUILTINFUNCNAMES.put("tolower", f_idx++);
+		BUILTINFUNCNAMES.put("toupper", f_idx++);
+		BUILTINFUNCNAMES.put("exec", F_EXEC);
 	}
 
 	private static final int sp_idx = 257;
@@ -250,25 +250,25 @@ public class AwkParser {
 	 * Keys are the variable names themselves, and values are the
 	 * variable token values.
 	 */
-	private static final Map<String, Integer> SPECIAL_VAR_NAMES = new HashMap<String, Integer>();
+	private static final Map<String, Integer> SPECIALVARNAMES = new HashMap<String, Integer>();
 
 	static {
-		SPECIAL_VAR_NAMES.put("NR", sp_idx);
-		SPECIAL_VAR_NAMES.put("FNR", sp_idx);
-		SPECIAL_VAR_NAMES.put("NF", sp_idx);
-		SPECIAL_VAR_NAMES.put("FS", sp_idx);
-		SPECIAL_VAR_NAMES.put("RS", sp_idx);
-		SPECIAL_VAR_NAMES.put("OFS", sp_idx);
-		SPECIAL_VAR_NAMES.put("ORS", sp_idx);
-		SPECIAL_VAR_NAMES.put("RSTART", sp_idx);
-		SPECIAL_VAR_NAMES.put("RLENGTH", sp_idx);
-		SPECIAL_VAR_NAMES.put("FILENAME", sp_idx);
-		SPECIAL_VAR_NAMES.put("SUBSEP", sp_idx);
-		SPECIAL_VAR_NAMES.put("CONVFMT", sp_idx);
-		SPECIAL_VAR_NAMES.put("OFMT", sp_idx);
-		SPECIAL_VAR_NAMES.put("ENVIRON", sp_idx);
-		SPECIAL_VAR_NAMES.put("ARGC", sp_idx);
-		SPECIAL_VAR_NAMES.put("ARGV", sp_idx);
+		SPECIALVARNAMES.put("NR", sp_idx);
+		SPECIALVARNAMES.put("FNR", sp_idx);
+		SPECIALVARNAMES.put("NF", sp_idx);
+		SPECIALVARNAMES.put("FS", sp_idx);
+		SPECIALVARNAMES.put("RS", sp_idx);
+		SPECIALVARNAMES.put("OFS", sp_idx);
+		SPECIALVARNAMES.put("ORS", sp_idx);
+		SPECIALVARNAMES.put("RSTART", sp_idx);
+		SPECIALVARNAMES.put("RLENGTH", sp_idx);
+		SPECIALVARNAMES.put("FILENAME", sp_idx);
+		SPECIALVARNAMES.put("SUBSEP", sp_idx);
+		SPECIALVARNAMES.put("CONVFMT", sp_idx);
+		SPECIALVARNAMES.put("OFMT", sp_idx);
+		SPECIALVARNAMES.put("ENVIRON", sp_idx);
+		SPECIALVARNAMES.put("ARGC", sp_idx);
+		SPECIALVARNAMES.put("ARGV", sp_idx);
 	}
 
 	/**
@@ -403,7 +403,7 @@ public class AwkParser {
 	private void readString() throws IOException {
 		string.setLength(0);
 
-		while (token != _EOF_ && c > 0 && c != '"' && c != '\n') {
+		while (token != EOF && c > 0 && c != '"' && c != '\n') {
 			if (c == '\\') {
 				read();
 				switch (c) {
@@ -489,7 +489,7 @@ public class AwkParser {
 			}
 			read();
 		}
-		if (token == _EOF_ || c == '\n' || c <= 0) {
+		if (token == EOF || c == '\n' || c <= 0) {
 			throw new LexerException("Unterminated string: " + text);
 		}
 		read();
@@ -503,7 +503,7 @@ public class AwkParser {
 	private void readRegexp() throws IOException {
 		regexp.setLength(0);
 
-		while (token != _EOF_ && c > 0 && c != '/' && c != '\n') {
+		while (token != EOF && c > 0 && c != '/' && c != '\n') {
 			if (c == '\\') {
 				read();
 				if (c != '/') {
@@ -513,7 +513,7 @@ public class AwkParser {
 			regexp.append((char) c);
 			read();
 		}
-		if (token == _EOF_ || c == '\n' || c <= 0) {
+		if (token == EOF || c == '\n' || c <= 0) {
 			throw new LexerException("Unterminated string: " + text);
 		}
 		read();
@@ -566,62 +566,62 @@ public class AwkParser {
 		}
 		text.setLength(0);
 		if (c < 0) {
-			return token = _EOF_;
+			return token = EOF;
 		}
 		if (c == ',') {
 			read();
 			skipWhitespaces();
-			return token = _COMMA_;
+			return token = COMMA;
 		}
 		if (c == '(') {
 			read();
-			return token = _OPEN_PAREN_;
+			return token = OPEN_PAREN;
 		}
 		if (c == ')') {
 			read();
-			return token = _CLOSE_PAREN_;
+			return token = CLOSE_PAREN;
 		}
 		if (c == '{') {
 			read();
 			skipWhitespaces();
-			return token = _OPEN_BRACE_;
+			return token = OPEN_BRACE;
 		}
 		if (c == '}') {
 			read();
-			return token = _CLOSE_BRACE_;
+			return token = CLOSE_BRACE;
 		}
 		if (c == '[') {
 			read();
-			return token = _OPEN_BRACKET_;
+			return token = OPEN_BRACKET;
 		}
 		if (c == ']') {
 			read();
-			return token = _CLOSE_BRACKET_;
+			return token = CLOSE_BRACKET;
 		}
 		if (c == '$') {
 			read();
-			return token = _DOLLAR_;
+			return token = DOLLAR;
 		}
 		if (c == '~') {
 			read();
-			return token = _MATCHES_;
+			return token = MATCHES;
 		}
 		if (c == '?') {
 			read();
 			skipWhitespaces();
-			return token = _QUESTION_MARK_;
+			return token = QUESTION_MARK;
 		}
 		if (c == ':') {
 			read();
 			skipWhitespaces();
-			return token = _COLON_;
+			return token = COLON;
 		}
 		if (c == '&') {
 			read();
 			if (c == '&') {
 				read();
 				skipWhitespaces();
-				return token = _AND_;
+				return token = AND;
 			}
 			throw new LexerException("use && for logical and");
 		}
@@ -630,104 +630,104 @@ public class AwkParser {
 			if (c == '|') {
 				read();
 				skipWhitespaces();
-				return token = _OR_;
+				return token = OR;
 			}
-			return token = _PIPE_;
+			return token = PIPE;
 		}
 		if (c == '=') {
 			read();
 			if (c == '=') {
 				read();
-				return token = _EQ_;
+				return token = EQ;
 			}
-			return token = _EQUALS_;
+			return token = EQUALS;
 		}
 		if (c == '+') {
 			read();
 			if (c == '=') {
 				read();
-				return token = _PLUS_EQ_;
+				return token = PLUS_EQ;
 			} else if (c == '+') {
 				read();
-				return token = _INC_;
+				return token = INC;
 			}
-			return token = _PLUS_;
+			return token = PLUS;
 		}
 		if (c == '-') {
 			read();
 			if (c == '=') {
 				read();
-				return token = _MINUS_EQ_;
+				return token = MINUS_EQ;
 			} else if (c == '-') {
 				read();
-				return token = _DEC_;
+				return token = DEC;
 			}
-			return token = _MINUS_;
+			return token = MINUS;
 		}
 		if (c == '*') {
 			read();
 			if (c == '=') {
 				read();
-				return token = _MULT_EQ_;
+				return token = MULT_EQ;
 			} else if (c == '*') {
 				read();
-				return token = _POW_;
+				return token = POW;
 			}
-			return token = _MULT_;
+			return token = MULT;
 		}
 		if (c == '/') {
 			read();
 			if (c == '=') {
 				read();
-				return token = _DIV_EQ_;
+				return token = DIV_EQ;
 			}
-			return token = _DIVIDE_;
+			return token = DIVIDE;
 		}
 		if (c == '%') {
 			read();
 			if (c == '=') {
 				read();
-				return token = _MOD_EQ_;
+				return token = MOD_EQ;
 			}
-			return token = _MOD_;
+			return token = MOD;
 		}
 		if (c == '^') {
 			read();
 			if (c == '=') {
 				read();
-				return token = _POW_EQ_;
+				return token = POW_EQ;
 			}
-			return token = _POW_;
+			return token = POW;
 		}
 		if (c == '>') {
 			read();
 			if (c == '=') {
 				read();
-				return token = _GE_;
+				return token = GE;
 			} else if (c == '>') {
 				read();
-				return token = _APPEND_;
+				return token = APPEND;
 			}
-			return token = _GT_;
+			return token = GT;
 		}
 		if (c == '<') {
 			read();
 			if (c == '=') {
 				read();
-				return token = _LE_;
+				return token = LE;
 			}
-			return token = _LT_;
+			return token = LT;
 		}
 		if (c == '!') {
 			read();
 			if (c == '=') {
 				read();
-				return token = _NE_;
+				return token = NE;
 			} else if (c == '~') {
 				read();
-				return token = _NOT_MATCHES_;
+				return token = NOT_MATCHES;
 			}
-			return token = _NOT_;
+			return token = NOT;
 		}
 
 		if (c == '.') {
@@ -741,7 +741,7 @@ public class AwkParser {
 			if (!hit) {
 				throw new LexerException("Decimal point encountered with no values on either side.");
 			}
-			return token = _DOUBLE_;
+			return token = DOUBLE;
 		}
 
 		if (Character.isDigit(c)) {
@@ -754,7 +754,7 @@ public class AwkParser {
 					while (c > 0 && Character.isDigit(c)) {
 						read();
 					}
-					return token = _DOUBLE_;
+					return token = DOUBLE;
 				} else if (Character.isDigit(c)) {
 					// integer or double.
 					read();
@@ -763,7 +763,7 @@ public class AwkParser {
 				}
 			}
 			// integer, only
-			return token = _INTEGER_;
+			return token = INTEGER;
 		}
 
 		if (Character.isJavaIdentifierStart(c)) {
@@ -774,31 +774,31 @@ public class AwkParser {
 			// check for certain keywords
 			// extensions override built-in stuff
 			if (extensions.get(text.toString()) != null) {
-				return token = _EXTENSION_;
+				return token = EXTENSION;
 			}
 			Integer kw_token = KEYWORDS.get(text.toString());
 			if (kw_token != null) {
 				int kw = kw_token.intValue();
-				boolean treatAsIdentifier = (!additional_functions && (kw == _KW_SLEEP_ || kw == _KW_DUMP_))
+				boolean treatAsIdentifier = (!additional_functions && (kw == KW_SLEEP || kw == KW_DUMP))
 						||
-						(!additional_type_functions && (kw == _KW_INTEGER_ || kw == _KW_DOUBLE_ || kw == _KW_STRING_));
+						(!additional_type_functions && (kw == KW_INTEGER || kw == KW_DOUBLE || kw == KW_STRING));
 				if (!treatAsIdentifier) {
 					return token = kw;
 				}
 				// treat as identifier
 			}
-			Integer bf_idx = BUILTIN_FUNC_NAMES.get(text.toString());
+			Integer bf_idx = BUILTINFUNCNAMES.get(text.toString());
 			if (bf_idx != null) {
 				int idx = bf_idx.intValue();
 				if (additional_functions || idx != F_EXEC) {
-					return token = _BUILTIN_FUNC_NAME_;
+					return token = BUILTIN_FUNC_NAME;
 				}
 				// treat as identifier
 			}
 			if (c == '(') {
-				return token = _FUNC_ID_;
+				return token = FUNC_ID;
 			} else {
-				return token = _ID_;
+				return token = ID;
 			}
 		}
 
@@ -819,7 +819,7 @@ public class AwkParser {
 					read();
 				}
 			}
-			return token = _SEMICOLON_;
+			return token = SEMICOLON;
 		}
 
 		if (c == '\n') {
@@ -832,14 +832,14 @@ public class AwkParser {
 				}
 				read();
 			}
-			return token = _NEWLINE_;
+			return token = NEWLINE;
 		}
 
 		if (c == '"') {
 			// string
 			read();
 			readString();
-			return token = _STRING_;
+			return token = STRING;
 		}
 
 		/*
@@ -868,9 +868,9 @@ public class AwkParser {
 	private boolean opt_terminator() throws IOException {
 		if (opt_newline()) {
 			return true;
-		} else if (token == _EOF_ || token == _CLOSE_BRACE_) {
+		} else if (token == EOF || token == CLOSE_BRACE) {
 			return true; // do nothing
-		} else if (token == _SEMICOLON_) {
+		} else if (token == SEMICOLON) {
 			lexer();
 			return true;
 		} else {
@@ -880,7 +880,7 @@ public class AwkParser {
 	}
 
 	private boolean opt_newline() throws IOException {
-		if (token == _NEWLINE_) {
+		if (token == NEWLINE) {
 			lexer();
 			return true;
 		} else {
@@ -892,12 +892,12 @@ public class AwkParser {
 	// SCRIPT : \n [RULE_LIST] EOF
 	AST SCRIPT() throws IOException {
 		AST rl;
-		if (token != _EOF_) {
+		if (token != EOF) {
 			rl = RULE_LIST();
 		} else {
 			rl = null;
 		}
-		lexer(_EOF_);
+		lexer(EOF);
 		return rl;
 	}
 
@@ -907,7 +907,7 @@ public class AwkParser {
 		AST rule_or_function = null;
 		if (token == KEYWORDS.get("function")) {
 			rule_or_function = FUNCTION();
-		} else if (token != _EOF_) {
+		} else if (token != EOF) {
 			rule_or_function = RULE();
 		} else {
 			return null;
@@ -919,39 +919,39 @@ public class AwkParser {
 	AST FUNCTION() throws IOException {
 		expectKeyword("function");
 		String function_name;
-		if (token == _FUNC_ID_ || token == _ID_) {
+		if (token == FUNC_ID || token == ID) {
 			function_name = text.toString();
 			lexer();
 		} else {
 			throw new ParserException("Expecting function name. Got " + toTokenString(token) + ": " + text);
 		}
 		symbol_table.setFunctionName(function_name);
-		lexer(_OPEN_PAREN_);
+		lexer(OPEN_PAREN);
 		AST formal_param_list;
-		if (token == _CLOSE_PAREN_) {
+		if (token == CLOSE_PAREN) {
 			formal_param_list = null;
 		} else {
-			formal_param_list = FORMAL_PARAM_LIST(function_name);
+			formal_param_list = FORMALPARAMLIST(function_name);
 		}
-		lexer(_CLOSE_PAREN_);
+		lexer(CLOSE_PAREN);
 		opt_newline();
 
-		lexer(_OPEN_BRACE_);
+		lexer(OPEN_BRACE);
 		AST function_block = STATEMENT_LIST();
-		lexer(_CLOSE_BRACE_);
+		lexer(CLOSE_BRACE);
 		symbol_table.clearFunctionName(function_name);
 		return symbol_table.addFunctionDef(function_name, formal_param_list, function_block);
 	}
 
-	AST FORMAL_PARAM_LIST(String func_name) throws IOException {
-		if (token == _ID_) {
+	AST FORMALPARAMLIST(String func_name) throws IOException {
+		if (token == ID) {
 			String id = text.toString();
 			symbol_table.addFunctionParameter(func_name, id);
 			lexer();
-			if (token == _COMMA_) {
+			if (token == COMMA) {
 				lexer();
 				opt_newline();
-				AST rest = FORMAL_PARAM_LIST(func_name);
+				AST rest = FORMALPARAMLIST(func_name);
 				if (rest == null) {
 					throw new ParserException("Cannot terminate a formal parameter list with a comma.");
 				} else {
@@ -975,11 +975,11 @@ public class AwkParser {
 		} else if (token == KEYWORDS.get("END")) {
 			lexer();
 			opt_expr = symbol_table.addEND();
-		} else if (token != _OPEN_BRACE_ && token != _SEMICOLON_ && token != _NEWLINE_ && token != _EOF_) {
+		} else if (token != OPEN_BRACE && token != SEMICOLON && token != NEWLINE && token != EOF) {
 			// true = allow comparators, allow IN keyword, do NOT allow multidim indices expressions
 			opt_expr = ASSIGNMENT_EXPRESSION(true, true, false);
 			// for ranges, like conditionStart, conditionEnd
-			if (token == _COMMA_) {
+			if (token == COMMA) {
 				lexer();
 				opt_newline();
 				// true = allow comparators, allow IN keyword, do NOT allow multidim indices expressions
@@ -988,10 +988,10 @@ public class AwkParser {
 		} else {
 			opt_expr = null;
 		}
-		if (token == _OPEN_BRACE_) {
+		if (token == OPEN_BRACE) {
 			lexer();
 			opt_stmts = STATEMENT_LIST();
-			lexer(_CLOSE_BRACE_);
+			lexer(CLOSE_BRACE);
 		} else {
 			opt_stmts = null;
 		}
@@ -1002,16 +1002,16 @@ public class AwkParser {
 	private AST STATEMENT_LIST() throws IOException {
 		// statement lists can only live within curly brackets (braces)
 		opt_newline();
-		if (token == _CLOSE_BRACE_ || token == _EOF_) {
+		if (token == CLOSE_BRACE || token == EOF) {
 			return null;
 		}
 		AST stmt;
-		if (token == _OPEN_BRACE_) {
+		if (token == OPEN_BRACE) {
 			lexer();
 			stmt = STATEMENT_LIST();
-			lexer(_CLOSE_BRACE_);
+			lexer(CLOSE_BRACE);
 		} else {
-			if (token == _SEMICOLON_) {
+			if (token == SEMICOLON) {
 				// an empty statement (;)
 				// do not polute the syntax tree with nulls in this case
 				// just return the next statement (recursively)
@@ -1036,7 +1036,7 @@ public class AwkParser {
 	AST EXPRESSION_LIST(boolean not_in_print_root, boolean allow_in_keyword) throws IOException {
 		AST expr = ASSIGNMENT_EXPRESSION(not_in_print_root, allow_in_keyword, false); // do NOT allow multidim indices
 																																									// expressions
-		if (token == _COMMA_) {
+		if (token == COMMA) {
 			lexer();
 			opt_newline();
 			return new FunctionCallParamList_AST(expr, EXPRESSION_LIST(not_in_print_root, allow_in_keyword));
@@ -1052,13 +1052,13 @@ public class AwkParser {
 		int op = 0;
 		String txt = null;
 		AST assignment_expression = null;
-		if (token == _EQUALS_
-				|| token == _PLUS_EQ_
-				|| token == _MINUS_EQ_
-				|| token == _MULT_EQ_
-				|| token == _DIV_EQ_
-				|| token == _MOD_EQ_
-				|| token == _POW_EQ_) {
+		if (token == EQUALS
+				|| token == PLUS_EQ
+				|| token == MINUS_EQ
+				|| token == MULT_EQ
+				|| token == DIV_EQ
+				|| token == MOD_EQ
+				|| token == POW_EQ) {
 			op = token;
 			txt = text.toString();
 			lexer();
@@ -1074,7 +1074,7 @@ public class AwkParser {
 	AST COMMA_EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
 			throws IOException {
 		AST concat_expression = TERNARY_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
-		if (allow_multidim_indices && token == _COMMA_) {
+		if (allow_multidim_indices && token == COMMA) {
 			// consume the comma
 			lexer();
 			opt_newline();
@@ -1089,14 +1089,14 @@ public class AwkParser {
 		}
 	}
 
-	// TERNARY_EXPRESSION = LOGICAL_OR_EXPRESSION [ ? TERNARY_EXPRESSION : TERNARY_EXPRESSION ]
+	// TERNARY_EXPRESSION = LOGICALOREXPRESSION [ ? TERNARY_EXPRESSION : TERNARY_EXPRESSION ]
 	AST TERNARY_EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
 			throws IOException {
-		AST le1 = LOGICAL_OR_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
-		if (token == _QUESTION_MARK_) {
+		AST le1 = LOGICALOREXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+		if (token == QUESTION_MARK) {
 			lexer();
 			AST true_block = TERNARY_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
-			lexer(_COLON_);
+			lexer(COLON);
 			AST false_block = TERNARY_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
 			return new TernaryExpression_AST(le1, true_block, false_block);
 		} else {
@@ -1104,35 +1104,35 @@ public class AwkParser {
 		}
 	}
 
-	// LOGICAL_OR_EXPRESSION = LOGICAL_AND_EXPRESSION [ || LOGICAL_OR_EXPRESSION ]
-	AST LOGICAL_OR_EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	// LOGICALOREXPRESSION = LOGICALANDEXPRESSION [ || LOGICALOREXPRESSION ]
+	AST LOGICALOREXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
 			throws IOException {
-		AST le2 = LOGICAL_AND_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+		AST le2 = LOGICALANDEXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
 		int op = 0;
 		String txt = null;
 		AST le1 = null;
-		if (token == _OR_) {
+		if (token == OR) {
 			op = token;
 			txt = text.toString();
 			lexer();
-			le1 = LOGICAL_OR_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+			le1 = LOGICALOREXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
 			return new LogicalExpression_AST(le2, op, txt, le1);
 		}
 		return le2;
 	}
 
-	// LOGICAL_AND_EXPRESSION = IN_EXPRESSION [ && LOGICAL_AND_EXPRESSION ]
-	AST LOGICAL_AND_EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	// LOGICALANDEXPRESSION = IN_EXPRESSION [ && LOGICALANDEXPRESSION ]
+	AST LOGICALANDEXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
 			throws IOException {
 		AST comparison_expression = IN_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
 		int op = 0;
 		String txt = null;
 		AST le2 = null;
-		if (token == _AND_) {
+		if (token == AND) {
 			op = token;
 			txt = text.toString();
 			lexer();
-			le2 = LOGICAL_AND_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+			le2 = LOGICALANDEXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
 			return new LogicalExpression_AST(comparison_expression, op, txt, le2);
 		}
 		return comparison_expression;
@@ -1164,7 +1164,7 @@ public class AwkParser {
 		int op = 0;
 		String txt = null;
 		AST comparison_expression = null;
-		if (token == _MATCHES_ || token == _NOT_MATCHES_) {
+		if (token == MATCHES || token == NOT_MATCHES) {
 			op = token;
 			txt = text.toString();
 			lexer();
@@ -1184,18 +1184,18 @@ public class AwkParser {
 		String txt = null;
 		AST comparison_expression = null;
 		// Allow < <= == != >=, and only > if comparators are allowed
-		if (token == _EQ_
-				|| token == _GE_
-				|| token == _LT_
-				|| token == _LE_
-				|| token == _NE_
-				|| (token == _GT_ && not_in_print_root)) {
+		if (token == EQ
+				|| token == GE
+				|| token == LT
+				|| token == LE
+				|| token == NE
+				|| (token == GT && not_in_print_root)) {
 			op = token;
 			txt = text.toString();
 			lexer();
 			comparison_expression = COMPARISON_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
 			return new ComparisonExpression_AST(expression, op, txt, comparison_expression);
-		} else if (not_in_print_root && token == _PIPE_) {
+		} else if (not_in_print_root && token == PIPE) {
 			lexer();
 			return GETLINE_EXPRESSION(expression, not_in_print_root, allow_in_keyword);
 		}
@@ -1207,27 +1207,27 @@ public class AwkParser {
 	AST CONCAT_EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
 			throws IOException {
 		AST te = EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
-		if (token == _INTEGER_
+		if (token == INTEGER
 				||
-				token == _DOUBLE_
+				token == DOUBLE
 				||
-				token == _OPEN_PAREN_
+				token == OPEN_PAREN
 				||
-				token == _FUNC_ID_
+				token == FUNC_ID
 				||
-				token == _INC_
+				token == INC
 				||
-				token == _DEC_
+				token == DEC
 				||
-				token == _ID_
+				token == ID
 				||
-				token == _STRING_
+				token == STRING
 				||
-				token == _DOLLAR_
+				token == DOLLAR
 				||
-				token == _BUILTIN_FUNC_NAME_
+				token == BUILTIN_FUNC_NAME
 				||
-				token == _EXTENSION_) {
+				token == EXTENSION) {
 			// allow concatination here only when certain tokens follow
 			return new ConcatExpression_AST(
 					te,
@@ -1250,7 +1250,7 @@ public class AwkParser {
 	AST EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
 			throws IOException {
 		AST term = TERM(not_in_print_root, allow_in_keyword, allow_multidim_indices);
-		while (token == _PLUS_ || token == _MINUS_) {
+		while (token == PLUS || token == MINUS) {
 			int op = token;
 			String txt = text.toString();
 			lexer();
@@ -1265,7 +1265,7 @@ public class AwkParser {
 	// TERM : UNARY_FACTOR [ (*|/|%) TERM ]
 	AST TERM(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices) throws IOException {
 		AST unaryFactor = UNARY_FACTOR(not_in_print_root, allow_in_keyword, allow_multidim_indices);
-		while (token == _MULT_ || token == _DIVIDE_ || token == _MOD_) {
+		while (token == MULT || token == DIVIDE || token == MOD) {
 			int op = token;
 			String txt = text.toString();
 			lexer();
@@ -1280,13 +1280,13 @@ public class AwkParser {
 	// UNARY_FACTOR : [ ! | - | + ] POWER_FACTOR
 	AST UNARY_FACTOR(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
 			throws IOException {
-		if (token == _NOT_) {
+		if (token == NOT) {
 			lexer();
 			return new NotExpression_AST(POWER_FACTOR(not_in_print_root, allow_in_keyword, allow_multidim_indices));
-		} else if (token == _MINUS_) {
+		} else if (token == MINUS) {
 			lexer();
 			return new NegativeExpression_AST(POWER_FACTOR(not_in_print_root, allow_in_keyword, allow_multidim_indices));
-		} else if (token == _PLUS_) {
+		} else if (token == PLUS) {
 			lexer();
 			return new UnaryPlusExpression_AST(POWER_FACTOR(not_in_print_root, allow_in_keyword, allow_multidim_indices));
 		} else {
@@ -1294,11 +1294,11 @@ public class AwkParser {
 		}
 	}
 
-	// POWER_FACTOR : FACTOR_FOR_INCDEC [ ^ POWER_FACTOR ]
+	// POWER_FACTOR : FACTORFORINCDEC [ ^ POWER_FACTOR ]
 	AST POWER_FACTOR(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
 			throws IOException {
-		AST incdec_ast = FACTOR_FOR_INCDEC(not_in_print_root, allow_in_keyword, allow_multidim_indices);
-		if (token == _POW_) {
+		AST incdec_ast = FACTORFORINCDEC(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+		if (token == POW) {
 			int op = token;
 			String txt = text.toString();
 			lexer();
@@ -1316,16 +1316,16 @@ public class AwkParser {
 		return (ast instanceof ID_AST) || (ast instanceof ArrayReference_AST) || (ast instanceof DollarExpression_AST);
 	}
 
-	AST FACTOR_FOR_INCDEC(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	AST FACTORFORINCDEC(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
 			throws IOException {
 		boolean pre_inc = false;
 		boolean pre_dec = false;
 		boolean post_inc = false;
 		boolean post_dec = false;
-		if (token == _INC_) {
+		if (token == INC) {
 			pre_inc = true;
 			lexer();
-		} else if (token == _DEC_) {
+		} else if (token == DEC) {
 			pre_dec = true;
 			lexer();
 		}
@@ -1340,10 +1340,10 @@ public class AwkParser {
 		// - factor_ast is an lvalue
 		// - pre ops were not encountered
 		if (isLvalue(factor_ast) && !pre_inc && !pre_dec) {
-			if (token == _INC_) {
+			if (token == INC) {
 				post_inc = true;
 				lexer();
-			} else if (token == _DEC_) {
+			} else if (token == DEC) {
 				post_dec = true;
 				lexer();
 			}
@@ -1366,36 +1366,36 @@ public class AwkParser {
 		}
 	}
 
-	// FACTOR : '(' ASSIGNMENT_EXPRESSION ')' | _INTEGER_ | _DOUBLE_ | _STRING_ | GETLINE [ID-or-array-or-$val] | /[=].../
+	// FACTOR : '(' ASSIGNMENT_EXPRESSION ')' | INTEGER | DOUBLE | STRING | GETLINE [ID-or-array-or-$val] | /[=].../
 	// | [++|--] SYMBOL [++|--]
 	// AST FACTOR(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_post_incdec_operators)
 	AST FACTOR(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices) throws IOException {
-		if (token == _OPEN_PAREN_) {
+		if (token == OPEN_PAREN) {
 			lexer();
 			// true = allow multi-dimensional array indices (i.e., commas for 1,2,3,4)
 			AST assignment_expression = ASSIGNMENT_EXPRESSION(true, allow_in_keyword, true);
 			if (allow_multidim_indices && (assignment_expression instanceof ArrayIndex_AST)) {
 				throw new ParserException("Cannot nest multi-dimensional array index expressions.");
 			}
-			lexer(_CLOSE_PAREN_);
+			lexer(CLOSE_PAREN);
 			return assignment_expression;
-		} else if (token == _INTEGER_) {
+		} else if (token == INTEGER) {
 			AST integer = symbol_table.addINTEGER(text.toString());
 			lexer();
 			return integer;
-		} else if (token == _DOUBLE_) {
+		} else if (token == DOUBLE) {
 			AST dbl = symbol_table.addDOUBLE(text.toString());
 			lexer();
 			return dbl;
-		} else if (token == _STRING_) {
+		} else if (token == STRING) {
 			AST str = symbol_table.addSTRING(string.toString());
 			lexer();
 			return str;
 		} else if (token == KEYWORDS.get("getline")) {
 			return GETLINE_EXPRESSION(null, not_in_print_root, allow_in_keyword);
-		} else if (token == _DIVIDE_ || token == _DIV_EQ_) {
+		} else if (token == DIVIDE || token == DIV_EQ) {
 			readRegexp();
-			if (token == _DIV_EQ_) {
+			if (token == DIV_EQ) {
 				regexp.insert(0, '=');
 			}
 			AST regexp_ast = symbol_table.addREGEXP(regexp.toString());
@@ -1408,13 +1408,13 @@ public class AwkParser {
 		} else if (additional_type_functions && token == KEYWORDS.get("_STRING")) {
 			return STRING_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
 		} else {
-			if (token == _DOLLAR_) {
+			if (token == DOLLAR) {
 				lexer();
-				if (token == _INC_ || token == _DEC_) {
+				if (token == INC || token == DEC) {
 					return new DollarExpression_AST(
-							FACTOR_FOR_INCDEC(not_in_print_root, allow_in_keyword, allow_multidim_indices));
+							FACTORFORINCDEC(not_in_print_root, allow_in_keyword, allow_multidim_indices));
 				}
-				if (token == _NOT_ || token == _MINUS_ || token == _PLUS_) {
+				if (token == NOT || token == MINUS || token == PLUS) {
 					return new DollarExpression_AST(UNARY_FACTOR(not_in_print_root, allow_in_keyword, allow_multidim_indices));
 				}
 				return new DollarExpression_AST(FACTOR(not_in_print_root, allow_in_keyword, allow_multidim_indices));
@@ -1427,23 +1427,23 @@ public class AwkParser {
 			throws IOException {
 		boolean parens = c == '(';
 		expectKeyword("_INTEGER");
-		if (token == _SEMICOLON_ || token == _NEWLINE_ || token == _CLOSE_BRACE_) {
+		if (token == SEMICOLON || token == NEWLINE || token == CLOSE_BRACE) {
 			throw new ParserException("expression expected");
 		} else {
 			// do NOT allow for a blank param list: "()" using the parens boolean below
 			// otherwise, the parser will complain because assignment_expression cannot be ()
 			if (parens) {
-				lexer(_OPEN_PAREN_);
+				lexer(OPEN_PAREN);
 			}
 			AST int_expr_ast;
-			if (token == _CLOSE_PAREN_) {
+			if (token == CLOSE_PAREN) {
 				throw new ParserException("expression expected");
 			} else {
 				int_expr_ast = new IntegerExpression_AST(
 						ASSIGNMENT_EXPRESSION(not_in_print_root || parens, allow_in_keyword, allow_multidim_indices));
 			}
 			if (parens) {
-				lexer(_CLOSE_PAREN_);
+				lexer(CLOSE_PAREN);
 			}
 			return int_expr_ast;
 		}
@@ -1453,23 +1453,23 @@ public class AwkParser {
 			throws IOException {
 		boolean parens = c == '(';
 		expectKeyword("_DOUBLE");
-		if (token == _SEMICOLON_ || token == _NEWLINE_ || token == _CLOSE_BRACE_) {
+		if (token == SEMICOLON || token == NEWLINE || token == CLOSE_BRACE) {
 			throw new ParserException("expression expected");
 		} else {
 			// do NOT allow for a blank param list: "()" using the parens boolean below
 			// otherwise, the parser will complain because assignment_expression cannot be ()
 			if (parens) {
-				lexer(_OPEN_PAREN_);
+				lexer(OPEN_PAREN);
 			}
 			AST double_expr_ast;
-			if (token == _CLOSE_PAREN_) {
+			if (token == CLOSE_PAREN) {
 				throw new ParserException("expression expected");
 			} else {
 				double_expr_ast = new DoubleExpression_AST(
 						ASSIGNMENT_EXPRESSION(not_in_print_root || parens, allow_in_keyword, allow_multidim_indices));
 			}
 			if (parens) {
-				lexer(_CLOSE_PAREN_);
+				lexer(CLOSE_PAREN);
 			}
 			return double_expr_ast;
 		}
@@ -1479,31 +1479,31 @@ public class AwkParser {
 			throws IOException {
 		boolean parens = c == '(';
 		expectKeyword("_STRING");
-		if (token == _SEMICOLON_ || token == _NEWLINE_ || token == _CLOSE_BRACE_) {
+		if (token == SEMICOLON || token == NEWLINE || token == CLOSE_BRACE) {
 			throw new ParserException("expression expected");
 		} else {
 			// do NOT allow for a blank param list: "()" using the parens boolean below
 			// otherwise, the parser will complain because assignment_expression cannot be ()
 			if (parens) {
-				lexer(_OPEN_PAREN_);
+				lexer(OPEN_PAREN);
 			}
 			AST string_expr_ast;
-			if (token == _CLOSE_PAREN_) {
+			if (token == CLOSE_PAREN) {
 				throw new ParserException("expression expected");
 			} else {
 				string_expr_ast = new StringExpression_AST(
 						ASSIGNMENT_EXPRESSION(not_in_print_root || parens, allow_in_keyword, allow_multidim_indices));
 			}
 			if (parens) {
-				lexer(_CLOSE_PAREN_);
+				lexer(CLOSE_PAREN);
 			}
 			return string_expr_ast;
 		}
 	}
 
-	// SYMBOL : _ID_ [ '(' params ')' | '[' ASSIGNMENT_EXPRESSION ']' ]
+	// SYMBOL : ID [ '(' params ')' | '[' ASSIGNMENT_EXPRESSION ']' ]
 	AST SYMBOL(boolean not_in_print_root, boolean allow_in_keyword) throws IOException {
-		if (token != _ID_ && token != _FUNC_ID_ && token != _BUILTIN_FUNC_NAME_ && token != _EXTENSION_) {
+		if (token != ID && token != FUNC_ID && token != BUILTIN_FUNC_NAME && token != EXTENSION) {
 			throw new ParserException("Expecting an ID. Got " + toTokenString(token) + ": " + text);
 		}
 		int id_token = token;
@@ -1511,46 +1511,46 @@ public class AwkParser {
 		boolean parens = c == '(';
 		lexer();
 
-		if (id_token == _EXTENSION_) {
+		if (id_token == EXTENSION) {
 			String extension_keyword = id;
 			// JawkExtension extension = extensions.get(extension_keyword);
 			AST params;
 
 			/*
 			 * if (extension.requiresParen()) {
-			 * lexer(_OPEN_PAREN_);
-			 * if (token == _CLOSE_PAREN_)
+			 * lexer(OPEN_PAREN);
+			 * if (token == CLOSE_PAREN)
 			 * params = null;
 			 * else
 			 * params = EXPRESSION_LIST(not_in_print_root, allow_in_keyword);
-			 * lexer(_CLOSE_PAREN_);
+			 * lexer(CLOSE_PAREN);
 			 * } else {
 			 * boolean parens = c == '(';
 			 * //expectKeyword("delete");
 			 * if (parens) {
-			 * assert token == _OPEN_PAREN_;
+			 * assert token == OPEN_PAREN;
 			 * lexer();
 			 * }
 			 * //AST symbol_ast = SYMBOL(true,true); // allow comparators
 			 * params = EXPRESSION_LIST(not_in_print_root, allow_in_keyword);
 			 * if (parens)
-			 * lexer(_CLOSE_PAREN_);
+			 * lexer(CLOSE_PAREN);
 			 * }
 			 */
 
 			// if (extension.requiresParens() || parens)
 			if (parens) {
 				lexer();
-				if (token == _CLOSE_PAREN_) {
+				if (token == CLOSE_PAREN) {
 					params = null;
 				} else { // ?//params = EXPRESSION_LIST(false,true); // NO comparators allowed, allow in expression
 					params = EXPRESSION_LIST(true, allow_in_keyword); // NO comparators allowed, allow in expression
 				}
-				lexer(_CLOSE_PAREN_);
+				lexer(CLOSE_PAREN);
 			} else {
 				/*
-				 * if (token == _NEWLINE_ || token == _SEMICOLON_ || token == _CLOSE_BRACE_ || token == _CLOSE_PAREN_
-				 * || (token == _GT_ || token == _APPEND_ || token == _PIPE_) )
+				 * if (token == NEWLINE || token == SEMICOLON || token == CLOSE_BRACE || token == CLOSE_PAREN
+				 * || (token == GT || token == APPEND || token == PIPE) )
 				 * params = null;
 				 * else
 				 * params = EXPRESSION_LIST(false,true); // NO comparators allowed, allow in expression
@@ -1559,41 +1559,41 @@ public class AwkParser {
 			}
 
 			return new Extension_AST(extension_keyword, params);
-		} else if (id_token == _FUNC_ID_ || id_token == _BUILTIN_FUNC_NAME_) {
+		} else if (id_token == FUNC_ID || id_token == BUILTIN_FUNC_NAME) {
 			AST params;
 			// length can take on the special form of no parens
 			if (id.equals("length")) {
-				if (token == _OPEN_PAREN_) {
+				if (token == OPEN_PAREN) {
 					lexer();
-					if (token == _CLOSE_PAREN_) {
+					if (token == CLOSE_PAREN) {
 						params = null;
 					} else {
 						params = EXPRESSION_LIST(true, allow_in_keyword);
 					}
-					lexer(_CLOSE_PAREN_);
+					lexer(CLOSE_PAREN);
 				} else {
 					params = null;
 				}
 			} else {
-				lexer(_OPEN_PAREN_);
-				if (token == _CLOSE_PAREN_) {
+				lexer(OPEN_PAREN);
+				if (token == CLOSE_PAREN) {
 					params = null;
 				} else {
 					params = EXPRESSION_LIST(true, allow_in_keyword);
 				}
-				lexer(_CLOSE_PAREN_);
+				lexer(CLOSE_PAREN);
 			}
-			if (id_token == _BUILTIN_FUNC_NAME_) {
+			if (id_token == BUILTIN_FUNC_NAME) {
 				return new BuiltinFunctionCall_AST(id, params);
 			} else {
 				return symbol_table.addFunctionCall(id, params);
 			}
 		}
-		if (token == _OPEN_BRACKET_) {
+		if (token == OPEN_BRACKET) {
 			lexer();
 			AST idx_ast = ARRAY_INDEX(true, allow_in_keyword);
-			lexer(_CLOSE_BRACKET_);
-			if (token == _OPEN_BRACKET_) {
+			lexer(CLOSE_BRACKET);
+			if (token == OPEN_BRACKET) {
 				throw new ParserException("Use [a,b,c,...] instead of [a][b][c]... for multi-dimensional arrays.");
 			}
 			return symbol_table.addArrayReference(id, idx_ast);
@@ -1604,7 +1604,7 @@ public class AwkParser {
 	// ARRAY_INDEX : ASSIGNMENT_EXPRESSION [, ARRAY_INDEX]
 	AST ARRAY_INDEX(boolean not_in_print_root, boolean allow_in_keyword) throws IOException {
 		AST expr_ast = ASSIGNMENT_EXPRESSION(not_in_print_root, allow_in_keyword, false);
-		if (token == _COMMA_) {
+		if (token == COMMA) {
 			opt_newline();
 			lexer();
 			return new ArrayIndex_AST(expr_ast, ARRAY_INDEX(not_in_print_root, allow_in_keyword));
@@ -1621,10 +1621,10 @@ public class AwkParser {
 	// | RETURN_STATEMENT
 	// | ASSIGNMENT_EXPRESSION
 	AST STATEMENT() throws IOException {
-		if (token == _OPEN_BRACE_) {
+		if (token == OPEN_BRACE) {
 			lexer();
 			AST lst = STATEMENT_LIST();
-			lexer(_CLOSE_BRACE_);
+			lexer(CLOSE_BRACE);
 			return lst;
 		}
 		AST stmt;
@@ -1682,25 +1682,25 @@ public class AwkParser {
 
 	AST IF_STATEMENT() throws IOException {
 		expectKeyword("if");
-		lexer(_OPEN_PAREN_);
+		lexer(OPEN_PAREN);
 		AST expr = ASSIGNMENT_EXPRESSION(true, true, false); // allow comparators, allow in keyword, do NOT allow multidim
 																													// indices expressions
-		lexer(_CLOSE_PAREN_);
+		lexer(CLOSE_PAREN);
 
 		//// Was:
-		//// AST b1 = BLOCK_OR_STMT();
+		//// AST b1 = BLOCKORSTMT();
 		//// But it didn't handle
 		//// if ; else ...
 		//// properly
 		opt_newline();
 		AST b1;
-		if (token == _SEMICOLON_) {
+		if (token == SEMICOLON) {
 			lexer();
 			// consume the newline after the semicolon
 			opt_newline();
 			b1 = null;
 		} else {
-			b1 = BLOCK_OR_STMT();
+			b1 = BLOCKORSTMT();
 		}
 
 		// The OPT_NEWLINE() above causes issues with the following form:
@@ -1710,14 +1710,14 @@ public class AwkParser {
 		// The \n before the else disassociates subsequent statements
 		// if an "else" does not immediately follow.
 		// To accommodate, the if_statement will continue to manage
-		// statements, causing the original OPT_STATEMENT_LIST to relinquish
-		// processing statements to this OPT_STATEMENT_LIST.
+		// statements, causing the original OPTSTATEMENTLIST to relinquish
+		// processing statements to this OPTSTATEMENTLIST.
 
 		opt_newline();
 		if (token == KEYWORDS.get("else")) {
 			lexer();
 			opt_newline();
-			AST b2 = BLOCK_OR_STMT();
+			AST b2 = BLOCKORSTMT();
 			return new IfStatement_AST(expr, b1, b2);
 		} else {
 			AST if_ast = new IfStatement_AST(expr, b1, null);
@@ -1730,21 +1730,21 @@ public class AwkParser {
 		return new BreakStatement_AST();
 	}
 
-	AST BLOCK_OR_STMT() throws IOException {
+	AST BLOCKORSTMT() throws IOException {
 		// default case, does NOT consume (require) a terminator
-		return BLOCK_OR_STMT(false);
+		return BLOCKORSTMT(false);
 	}
 
-	AST BLOCK_OR_STMT(boolean require_terminator) throws IOException {
+	AST BLOCKORSTMT(boolean require_terminator) throws IOException {
 		opt_newline();
 		AST block;
 		// HIJACK BRACES HERE SINCE WE MAY NOT HAVE A TERMINATOR AFTER THE CLOSING BRACE
-		if (token == _OPEN_BRACE_) {
+		if (token == OPEN_BRACE) {
 			lexer();
 			block = STATEMENT_LIST();
-			lexer(_CLOSE_BRACE_);
+			lexer(CLOSE_BRACE);
 			return block;
-		} else if (token == _SEMICOLON_) {
+		} else if (token == SEMICOLON) {
 			block = null;
 		} else {
 			block = STATEMENT();
@@ -1758,11 +1758,11 @@ public class AwkParser {
 
 	AST WHILE_STATEMENT() throws IOException {
 		expectKeyword("while");
-		lexer(_OPEN_PAREN_);
+		lexer(OPEN_PAREN);
 		AST expr = ASSIGNMENT_EXPRESSION(true, true, false); // allow comparators, allow IN keyword, do NOT allow multidim
 																													// indices expressions
-		lexer(_CLOSE_PAREN_);
-		AST block = BLOCK_OR_STMT();
+		lexer(CLOSE_PAREN);
+		AST block = BLOCKORSTMT();
 		return new WhileStatement_AST(expr, block);
 	}
 
@@ -1771,8 +1771,8 @@ public class AwkParser {
 		AST expr1 = null;
 		AST expr2 = null;
 		AST expr3 = null;
-		lexer(_OPEN_PAREN_);
-		expr1 = OPT_SIMPLE_STATEMENT(false); // false = "no in keyword allowed"
+		lexer(OPEN_PAREN);
+		expr1 = OPTSIMPLESTATEMENT(false); // false = "no in keyword allowed"
 
 		// branch here if we expect a for(... in ...) statement
 		if (token == KEYWORDS.get("in")) {
@@ -1787,7 +1787,7 @@ public class AwkParser {
 			// in
 			lexer();
 			// id
-			if (token != _ID_) {
+			if (token != ID) {
 				throw new ParserException(
 						"Expecting an ARRAY ID for 'in' statement. Got " + toTokenString(token) + ": " + text);
 			}
@@ -1798,35 +1798,35 @@ public class AwkParser {
 
 			lexer();
 			// close paren ...
-			lexer(_CLOSE_PAREN_);
-			AST block = BLOCK_OR_STMT();
+			lexer(CLOSE_PAREN);
+			AST block = BLOCKORSTMT();
 			return new ForInStatement_AST(expr1, array_id_ast, block);
 		}
 
-		if (token == _SEMICOLON_) {
+		if (token == SEMICOLON) {
 			lexer();
 		} else {
 			throw new ParserException("Expecting ;. Got " + toTokenString(token) + ": " + text);
 		}
-		if (token != _SEMICOLON_) {
+		if (token != SEMICOLON) {
 			expr2 = ASSIGNMENT_EXPRESSION(true, true, false); // allow comparators, allow IN keyword, do NOT allow multidim
 																												// indices expressions
 		}
-		if (token == _SEMICOLON_) {
+		if (token == SEMICOLON) {
 			lexer();
 		} else {
 			throw new ParserException("Expecting ;. Got " + toTokenString(token) + ": " + text);
 		}
-		if (token != _CLOSE_PAREN_) {
-			expr3 = OPT_SIMPLE_STATEMENT(true); // true = "allow the in keyword"
+		if (token != CLOSE_PAREN) {
+			expr3 = OPTSIMPLESTATEMENT(true); // true = "allow the in keyword"
 		}
-		lexer(_CLOSE_PAREN_);
-		AST block = BLOCK_OR_STMT();
+		lexer(CLOSE_PAREN);
+		AST block = BLOCKORSTMT();
 		return new ForStatement_AST(expr1, expr2, expr3, block);
 	}
 
-	AST OPT_SIMPLE_STATEMENT(boolean allow_in_keyword) throws IOException {
-		if (token == _SEMICOLON_) {
+	AST OPTSIMPLESTATEMENT(boolean allow_in_keyword) throws IOException {
+		if (token == SEMICOLON) {
 			return null;
 		} else if (token == KEYWORDS.get("delete")) {
 			return DELETE_STATEMENT();
@@ -1844,12 +1844,12 @@ public class AwkParser {
 		boolean parens = c == '(';
 		expectKeyword("delete");
 		if (parens) {
-			assert token == _OPEN_PAREN_;
+			assert token == OPEN_PAREN;
 			lexer();
 		}
 		AST symbol_ast = SYMBOL(true, true); // allow comparators
 		if (parens) {
-			lexer(_CLOSE_PAREN_);
+			lexer(CLOSE_PAREN);
 		}
 
 		return new DeleteStatement_AST(symbol_ast);
@@ -1886,26 +1886,26 @@ public class AwkParser {
 		AST output_expr;
 		if (parens) {
 			lexer();
-			if (token == _CLOSE_PAREN_) {
+			if (token == CLOSE_PAREN) {
 				func_params = null;
 			} else {
 				func_params = EXPRESSION_LIST(true, true); // comparators are allowed, and also in expression
 			}
-			lexer(_CLOSE_PAREN_);
+			lexer(CLOSE_PAREN);
 		} else {
-			if (token == _NEWLINE_
-					|| token == _SEMICOLON_
-					|| token == _CLOSE_BRACE_
-					|| token == _CLOSE_PAREN_
-					|| token == _GT_
-					|| token == _APPEND_
-					|| token == _PIPE_) {
+			if (token == NEWLINE
+					|| token == SEMICOLON
+					|| token == CLOSE_BRACE
+					|| token == CLOSE_PAREN
+					|| token == GT
+					|| token == APPEND
+					|| token == PIPE) {
 				func_params = null;
 			} else {
 				func_params = EXPRESSION_LIST(false, true); // NO comparators allowed, allow in expression
 			}
 		}
-		if (token == _GT_ || token == _APPEND_ || token == _PIPE_) {
+		if (token == GT || token == APPEND || token == PIPE) {
 			output_token = token;
 			lexer();
 			output_expr = ASSIGNMENT_EXPRESSION(true, true, false); // true = allow comparators, allow IN keyword, do NOT
@@ -1946,7 +1946,7 @@ public class AwkParser {
 		if (lvalue == null) {
 			throw new ParserException("Missing lvalue in getline expression");
 		}
-		if (token == _LT_) {
+		if (token == LT) {
 			lexer();
 			AST assignment_expr = ASSIGNMENT_EXPRESSION(not_in_print_root, allow_in_keyword, false); // do NOT allow multidim
 																																																// indices expressions
@@ -1959,10 +1959,10 @@ public class AwkParser {
 
 	AST LVALUE(boolean not_in_print_root, boolean allow_in_keyword) throws IOException {
 		// false = do NOT allow multi dimension indices expressions
-		if (token == _DOLLAR_) {
+		if (token == DOLLAR) {
 			return FACTOR(not_in_print_root, allow_in_keyword, false);
 		}
-		if (token == _ID_) {
+		if (token == ID) {
 			return FACTOR(not_in_print_root, allow_in_keyword, false);
 		}
 		return null;
@@ -1971,22 +1971,22 @@ public class AwkParser {
 	AST DO_STATEMENT() throws IOException {
 		expectKeyword("do");
 		opt_newline();
-		AST block = BLOCK_OR_STMT();
-		if (token == _SEMICOLON_) {
+		AST block = BLOCKORSTMT();
+		if (token == SEMICOLON) {
 			lexer();
 		}
 		opt_newline();
 		expectKeyword("while");
-		lexer(_OPEN_PAREN_);
+		lexer(OPEN_PAREN);
 		AST expr = ASSIGNMENT_EXPRESSION(true, true, false); // true = allow comparators, allow IN keyword, do NOT allow
 																													// multidim indices expressions
-		lexer(_CLOSE_PAREN_);
+		lexer(CLOSE_PAREN);
 		return new DoStatement_AST(block, expr);
 	}
 
 	AST RETURN_STATEMENT() throws IOException {
 		expectKeyword("return");
-		if (token == _SEMICOLON_ || token == _NEWLINE_ || token == _CLOSE_BRACE_) {
+		if (token == SEMICOLON || token == NEWLINE || token == CLOSE_BRACE) {
 			return new ReturnStatement_AST(null);
 		} else {
 			return new ReturnStatement_AST(ASSIGNMENT_EXPRESSION(true, true, false)); // true = allow comparators, allow IN
@@ -1997,7 +1997,7 @@ public class AwkParser {
 
 	AST EXIT_STATEMENT() throws IOException {
 		expectKeyword("exit");
-		if (token == _SEMICOLON_ || token == _NEWLINE_ || token == _CLOSE_BRACE_) {
+		if (token == SEMICOLON || token == NEWLINE || token == CLOSE_BRACE) {
 			return new ExitStatement_AST(null);
 		} else {
 			return new ExitStatement_AST(ASSIGNMENT_EXPRESSION(true, true, false)); // true = allow comparators, allow IN
@@ -2009,7 +2009,7 @@ public class AwkParser {
 	AST SLEEP_STATEMENT() throws IOException {
 		boolean parens = c == '(';
 		expectKeyword("_sleep");
-		if (token == _SEMICOLON_ || token == _NEWLINE_ || token == _CLOSE_BRACE_) {
+		if (token == SEMICOLON || token == NEWLINE || token == CLOSE_BRACE) {
 			return new SleepStatement_AST(null);
 		} else {
 			// allow for a blank param list: "()" using the parens boolean below
@@ -2018,7 +2018,7 @@ public class AwkParser {
 				lexer();
 			}
 			AST sleep_ast;
-			if (token == _CLOSE_PAREN_) {
+			if (token == CLOSE_PAREN) {
 				sleep_ast = new SleepStatement_AST(null);
 			} else {
 				sleep_ast = new SleepStatement_AST(ASSIGNMENT_EXPRESSION(true, true, false)); // true = allow comparators, allow
@@ -2026,7 +2026,7 @@ public class AwkParser {
 																																											// multidim indices expressions
 			}
 			if (parens) {
-				lexer(_CLOSE_PAREN_);
+				lexer(CLOSE_PAREN);
 			}
 			return sleep_ast;
 		}
@@ -2035,20 +2035,20 @@ public class AwkParser {
 	AST DUMP_STATEMENT() throws IOException {
 		boolean parens = c == '(';
 		expectKeyword("_dump");
-		if (token == _SEMICOLON_ || token == _NEWLINE_ || token == _CLOSE_BRACE_) {
+		if (token == SEMICOLON || token == NEWLINE || token == CLOSE_BRACE) {
 			return new DumpStatement_AST(null);
 		} else {
 			if (parens) {
 				lexer();
 			}
 			AST dump_ast;
-			if (token == _CLOSE_PAREN_) {
+			if (token == CLOSE_PAREN) {
 				dump_ast = new DumpStatement_AST(null);
 			} else {
 				dump_ast = new DumpStatement_AST(EXPRESSION_LIST(true, true)); // true = allow comparators, allow IN keyword
 			}
 			if (parens) {
-				lexer(_CLOSE_PAREN_);
+				lexer(CLOSE_PAREN);
 			}
 			return dump_ast;
 		}
@@ -3032,21 +3032,21 @@ public class AwkParser {
 					throw new SemanticException("Cannot use " + id_ast + " as a scalar. It is an array.");
 				}
 				id_ast.setScalar(true);
-				if (op == _EQUALS_) {
+				if (op == EQUALS) {
 					// Expected side effect:
 					// Upon assignment, if the var is RS, reapply RS to input streams.
 					tuples.assign(id_ast.offset, id_ast.is_global);
-				} else if (op == _PLUS_EQ_) {
+				} else if (op == PLUS_EQ) {
 					tuples.plusEq(id_ast.offset, id_ast.is_global);
-				} else if (op == _MINUS_EQ_) {
+				} else if (op == MINUS_EQ) {
 					tuples.minusEq(id_ast.offset, id_ast.is_global);
-				} else if (op == _MULT_EQ_) {
+				} else if (op == MULT_EQ) {
 					tuples.multEq(id_ast.offset, id_ast.is_global);
-				} else if (op == _DIV_EQ_) {
+				} else if (op == DIV_EQ) {
 					tuples.divEq(id_ast.offset, id_ast.is_global);
-				} else if (op == _MOD_EQ_) {
+				} else if (op == MOD_EQ) {
 					tuples.modEq(id_ast.offset, id_ast.is_global);
-				} else if (op == _POW_EQ_) {
+				} else if (op == POW_EQ) {
 					tuples.powEq(id_ast.offset, id_ast.is_global);
 				} else {
 					throw new Error("Unhandled op: " + op + " / " + text);
@@ -3066,19 +3066,19 @@ public class AwkParser {
 					throw new SemanticException("Cannot use " + id_ast + " as an array. It is a scalar.");
 				}
 				id_ast.setArray(true);
-				if (op == _EQUALS_) {
+				if (op == EQUALS) {
 					tuples.assignArray(id_ast.offset, id_ast.is_global);
-				} else if (op == _PLUS_EQ_) {
+				} else if (op == PLUS_EQ) {
 					tuples.plusEqArray(id_ast.offset, id_ast.is_global);
-				} else if (op == _MINUS_EQ_) {
+				} else if (op == MINUS_EQ) {
 					tuples.minusEqArray(id_ast.offset, id_ast.is_global);
-				} else if (op == _MULT_EQ_) {
+				} else if (op == MULT_EQ) {
 					tuples.multEqArray(id_ast.offset, id_ast.is_global);
-				} else if (op == _DIV_EQ_) {
+				} else if (op == DIV_EQ) {
 					tuples.divEqArray(id_ast.offset, id_ast.is_global);
-				} else if (op == _MOD_EQ_) {
+				} else if (op == MOD_EQ) {
 					tuples.modEqArray(id_ast.offset, id_ast.is_global);
-				} else if (op == _POW_EQ_) {
+				} else if (op == POW_EQ) {
 					tuples.powEqArray(id_ast.offset, id_ast.is_global);
 				} else {
 					throw new NotImplementedError("Unhandled op: " + op + " / " + text + " for arrays.");
@@ -3090,19 +3090,19 @@ public class AwkParser {
 				assert ast1_result == 1;
 				// stack contains eval of dollar arg
 
-				if (op == _EQUALS_) {
+				if (op == EQUALS) {
 					tuples.assignAsInputField();
-				} else if (op == _PLUS_EQ_) {
+				} else if (op == PLUS_EQ) {
 					tuples.plusEqInputField();
-				} else if (op == _MINUS_EQ_) {
+				} else if (op == MINUS_EQ) {
 					tuples.minusEqInputField();
-				} else if (op == _MULT_EQ_) {
+				} else if (op == MULT_EQ) {
 					tuples.multEqInputField();
-				} else if (op == _DIV_EQ_) {
+				} else if (op == DIV_EQ) {
 					tuples.divEqInputField();
-				} else if (op == _MOD_EQ_) {
+				} else if (op == MOD_EQ) {
 					tuples.modEqInputField();
-				} else if (op == _POW_EQ_) {
+				} else if (op == POW_EQ) {
 					tuples.powEqInputField();
 				} else {
 					throw new NotImplementedError("Unhandled op: " + op + " / " + text + " for dollar expressions.");
@@ -3181,24 +3181,24 @@ public class AwkParser {
 
 			// 2 values on the stack
 
-			if (op == _EQ_) {
+			if (op == EQ) {
 				tuples.cmpEq();
-			} else if (op == _NE_) {
+			} else if (op == NE) {
 				tuples.cmpEq();
 				tuples.not();
-			} else if (op == _LT_) {
+			} else if (op == LT) {
 				tuples.cmpLt();
-			} else if (op == _GT_) {
+			} else if (op == GT) {
 				tuples.cmpGt();
-			} else if (op == _LE_) {
+			} else if (op == LE) {
 				tuples.cmpGt();
 				tuples.not();
-			} else if (op == _GE_) {
+			} else if (op == GE) {
 				tuples.cmpLt();
 				tuples.not();
-			} else if (op == _MATCHES_) {
+			} else if (op == MATCHES) {
 				tuples.matches();
-			} else if (op == _NOT_MATCHES_) {
+			} else if (op == NOT_MATCHES) {
 				tuples.matches();
 				tuples.not();
 			} else {
@@ -3237,10 +3237,10 @@ public class AwkParser {
 			int ast1_result = ast1.populateTuples(tuples);
 			assert ast1_result == 1;
 			tuples.dup();
-			if (op == _OR_) {
+			if (op == OR) {
 				// short_circuit when op is OR and 1st arg is true
 				tuples.ifTrue(end);
-			} else if (op == _AND_) {
+			} else if (op == AND) {
 				tuples.ifFalse(end);
 			} else {
 				assert false : "Invalid op: " + op + " / " + text;
@@ -3284,17 +3284,17 @@ public class AwkParser {
 			assert ast1_result == 1;
 			int ast2_result = ast2.populateTuples(tuples);
 			assert ast2_result == 1;
-			if (op == _PLUS_) {
+			if (op == PLUS) {
 				tuples.add();
-			} else if (op == _MINUS_) {
+			} else if (op == MINUS) {
 				tuples.subtract();
-			} else if (op == _MULT_) {
+			} else if (op == MULT) {
 				tuples.multiply();
-			} else if (op == _DIVIDE_) {
+			} else if (op == DIVIDE) {
 				tuples.divide();
-			} else if (op == _MOD_) {
+			} else if (op == MOD) {
 				tuples.mod();
-			} else if (op == _POW_) {
+			} else if (op == POW) {
 				tuples.pow();
 			} else {
 				throw new Error("Unhandled op: " + op + " / " + this);
@@ -3685,14 +3685,14 @@ public class AwkParser {
 		private BuiltinFunctionCall_AST(String id, AST params) {
 			super(params);
 			this.id = id;
-			assert BUILTIN_FUNC_NAMES.get(id) != null;
-			this.f_idx = BUILTIN_FUNC_NAMES.get(id);
+			assert BUILTINFUNCNAMES.get(id) != null;
+			this.f_idx = BUILTINFUNCNAMES.get(id);
 		}
 
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (f_idx == BUILTIN_FUNC_NAMES.get("sprintf")) {
+			if (f_idx == BUILTINFUNCNAMES.get("sprintf")) {
 				if (ast1 == null) {
 					throw new SemanticException("sprintf requires at least 1 argument");
 				}
@@ -3703,7 +3703,7 @@ public class AwkParser {
 				tuples.sprintf(ast1_result);
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("close")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("close")) {
 				if (ast1 == null) {
 					throw new SemanticException("close requires 1 argument");
 				}
@@ -3714,7 +3714,7 @@ public class AwkParser {
 				tuples.close();
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("length")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("length")) {
 				if (ast1 == null) {
 					tuples.length(0);
 				} else {
@@ -3726,7 +3726,7 @@ public class AwkParser {
 				}
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("srand")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("srand")) {
 				if (ast1 == null) {
 					tuples.srand(0);
 				} else {
@@ -3738,14 +3738,14 @@ public class AwkParser {
 				}
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("rand")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("rand")) {
 				if (ast1 != null) {
 					throw new SemanticException("rand does not take arguments");
 				}
 				tuples.rand();
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("sqrt")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("sqrt")) {
 				int ast1_result = ast1.populateTuples(tuples);
 				if (ast1_result != 1) {
 					throw new SemanticException("sqrt requires only 1 argument");
@@ -3753,7 +3753,7 @@ public class AwkParser {
 				tuples.sqrt();
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("int")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("int")) {
 				int ast1_result = ast1.populateTuples(tuples);
 				if (ast1_result != 1) {
 					throw new SemanticException("int requires only 1 argument");
@@ -3761,7 +3761,7 @@ public class AwkParser {
 				tuples.intFunc();
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("log")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("log")) {
 				int ast1_result = ast1.populateTuples(tuples);
 				if (ast1_result != 1) {
 					throw new SemanticException("int requires only 1 argument");
@@ -3769,7 +3769,7 @@ public class AwkParser {
 				tuples.log();
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("exp")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("exp")) {
 				int ast1_result = ast1.populateTuples(tuples);
 				if (ast1_result != 1) {
 					throw new SemanticException("exp requires only 1 argument");
@@ -3777,7 +3777,7 @@ public class AwkParser {
 				tuples.exp();
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("sin")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("sin")) {
 				int ast1_result = ast1.populateTuples(tuples);
 				if (ast1_result != 1) {
 					throw new SemanticException("sin requires only 1 argument");
@@ -3785,7 +3785,7 @@ public class AwkParser {
 				tuples.sin();
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("cos")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("cos")) {
 				int ast1_result = ast1.populateTuples(tuples);
 				if (ast1_result != 1) {
 					throw new SemanticException("cos requires only 1 argument");
@@ -3793,7 +3793,7 @@ public class AwkParser {
 				tuples.cos();
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("atan2")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("atan2")) {
 				int ast1_result = ast1.populateTuples(tuples);
 				if (ast1_result != 2) {
 					throw new SemanticException("atan2 requires 2 arguments");
@@ -3801,7 +3801,7 @@ public class AwkParser {
 				tuples.atan2();
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("match")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("match")) {
 				int ast1_result = ast1.populateTuples(tuples);
 				if (ast1_result != 2) {
 					throw new SemanticException("match requires 2 arguments");
@@ -3809,7 +3809,7 @@ public class AwkParser {
 				tuples.match();
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("index")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("index")) {
 				int ast1_result = ast1.populateTuples(tuples);
 				if (ast1_result != 2) {
 					throw new SemanticException("index requires 2 arguments");
@@ -3817,11 +3817,11 @@ public class AwkParser {
 				tuples.index();
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("sub") || f_idx == BUILTIN_FUNC_NAMES.get("gsub")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("sub") || f_idx == BUILTINFUNCNAMES.get("gsub")) {
 				if (ast1 == null || ast1.ast2 == null || ast1.ast2.ast1 == null) {
 					throw new SemanticException("sub needs at least 2 arguments");
 				}
-				boolean is_gsub = f_idx == BUILTIN_FUNC_NAMES.get("gsub");
+				boolean is_gsub = f_idx == BUILTINFUNCNAMES.get("gsub");
 
 				int numargs = ast1.populateTuples(tuples);
 
@@ -3862,7 +3862,7 @@ public class AwkParser {
 				}
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("split")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("split")) {
 				// split can take 2 or 3 args:
 				// split (string, array [,fs])
 				// the 2nd argument is pass by reference, which is ok (?)
@@ -3888,7 +3888,7 @@ public class AwkParser {
 				tuples.split(ast1_result);
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("substr")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("substr")) {
 				if (ast1 == null) {
 					throw new SemanticException("substr requires at least 2 arguments");
 				}
@@ -3899,7 +3899,7 @@ public class AwkParser {
 				tuples.substr(ast1_result);
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("tolower")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("tolower")) {
 				if (ast1 == null) {
 					throw new SemanticException("tolower requires 1 argument");
 				}
@@ -3910,7 +3910,7 @@ public class AwkParser {
 				tuples.tolower();
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("toupper")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("toupper")) {
 				if (ast1 == null) {
 					throw new SemanticException("toupper requires 1 argument");
 				}
@@ -3921,7 +3921,7 @@ public class AwkParser {
 				tuples.toupper();
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("system")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("system")) {
 				if (ast1 == null) {
 					throw new SemanticException("system requires 1 argument");
 				}
@@ -3932,7 +3932,7 @@ public class AwkParser {
 				tuples.system();
 				popSourceLineNumber(tuples);
 				return 1;
-			} else if (f_idx == BUILTIN_FUNC_NAMES.get("exec")) {
+			} else if (f_idx == BUILTINFUNCNAMES.get("exec")) {
 				if (ast1 == null) {
 					throw new SemanticException("exec requires 1 argument");
 				}
@@ -4000,7 +4000,7 @@ public class AwkParser {
 
 			FunctionDefParamList_AST ptr = this;
 			while (ptr != null) {
-				if (SPECIAL_VAR_NAMES.get(ptr.id) != null) {
+				if (SPECIALVARNAMES.get(ptr.id) != null) {
 					throw new SemanticException("Special variable " + ptr.id + " cannot be used as a formal parameter");
 				}
 				ptr = (FunctionDefParamList_AST) ptr.ast1;
@@ -4503,11 +4503,11 @@ public class AwkParser {
 				assert ast2_result == 1;
 			}
 
-			if (output_token == _GT_) {
+			if (output_token == GT) {
 				tuples.printToFile(param_count, false); // false = no append
-			} else if (output_token == _APPEND_) {
+			} else if (output_token == APPEND) {
 				tuples.printToFile(param_count, true); // false = no append
-			} else if (output_token == _PIPE_) {
+			} else if (output_token == PIPE) {
 				tuples.printToPipe(param_count);
 			} else {
 				tuples.print(param_count);
@@ -4639,11 +4639,11 @@ public class AwkParser {
 				assert ast2_result == 1;
 			}
 
-			if (output_token == _GT_) {
+			if (output_token == GT) {
 				tuples.printfToFile(param_count, false); // false = no append
-			} else if (output_token == _APPEND_) {
+			} else if (output_token == APPEND) {
 				tuples.printfToFile(param_count, true); // false = no append
-			} else if (output_token == _PIPE_) {
+			} else if (output_token == PIPE) {
 				tuples.printfToPipe(param_count);
 			} else {
 				tuples.printf(param_count);

@@ -278,8 +278,8 @@ public class AwkParser {
 	 */
 	private final AwkSymbolTableImpl symbol_table = new AwkSymbolTableImpl();
 
-	private final boolean additional_functions;
-	private final boolean additional_type_functions;
+	private final boolean additionalFunctions;
+	private final boolean additionalTypeFunctions;
 	private final Map<String, JawkExtension> extensions;
 
 	/**
@@ -287,14 +287,14 @@ public class AwkParser {
 	 * Constructor for AwkParser.
 	 * </p>
 	 *
-	 * @param additional_functions a boolean
-	 * @param additional_type_functions a boolean
+	 * @param additionalFunctions a boolean
+	 * @param additionalTypeFunctions a boolean
 	 * @param extensions a {@link java.util.Map} object
 	 */
-	public AwkParser(boolean additional_functions, boolean additional_type_functions,
+	public AwkParser(boolean additionalFunctions, boolean additionalTypeFunctions,
 			Map<String, JawkExtension> extensions) {
-		this.additional_functions = additional_functions;
-		this.additional_type_functions = additional_type_functions;
+		this.additionalFunctions = additionalFunctions;
+		this.additionalTypeFunctions = additionalTypeFunctions;
 		this.extensions = extensions == null ? Collections.emptyMap() : new HashMap<>(extensions);
 	}
 
@@ -537,10 +537,10 @@ public class AwkParser {
 		return "{" + token + "}";
 	}
 
-	private int lexer(int expected_token) throws IOException {
-		if (token != expected_token) {
+	private int lexer(int expectedToken) throws IOException {
+		if (token != expectedToken) {
 			throw new ParserException(
-					"Expecting " + toTokenString(expected_token) + ". Found: " + toTokenString(token) + " (" + text + ")");
+					"Expecting " + toTokenString(expectedToken) + ". Found: " + toTokenString(token) + " (" + text + ")");
 		}
 		return lexer();
 	}
@@ -823,9 +823,9 @@ public class AwkParser {
 			Integer kwToken = KEYWORDS.get(text.toString());
 			if (kwToken != null) {
 				int kw = kwToken.intValue();
-				boolean treatAsIdentifier = (!additional_functions && (kw == _KW_SLEEP_ || kw == _KW_DUMP_))
+				boolean treatAsIdentifier = (!additionalFunctions && (kw == _KW_SLEEP_ || kw == _KW_DUMP_))
 						||
-						(!additional_type_functions && (kw == _KW_INTEGER_ || kw == _KW_DOUBLE_ || kw == _KW_STRING_));
+						(!additionalTypeFunctions && (kw == _KW_INTEGER_ || kw == _KW_DOUBLE_ || kw == _KW_STRING_));
 				if (!treatAsIdentifier) {
 					token = kw;
 					return token;
@@ -835,7 +835,7 @@ public class AwkParser {
 			Integer builtinIdx = BUILTIN_FUNC_NAMES.get(text.toString());
 			if (builtinIdx != null) {
 				int idx = builtinIdx.intValue();
-				if (additional_functions || idx != F_EXEC) {
+				if (additionalFunctions || idx != F_EXEC) {
 					token = _BUILTIN_FUNC_NAME_;
 					return token;
 				}
@@ -1085,22 +1085,22 @@ public class AwkParser {
 	}
 
 	// EXPRESSION_LIST : ASSIGNMENT_EXPRESSION [, EXPRESSION_LIST]
-	AST EXPRESSION_LIST(boolean not_in_print_root, boolean allow_in_keyword) throws IOException {
-		AST expr = ASSIGNMENT_EXPRESSION(not_in_print_root, allow_in_keyword, false); // do NOT allow multidim indices
-																																									// expressions
+	AST EXPRESSION_LIST(boolean notInPrintRoot, boolean allowInKeyword) throws IOException {
+		AST expr = ASSIGNMENT_EXPRESSION(notInPrintRoot, allowInKeyword, false); // do NOT allow multidim indices
+																																							// expressions
 		if (token == _COMMA_) {
 			lexer();
 			opt_newline();
-			return new FunctionCallParamList_AST(expr, EXPRESSION_LIST(not_in_print_root, allow_in_keyword));
+			return new FunctionCallParamList_AST(expr, EXPRESSION_LIST(notInPrintRoot, allowInKeyword));
 		} else {
 			return new FunctionCallParamList_AST(expr, null);
 		}
 	}
 
 	// ASSIGNMENT_EXPRESSION = COMMA_EXPRESSION [ (=,+=,-=,*=) ASSIGNMENT_EXPRESSION ]
-	AST ASSIGNMENT_EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	AST ASSIGNMENT_EXPRESSION(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
-		AST comma_expression = COMMA_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+		AST comma_expression = COMMA_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 		int op = 0;
 		String txt = null;
 		AST assignment_expression = null;
@@ -1114,23 +1114,23 @@ public class AwkParser {
 			op = token;
 			txt = text.toString();
 			lexer();
-			assignment_expression = ASSIGNMENT_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+			assignment_expression = ASSIGNMENT_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 			return new AssignmentExpression_AST(comma_expression, op, txt, assignment_expression);
 		}
 		return comma_expression;
 	}
 
-	// COMMA_EXPRESSION = TERNARY_EXPRESSION [, COMMA_EXPRESSION] !!!ONLY IF!!! allow_multidim_indices is true
-	// allow_multidim_indices is set to true when we need (1,2,3,4) expressions to collapse into an array index expression
+	// COMMA_EXPRESSION = TERNARY_EXPRESSION [, COMMA_EXPRESSION] !!!ONLY IF!!! allowMultidimIndices is true
+	// allowMultidimIndices is set to true when we need (1,2,3,4) expressions to collapse into an array index expression
 	// (converts 1,2,3,4 to 1 SUBSEP 2 SUBSEP 3 SUBSEP 4) after an open parenthesis (grouping) expression starter
-	AST COMMA_EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	AST COMMA_EXPRESSION(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
-		AST concat_expression = TERNARY_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
-		if (allow_multidim_indices && token == _COMMA_) {
+		AST concat_expression = TERNARY_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
+		if (allowMultidimIndices && token == _COMMA_) {
 			// consume the comma
 			lexer();
 			opt_newline();
-			AST rest = COMMA_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+			AST rest = COMMA_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 			if (rest instanceof ArrayIndex_AST) {
 				return new ArrayIndex_AST(concat_expression, rest);
 			} else {
@@ -1142,14 +1142,14 @@ public class AwkParser {
 	}
 
 	// TERNARY_EXPRESSION = LOGICAL_OR_EXPRESSION [ ? TERNARY_EXPRESSION : TERNARY_EXPRESSION ]
-	AST TERNARY_EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	AST TERNARY_EXPRESSION(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
-		AST le1 = LOGICAL_OR_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+		AST le1 = LOGICAL_OR_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 		if (token == _QUESTION_MARK_) {
 			lexer();
-			AST true_block = TERNARY_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+			AST true_block = TERNARY_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 			lexer(_COLON_);
-			AST false_block = TERNARY_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+			AST false_block = TERNARY_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 			return new TernaryExpression_AST(le1, true_block, false_block);
 		} else {
 			return le1;
@@ -1157,9 +1157,9 @@ public class AwkParser {
 	}
 
 	// LOGICAL_OR_EXPRESSION = LOGICAL_AND_EXPRESSION [ || LOGICAL_OR_EXPRESSION ]
-	AST LOGICAL_OR_EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	AST LOGICAL_OR_EXPRESSION(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
-		AST le2 = LOGICAL_AND_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+		AST le2 = LOGICAL_AND_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 		int op = 0;
 		String txt = null;
 		AST le1 = null;
@@ -1167,16 +1167,16 @@ public class AwkParser {
 			op = token;
 			txt = text.toString();
 			lexer();
-			le1 = LOGICAL_OR_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+			le1 = LOGICAL_OR_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 			return new LogicalExpression_AST(le2, op, txt, le1);
 		}
 		return le2;
 	}
 
 	// LOGICAL_AND_EXPRESSION = IN_EXPRESSION [ && LOGICAL_AND_EXPRESSION ]
-	AST LOGICAL_AND_EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	AST LOGICAL_AND_EXPRESSION(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
-		AST comparison_expression = IN_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+		AST comparison_expression = IN_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 		int op = 0;
 		String txt = null;
 		AST le2 = null;
@@ -1184,35 +1184,35 @@ public class AwkParser {
 			op = token;
 			txt = text.toString();
 			lexer();
-			le2 = LOGICAL_AND_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+			le2 = LOGICAL_AND_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 			return new LogicalExpression_AST(comparison_expression, op, txt, le2);
 		}
 		return comparison_expression;
 	}
 
 	// IN_EXPRESSION = MATCHING_EXPRESSION [ IN_EXPRESSION ]
-	// allow_in_keyword is set false while parsing the first expression within
+	// allowInKeyword is set false while parsing the first expression within
 	// a for() statement (because it could be "for (key in arr)", and this
 	// production will consume and the for statement will never have a chance
 	// of processing it
 	// all other times, it is true
-	AST IN_EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	AST IN_EXPRESSION(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
 		// true = allow post_inc/dec operators
-		AST comparison = MATCHING_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
-		if (allow_in_keyword && token == KEYWORDS.get("in")) {
+		AST comparison = MATCHING_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
+		if (allowInKeyword && token == KEYWORDS.get("in")) {
 			lexer();
 			return new InExpression_AST(
 					comparison,
-					IN_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices));
+					IN_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices));
 		}
 		return comparison;
 	}
 
 	// MATCHING_EXPRESSION = COMPARISON_EXPRESSION [ (~,!~) MATCHING_EXPRESSION ]
-	AST MATCHING_EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	AST MATCHING_EXPRESSION(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
-		AST expression = COMPARISON_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+		AST expression = COMPARISON_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 		int op = 0;
 		String txt = null;
 		AST comparison_expression = null;
@@ -1220,18 +1220,18 @@ public class AwkParser {
 			op = token;
 			txt = text.toString();
 			lexer();
-			comparison_expression = MATCHING_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+			comparison_expression = MATCHING_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 			return new ComparisonExpression_AST(expression, op, txt, comparison_expression);
 		}
 		return expression;
 	}
 
 	// COMPARISON_EXPRESSION = CONCAT_EXPRESSION [ (==,>,>=,<,<=,!=,|) COMPARISON_EXPRESSION ]
-	// not_in_print_root is set false when within a print/printf statement;
+	// notInPrintRoot is set false when within a print/printf statement;
 	// all other times it is set true
-	AST COMPARISON_EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	AST COMPARISON_EXPRESSION(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
-		AST expression = CONCAT_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+		AST expression = CONCAT_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 		int op = 0;
 		String txt = null;
 		AST comparison_expression = null;
@@ -1241,24 +1241,24 @@ public class AwkParser {
 				|| token == _LT_
 				|| token == _LE_
 				|| token == _NE_
-				|| (token == _GT_ && not_in_print_root)) {
+				|| (token == _GT_ && notInPrintRoot)) {
 			op = token;
 			txt = text.toString();
 			lexer();
-			comparison_expression = COMPARISON_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+			comparison_expression = COMPARISON_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 			return new ComparisonExpression_AST(expression, op, txt, comparison_expression);
-		} else if (not_in_print_root && token == _PIPE_) {
+		} else if (notInPrintRoot && token == _PIPE_) {
 			lexer();
-			return GETLINE_EXPRESSION(expression, not_in_print_root, allow_in_keyword);
+			return GETLINE_EXPRESSION(expression, notInPrintRoot, allowInKeyword);
 		}
 
 		return expression;
 	}
 
 	// CONCAT_EXPRESSION = EXPRESSION [ CONCAT_EXPRESSION ]
-	AST CONCAT_EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	AST CONCAT_EXPRESSION(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
-		AST te = EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+		AST te = EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 		if (token == _INTEGER_
 				||
 				token == _DOUBLE_
@@ -1283,30 +1283,30 @@ public class AwkParser {
 			// allow concatination here only when certain tokens follow
 			return new ConcatExpression_AST(
 					te,
-					CONCAT_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices));
+					CONCAT_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices));
 		} else
-			if (additional_type_functions
+			if (additionalTypeFunctions
 					&& (token == KEYWORDS.get("_INTEGER")
 							|| token == KEYWORDS.get("_DOUBLE")
 							|| token == KEYWORDS.get("_STRING"))) {
 								// allow concatenation here only when certain tokens follow
 								return new ConcatExpression_AST(
 										te,
-										CONCAT_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices));
+										CONCAT_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices));
 							} else {
 								return te;
 							}
 	}
 
 	// EXPRESSION : TERM [ (+|-) EXPRESSION ]
-	AST EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	AST EXPRESSION(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
-		AST term = TERM(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+		AST term = TERM(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 		while (token == _PLUS_ || token == _MINUS_) {
 			int op = token;
 			String txt = text.toString();
 			lexer();
-			AST nextTerm = TERM(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+			AST nextTerm = TERM(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 
 			// Build the tree in left-associative manner
 			term = new BinaryExpression_AST(term, op, txt, nextTerm);
@@ -1315,13 +1315,13 @@ public class AwkParser {
 	}
 
 	// TERM : UNARY_FACTOR [ (*|/|%) TERM ]
-	AST TERM(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices) throws IOException {
-		AST unaryFactor = UNARY_FACTOR(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+	AST TERM(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices) throws IOException {
+		AST unaryFactor = UNARY_FACTOR(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 		while (token == _MULT_ || token == _DIVIDE_ || token == _MOD_) {
 			int op = token;
 			String txt = text.toString();
 			lexer();
-			AST nextUnaryFactor = UNARY_FACTOR(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+			AST nextUnaryFactor = UNARY_FACTOR(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 
 			// Build the tree in left-associative manner
 			unaryFactor = new BinaryExpression_AST(unaryFactor, op, txt, nextUnaryFactor);
@@ -1330,31 +1330,31 @@ public class AwkParser {
 	}
 
 	// UNARY_FACTOR : [ ! | - | + ] POWER_FACTOR
-	AST UNARY_FACTOR(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	AST UNARY_FACTOR(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
 		if (token == _NOT_) {
 			lexer();
-			return new NotExpression_AST(POWER_FACTOR(not_in_print_root, allow_in_keyword, allow_multidim_indices));
+			return new NotExpression_AST(POWER_FACTOR(notInPrintRoot, allowInKeyword, allowMultidimIndices));
 		} else if (token == _MINUS_) {
 			lexer();
-			return new NegativeExpression_AST(POWER_FACTOR(not_in_print_root, allow_in_keyword, allow_multidim_indices));
+			return new NegativeExpression_AST(POWER_FACTOR(notInPrintRoot, allowInKeyword, allowMultidimIndices));
 		} else if (token == _PLUS_) {
 			lexer();
-			return new UnaryPlusExpression_AST(POWER_FACTOR(not_in_print_root, allow_in_keyword, allow_multidim_indices));
+			return new UnaryPlusExpression_AST(POWER_FACTOR(notInPrintRoot, allowInKeyword, allowMultidimIndices));
 		} else {
-			return POWER_FACTOR(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+			return POWER_FACTOR(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 		}
 	}
 
 	// POWER_FACTOR : FACTOR_FOR_INCDEC [ ^ POWER_FACTOR ]
-	AST POWER_FACTOR(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	AST POWER_FACTOR(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
-		AST incdec_ast = FACTOR_FOR_INCDEC(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+		AST incdec_ast = FACTOR_FOR_INCDEC(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 		if (token == _POW_) {
 			int op = token;
 			String txt = text.toString();
 			lexer();
-			AST term = POWER_FACTOR(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+			AST term = POWER_FACTOR(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 
 			return new BinaryExpression_AST(incdec_ast, op, txt, term);
 		}
@@ -1368,7 +1368,7 @@ public class AwkParser {
 		return (ast instanceof ID_AST) || (ast instanceof ArrayReference_AST) || (ast instanceof DollarExpression_AST);
 	}
 
-	AST FACTOR_FOR_INCDEC(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	AST FACTOR_FOR_INCDEC(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
 		boolean pre_inc = false;
 		boolean pre_dec = false;
@@ -1382,7 +1382,7 @@ public class AwkParser {
 			lexer();
 		}
 
-		AST factor_ast = FACTOR(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+		AST factor_ast = FACTOR(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 
 		if ((pre_inc || pre_dec) && !isLvalue(factor_ast)) {
 			throw new ParserException("Cannot pre inc/dec a non-lvalue");
@@ -1420,13 +1420,13 @@ public class AwkParser {
 
 	// FACTOR : '(' ASSIGNMENT_EXPRESSION ')' | _INTEGER_ | _DOUBLE_ | _STRING_ | GETLINE [ID-or-array-or-$val] | /[=].../
 	// | [++|--] SYMBOL [++|--]
-	// AST FACTOR(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_post_incdec_operators)
-	AST FACTOR(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices) throws IOException {
+	// AST FACTOR(boolean notInPrintRoot, boolean allowInKeyword, boolean allow_post_incdec_operators)
+	AST FACTOR(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices) throws IOException {
 		if (token == _OPEN_PAREN_) {
 			lexer();
 			// true = allow multi-dimensional array indices (i.e., commas for 1,2,3,4)
-			AST assignment_expression = ASSIGNMENT_EXPRESSION(true, allow_in_keyword, true);
-			if (allow_multidim_indices && (assignment_expression instanceof ArrayIndex_AST)) {
+			AST assignment_expression = ASSIGNMENT_EXPRESSION(true, allowInKeyword, true);
+			if (allowMultidimIndices && (assignment_expression instanceof ArrayIndex_AST)) {
 				throw new ParserException("Cannot nest multi-dimensional array index expressions.");
 			}
 			lexer(_CLOSE_PAREN_);
@@ -1444,7 +1444,7 @@ public class AwkParser {
 			lexer();
 			return str;
 		} else if (token == KEYWORDS.get("getline")) {
-			return GETLINE_EXPRESSION(null, not_in_print_root, allow_in_keyword);
+			return GETLINE_EXPRESSION(null, notInPrintRoot, allowInKeyword);
 		} else if (token == _DIVIDE_ || token == _DIV_EQ_) {
 			readRegexp();
 			if (token == _DIV_EQ_) {
@@ -1453,29 +1453,29 @@ public class AwkParser {
 			AST regexp_ast = symbol_table.addREGEXP(regexp.toString());
 			lexer();
 			return regexp_ast;
-		} else if (additional_type_functions && token == KEYWORDS.get("_INTEGER")) {
-			return INTEGER_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
-		} else if (additional_type_functions && token == KEYWORDS.get("_DOUBLE")) {
-			return DOUBLE_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
-		} else if (additional_type_functions && token == KEYWORDS.get("_STRING")) {
-			return STRING_EXPRESSION(not_in_print_root, allow_in_keyword, allow_multidim_indices);
+		} else if (additionalTypeFunctions && token == KEYWORDS.get("_INTEGER")) {
+			return INTEGER_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
+		} else if (additionalTypeFunctions && token == KEYWORDS.get("_DOUBLE")) {
+			return DOUBLE_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
+		} else if (additionalTypeFunctions && token == KEYWORDS.get("_STRING")) {
+			return STRING_EXPRESSION(notInPrintRoot, allowInKeyword, allowMultidimIndices);
 		} else {
 			if (token == _DOLLAR_) {
 				lexer();
 				if (token == _INC_ || token == _DEC_) {
 					return new DollarExpression_AST(
-							FACTOR_FOR_INCDEC(not_in_print_root, allow_in_keyword, allow_multidim_indices));
+							FACTOR_FOR_INCDEC(notInPrintRoot, allowInKeyword, allowMultidimIndices));
 				}
 				if (token == _NOT_ || token == _MINUS_ || token == _PLUS_) {
-					return new DollarExpression_AST(UNARY_FACTOR(not_in_print_root, allow_in_keyword, allow_multidim_indices));
+					return new DollarExpression_AST(UNARY_FACTOR(notInPrintRoot, allowInKeyword, allowMultidimIndices));
 				}
-				return new DollarExpression_AST(FACTOR(not_in_print_root, allow_in_keyword, allow_multidim_indices));
+				return new DollarExpression_AST(FACTOR(notInPrintRoot, allowInKeyword, allowMultidimIndices));
 			}
-			return SYMBOL(not_in_print_root, allow_in_keyword);
+			return SYMBOL(notInPrintRoot, allowInKeyword);
 		}
 	}
 
-	AST INTEGER_EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	AST INTEGER_EXPRESSION(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
 		boolean parens = c == '(';
 		expectKeyword("_INTEGER");
@@ -1492,7 +1492,7 @@ public class AwkParser {
 				throw new ParserException("expression expected");
 			} else {
 				int_expr_ast = new IntegerExpression_AST(
-						ASSIGNMENT_EXPRESSION(not_in_print_root || parens, allow_in_keyword, allow_multidim_indices));
+						ASSIGNMENT_EXPRESSION(notInPrintRoot || parens, allowInKeyword, allowMultidimIndices));
 			}
 			if (parens) {
 				lexer(_CLOSE_PAREN_);
@@ -1501,7 +1501,7 @@ public class AwkParser {
 		}
 	}
 
-	AST DOUBLE_EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	AST DOUBLE_EXPRESSION(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
 		boolean parens = c == '(';
 		expectKeyword("_DOUBLE");
@@ -1518,7 +1518,7 @@ public class AwkParser {
 				throw new ParserException("expression expected");
 			} else {
 				double_expr_ast = new DoubleExpression_AST(
-						ASSIGNMENT_EXPRESSION(not_in_print_root || parens, allow_in_keyword, allow_multidim_indices));
+						ASSIGNMENT_EXPRESSION(notInPrintRoot || parens, allowInKeyword, allowMultidimIndices));
 			}
 			if (parens) {
 				lexer(_CLOSE_PAREN_);
@@ -1527,7 +1527,7 @@ public class AwkParser {
 		}
 	}
 
-	AST STRING_EXPRESSION(boolean not_in_print_root, boolean allow_in_keyword, boolean allow_multidim_indices)
+	AST STRING_EXPRESSION(boolean notInPrintRoot, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
 		boolean parens = c == '(';
 		expectKeyword("_STRING");
@@ -1544,7 +1544,7 @@ public class AwkParser {
 				throw new ParserException("expression expected");
 			} else {
 				string_expr_ast = new StringExpression_AST(
-						ASSIGNMENT_EXPRESSION(not_in_print_root || parens, allow_in_keyword, allow_multidim_indices));
+						ASSIGNMENT_EXPRESSION(notInPrintRoot || parens, allowInKeyword, allowMultidimIndices));
 			}
 			if (parens) {
 				lexer(_CLOSE_PAREN_);
@@ -1554,7 +1554,7 @@ public class AwkParser {
 	}
 
 	// SYMBOL : _ID_ [ '(' params ')' | '[' ASSIGNMENT_EXPRESSION ']' ]
-	AST SYMBOL(boolean not_in_print_root, boolean allow_in_keyword) throws IOException {
+	AST SYMBOL(boolean notInPrintRoot, boolean allowInKeyword) throws IOException {
 		if (token != _ID_ && token != _FUNC_ID_ && token != _BUILTIN_FUNC_NAME_ && token != _EXTENSION_) {
 			throw new ParserException("Expecting an ID. Got " + toTokenString(token) + ": " + text);
 		}
@@ -1574,7 +1574,7 @@ public class AwkParser {
 			 * if (token == _CLOSE_PAREN_)
 			 * params = null;
 			 * else
-			 * params = EXPRESSION_LIST(not_in_print_root, allow_in_keyword);
+			 * params = EXPRESSION_LIST(notInPrintRoot, allowInKeyword);
 			 * lexer(_CLOSE_PAREN_);
 			 * } else {
 			 * boolean parens = c == '(';
@@ -1583,8 +1583,8 @@ public class AwkParser {
 			 * assert token == _OPEN_PAREN_;
 			 * lexer();
 			 * }
-			 * //AST symbol_ast = SYMBOL(true,true); // allow comparators
-			 * params = EXPRESSION_LIST(not_in_print_root, allow_in_keyword);
+			 * //AST symbolAst = SYMBOL(true,true); // allow comparators
+			 * params = EXPRESSION_LIST(notInPrintRoot, allowInKeyword);
 			 * if (parens)
 			 * lexer(_CLOSE_PAREN_);
 			 * }
@@ -1596,7 +1596,7 @@ public class AwkParser {
 				if (token == _CLOSE_PAREN_) {
 					params = null;
 				} else { // ?//params = EXPRESSION_LIST(false,true); // NO comparators allowed, allow in expression
-					params = EXPRESSION_LIST(true, allow_in_keyword); // NO comparators allowed, allow in expression
+					params = EXPRESSION_LIST(true, allowInKeyword); // NO comparators allowed, allow in expression
 				}
 				lexer(_CLOSE_PAREN_);
 			} else {
@@ -1620,7 +1620,7 @@ public class AwkParser {
 					if (token == _CLOSE_PAREN_) {
 						params = null;
 					} else {
-						params = EXPRESSION_LIST(true, allow_in_keyword);
+						params = EXPRESSION_LIST(true, allowInKeyword);
 					}
 					lexer(_CLOSE_PAREN_);
 				} else {
@@ -1631,7 +1631,7 @@ public class AwkParser {
 				if (token == _CLOSE_PAREN_) {
 					params = null;
 				} else {
-					params = EXPRESSION_LIST(true, allow_in_keyword);
+					params = EXPRESSION_LIST(true, allowInKeyword);
 				}
 				lexer(_CLOSE_PAREN_);
 			}
@@ -1643,25 +1643,25 @@ public class AwkParser {
 		}
 		if (token == _OPEN_BRACKET_) {
 			lexer();
-			AST idx_ast = ARRAY_INDEX(true, allow_in_keyword);
+			AST idxAst = ARRAY_INDEX(true, allowInKeyword);
 			lexer(_CLOSE_BRACKET_);
 			if (token == _OPEN_BRACKET_) {
 				throw new ParserException("Use [a,b,c,...] instead of [a][b][c]... for multi-dimensional arrays.");
 			}
-			return symbol_table.addArrayReference(id, idx_ast);
+			return symbol_table.addArrayReference(id, idxAst);
 		}
 		return symbol_table.addID(id);
 	}
 
 	// ARRAY_INDEX : ASSIGNMENT_EXPRESSION [, ARRAY_INDEX]
-	AST ARRAY_INDEX(boolean not_in_print_root, boolean allow_in_keyword) throws IOException {
-		AST expr_ast = ASSIGNMENT_EXPRESSION(not_in_print_root, allow_in_keyword, false);
+	AST ARRAY_INDEX(boolean notInPrintRoot, boolean allowInKeyword) throws IOException {
+		AST exprAst = ASSIGNMENT_EXPRESSION(notInPrintRoot, allowInKeyword, false);
 		if (token == _COMMA_) {
 			opt_newline();
 			lexer();
-			return new ArrayIndex_AST(expr_ast, ARRAY_INDEX(not_in_print_root, allow_in_keyword));
+			return new ArrayIndex_AST(exprAst, ARRAY_INDEX(notInPrintRoot, allowInKeyword));
 		} else {
-			return new ArrayIndex_AST(expr_ast, null);
+			return new ArrayIndex_AST(exprAst, null);
 		}
 	}
 
@@ -1705,9 +1705,9 @@ public class AwkParser {
 				stmt = CONTINUE_STATEMENT();
 			} else if (token == KEYWORDS.get("break")) {
 				stmt = BREAK_STATEMENT();
-			} else if (additional_functions && token == KEYWORDS.get("_sleep")) {
+			} else if (additionalFunctions && token == KEYWORDS.get("_sleep")) {
 				stmt = SLEEP_STATEMENT();
-			} else if (additional_functions && token == KEYWORDS.get("_dump")) {
+			} else if (additionalFunctions && token == KEYWORDS.get("_dump")) {
 				stmt = DUMP_STATEMENT();
 			} else {
 				stmt = EXPRESSION_STATEMENT(true, false); // allow in keyword, do NOT allow NonStatement_ASTs
@@ -1720,16 +1720,16 @@ public class AwkParser {
 		return stmt;
 	}
 
-	AST EXPRESSION_STATEMENT(boolean allow_in_keyword, boolean allow_non_statement_asts) throws IOException {
+	AST EXPRESSION_STATEMENT(boolean allowInKeyword, boolean allowNonStatementAsts) throws IOException {
 		// true = allow comparators
 		// false = do NOT allow multi-dimensional array indices
-		// return new ExpressionStatement_AST(ASSIGNMENT_EXPRESSION(true, allow_in_keyword, false));
+		// return new ExpressionStatement_AST(ASSIGNMENT_EXPRESSION(true, allowInKeyword, false));
 
-		AST expr_ast = ASSIGNMENT_EXPRESSION(true, allow_in_keyword, false);
-		if (!allow_non_statement_asts && expr_ast instanceof NonStatement_AST) {
+		AST exprAst = ASSIGNMENT_EXPRESSION(true, allowInKeyword, false);
+		if (!allowNonStatementAsts && exprAst instanceof NonStatement_AST) {
 			throw new ParserException("Not a valid statement.");
 		}
-		return new ExpressionStatement_AST(expr_ast);
+		return new ExpressionStatement_AST(exprAst);
 	}
 
 	AST IF_STATEMENT() throws IOException {
@@ -1787,7 +1787,7 @@ public class AwkParser {
 		return BLOCK_OR_STMT(false);
 	}
 
-	AST BLOCK_OR_STMT(boolean require_terminator) throws IOException {
+	AST BLOCK_OR_STMT(boolean requireTerminator) throws IOException {
 		opt_newline();
 		AST block;
 		// HIJACK BRACES HERE SINCE WE MAY NOT HAVE A TERMINATOR AFTER THE CLOSING BRACE
@@ -1802,7 +1802,7 @@ public class AwkParser {
 			block = STATEMENT();
 			// NO TERMINATOR HERE!
 		}
-		if (require_terminator) {
+		if (requireTerminator) {
 			terminator();
 		}
 		return block;
@@ -1846,13 +1846,13 @@ public class AwkParser {
 			String arr_id = text.toString();
 
 			// not an indexed array reference!
-			AST array_id_ast = symbol_table.addArrayID(arr_id);
+			AST arrayIdAst = symbol_table.addArrayID(arr_id);
 
 			lexer();
 			// close paren ...
 			lexer(_CLOSE_PAREN_);
 			AST block = BLOCK_OR_STMT();
-			return new ForInStatement_AST(expr1, array_id_ast, block);
+			return new ForInStatement_AST(expr1, arrayIdAst, block);
 		}
 
 		if (token == _SEMICOLON_) {
@@ -1877,7 +1877,7 @@ public class AwkParser {
 		return new ForStatement_AST(expr1, expr2, expr3, block);
 	}
 
-	AST OPT_SIMPLE_STATEMENT(boolean allow_in_keyword) throws IOException {
+	AST OPT_SIMPLE_STATEMENT(boolean allowInKeyword) throws IOException {
 		if (token == _SEMICOLON_) {
 			return null;
 		} else if (token == KEYWORDS.get("delete")) {
@@ -1888,7 +1888,7 @@ public class AwkParser {
 			return PRINTF_STATEMENT();
 		} else {
 			// allow NonStatement_ASTs
-			return EXPRESSION_STATEMENT(allow_in_keyword, true);
+			return EXPRESSION_STATEMENT(allowInKeyword, true);
 		}
 	}
 
@@ -1899,12 +1899,12 @@ public class AwkParser {
 			assert token == _OPEN_PAREN_;
 			lexer();
 		}
-		AST symbol_ast = SYMBOL(true, true); // allow comparators
+		AST symbolAst = SYMBOL(true, true); // allow comparators
 		if (parens) {
 			lexer(_CLOSE_PAREN_);
 		}
 
-		return new DeleteStatement_AST(symbol_ast);
+		return new DeleteStatement_AST(symbolAst);
 	}
 
 	private static final class ParsedPrintStatement {
@@ -1992,30 +1992,30 @@ public class AwkParser {
 				parsedPrintStatement.getOutputExpr());
 	}
 
-	AST GETLINE_EXPRESSION(AST pipe_expr, boolean not_in_print_root, boolean allow_in_keyword) throws IOException {
+	AST GETLINE_EXPRESSION(AST pipeExpr, boolean notInPrintRoot, boolean allowInKeyword) throws IOException {
 		expectKeyword("getline");
-		AST lvalue = LVALUE(not_in_print_root, allow_in_keyword);
+		AST lvalue = LVALUE(notInPrintRoot, allowInKeyword);
 		if (lvalue == null) {
 			throw new ParserException("Missing lvalue in getline expression");
 		}
 		if (token == _LT_) {
 			lexer();
-			AST assignment_expr = ASSIGNMENT_EXPRESSION(not_in_print_root, allow_in_keyword, false); // do NOT allow multidim
-																																																// indices expressions
-			return pipe_expr == null ?
-					new Getline_AST(null, lvalue, assignment_expr) : new Getline_AST(pipe_expr, lvalue, assignment_expr);
+			AST assignment_expr = ASSIGNMENT_EXPRESSION(notInPrintRoot, allowInKeyword, false); // do NOT allow multidim
+																																													// indices expressions
+			return pipeExpr == null ?
+					new Getline_AST(null, lvalue, assignment_expr) : new Getline_AST(pipeExpr, lvalue, assignment_expr);
 		} else {
-			return pipe_expr == null ? new Getline_AST(null, lvalue, null) : new Getline_AST(pipe_expr, lvalue, null);
+			return pipeExpr == null ? new Getline_AST(null, lvalue, null) : new Getline_AST(pipeExpr, lvalue, null);
 		}
 	}
 
-	AST LVALUE(boolean not_in_print_root, boolean allow_in_keyword) throws IOException {
+	AST LVALUE(boolean notInPrintRoot, boolean allowInKeyword) throws IOException {
 		// false = do NOT allow multi dimension indices expressions
 		if (token == _DOLLAR_) {
-			return FACTOR(not_in_print_root, allow_in_keyword, false);
+			return FACTOR(notInPrintRoot, allowInKeyword, false);
 		}
 		if (token == _ID_) {
-			return FACTOR(not_in_print_root, allow_in_keyword, false);
+			return FACTOR(notInPrintRoot, allowInKeyword, false);
 		}
 		return null;
 	}
@@ -2446,20 +2446,20 @@ public class AwkParser {
 		return containsASTType(ast, new Class[] { cls });
 	}
 
-	private static boolean containsASTType(AST ast, Class<?>[] cls_array) {
+	private static boolean containsASTType(AST ast, Class<?>[] clsArray) {
 		if (ast == null) {
 			return false;
 		}
-		for (Class<?> cls : cls_array) {
+		for (Class<?> cls : clsArray) {
 			if (cls.isInstance(ast)) {
 				return true;
 			}
 		}
 		// prettier-ignore
-		return containsASTType(ast.ast1, cls_array)
-				|| containsASTType(ast.ast2, cls_array)
-				|| containsASTType(ast.ast3, cls_array)
-				|| containsASTType(ast.ast4, cls_array);
+		return containsASTType(ast.ast1, clsArray)
+				|| containsASTType(ast.ast2, clsArray)
+				|| containsASTType(ast.ast3, clsArray)
+				|| containsASTType(ast.ast4, clsArray);
 	}
 
 	private Address next_address;
@@ -2634,8 +2634,8 @@ public class AwkParser {
 	// made non-static to access the "next_address" field of the frontend
 	private final class Rule_AST extends AST implements Nextable {
 
-		private Rule_AST(AST opt_expression, AST opt_rule) {
-			super(opt_expression, opt_rule);
+		private Rule_AST(AST optExpression, AST optRule) {
+			super(optExpression, optRule);
 		}
 
 		@Override
@@ -2651,7 +2651,7 @@ public class AwkParser {
 			// result of whether to execute or not is on the stack
 			Address bypass_rule = tuples.createAddress("bypass_rule");
 			tuples.ifFalse(bypass_rule);
-			// execute the opt_rule here!
+			// execute the optRule here!
 			if (ast2 == null) {
 				if (ast1 == null || (!ast1.isBegin() && !ast1.isEnd())) {
 					// display $0
@@ -2937,8 +2937,8 @@ public class AwkParser {
 		private Address break_address;
 		private Address continue_address;
 
-		private ForInStatement_AST(AST key_id_ast, AST array_id_ast, AST block) {
-			super(key_id_ast, array_id_ast, block);
+		private ForInStatement_AST(AST keyIdAst, AST arrayIdAst, AST block) {
+			super(keyIdAst, arrayIdAst, block);
 		}
 
 		@Override
@@ -2959,11 +2959,11 @@ public class AwkParser {
 
 			assert ast2 != null;
 
-			ID_AST array_id_ast = (ID_AST) ast2;
-			if (array_id_ast.isScalar()) {
-				throw new SemanticException(array_id_ast + " is not an array");
+			ID_AST arrayIdAst = (ID_AST) ast2;
+			if (arrayIdAst.isScalar()) {
+				throw new SemanticException(arrayIdAst + " is not an array");
 			}
-			array_id_ast.setArray(true);
+			arrayIdAst.setArray(true);
 
 			break_address = tuples.createAddress("break_address");
 
@@ -2993,7 +2993,7 @@ public class AwkParser {
 			tuples.dup();
 			tuples.getFirstAndRemoveFromList();
 			// assign it to the id
-			tuples.assign(((ID_AST) ast1).offset, ((ID_AST) ast1).is_global);
+			tuples.assign(((ID_AST) ast1).offset, ((ID_AST) ast1).isGlobal);
 			tuples.pop(); // remove the assignment result
 
 			if (ast3 != null) {
@@ -3081,31 +3081,31 @@ public class AwkParser {
 			assert ast2_count == 1;
 			// here, stack contains one value
 			if (ast1 instanceof ID_AST) {
-				ID_AST id_ast = (ID_AST) ast1;
-				if (id_ast.isArray()) {
-					throw new SemanticException("Cannot use " + id_ast + " as a scalar. It is an array.");
+				ID_AST idAst = (ID_AST) ast1;
+				if (idAst.isArray()) {
+					throw new SemanticException("Cannot use " + idAst + " as a scalar. It is an array.");
 				}
-				id_ast.setScalar(true);
+				idAst.setScalar(true);
 				if (op == _EQUALS_) {
 					// Expected side effect:
 					// Upon assignment, if the var is RS, reapply RS to input streams.
-					tuples.assign(id_ast.offset, id_ast.is_global);
+					tuples.assign(idAst.offset, idAst.isGlobal);
 				} else if (op == _PLUS_EQ_) {
-					tuples.plusEq(id_ast.offset, id_ast.is_global);
+					tuples.plusEq(idAst.offset, idAst.isGlobal);
 				} else if (op == _MINUS_EQ_) {
-					tuples.minusEq(id_ast.offset, id_ast.is_global);
+					tuples.minusEq(idAst.offset, idAst.isGlobal);
 				} else if (op == _MULT_EQ_) {
-					tuples.multEq(id_ast.offset, id_ast.is_global);
+					tuples.multEq(idAst.offset, idAst.isGlobal);
 				} else if (op == _DIV_EQ_) {
-					tuples.divEq(id_ast.offset, id_ast.is_global);
+					tuples.divEq(idAst.offset, idAst.isGlobal);
 				} else if (op == _MOD_EQ_) {
-					tuples.modEq(id_ast.offset, id_ast.is_global);
+					tuples.modEq(idAst.offset, idAst.isGlobal);
 				} else if (op == _POW_EQ_) {
-					tuples.powEq(id_ast.offset, id_ast.is_global);
+					tuples.powEq(idAst.offset, idAst.isGlobal);
 				} else {
 					throw new Error("Unhandled op: " + op + " / " + text);
 				}
-				if (id_ast.id.equals("RS")) {
+				if (idAst.id.equals("RS")) {
 					tuples.applyRS();
 				}
 			} else if (ast1 instanceof ArrayReference_AST) {
@@ -3115,25 +3115,25 @@ public class AwkParser {
 				int arr_ast2_result = arr.ast2.populateTuples(tuples);
 				assert arr_ast2_result == 1;
 				// push the array ref itself
-				ID_AST id_ast = (ID_AST) arr.ast1;
-				if (id_ast.isScalar()) {
-					throw new SemanticException("Cannot use " + id_ast + " as an array. It is a scalar.");
+				ID_AST idAst = (ID_AST) arr.ast1;
+				if (idAst.isScalar()) {
+					throw new SemanticException("Cannot use " + idAst + " as an array. It is a scalar.");
 				}
-				id_ast.setArray(true);
+				idAst.setArray(true);
 				if (op == _EQUALS_) {
-					tuples.assignArray(id_ast.offset, id_ast.is_global);
+					tuples.assignArray(idAst.offset, idAst.isGlobal);
 				} else if (op == _PLUS_EQ_) {
-					tuples.plusEqArray(id_ast.offset, id_ast.is_global);
+					tuples.plusEqArray(idAst.offset, idAst.isGlobal);
 				} else if (op == _MINUS_EQ_) {
-					tuples.minusEqArray(id_ast.offset, id_ast.is_global);
+					tuples.minusEqArray(idAst.offset, idAst.isGlobal);
 				} else if (op == _MULT_EQ_) {
-					tuples.multEqArray(id_ast.offset, id_ast.is_global);
+					tuples.multEqArray(idAst.offset, idAst.isGlobal);
 				} else if (op == _DIV_EQ_) {
-					tuples.divEqArray(id_ast.offset, id_ast.is_global);
+					tuples.divEqArray(idAst.offset, idAst.isGlobal);
 				} else if (op == _MOD_EQ_) {
-					tuples.modEqArray(id_ast.offset, id_ast.is_global);
+					tuples.modEqArray(idAst.offset, idAst.isGlobal);
 				} else if (op == _POW_EQ_) {
-					tuples.powEqArray(id_ast.offset, id_ast.is_global);
+					tuples.powEqArray(idAst.offset, idAst.isGlobal);
 				} else {
 					throw new NotImplementedError("Unhandled op: " + op + " / " + text + " for arrays.");
 				}
@@ -3453,8 +3453,8 @@ public class AwkParser {
 
 	private final class ArrayIndex_AST extends ScalarExpression_AST {
 
-		private ArrayIndex_AST(AST expr_ast, AST next) {
-			super(expr_ast, next);
+		private ArrayIndex_AST(AST exprAst, AST next) {
+			super(exprAst, next);
 		}
 
 		@Override
@@ -3481,8 +3481,8 @@ public class AwkParser {
 	// made classname all capitals to stand out in a syntax tree dump
 	private final class STATEMENTLIST_AST extends AST {
 
-		private STATEMENTLIST_AST(AST statement_ast, AST rest) {
-			super(statement_ast, rest);
+		private STATEMENTLIST_AST(AST statementAst, AST rest) {
+			super(statementAst, rest);
 		}
 
 		/**
@@ -3534,8 +3534,8 @@ public class AwkParser {
 			return return_address;
 		}
 
-		private FunctionDef_AST(String id, AST params, AST func_body) {
-			super(params, func_body);
+		private FunctionDef_AST(String id, AST params, AST funcBody) {
+			super(params, funcBody);
 			this.id = id;
 			is_function = true;
 		}
@@ -3593,8 +3593,8 @@ public class AwkParser {
 			return count;
 		}
 
-		void checkActualToFormalParameters(AST actual_param_list) {
-			AST a_ptr = actual_param_list;
+		void checkActualToFormalParameters(AST actualParamList) {
+			AST a_ptr = actualParamList;
 			FunctionDefParamList_AST f_ptr = (FunctionDefParamList_AST) ast1;
 			while (a_ptr != null) {
 				// actual parameter
@@ -3632,11 +3632,11 @@ public class AwkParser {
 
 	private final class FunctionCall_AST extends ScalarExpression_AST {
 
-		private FunctionProxy function_proxy;
+		private FunctionProxy functionProxy;
 
-		private FunctionCall_AST(FunctionProxy function_proxy, AST params) {
+		private FunctionCall_AST(FunctionProxy functionProxy, AST params) {
 			super(params);
-			this.function_proxy = function_proxy;
+			this.functionProxy = functionProxy;
 		}
 
 		/**
@@ -3663,8 +3663,8 @@ public class AwkParser {
 		 */
 		@Override
 		public void semanticAnalysis() throws SemanticException {
-			if (!function_proxy.isDefined()) {
-				throw new SemanticException("function " + function_proxy + " not defined");
+			if (!functionProxy.isDefined()) {
+				throw new SemanticException("function " + functionProxy + " not defined");
 			}
 			int actual_param_count;
 			if (ast1 == null) {
@@ -3672,11 +3672,11 @@ public class AwkParser {
 			} else {
 				actual_param_count = actualParamCount();
 			}
-			int formal_param_count = function_proxy.getFunctionParamCount();
+			int formal_param_count = functionProxy.getFunctionParamCount();
 			if (formal_param_count < actual_param_count) {
 				throw new SemanticException(
 						"the "
-								+ function_proxy.getFunctionName()
+								+ functionProxy.getFunctionName()
 								+ " function"
 								+ " only accepts at most "
 								+ formal_param_count
@@ -3684,15 +3684,15 @@ public class AwkParser {
 								+ actual_param_count);
 			}
 			if (ast1 != null) {
-				function_proxy.checkActualToFormalParameters(ast1);
+				functionProxy.checkActualToFormalParameters(ast1);
 			}
 		}
 
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (!function_proxy.isDefined()) {
-				throw new SemanticException("function " + function_proxy + " not defined");
+			if (!functionProxy.isDefined()) {
+				throw new SemanticException("function " + functionProxy + " not defined");
 			}
 			tuples.scriptThis();
 			int actual_param_count;
@@ -3701,11 +3701,11 @@ public class AwkParser {
 			} else {
 				actual_param_count = ast1.populateTuples(tuples);
 			}
-			int formal_param_count = function_proxy.getFunctionParamCount();
+			int formal_param_count = functionProxy.getFunctionParamCount();
 			if (formal_param_count < actual_param_count) {
 				throw new SemanticException(
 						"the "
-								+ function_proxy.getFunctionName()
+								+ functionProxy.getFunctionName()
 								+ " function"
 								+ " only accepts at most "
 								+ formal_param_count
@@ -3713,8 +3713,8 @@ public class AwkParser {
 								+ actual_param_count);
 			}
 
-			function_proxy.checkActualToFormalParameters(ast1);
-			tuples.callFunction(function_proxy, function_proxy.getFunctionName(), formal_param_count, actual_param_count);
+			functionProxy.checkActualToFormalParameters(ast1);
+			tuples.callFunction(functionProxy, functionProxy.getFunctionName(), formal_param_count, actual_param_count);
 			popSourceLineNumber(tuples);
 			return 1;
 		}
@@ -3886,22 +3886,22 @@ public class AwkParser {
 				} else if (numargs == 3) {
 					AST ptr = ast1.ast2.ast2.ast1;
 					if (ptr instanceof ID_AST) {
-						ID_AST id_ast = (ID_AST) ptr;
-						if (id_ast.isArray()) {
+						ID_AST idAst = (ID_AST) ptr;
+						if (idAst.isArray()) {
 							throw new SemanticException("sub cannot accept an unindexed array as its 3rd argument");
 						}
-						id_ast.setScalar(true);
-						tuples.subForVariable(id_ast.offset, id_ast.is_global, isGsub);
+						idAst.setScalar(true);
+						tuples.subForVariable(idAst.offset, idAst.isGlobal, isGsub);
 					} else if (ptr instanceof ArrayReference_AST) {
 						ArrayReference_AST arr_ast = (ArrayReference_AST) ptr;
 						// push the index
 						int ast2_result = arr_ast.ast2.populateTuples(tuples);
 						assert ast2_result == 1;
-						ID_AST id_ast = (ID_AST) arr_ast.ast1;
-						if (id_ast.isScalar()) {
-							throw new SemanticException("Cannot use " + id_ast + " as an array.");
+						ID_AST idAst = (ID_AST) arr_ast.ast1;
+						if (idAst.isScalar()) {
+							throw new SemanticException("Cannot use " + idAst + " as an array.");
 						}
-						tuples.subForArrayReference(id_ast.offset, id_ast.is_global, isGsub);
+						tuples.subForArrayReference(idAst.offset, idAst.isGlobal, isGsub);
 					} else if (ptr instanceof DollarExpression_AST) {
 						// push the field ref
 						DollarExpression_AST dollar_expr = (DollarExpression_AST) ptr;
@@ -3921,7 +3921,7 @@ public class AwkParser {
 				// split (string, array [,fs])
 				// the 2nd argument is pass by reference, which is ok (?)
 
-				// funccallparamlist.funccallparamlist.id_ast
+				// funccallparamlist.funccallparamlist.idAst
 				if (ast1 == null || ast1.ast2 == null || ast1.ast2.ast1 == null) {
 					throw new SemanticException("split needs at least 2 arguments");
 				}
@@ -4078,11 +4078,11 @@ public class AwkParser {
 
 		private String id;
 		private int offset = AVM.NULL_OFFSET;
-		private boolean is_global;
+		private boolean isGlobal;
 
-		private ID_AST(String id, boolean is_global) {
+		private ID_AST(String id, boolean isGlobal) {
 			this.id = id;
-			this.is_global = is_global;
+			this.isGlobal = isGlobal;
 		}
 
 		private boolean is_array = false;
@@ -4097,7 +4097,7 @@ public class AwkParser {
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 			assert offset != AVM.NULL_OFFSET : "offset = " + offset + " for " + this;
-			tuples.dereference(offset, isArray(), is_global);
+			tuples.dereference(offset, isArray(), isGlobal);
 			popSourceLineNumber(tuples);
 			return 1;
 		}
@@ -4123,8 +4123,8 @@ public class AwkParser {
 
 	private final class ArrayReference_AST extends ScalarExpression_AST {
 
-		private ArrayReference_AST(AST id_ast, AST idx_ast) {
-			super(id_ast, idx_ast);
+		private ArrayReference_AST(AST idAst, AST idxAst) {
+			super(idAst, idxAst);
 		}
 
 		@Override
@@ -4153,8 +4153,8 @@ public class AwkParser {
 
 		private Long I;
 
-		private Integer_AST(Long I) {
-			this.I = I;
+		private Integer_AST(Long i) {
+			this.I = i;
 		}
 
 		@Override
@@ -4179,8 +4179,8 @@ public class AwkParser {
 
 		private Object D;
 
-		private Double_AST(Double D) {
-			double d = D.doubleValue();
+		private Double_AST(Double dVal) {
+			double d = dVal.doubleValue();
 			if (d == (int) d) {
 				this.D = (int) d;
 			} else {
@@ -4231,22 +4231,22 @@ public class AwkParser {
 
 	private final class Regexp_AST extends ScalarExpression_AST {
 
-		private String regexp_str;
+		private String regexpStr;
 
-		private Regexp_AST(String regexp_str) {
-			assert regexp_str != null;
-			this.regexp_str = regexp_str;
+		private Regexp_AST(String regexpStr) {
+			assert regexpStr != null;
+			this.regexpStr = regexpStr;
 		}
 
 		@Override
 		public String toString() {
-			return super.toString() + " (" + regexp_str + ")";
+			return super.toString() + " (" + regexpStr + ")";
 		}
 
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			tuples.regexp(regexp_str);
+			tuples.regexp(regexpStr);
 			popSourceLineNumber(tuples);
 			return 1;
 		}
@@ -4254,8 +4254,8 @@ public class AwkParser {
 
 	private final class ConditionPair_AST extends ScalarExpression_AST {
 
-		private ConditionPair_AST(AST boolean_ast_1, AST boolean_ast_2) {
-			super(boolean_ast_1, boolean_ast_2);
+		private ConditionPair_AST(AST booleanAst1, AST booleanAst2) {
+			super(booleanAst1, booleanAst2);
 		}
 
 		@Override
@@ -4358,8 +4358,8 @@ public class AwkParser {
 
 	private final class PreInc_AST extends ScalarExpression_AST {
 
-		private PreInc_AST(AST symbol_ast) {
-			super(symbol_ast);
+		private PreInc_AST(AST symbolAst) {
+			super(symbolAst);
 		}
 
 		@Override
@@ -4367,16 +4367,16 @@ public class AwkParser {
 			pushSourceLineNumber(tuples);
 			assert ast1 != null;
 			if (ast1 instanceof ID_AST) {
-				ID_AST id_ast = (ID_AST) ast1;
-				tuples.inc(id_ast.offset, id_ast.is_global);
+				ID_AST idAst = (ID_AST) ast1;
+				tuples.inc(idAst.offset, idAst.isGlobal);
 			} else if (ast1 instanceof ArrayReference_AST) {
 				ArrayReference_AST arr_ast = (ArrayReference_AST) ast1;
-				ID_AST id_ast = (ID_AST) arr_ast.ast1;
-				assert id_ast != null;
+				ID_AST idAst = (ID_AST) arr_ast.ast1;
+				assert idAst != null;
 				assert arr_ast.ast2 != null;
 				int arr_ast2_result = arr_ast.ast2.populateTuples(tuples);
 				assert arr_ast2_result == 1;
-				tuples.incArrayRef(id_ast.offset, id_ast.is_global);
+				tuples.incArrayRef(idAst.offset, idAst.isGlobal);
 			} else if (ast1 instanceof DollarExpression_AST) {
 				DollarExpression_AST dollar_expr = (DollarExpression_AST) ast1;
 				assert dollar_expr.ast1 != null;
@@ -4408,8 +4408,8 @@ public class AwkParser {
 
 	private final class PreDec_AST extends ScalarExpression_AST {
 
-		private PreDec_AST(AST symbol_ast) {
-			super(symbol_ast);
+		private PreDec_AST(AST symbolAst) {
+			super(symbolAst);
 		}
 
 		@Override
@@ -4417,16 +4417,16 @@ public class AwkParser {
 			pushSourceLineNumber(tuples);
 			assert ast1 != null;
 			if (ast1 instanceof ID_AST) {
-				ID_AST id_ast = (ID_AST) ast1;
-				tuples.dec(id_ast.offset, id_ast.is_global);
+				ID_AST idAst = (ID_AST) ast1;
+				tuples.dec(idAst.offset, idAst.isGlobal);
 			} else if (ast1 instanceof ArrayReference_AST) {
 				ArrayReference_AST arr_ast = (ArrayReference_AST) ast1;
-				ID_AST id_ast = (ID_AST) arr_ast.ast1;
-				assert id_ast != null;
+				ID_AST idAst = (ID_AST) arr_ast.ast1;
+				assert idAst != null;
 				assert arr_ast.ast2 != null;
 				int arr_ast2_result = arr_ast.ast2.populateTuples(tuples);
 				assert arr_ast2_result == 1;
-				tuples.decArrayRef(id_ast.offset, id_ast.is_global);
+				tuples.decArrayRef(idAst.offset, idAst.isGlobal);
 			} else if (ast1 instanceof DollarExpression_AST) {
 				DollarExpression_AST dollar_expr = (DollarExpression_AST) ast1;
 				assert dollar_expr.ast1 != null;
@@ -4456,8 +4456,8 @@ public class AwkParser {
 
 	private final class PostInc_AST extends ScalarExpression_AST {
 
-		private PostInc_AST(AST symbol_ast) {
-			super(symbol_ast);
+		private PostInc_AST(AST symbolAst) {
+			super(symbolAst);
 		}
 
 		@Override
@@ -4467,16 +4467,16 @@ public class AwkParser {
 			int ast1_result = ast1.populateTuples(tuples);
 			assert ast1_result == 1;
 			if (ast1 instanceof ID_AST) {
-				ID_AST id_ast = (ID_AST) ast1;
-				tuples.postInc(id_ast.offset, id_ast.is_global);
+				ID_AST idAst = (ID_AST) ast1;
+				tuples.postInc(idAst.offset, idAst.isGlobal);
 			} else if (ast1 instanceof ArrayReference_AST) {
 				ArrayReference_AST arr_ast = (ArrayReference_AST) ast1;
-				ID_AST id_ast = (ID_AST) arr_ast.ast1;
-				assert id_ast != null;
+				ID_AST idAst = (ID_AST) arr_ast.ast1;
+				assert idAst != null;
 				assert arr_ast.ast2 != null;
 				int arr_ast2_result = arr_ast.ast2.populateTuples(tuples);
 				assert arr_ast2_result == 1;
-				tuples.incArrayRef(id_ast.offset, id_ast.is_global);
+				tuples.incArrayRef(idAst.offset, idAst.isGlobal);
 			} else if (ast1 instanceof DollarExpression_AST) {
 				DollarExpression_AST dollar_expr = (DollarExpression_AST) ast1;
 				assert dollar_expr.ast1 != null;
@@ -4493,8 +4493,8 @@ public class AwkParser {
 
 	private final class PostDec_AST extends ScalarExpression_AST {
 
-		private PostDec_AST(AST symbol_ast) {
-			super(symbol_ast);
+		private PostDec_AST(AST symbolAst) {
+			super(symbolAst);
 		}
 
 		@Override
@@ -4504,16 +4504,16 @@ public class AwkParser {
 			int ast1_result = ast1.populateTuples(tuples);
 			assert ast1_result == 1;
 			if (ast1 instanceof ID_AST) {
-				ID_AST id_ast = (ID_AST) ast1;
-				tuples.postDec(id_ast.offset, id_ast.is_global);
+				ID_AST idAst = (ID_AST) ast1;
+				tuples.postDec(idAst.offset, idAst.isGlobal);
 			} else if (ast1 instanceof ArrayReference_AST) {
 				ArrayReference_AST arr_ast = (ArrayReference_AST) ast1;
-				ID_AST id_ast = (ID_AST) arr_ast.ast1;
-				assert id_ast != null;
+				ID_AST idAst = (ID_AST) arr_ast.ast1;
+				assert idAst != null;
 				assert arr_ast.ast2 != null;
 				int arr_ast2_result = arr_ast.ast2.populateTuples(tuples);
 				assert arr_ast2_result == 1;
-				tuples.decArrayRef(id_ast.offset, id_ast.is_global);
+				tuples.decArrayRef(idAst.offset, idAst.isGlobal);
 			} else if (ast1 instanceof DollarExpression_AST) {
 				DollarExpression_AST dollar_expr = (DollarExpression_AST) ast1;
 				assert dollar_expr.ast1 != null;
@@ -4532,8 +4532,8 @@ public class AwkParser {
 
 		private int outputToken;
 
-		private Print_AST(AST expr_list, int outToken, AST outputExpr) {
-			super(expr_list, outputExpr);
+		private Print_AST(AST exprList, int outToken, AST outputExpr) {
+			super(exprList, outputExpr);
 			this.outputToken = outToken;
 		}
 
@@ -4577,8 +4577,8 @@ public class AwkParser {
 
 		private String extensionKeyword;
 
-		private Extension_AST(String keyword, AST param_ast) {
-			super(param_ast);
+		private Extension_AST(String keyword, AST paramAst) {
+			super(paramAst);
 			this.extensionKeyword = keyword;
 		}
 
@@ -4597,14 +4597,14 @@ public class AwkParser {
 				assert req_array_idxs != null;
 
 				for (int idx : req_array_idxs) {
-					AST param_ast = getParamAst((FunctionCallParamList_AST) ast1, idx);
+					AST paramAst = getParamAst((FunctionCallParamList_AST) ast1, idx);
 					assert ast1 instanceof FunctionCallParamList_AST;
 					// if the parameter is an ID_AST...
-					if (param_ast.ast1 instanceof ID_AST) {
+					if (paramAst.ast1 instanceof ID_AST) {
 						// then force it to be an array,
 						// or complain if it is already tagged as a scalar
-						ID_AST id_ast = (ID_AST) param_ast.ast1;
-						if (id_ast.isScalar()) {
+						ID_AST idAst = (ID_AST) paramAst.ast1;
+						if (idAst.isScalar()) {
 							throw new SemanticException(
 									"Extension '"
 											+ extensionKeyword
@@ -4612,7 +4612,7 @@ public class AwkParser {
 											+ idx
 											+ " be an associative array, not a scalar.");
 						}
-						id_ast.setArray(true);
+						idAst.setArray(true);
 					}
 				}
 
@@ -4639,20 +4639,20 @@ public class AwkParser {
 			return 1;
 		}
 
-		private AST getParamAst(FunctionCallParamList_AST p_ast, int pos) {
+		private AST getParamAst(FunctionCallParamList_AST pAst, int pos) {
 			for (int i = 0; i < pos; ++i) {
-				p_ast = (FunctionCallParamList_AST) p_ast.ast2;
-				if (p_ast == null) {
+				pAst = (FunctionCallParamList_AST) pAst.ast2;
+				if (pAst == null) {
 					throw new SemanticException("More arguments required for assoc array parameter position specification.");
 				}
 			}
-			return p_ast;
+			return pAst;
 		}
 
-		private int countParams(FunctionCallParamList_AST p_ast) {
+		private int countParams(FunctionCallParamList_AST pAst) {
 			int cnt = 0;
-			while (p_ast != null) {
-				p_ast = (FunctionCallParamList_AST) p_ast.ast2;
+			while (pAst != null) {
+				pAst = (FunctionCallParamList_AST) pAst.ast2;
 				++cnt;
 			}
 			return cnt;
@@ -4668,8 +4668,8 @@ public class AwkParser {
 
 		private int outputToken;
 
-		private Printf_AST(AST expr_list, int outToken, AST outputExpr) {
-			super(expr_list, outputExpr);
+		private Printf_AST(AST exprList, int outToken, AST outputExpr) {
+			super(exprList, outputExpr);
 			this.outputToken = outToken;
 		}
 
@@ -4710,8 +4710,8 @@ public class AwkParser {
 
 	private final class Getline_AST extends ScalarExpression_AST {
 
-		private Getline_AST(AST pipe_expr, AST lvalue_ast, AST in_redirect) {
-			super(pipe_expr, lvalue_ast, in_redirect);
+		private Getline_AST(AST pipeExpr, AST lvalueAst, AST inRedirect) {
+			super(pipeExpr, lvalueAst, inRedirect);
 		}
 
 		@Override
@@ -4739,9 +4739,9 @@ public class AwkParser {
 				// stack still has the input, to be popped below...
 				// (all assignment results are placed on the stack)
 			} else if (ast2 instanceof ID_AST) {
-				ID_AST id_ast = (ID_AST) ast2;
-				tuples.assign(id_ast.offset, id_ast.is_global);
-				if (id_ast.id.equals("RS")) {
+				ID_AST idAst = (ID_AST) ast2;
+				tuples.assign(idAst.offset, idAst.isGlobal);
+				if (idAst.id.equals("RS")) {
 					tuples.applyRS();
 				}
 			} else if (ast2 instanceof ArrayReference_AST) {
@@ -4751,8 +4751,8 @@ public class AwkParser {
 				int arr_ast2_result = arr.ast2.populateTuples(tuples);
 				assert arr_ast2_result == 1;
 				// push the array ref itself
-				ID_AST id_ast = (ID_AST) arr.ast1;
-				tuples.assignArray(id_ast.offset, id_ast.is_global);
+				ID_AST idAst = (ID_AST) arr.ast1;
+				tuples.assignArray(idAst.offset, idAst.isGlobal);
 			} else if (ast2 instanceof DollarExpression_AST) {
 				DollarExpression_AST dollar_expr = (DollarExpression_AST) ast2;
 				if (dollar_expr.ast2 != null) {
@@ -4819,8 +4819,8 @@ public class AwkParser {
 
 	private final class DeleteStatement_AST extends AST {
 
-		private DeleteStatement_AST(AST symbol_ast) {
-			super(symbol_ast);
+		private DeleteStatement_AST(AST symbolAst) {
+			super(symbolAst);
 		}
 
 		@Override
@@ -4831,22 +4831,22 @@ public class AwkParser {
 			if (ast1 instanceof ArrayReference_AST) {
 				assert ast1.ast1 != null; // a in a[b]
 				assert ast1.ast2 != null; // b in a[b]
-				ID_AST id_ast = (ID_AST) ast1.ast1;
-				if (id_ast.isScalar()) {
+				ID_AST idAst = (ID_AST) ast1.ast1;
+				if (idAst.isScalar()) {
 					throw new SemanticException("delete: Cannot use a scalar as an array.");
 				}
-				id_ast.setArray(true);
+				idAst.setArray(true);
 				int idx_result = ast1.ast2.populateTuples(tuples);
 				assert idx_result == 1;
 				// idx on the stack
-				tuples.deleteArrayElement(id_ast.offset, id_ast.is_global);
+				tuples.deleteArrayElement(idAst.offset, idAst.isGlobal);
 			} else if (ast1 instanceof ID_AST) {
-				ID_AST id_ast = (ID_AST) ast1;
-				if (id_ast.isScalar()) {
+				ID_AST idAst = (ID_AST) ast1;
+				if (idAst.isScalar()) {
 					throw new SemanticException("delete: Cannot delete a scalar.");
 				}
-				id_ast.setArray(true);
-				tuples.deleteArray(id_ast.offset, id_ast.is_global);
+				idAst.setArray(true);
+				tuples.deleteArray(idAst.offset, idAst.isGlobal);
 			} else {
 				throw new Error("Should never reach here : delete for " + ast1);
 			}
@@ -4911,11 +4911,11 @@ public class AwkParser {
 					if (!(ptr.ast1 instanceof ID_AST)) {
 						throw new SemanticException("ID required for argument(s) to _dump");
 					}
-					ID_AST id_ast = (ID_AST) ptr.ast1;
-					if (id_ast.isScalar()) {
+					ID_AST idAst = (ID_AST) ptr.ast1;
+					if (idAst.isScalar()) {
 						throw new SemanticException("_dump: Cannot use a scalar as an argument.");
 					}
-					id_ast.setArray(true);
+					idAst.setArray(true);
 					ptr = ptr.ast2;
 				}
 				int ast1_result = ast1.populateTuples(tuples);
@@ -4973,11 +4973,11 @@ public class AwkParser {
 			this.id = id;
 		}
 
-		private void setFunctionDefinition(FunctionDef_AST function_def) {
+		private void setFunctionDefinition(FunctionDef_AST functionDef) {
 			if (function_def_ast != null) {
-				throw new ParserException("function " + function_def + " already defined");
+				throw new ParserException("function " + functionDef + " already defined");
 			} else {
-				function_def_ast = function_def;
+				function_def_ast = functionDef;
 			}
 		}
 
@@ -5003,8 +5003,8 @@ public class AwkParser {
 			return super.toString() + " (" + id + ")";
 		}
 
-		private void checkActualToFormalParameters(AST actual_params) {
-			function_def_ast.checkActualToFormalParameters(actual_params);
+		private void checkActualToFormalParameters(AST actualParams) {
+			function_def_ast.checkActualToFormalParameters(actualParams);
 		}
 	}
 
@@ -5020,11 +5020,11 @@ public class AwkParser {
 	 */
 	public void populateGlobalVariableNameToOffsetMappings(AwkTuples tuples) {
 		for (String varname : symbol_table.global_ids.keySet()) {
-			ID_AST id_ast = symbol_table.global_ids.get(varname);
-			// The last arg originally was ", id_ast.is_scalar", but this is not set true
+			ID_AST idAst = symbol_table.global_ids.get(varname);
+			// The last arg originally was ", idAst.is_scalar", but this is not set true
 			// if the variable use is ambiguous. Therefore, assume it is a scalar
 			// if it's NOT used as an array.
-			tuples.addGlobalVariableNameToOffsetMapping(varname, id_ast.offset, id_ast.is_array);
+			tuples.addGlobalVariableNameToOffsetMapping(varname, idAst.offset, idAst.is_array);
 		}
 		tuples.setFunctionNameSet(symbol_table.function_proxies.keySet());
 	}
@@ -5103,14 +5103,14 @@ public class AwkParser {
 				}
 			}
 			assert map != null;
-			ID_AST id_ast = map.get(id);
-			if (id_ast == null) {
-				id_ast = new ID_AST(id, map == global_ids);
-				id_ast.offset = map.size();
-				assert id_ast.offset != AVM.NULL_OFFSET;
-				map.put(id, id_ast);
+			ID_AST idAst = map.get(id);
+			if (idAst == null) {
+				idAst = new ID_AST(id, map == global_ids);
+				idAst.offset = map.size();
+				assert idAst.offset != AVM.NULL_OFFSET;
+				map.put(id, idAst);
 			}
-			return id_ast;
+			return idAst;
 		}
 
 		AST addID(String id) throws ParserException {
@@ -5140,12 +5140,12 @@ public class AwkParser {
 				local_ids.put(functionName, map = new HashMap<String, ID_AST>());
 			}
 			assert map != null;
-			ID_AST id_ast = map.get(id);
-			if (id_ast == null) {
-				id_ast = new ID_AST(id, map == global_ids);
-				id_ast.offset = map.size();
-				assert id_ast.offset != AVM.NULL_OFFSET;
-				map.put(id, id_ast);
+			ID_AST idAst = map.get(id);
+			if (idAst == null) {
+				idAst = new ID_AST(id, map == global_ids);
+				idAst.offset = map.size();
+				assert idAst.offset != AVM.NULL_OFFSET;
+				map.put(id, idAst);
 			}
 
 			return retval;
@@ -5164,29 +5164,29 @@ public class AwkParser {
 			return ret_val;
 		}
 
-		AST addFunctionDef(String functionName, AST param_list, AST block) {
+		AST addFunctionDef(String functionName, AST paramList, AST block) {
 			if (ids.contains(functionName)) {
 				throw new ParserException("cannot use " + functionName + " as a function; it is a variable");
 			}
-			FunctionProxy function_proxy = function_proxies.get(functionName);
-			if (function_proxy == null) {
-				function_proxies.put(functionName, function_proxy = new FunctionProxy(functionName));
+			FunctionProxy functionProxy = function_proxies.get(functionName);
+			if (functionProxy == null) {
+				function_proxies.put(functionName, functionProxy = new FunctionProxy(functionName));
 			}
-			FunctionDef_AST function_def = new FunctionDef_AST(functionName, param_list, block);
-			function_proxy.setFunctionDefinition(function_def);
-			return function_def;
+			FunctionDef_AST functionDef = new FunctionDef_AST(functionName, paramList, block);
+			functionProxy.setFunctionDefinition(functionDef);
+			return functionDef;
 		}
 
-		AST addFunctionCall(String id, AST param_list) {
-			FunctionProxy function_proxy = function_proxies.get(id);
-			if (function_proxy == null) {
-				function_proxies.put(id, function_proxy = new FunctionProxy(id));
+		AST addFunctionCall(String id, AST paramList) {
+			FunctionProxy functionProxy = function_proxies.get(id);
+			if (functionProxy == null) {
+				function_proxies.put(id, functionProxy = new FunctionProxy(id));
 			}
-			return new FunctionCall_AST(function_proxy, param_list);
+			return new FunctionCall_AST(functionProxy, paramList);
 		}
 
-		AST addArrayReference(String id, AST idx_ast) throws ParserException {
-			return new ArrayReference_AST(addArrayID(id), idx_ast);
+		AST addArrayReference(String id, AST idxAst) throws ParserException {
+			return new ArrayReference_AST(addArrayID(id), idxAst);
 		}
 
 		// constants are no longer cached/hashed so that individual ASTs

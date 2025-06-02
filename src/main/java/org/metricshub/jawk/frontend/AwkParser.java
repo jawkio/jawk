@@ -2079,8 +2079,40 @@ public class AwkParser {
 
 		private final String sourceDescription = scriptSources.get(scriptSourcesCurrentIndex).getDescription();
 		private final int lineNo = reader.getLineNumber() + 1;
-		protected AST parent;
-		protected AST ast1, ast2, ast3, ast4;
+		private AST parent;
+		private AST ast1, ast2, ast3, ast4;
+
+		protected final AST getParent() {
+			return parent;
+		}
+
+		protected final AST getAst1() {
+			return ast1;
+		}
+
+		protected final AST getAst2() {
+			return ast2;
+		}
+
+		protected final AST getAst3() {
+			return ast3;
+		}
+
+		protected final AST getAst4() {
+			return ast4;
+		}
+
+		protected final void markBegin() {
+			isBegin = true;
+		}
+
+		protected final void markEnd() {
+			isEnd = true;
+		}
+
+		protected final void markFunction() {
+			isFunction = true;
+		}
 
 		protected final AST searchFor(Class<?> cls) {
 			AST ptr = this;
@@ -2236,10 +2268,10 @@ public class AwkParser {
 			tuples.popSourceLineNumber(lineNo);
 		}
 
-		protected boolean is_begin = isBegin();
+		private boolean isBegin = isBegin();
 
 		private boolean isBegin() {
-			boolean result = is_begin;
+			boolean result = isBegin;
 			if (!result && ast1 != null) {
 				result = ast1.isBegin();
 			}
@@ -2255,10 +2287,10 @@ public class AwkParser {
 			return result;
 		}
 
-		protected boolean is_end = isEnd();
+		private boolean isEnd = isEnd();
 
 		private boolean isEnd() {
-			boolean result = is_end;
+			boolean result = isEnd;
 			if (!result && ast1 != null) {
 				result = ast1.isEnd();
 			}
@@ -2274,10 +2306,10 @@ public class AwkParser {
 			return result;
 		}
 
-		protected boolean is_function = isFunction();
+		private boolean isFunction = isFunction();
 
 		private boolean isFunction() {
-			boolean result = is_function;
+			boolean result = isFunction;
 			if (!result && ast1 != null) {
 				result = ast1.isFunction();
 			}
@@ -2373,15 +2405,15 @@ public class AwkParser {
 		if (!isRule(ast)) {
 			return false;
 		}
-		if (ast.ast1 == null) {
+		if (ast.getAst1() == null) {
 			return false;
 		}
 
-		if (!containsASTType(ast.ast1, Extension_AST.class)) {
+		if (!containsASTType(ast.getAst1(), Extension_AST.class)) {
 			return false;
 		}
 
-		if (containsASTType(ast.ast1, new Class[] { FunctionCall_AST.class, DollarExpression_AST.class })) {
+		if (containsASTType(ast.getAst1(), new Class[] { FunctionCall_AST.class, DollarExpression_AST.class })) {
 			return false;
 		}
 
@@ -2402,10 +2434,10 @@ public class AwkParser {
 			}
 		}
 		// prettier-ignore
-		return containsASTType(ast.ast1, cls_array)
-				|| containsASTType(ast.ast2, cls_array)
-				|| containsASTType(ast.ast3, cls_array)
-				|| containsASTType(ast.ast4, cls_array);
+		return containsASTType(ast.getAst1(), cls_array)
+				|| containsASTType(ast.getAst2(), cls_array)
+				|| containsASTType(ast.getAst3(), cls_array)
+				|| containsASTType(ast.getAst4(), cls_array);
 	}
 
 	private Address next_address;
@@ -2437,13 +2469,13 @@ public class AwkParser {
 
 			ptr = this;
 			while (ptr != null) {
-				if (ptr.ast1 != null && ptr.ast1.isFunction()) {
-					assert ptr.ast1 != null;
-					int ast1_count = ptr.ast1.populateTuples(tuples);
+				if (ptr.getAst1() != null && ptr.getAst1().isFunction()) {
+					assert ptr.getAst1() != null;
+					int ast1_count = ptr.getAst1().populateTuples(tuples);
 					assert ast1_count == 0;
 				}
 
-				ptr = ptr.ast2;
+				ptr = ptr.getAst2();
 			}
 
 			// START OF MAIN BLOCK
@@ -2492,13 +2524,13 @@ public class AwkParser {
 
 			// grab all BEGINs
 			ptr = this;
-			// ptr.ast1 == blank rule condition (i.e.: { print })
+			// ptr.getAst1() == blank rule condition (i.e.: { print })
 			while (ptr != null) {
-				if (ptr.ast1 != null && ptr.ast1.isBegin()) {
-					ptr.ast1.populateTuples(tuples);
+				if (ptr.getAst1() != null && ptr.getAst1().isBegin()) {
+					ptr.getAst1().populateTuples(tuples);
 				}
 
-				ptr = ptr.ast2;
+				ptr = ptr.getAst2();
 			}
 
 			// Do we have rules? (apart from BEGIN)
@@ -2508,19 +2540,19 @@ public class AwkParser {
 			// Check for "normal" rules
 			ptr = this;
 			while (!req_input && (ptr != null)) {
-				if (isRule(ptr.ast1)) {
+				if (isRule(ptr.getAst1())) {
 					req_input = true;
 				}
-				ptr = ptr.ast2;
+				ptr = ptr.getAst2();
 			}
 
 			// Now check for "END" rules
 			ptr = this;
 			while (!req_input && (ptr != null)) {
-				if (ptr.ast1 != null && ptr.ast1.isEnd()) {
+				if (ptr.getAst1() != null && ptr.getAst1().isEnd()) {
 					req_input = true;
 				}
-				ptr = ptr.ast2;
+				ptr = ptr.getAst2();
 			}
 
 			if (req_input) {
@@ -2538,10 +2570,10 @@ public class AwkParser {
 				// grab all INPUT RULES
 				while (ptr != null) {
 					// the first one of these is an input rule
-					if (isRule(ptr.ast1)) {
-						ptr.ast1.populateTuples(tuples);
+					if (isRule(ptr.getAst1())) {
+						ptr.getAst1().populateTuples(tuples);
 					}
-					ptr = ptr.ast2;
+					ptr = ptr.getAst2();
 				}
 				tuples.address(next_address);
 
@@ -2562,10 +2594,10 @@ public class AwkParser {
 			// grab all ENDs
 			ptr = this;
 			while (ptr != null) {
-				if (ptr.ast1 != null && ptr.ast1.isEnd()) {
-					ptr.ast1.populateTuples(tuples);
+				if (ptr.getAst1() != null && ptr.getAst1().isEnd()) {
+					ptr.getAst1().populateTuples(tuples);
 				}
-				ptr = ptr.ast2;
+				ptr = ptr.getAst2();
 			}
 
 			// force a nop here to resolve any addresses that haven't been resolved yet
@@ -2587,19 +2619,19 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (ast1 == null) {
+			if (getAst1() == null) {
 				// just indicate to execute the rule
 				tuples.push(1); // 1 == true
 			} else {
-				int result = ast1.populateTuples(tuples);
+				int result = getAst1().populateTuples(tuples);
 				assert result == 1;
 			}
 			// result of whether to execute or not is on the stack
 			Address bypass_rule = tuples.createAddress("bypass_rule");
 			tuples.ifFalse(bypass_rule);
 			// execute the opt_rule here!
-			if (ast2 == null) {
-				if (ast1 == null || (!ast1.isBegin() && !ast1.isEnd())) {
+			if (getAst2() == null) {
+				if (getAst1() == null || (!getAst1().isBegin() && !getAst1().isEnd())) {
 					// display $0
 					tuples.print(0);
 				}
@@ -2607,7 +2639,7 @@ public class AwkParser {
 				// (i.e., blank BEGIN/END rule)
 			} else {
 				// execute it, and leave nothing on the stack
-				int ast2_count = ast2.populateTuples(tuples);
+				int ast2_count = getAst2().populateTuples(tuples);
 				assert ast2_count == 0;
 			}
 			tuples.address(bypass_rule).nop();
@@ -2636,24 +2668,24 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast1 != null;
+			assert getAst1() != null;
 
 			Address elseblock = tuples.createAddress("elseblock");
 
-			int ast1_result = ast1.populateTuples(tuples);
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
 			tuples.ifFalse(elseblock);
-			if (ast2 != null) {
-				int ast2_result = ast2.populateTuples(tuples);
+			if (getAst2() != null) {
+				int ast2_result = getAst2().populateTuples(tuples);
 				assert ast2_result == 0;
 			}
-			if (ast3 == null) {
+			if (getAst3() == null) {
 				tuples.address(elseblock);
 			} else {
 				Address end = tuples.createAddress("end");
 				tuples.gotoAddress(end);
 				tuples.address(elseblock);
-				int ast3_result = ast3.populateTuples(tuples);
+				int ast3_result = getAst3().populateTuples(tuples);
 				assert ast3_result == 0;
 				tuples.address(end);
 			}
@@ -2671,22 +2703,22 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast1 != null;
-			assert ast2 != null;
-			assert ast3 != null;
+			assert getAst1() != null;
+			assert getAst2() != null;
+			assert getAst3() != null;
 
 			Address elseexpr = tuples.createAddress("elseexpr");
 			Address end_tertiary = tuples.createAddress("end_tertiary");
 
-			int ast1_result = ast1.populateTuples(tuples);
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
 			tuples.ifFalse(elseexpr);
-			int ast2_result = ast2.populateTuples(tuples);
+			int ast2_result = getAst2().populateTuples(tuples);
 			assert ast2_result == 1;
 			tuples.gotoAddress(end_tertiary);
 
 			tuples.address(elseexpr);
-			int ast3_result = ast3.populateTuples(tuples);
+			int ast3_result = getAst3().populateTuples(tuples);
 			assert ast3_result == 1;
 
 			tuples.address(end_tertiary);
@@ -2731,13 +2763,13 @@ public class AwkParser {
 			continue_address = loop;
 
 			// condition
-			assert ast1 != null;
-			int ast1_result = ast1.populateTuples(tuples);
+			assert getAst1() != null;
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
 			tuples.ifFalse(break_address);
 
-			if (ast2 != null) {
-				int ast2_result = ast2.populateTuples(tuples);
+			if (getAst2() != null) {
+				int ast2_result = getAst2().populateTuples(tuples);
 				assert ast2_result == 0;
 			}
 
@@ -2782,8 +2814,8 @@ public class AwkParser {
 			Address loop = tuples.createAddress("loop");
 			tuples.address(loop);
 
-			if (ast1 != null) {
-				int ast1_result = ast1.populateTuples(tuples);
+			if (getAst1() != null) {
+				int ast1_result = getAst1().populateTuples(tuples);
 				assert ast1_result == 0;
 			}
 
@@ -2791,8 +2823,8 @@ public class AwkParser {
 			tuples.address(continue_address);
 
 			// condition
-			assert ast2 != null;
-			int ast2_result = ast2.populateTuples(tuples);
+			assert getAst2() != null;
+			int ast2_result = getAst2().populateTuples(tuples);
 			assert ast2_result == 1;
 			tuples.ifTrue(loop);
 
@@ -2834,8 +2866,8 @@ public class AwkParser {
 			continue_address = tuples.createAddress("continue_address");
 
 			// initial actions
-			if (ast1 != null) {
-				int ast1_result = ast1.populateTuples(tuples);
+			if (getAst1() != null) {
+				int ast1_result = getAst1().populateTuples(tuples);
 				for (int i = 0; i < ast1_result; i++) {
 					tuples.pop();
 				}
@@ -2844,17 +2876,17 @@ public class AwkParser {
 			Address loop = tuples.createAddress("loop");
 			tuples.address(loop);
 
-			if (ast2 != null) {
+			if (getAst2() != null) {
 				// condition
-				// assert(ast2 != null);
-				int ast2_result = ast2.populateTuples(tuples);
+				// assert(getAst2() != null);
+				int ast2_result = getAst2().populateTuples(tuples);
 				assert ast2_result == 1;
 				tuples.ifFalse(break_address);
 			}
 
-			if (ast4 != null) {
+			if (getAst4() != null) {
 				// post loop action
-				int ast4_result = ast4.populateTuples(tuples);
+				int ast4_result = getAst4().populateTuples(tuples);
 				assert ast4_result == 0;
 			}
 
@@ -2862,8 +2894,8 @@ public class AwkParser {
 			tuples.address(continue_address);
 
 			// post-loop action
-			if (ast3 != null) {
-				int ast3_result = ast3.populateTuples(tuples);
+			if (getAst3() != null) {
+				int ast3_result = getAst3().populateTuples(tuples);
 				for (int i = 0; i < ast3_result; i++) {
 					tuples.pop();
 				}
@@ -2903,9 +2935,9 @@ public class AwkParser {
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 
-			assert ast2 != null;
+			assert getAst2() != null;
 
-			ID_AST array_id_ast = (ID_AST) ast2;
+			ID_AST array_id_ast = (ID_AST) getAst2();
 			if (array_id_ast.isScalar()) {
 				throw new SemanticException(array_id_ast + " is not an array");
 			}
@@ -2913,7 +2945,7 @@ public class AwkParser {
 
 			break_address = tuples.createAddress("break_address");
 
-			ast2.populateTuples(tuples);
+			getAst2().populateTuples(tuples);
 			// pops the array and pushes the keyset
 			tuples.keylist();
 
@@ -2939,12 +2971,12 @@ public class AwkParser {
 			tuples.dup();
 			tuples.getFirstAndRemoveFromList();
 			// assign it to the id
-			tuples.assign(((ID_AST) ast1).offset, ((ID_AST) ast1).is_global);
+			tuples.assign(((ID_AST) getAst1()).offset, ((ID_AST) getAst1()).is_global);
 			tuples.pop(); // remove the assignment result
 
-			if (ast3 != null) {
+			if (getAst3() != null) {
 				// execute the block
-				int ast3_result = ast3.populateTuples(tuples);
+				int ast3_result = getAst3().populateTuples(tuples);
 				assert ast3_result == 0;
 			}
 			// otherwise, there is no block to execute
@@ -2991,7 +3023,7 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			int expr_count = ast1.populateTuples(tuples);
+			int expr_count = getAst1().populateTuples(tuples);
 			if (expr_count == 1) {
 				tuples.pop();
 			} else if (expr_count != 0) {
@@ -3022,12 +3054,12 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast2 != null;
-			int ast2_count = ast2.populateTuples(tuples);
+			assert getAst2() != null;
+			int ast2_count = getAst2().populateTuples(tuples);
 			assert ast2_count == 1;
 			// here, stack contains one value
-			if (ast1 instanceof ID_AST) {
-				ID_AST id_ast = (ID_AST) ast1;
+			if (getAst1() instanceof ID_AST) {
+				ID_AST id_ast = (ID_AST) getAst1();
 				if (id_ast.isArray()) {
 					throw new SemanticException("Cannot use " + id_ast + " as a scalar. It is an array.");
 				}
@@ -3054,14 +3086,14 @@ public class AwkParser {
 				if (id_ast.id.equals("RS")) {
 					tuples.applyRS();
 				}
-			} else if (ast1 instanceof ArrayReference_AST) {
-				ArrayReference_AST arr = (ArrayReference_AST) ast1;
+			} else if (getAst1() instanceof ArrayReference_AST) {
+				ArrayReference_AST arr = (ArrayReference_AST) getAst1();
 				// push the index
-				assert arr.ast2 != null;
-				int arr_ast2_result = arr.ast2.populateTuples(tuples);
+				assert arr.getAst2() != null;
+				int arr_ast2_result = arr.getAst2().populateTuples(tuples);
 				assert arr_ast2_result == 1;
 				// push the array ref itself
-				ID_AST id_ast = (ID_AST) arr.ast1;
+				ID_AST id_ast = (ID_AST) arr.getAst1();
 				if (id_ast.isScalar()) {
 					throw new SemanticException("Cannot use " + id_ast + " as an array. It is a scalar.");
 				}
@@ -3083,10 +3115,10 @@ public class AwkParser {
 				} else {
 					throw new NotImplementedError("Unhandled op: " + op + " / " + text + " for arrays.");
 				}
-			} else if (ast1 instanceof DollarExpression_AST) {
-				DollarExpression_AST dollar_expr = (DollarExpression_AST) ast1;
-				assert dollar_expr.ast1 != null;
-				int ast1_result = dollar_expr.ast1.populateTuples(tuples);
+			} else if (getAst1() instanceof DollarExpression_AST) {
+				DollarExpression_AST dollar_expr = (DollarExpression_AST) getAst1();
+				assert dollar_expr.getAst1() != null;
+				int ast1_result = dollar_expr.getAst1().populateTuples(tuples);
 				assert ast1_result == 1;
 				// stack contains eval of dollar arg
 
@@ -3108,7 +3140,7 @@ public class AwkParser {
 					throw new NotImplementedError("Unhandled op: " + op + " / " + text + " for dollar expressions.");
 				}
 			} else {
-				throw new SemanticException("Cannot perform an assignment on: " + ast1);
+				throw new SemanticException("Cannot perform an assignment on: " + getAst1());
 			}
 			popSourceLineNumber(tuples);
 			return 1;
@@ -3124,18 +3156,18 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast1 != null;
-			assert ast2 != null;
-			if (!(ast2 instanceof ID_AST)) {
+			assert getAst1() != null;
+			assert getAst2() != null;
+			if (!(getAst2() instanceof ID_AST)) {
 				throw new SemanticException("Expecting an array for rhs of IN. Got an expression.");
 			}
-			ID_AST arr_ast = (ID_AST) ast2;
+			ID_AST arr_ast = (ID_AST) getAst2();
 			if (arr_ast.isScalar()) {
 				throw new SemanticException("Expecting an array for rhs of IN. Got a scalar.");
 			}
 			arr_ast.setArray(true);
 
-			int ast1_result = ast1.populateTuples(tuples);
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
 
 			int ast2_result = arr_ast.populateTuples(tuples);
@@ -3170,13 +3202,13 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast1 != null;
-			assert ast2 != null;
+			assert getAst1() != null;
+			assert getAst2() != null;
 
-			int ast1_result = ast1.populateTuples(tuples);
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
 
-			int ast2_result = ast2.populateTuples(tuples);
+			int ast2_result = getAst2().populateTuples(tuples);
 			assert ast2_result == 1;
 
 			// 2 values on the stack
@@ -3234,7 +3266,7 @@ public class AwkParser {
 			pushSourceLineNumber(tuples);
 			// exhibit short-circuit behavior
 			Address end = tuples.createAddress("end");
-			int ast1_result = ast1.populateTuples(tuples);
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
 			tuples.dup();
 			if (op == _OR_) {
@@ -3246,7 +3278,7 @@ public class AwkParser {
 				assert false : "Invalid op: " + op + " / " + text;
 			}
 			tuples.pop();
-			int ast2_result = ast2.populateTuples(tuples);
+			int ast2_result = getAst2().populateTuples(tuples);
 			assert ast2_result == 1;
 
 			tuples.address(end);
@@ -3280,9 +3312,9 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			int ast1_result = ast1.populateTuples(tuples);
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
-			int ast2_result = ast2.populateTuples(tuples);
+			int ast2_result = getAst2().populateTuples(tuples);
 			assert ast2_result == 1;
 			if (op == _PLUS_) {
 				tuples.add();
@@ -3313,11 +3345,11 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast1 != null;
-			int lhs_count = ast1.populateTuples(tuples);
+			assert getAst1() != null;
+			int lhs_count = getAst1().populateTuples(tuples);
 			assert lhs_count == 1;
-			assert ast2 != null;
-			int rhs_count = ast2.populateTuples(tuples);
+			assert getAst2() != null;
+			int rhs_count = getAst2().populateTuples(tuples);
 			assert rhs_count == 1;
 			tuples.concat();
 			popSourceLineNumber(tuples);
@@ -3334,8 +3366,8 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast1 != null;
-			int ast1_result = ast1.populateTuples(tuples);
+			assert getAst1() != null;
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
 			tuples.negate();
 			popSourceLineNumber(tuples);
@@ -3352,8 +3384,8 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast1 != null;
-			int ast1_result = ast1.populateTuples(tuples);
+			assert getAst1() != null;
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
 			tuples.unaryPlus();
 			popSourceLineNumber(tuples);
@@ -3370,8 +3402,8 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast1 != null;
-			int ast1_result = ast1.populateTuples(tuples);
+			assert getAst1() != null;
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
 			tuples.not();
 			popSourceLineNumber(tuples);
@@ -3388,8 +3420,8 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast1 != null;
-			int ast1_result = ast1.populateTuples(tuples);
+			assert getAst1() != null;
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
 			tuples.getInputField();
 			popSourceLineNumber(tuples);
@@ -3409,11 +3441,11 @@ public class AwkParser {
 			AST ptr = this;
 			int cnt = 0;
 			while (ptr != null) {
-				assert ptr.ast1 != null;
-				int ptr_ast1_result = ptr.ast1.populateTuples(tuples);
+				assert ptr.getAst1() != null;
+				int ptr_ast1_result = ptr.getAst1().populateTuples(tuples);
 				assert ptr_ast1_result == 1;
 				++cnt;
-				ptr = ptr.ast2;
+				ptr = ptr.getAst2();
 			}
 			assert cnt >= 1;
 			if (cnt > 1) {
@@ -3444,11 +3476,11 @@ public class AwkParser {
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 			// typical recursive processing of a list
-			assert ast1 != null;
-			int ast1_count = ast1.populateTuples(tuples);
+			assert getAst1() != null;
+			int ast1_count = getAst1().populateTuples(tuples);
 			assert ast1_count == 0;
-			if (ast2 != null) {
-				int ast2_count = ast2.populateTuples(tuples);
+			if (getAst2() != null) {
+				int ast2_count = getAst2().populateTuples(tuples);
 				assert ast2_count == 0;
 			}
 			popSourceLineNumber(tuples);
@@ -3457,7 +3489,7 @@ public class AwkParser {
 
 		@Override
 		public String toString() {
-			return super.toString() + " <" + ast1 + ">";
+			return super.toString() + " <" + getAst1() + ">";
 		}
 	}
 
@@ -3483,7 +3515,7 @@ public class AwkParser {
 		private FunctionDef_AST(String id, AST params, AST func_body) {
 			super(params, func_body);
 			this.id = id;
-			is_function = true;
+			markFunction();
 		}
 
 		public Address getAddress() {
@@ -3514,8 +3546,8 @@ public class AwkParser {
 
 			// execute the body
 			// (function body could be empty [no statements])
-			if (ast2 != null) {
-				int ast2_result = ast2.populateTuples(tuples);
+			if (getAst2() != null) {
+				int ast2_result = getAst2().populateTuples(tuples);
 				assert ast2_result == 0 || ast2_result == 1;
 			}
 
@@ -3530,21 +3562,21 @@ public class AwkParser {
 		}
 
 		int paramCount() {
-			AST ptr = ast1;
+			AST ptr = getAst1();
 			int count = 0;
 			while (ptr != null) {
 				++count;
-				ptr = ptr.ast1;
+				ptr = ptr.getAst1();
 			}
 			return count;
 		}
 
 		void checkActualToFormalParameters(AST actual_param_list) {
 			AST a_ptr = actual_param_list;
-			FunctionDefParamList_AST f_ptr = (FunctionDefParamList_AST) ast1;
+			FunctionDefParamList_AST f_ptr = (FunctionDefParamList_AST) getAst1();
 			while (a_ptr != null) {
 				// actual parameter
-				AST aparam = a_ptr.ast1;
+				AST aparam = a_ptr.getAst1();
 				// formal function parameter
 				AST fparam = symbol_table.getFunctionParameterIDAST(id, f_ptr.id);
 
@@ -3570,8 +3602,8 @@ public class AwkParser {
 					}
 				}
 				// next
-				a_ptr = a_ptr.ast2;
-				f_ptr = (FunctionDefParamList_AST) f_ptr.ast1;
+				a_ptr = a_ptr.getAst2();
+				f_ptr = (FunctionDefParamList_AST) f_ptr.getAst1();
 			}
 		}
 	}
@@ -3613,7 +3645,7 @@ public class AwkParser {
 				throw new SemanticException("function " + function_proxy + " not defined");
 			}
 			int actual_param_count;
-			if (ast1 == null) {
+			if (getAst1() == null) {
 				actual_param_count = 0;
 			} else {
 				actual_param_count = actualParamCount();
@@ -3629,8 +3661,8 @@ public class AwkParser {
 								+ " parameter(s), not "
 								+ actual_param_count);
 			}
-			if (ast1 != null) {
-				function_proxy.checkActualToFormalParameters(ast1);
+			if (getAst1() != null) {
+				function_proxy.checkActualToFormalParameters(getAst1());
 			}
 		}
 
@@ -3642,10 +3674,10 @@ public class AwkParser {
 			}
 			tuples.scriptThis();
 			int actual_param_count;
-			if (ast1 == null) {
+			if (getAst1() == null) {
 				actual_param_count = 0;
 			} else {
-				actual_param_count = ast1.populateTuples(tuples);
+				actual_param_count = getAst1().populateTuples(tuples);
 			}
 			int formal_param_count = function_proxy.getFunctionParamCount();
 			if (formal_param_count < actual_param_count) {
@@ -3659,7 +3691,7 @@ public class AwkParser {
 								+ actual_param_count);
 			}
 
-			function_proxy.checkActualToFormalParameters(ast1);
+			function_proxy.checkActualToFormalParameters(getAst1());
 			tuples.callFunction(function_proxy, function_proxy.getFunctionName(), formal_param_count, actual_param_count);
 			popSourceLineNumber(tuples);
 			return 1;
@@ -3667,11 +3699,11 @@ public class AwkParser {
 
 		private int actualParamCount() {
 			int cnt = 0;
-			AST ptr = ast1;
+			AST ptr = getAst1();
 			while (ptr != null) {
-				assert ptr.ast1 != null;
+				assert ptr.getAst1() != null;
 				++cnt;
-				ptr = ptr.ast2;
+				ptr = ptr.getAst2();
 			}
 			return cnt;
 		}
@@ -3693,10 +3725,10 @@ public class AwkParser {
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 			if (f_idx == BUILTIN_FUNC_NAMES.get("sprintf")) {
-				if (ast1 == null) {
+				if (getAst1() == null) {
 					throw new SemanticException("sprintf requires at least 1 argument");
 				}
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				if (ast1_result == 0) {
 					throw new SemanticException("sprintf requires at minimum 1 argument");
 				}
@@ -3704,10 +3736,10 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("close")) {
-				if (ast1 == null) {
+				if (getAst1() == null) {
 					throw new SemanticException("close requires 1 argument");
 				}
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				if (ast1_result != 1) {
 					throw new SemanticException("close requires only 1 argument");
 				}
@@ -3715,10 +3747,10 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("length")) {
-				if (ast1 == null) {
+				if (getAst1() == null) {
 					tuples.length(0);
 				} else {
-					int ast1_result = ast1.populateTuples(tuples);
+					int ast1_result = getAst1().populateTuples(tuples);
 					if (ast1_result != 1) {
 						throw new SemanticException("length requires at least one argument");
 					}
@@ -3727,10 +3759,10 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("srand")) {
-				if (ast1 == null) {
+				if (getAst1() == null) {
 					tuples.srand(0);
 				} else {
-					int ast1_result = ast1.populateTuples(tuples);
+					int ast1_result = getAst1().populateTuples(tuples);
 					if (ast1_result != 1) {
 						throw new SemanticException("srand takes either 0 or one argument, not " + ast1_result);
 					}
@@ -3739,14 +3771,14 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("rand")) {
-				if (ast1 != null) {
+				if (getAst1() != null) {
 					throw new SemanticException("rand does not take arguments");
 				}
 				tuples.rand();
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("sqrt")) {
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				if (ast1_result != 1) {
 					throw new SemanticException("sqrt requires only 1 argument");
 				}
@@ -3754,7 +3786,7 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("int")) {
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				if (ast1_result != 1) {
 					throw new SemanticException("int requires only 1 argument");
 				}
@@ -3762,7 +3794,7 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("log")) {
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				if (ast1_result != 1) {
 					throw new SemanticException("int requires only 1 argument");
 				}
@@ -3770,7 +3802,7 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("exp")) {
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				if (ast1_result != 1) {
 					throw new SemanticException("exp requires only 1 argument");
 				}
@@ -3778,7 +3810,7 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("sin")) {
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				if (ast1_result != 1) {
 					throw new SemanticException("sin requires only 1 argument");
 				}
@@ -3786,7 +3818,7 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("cos")) {
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				if (ast1_result != 1) {
 					throw new SemanticException("cos requires only 1 argument");
 				}
@@ -3794,7 +3826,7 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("atan2")) {
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				if (ast1_result != 2) {
 					throw new SemanticException("atan2 requires 2 arguments");
 				}
@@ -3802,7 +3834,7 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("match")) {
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				if (ast1_result != 2) {
 					throw new SemanticException("match requires 2 arguments");
 				}
@@ -3810,7 +3842,7 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("index")) {
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				if (ast1_result != 2) {
 					throw new SemanticException("index requires 2 arguments");
 				}
@@ -3818,19 +3850,19 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("sub") || f_idx == BUILTIN_FUNC_NAMES.get("gsub")) {
-				if (ast1 == null || ast1.ast2 == null || ast1.ast2.ast1 == null) {
+				if (getAst1() == null || getAst1().getAst2() == null || getAst1().getAst2().getAst1() == null) {
 					throw new SemanticException("sub needs at least 2 arguments");
 				}
 				boolean is_gsub = f_idx == BUILTIN_FUNC_NAMES.get("gsub");
 
-				int numargs = ast1.populateTuples(tuples);
+				int numargs = getAst1().populateTuples(tuples);
 
 				// stack contains arg1,arg2[,arg3] - in that pop() order
 
 				if (numargs == 2) {
 					tuples.subForDollar0(is_gsub);
 				} else if (numargs == 3) {
-					AST ptr = ast1.ast2.ast2.ast1;
+					AST ptr = getAst1().getAst2().getAst2().getAst1();
 					if (ptr instanceof ID_AST) {
 						ID_AST id_ast = (ID_AST) ptr;
 						if (id_ast.isArray()) {
@@ -3841,9 +3873,9 @@ public class AwkParser {
 					} else if (ptr instanceof ArrayReference_AST) {
 						ArrayReference_AST arr_ast = (ArrayReference_AST) ptr;
 						// push the index
-						int ast2_result = arr_ast.ast2.populateTuples(tuples);
+						int ast2_result = arr_ast.getAst2().populateTuples(tuples);
 						assert ast2_result == 1;
-						ID_AST id_ast = (ID_AST) arr_ast.ast1;
+						ID_AST id_ast = (ID_AST) arr_ast.getAst1();
 						if (id_ast.isScalar()) {
 							throw new SemanticException("Cannot use " + id_ast + " as an array.");
 						}
@@ -3851,8 +3883,8 @@ public class AwkParser {
 					} else if (ptr instanceof DollarExpression_AST) {
 						// push the field ref
 						DollarExpression_AST dollar_expr = (DollarExpression_AST) ptr;
-						assert dollar_expr.ast1 != null;
-						int ast1_result = dollar_expr.ast1.populateTuples(tuples);
+						assert dollar_expr.getAst1() != null;
+						int ast1_result = dollar_expr.getAst1().populateTuples(tuples);
 						assert ast1_result == 1;
 						tuples.subForDollarReference(is_gsub);
 					} else {
@@ -3868,10 +3900,10 @@ public class AwkParser {
 				// the 2nd argument is pass by reference, which is ok (?)
 
 				// funccallparamlist.funccallparamlist.id_ast
-				if (ast1 == null || ast1.ast2 == null || ast1.ast2.ast1 == null) {
+				if (getAst1() == null || getAst1().getAst2() == null || getAst1().getAst2().getAst1() == null) {
 					throw new SemanticException("split needs at least 2 arguments");
 				}
-				AST ptr = ast1.ast2.ast1;
+				AST ptr = getAst1().getAst2().getAst1();
 				if (!(ptr instanceof ID_AST)) {
 					throw new SemanticException("split needs an array name as its 2nd argument");
 				}
@@ -3881,7 +3913,7 @@ public class AwkParser {
 				}
 				arr_ast.setArray(true);
 
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				if (ast1_result != 2 && ast1_result != 3) {
 					throw new SemanticException("split requires 2 or 3 arguments, not " + ast1_result);
 				}
@@ -3889,10 +3921,10 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("substr")) {
-				if (ast1 == null) {
+				if (getAst1() == null) {
 					throw new SemanticException("substr requires at least 2 arguments");
 				}
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				if (ast1_result != 2 && ast1_result != 3) {
 					throw new SemanticException("substr requires 2 or 3 arguments, not " + ast1_result);
 				}
@@ -3900,10 +3932,10 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("tolower")) {
-				if (ast1 == null) {
+				if (getAst1() == null) {
 					throw new SemanticException("tolower requires 1 argument");
 				}
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				if (ast1_result != 1) {
 					throw new SemanticException("tolower requires only 1 argument");
 				}
@@ -3911,10 +3943,10 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("toupper")) {
-				if (ast1 == null) {
+				if (getAst1() == null) {
 					throw new SemanticException("toupper requires 1 argument");
 				}
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				if (ast1_result != 1) {
 					throw new SemanticException("toupper requires only 1 argument");
 				}
@@ -3922,10 +3954,10 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("system")) {
-				if (ast1 == null) {
+				if (getAst1() == null) {
 					throw new SemanticException("system requires 1 argument");
 				}
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				if (ast1_result != 1) {
 					throw new SemanticException("system requires only 1 argument");
 				}
@@ -3933,10 +3965,10 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (f_idx == BUILTIN_FUNC_NAMES.get("exec")) {
-				if (ast1 == null) {
+				if (getAst1() == null) {
 					throw new SemanticException("exec requires 1 argument");
 				}
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				if (ast1_result != 1) {
 					throw new SemanticException("exec requires only 1 argument");
 				}
@@ -3958,12 +3990,12 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast1 != null;
+			assert getAst1() != null;
 			int retval;
-			if (ast2 == null) {
-				retval = ast1.populateTuples(tuples);
+			if (getAst2() == null) {
+				retval = getAst1().populateTuples(tuples);
 			} else {
-				retval = ast1.populateTuples(tuples) + ast2.populateTuples(tuples);
+				retval = getAst1().populateTuples(tuples) + getAst2().populateTuples(tuples);
 			}
 			popSourceLineNumber(tuples);
 			return retval;
@@ -3994,7 +4026,7 @@ public class AwkParser {
 		@Override
 		public void semanticAnalysis() throws SemanticException {
 			// could do it recursively, but not necessary
-			// since all ast1's are FunctionDefParamList's
+			// since all getAst1()'s are FunctionDefParamList's
 			// and, thus, terminals (no need to do further
 			// semantic analysis)
 
@@ -4003,7 +4035,7 @@ public class AwkParser {
 				if (SPECIAL_VAR_NAMES.get(ptr.id) != null) {
 					throw new SemanticException("Special variable " + ptr.id + " cannot be used as a formal parameter");
 				}
-				ptr = (FunctionDefParamList_AST) ptr.ast1;
+				ptr = (FunctionDefParamList_AST) ptr.getAst1();
 			}
 		}
 	}
@@ -4075,19 +4107,19 @@ public class AwkParser {
 
 		@Override
 		public String toString() {
-			return super.toString() + " (" + ast1 + " [...])";
+			return super.toString() + " (" + getAst1() + " [...])";
 		}
 
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast1 != null;
-			assert ast2 != null;
+			assert getAst1() != null;
+			assert getAst2() != null;
 			// get the array var
-			int ast1_result = ast1.populateTuples(tuples);
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
 			// get the index
-			int ast2_result = ast2.populateTuples(tuples);
+			int ast2_result = getAst2().populateTuples(tuples);
 			assert ast2_result == 1;
 			tuples.dereferenceArray();
 			popSourceLineNumber(tuples);
@@ -4207,11 +4239,11 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast1 != null;
-			int ast1_result = ast1.populateTuples(tuples);
+			assert getAst1() != null;
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
-			assert ast2 != null;
-			int ast2_result = ast2.populateTuples(tuples);
+			assert getAst2() != null;
+			int ast2_result = getAst2().populateTuples(tuples);
 			assert ast2_result == 1;
 			tuples.conditionPair();
 			popSourceLineNumber(tuples);
@@ -4228,7 +4260,7 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			int ast1_result = ast1.populateTuples(tuples);
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
 			tuples.castInt();
 			popSourceLineNumber(tuples);
@@ -4245,7 +4277,7 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			int ast1_result = ast1.populateTuples(tuples);
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
 			tuples.castDouble();
 			popSourceLineNumber(tuples);
@@ -4262,7 +4294,7 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			int ast1_result = ast1.populateTuples(tuples);
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
 			tuples.castString();
 			popSourceLineNumber(tuples);
@@ -4274,7 +4306,7 @@ public class AwkParser {
 
 		private Begin_AST() {
 			super();
-			is_begin = true;
+			markBegin();
 		}
 
 		@Override
@@ -4290,7 +4322,7 @@ public class AwkParser {
 
 		private End_AST() {
 			super();
-			is_end = true;
+			markEnd();
 		}
 
 		@Override
@@ -4311,22 +4343,22 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast1 != null;
-			if (ast1 instanceof ID_AST) {
-				ID_AST id_ast = (ID_AST) ast1;
+			assert getAst1() != null;
+			if (getAst1() instanceof ID_AST) {
+				ID_AST id_ast = (ID_AST) getAst1();
 				tuples.inc(id_ast.offset, id_ast.is_global);
-			} else if (ast1 instanceof ArrayReference_AST) {
-				ArrayReference_AST arr_ast = (ArrayReference_AST) ast1;
-				ID_AST id_ast = (ID_AST) arr_ast.ast1;
+			} else if (getAst1() instanceof ArrayReference_AST) {
+				ArrayReference_AST arr_ast = (ArrayReference_AST) getAst1();
+				ID_AST id_ast = (ID_AST) arr_ast.getAst1();
 				assert id_ast != null;
-				assert arr_ast.ast2 != null;
-				int arr_ast2_result = arr_ast.ast2.populateTuples(tuples);
+				assert arr_ast.getAst2() != null;
+				int arr_ast2_result = arr_ast.getAst2().populateTuples(tuples);
 				assert arr_ast2_result == 1;
 				tuples.incArrayRef(id_ast.offset, id_ast.is_global);
-			} else if (ast1 instanceof DollarExpression_AST) {
-				DollarExpression_AST dollar_expr = (DollarExpression_AST) ast1;
-				assert dollar_expr.ast1 != null;
-				int ast1_result = dollar_expr.ast1.populateTuples(tuples);
+			} else if (getAst1() instanceof DollarExpression_AST) {
+				DollarExpression_AST dollar_expr = (DollarExpression_AST) getAst1();
+				assert dollar_expr.getAst1() != null;
+				int ast1_result = dollar_expr.getAst1().populateTuples(tuples);
 				assert ast1_result == 1;
 				// OPTIMIATION: duplicate the x in $x here
 				// so that it is not evaluated again
@@ -4341,11 +4373,11 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1; // NOTE, short-circuit return here!
 			} else {
-				throw new NotImplementedError("unhandled preinc for " + ast1);
+				throw new NotImplementedError("unhandled preinc for " + getAst1());
 			}
 			// else
-			// assert false : "cannot refer for pre_inc to "+ast1;
-			int ast1_result = ast1.populateTuples(tuples);
+			// assert false : "cannot refer for pre_inc to "+getAst1();
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
 			popSourceLineNumber(tuples);
 			return 1;
@@ -4361,22 +4393,22 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast1 != null;
-			if (ast1 instanceof ID_AST) {
-				ID_AST id_ast = (ID_AST) ast1;
+			assert getAst1() != null;
+			if (getAst1() instanceof ID_AST) {
+				ID_AST id_ast = (ID_AST) getAst1();
 				tuples.dec(id_ast.offset, id_ast.is_global);
-			} else if (ast1 instanceof ArrayReference_AST) {
-				ArrayReference_AST arr_ast = (ArrayReference_AST) ast1;
-				ID_AST id_ast = (ID_AST) arr_ast.ast1;
+			} else if (getAst1() instanceof ArrayReference_AST) {
+				ArrayReference_AST arr_ast = (ArrayReference_AST) getAst1();
+				ID_AST id_ast = (ID_AST) arr_ast.getAst1();
 				assert id_ast != null;
-				assert arr_ast.ast2 != null;
-				int arr_ast2_result = arr_ast.ast2.populateTuples(tuples);
+				assert arr_ast.getAst2() != null;
+				int arr_ast2_result = arr_ast.getAst2().populateTuples(tuples);
 				assert arr_ast2_result == 1;
 				tuples.decArrayRef(id_ast.offset, id_ast.is_global);
-			} else if (ast1 instanceof DollarExpression_AST) {
-				DollarExpression_AST dollar_expr = (DollarExpression_AST) ast1;
-				assert dollar_expr.ast1 != null;
-				int ast1_result = dollar_expr.ast1.populateTuples(tuples);
+			} else if (getAst1() instanceof DollarExpression_AST) {
+				DollarExpression_AST dollar_expr = (DollarExpression_AST) getAst1();
+				assert dollar_expr.getAst1() != null;
+				int ast1_result = dollar_expr.getAst1().populateTuples(tuples);
 				assert ast1_result == 1;
 				// OPTIMIATION: duplicate the x in $x here
 				// so that it is not evaluated again
@@ -4391,9 +4423,9 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1; // NOTE, short-circuit return here!
 			} else {
-				throw new NotImplementedError("unhandled predec for " + ast1);
+				throw new NotImplementedError("unhandled predec for " + getAst1());
 			}
-			int ast1_result = ast1.populateTuples(tuples);
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
 			popSourceLineNumber(tuples);
 			return 1;
@@ -4409,28 +4441,28 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast1 != null;
-			int ast1_result = ast1.populateTuples(tuples);
+			assert getAst1() != null;
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
-			if (ast1 instanceof ID_AST) {
-				ID_AST id_ast = (ID_AST) ast1;
+			if (getAst1() instanceof ID_AST) {
+				ID_AST id_ast = (ID_AST) getAst1();
 				tuples.postInc(id_ast.offset, id_ast.is_global);
-			} else if (ast1 instanceof ArrayReference_AST) {
-				ArrayReference_AST arr_ast = (ArrayReference_AST) ast1;
-				ID_AST id_ast = (ID_AST) arr_ast.ast1;
+			} else if (getAst1() instanceof ArrayReference_AST) {
+				ArrayReference_AST arr_ast = (ArrayReference_AST) getAst1();
+				ID_AST id_ast = (ID_AST) arr_ast.getAst1();
 				assert id_ast != null;
-				assert arr_ast.ast2 != null;
-				int arr_ast2_result = arr_ast.ast2.populateTuples(tuples);
+				assert arr_ast.getAst2() != null;
+				int arr_ast2_result = arr_ast.getAst2().populateTuples(tuples);
 				assert arr_ast2_result == 1;
 				tuples.incArrayRef(id_ast.offset, id_ast.is_global);
-			} else if (ast1 instanceof DollarExpression_AST) {
-				DollarExpression_AST dollar_expr = (DollarExpression_AST) ast1;
-				assert dollar_expr.ast1 != null;
-				int dollarast_ast1_result = dollar_expr.ast1.populateTuples(tuples);
+			} else if (getAst1() instanceof DollarExpression_AST) {
+				DollarExpression_AST dollar_expr = (DollarExpression_AST) getAst1();
+				assert dollar_expr.getAst1() != null;
+				int dollarast_ast1_result = dollar_expr.getAst1().populateTuples(tuples);
 				assert dollarast_ast1_result == 1;
 				tuples.incDollarRef();
 			} else {
-				throw new NotImplementedError("unhandled postinc for " + ast1);
+				throw new NotImplementedError("unhandled postinc for " + getAst1());
 			}
 			popSourceLineNumber(tuples);
 			return 1;
@@ -4446,28 +4478,28 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast1 != null;
-			int ast1_result = ast1.populateTuples(tuples);
+			assert getAst1() != null;
+			int ast1_result = getAst1().populateTuples(tuples);
 			assert ast1_result == 1;
-			if (ast1 instanceof ID_AST) {
-				ID_AST id_ast = (ID_AST) ast1;
+			if (getAst1() instanceof ID_AST) {
+				ID_AST id_ast = (ID_AST) getAst1();
 				tuples.postDec(id_ast.offset, id_ast.is_global);
-			} else if (ast1 instanceof ArrayReference_AST) {
-				ArrayReference_AST arr_ast = (ArrayReference_AST) ast1;
-				ID_AST id_ast = (ID_AST) arr_ast.ast1;
+			} else if (getAst1() instanceof ArrayReference_AST) {
+				ArrayReference_AST arr_ast = (ArrayReference_AST) getAst1();
+				ID_AST id_ast = (ID_AST) arr_ast.getAst1();
 				assert id_ast != null;
-				assert arr_ast.ast2 != null;
-				int arr_ast2_result = arr_ast.ast2.populateTuples(tuples);
+				assert arr_ast.getAst2() != null;
+				int arr_ast2_result = arr_ast.getAst2().populateTuples(tuples);
 				assert arr_ast2_result == 1;
 				tuples.decArrayRef(id_ast.offset, id_ast.is_global);
-			} else if (ast1 instanceof DollarExpression_AST) {
-				DollarExpression_AST dollar_expr = (DollarExpression_AST) ast1;
-				assert dollar_expr.ast1 != null;
-				int dollarast_ast1_result = dollar_expr.ast1.populateTuples(tuples);
+			} else if (getAst1() instanceof DollarExpression_AST) {
+				DollarExpression_AST dollar_expr = (DollarExpression_AST) getAst1();
+				assert dollar_expr.getAst1() != null;
+				int dollarast_ast1_result = dollar_expr.getAst1().populateTuples(tuples);
 				assert dollarast_ast1_result == 1;
 				tuples.decDollarRef();
 			} else {
-				throw new NotImplementedError("unhandled postinc for " + ast1);
+				throw new NotImplementedError("unhandled postinc for " + getAst1());
 			}
 			popSourceLineNumber(tuples);
 			return 1;
@@ -4488,18 +4520,18 @@ public class AwkParser {
 			pushSourceLineNumber(tuples);
 
 			int param_count;
-			if (ast1 == null) {
+			if (getAst1() == null) {
 				param_count = 0;
 			} else {
-				param_count = ast1.populateTuples(tuples);
+				param_count = getAst1().populateTuples(tuples);
 				assert param_count >= 0;
 				if (param_count == 0) {
 					throw new SemanticException("Cannot print the result. The expression doesn't return anything.");
 				}
 			}
 
-			if (ast2 != null) {
-				int ast2_result = ast2.populateTuples(tuples);
+			if (getAst2() != null) {
+				int ast2_result = getAst2().populateTuples(tuples);
 				assert ast2_result == 1;
 			}
 
@@ -4532,24 +4564,24 @@ public class AwkParser {
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 			int param_count;
-			if (ast1 == null) {
+			if (getAst1() == null) {
 				param_count = 0;
 			} else {
 				/// Query for the extension.
 				JawkExtension extension = extensions.get(extension_keyword);
-				int arg_count = countParams((FunctionCallParamList_AST) ast1);
+				int arg_count = countParams((FunctionCallParamList_AST) getAst1());
 				/// Get all required assoc array parameters:
 				int[] req_array_idxs = extension.getAssocArrayParameterPositions(extension_keyword, arg_count);
 				assert req_array_idxs != null;
 
 				for (int idx : req_array_idxs) {
-					AST param_ast = getParamAst((FunctionCallParamList_AST) ast1, idx);
-					assert ast1 instanceof FunctionCallParamList_AST;
+					AST param_ast = getParamAst((FunctionCallParamList_AST) getAst1(), idx);
+					assert getAst1() instanceof FunctionCallParamList_AST;
 					// if the parameter is an ID_AST...
-					if (param_ast.ast1 instanceof ID_AST) {
+					if (param_ast.getAst1() instanceof ID_AST) {
 						// then force it to be an array,
 						// or complain if it is already tagged as a scalar
-						ID_AST id_ast = (ID_AST) param_ast.ast1;
+						ID_AST id_ast = (ID_AST) param_ast.getAst1();
 						if (id_ast.isScalar()) {
 							throw new SemanticException(
 									"Extension '"
@@ -4562,7 +4594,7 @@ public class AwkParser {
 					}
 				}
 
-				param_count = ast1.populateTuples(tuples);
+				param_count = getAst1().populateTuples(tuples);
 				assert param_count >= 0;
 			}
 			// is_initial == true ::
@@ -4570,10 +4602,10 @@ public class AwkParser {
 			// of another extension
 			// true iff Extension | FunctionCallParam | FunctionCallParam | etc.
 			boolean is_initial;
-			if (parent instanceof FunctionCallParamList_AST) {
-				AST ptr = parent;
+			if (getParent() instanceof FunctionCallParamList_AST) {
+				AST ptr = getParent();
 				while (ptr instanceof FunctionCallParamList_AST) {
-					ptr = ptr.parent;
+					ptr = ptr.getParent();
 				}
 				is_initial = !(ptr instanceof Extension_AST);
 			} else {
@@ -4587,7 +4619,7 @@ public class AwkParser {
 
 		private AST getParamAst(FunctionCallParamList_AST p_ast, int pos) {
 			for (int i = 0; i < pos; ++i) {
-				p_ast = (FunctionCallParamList_AST) p_ast.ast2;
+				p_ast = (FunctionCallParamList_AST) p_ast.getAst2();
 				if (p_ast == null) {
 					throw new SemanticException("More arguments required for assoc array parameter position specification.");
 				}
@@ -4598,7 +4630,7 @@ public class AwkParser {
 		private int countParams(FunctionCallParamList_AST p_ast) {
 			int cnt = 0;
 			while (p_ast != null) {
-				p_ast = (FunctionCallParamList_AST) p_ast.ast2;
+				p_ast = (FunctionCallParamList_AST) p_ast.getAst2();
 				++cnt;
 			}
 			return cnt;
@@ -4624,18 +4656,18 @@ public class AwkParser {
 			pushSourceLineNumber(tuples);
 
 			int param_count;
-			if (ast1 == null) {
+			if (getAst1() == null) {
 				param_count = 0;
 			} else {
-				param_count = ast1.populateTuples(tuples);
+				param_count = getAst1().populateTuples(tuples);
 				assert param_count >= 0;
 				if (param_count == 0) {
 					throw new SemanticException("Cannot printf the result. The expression doesn't return anything.");
 				}
 			}
 
-			if (ast2 != null) {
-				int ast2_result = ast2.populateTuples(tuples);
+			if (getAst2() != null) {
+				int ast2_result = getAst2().populateTuples(tuples);
 				assert ast2_result == 1;
 			}
 
@@ -4663,16 +4695,16 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (ast1 != null) {
-				int ast1_result = ast1.populateTuples(tuples);
+			if (getAst1() != null) {
+				int ast1_result = getAst1().populateTuples(tuples);
 				assert ast1_result == 1;
-				// stack has ast1 (i.e., "command")
+				// stack has getAst1() (i.e., "command")
 				tuples.useAsCommandInput();
-			} else if (ast3 != null) {
-				// getline ... < ast3
-				int ast3_result = ast3.populateTuples(tuples);
+			} else if (getAst3() != null) {
+				// getline ... < getAst3()
+				int ast3_result = getAst3().populateTuples(tuples);
 				assert ast3_result == 1;
-				// stack has ast3 (i.e., "filename")
+				// stack has getAst3() (i.e., "filename")
 				tuples.useAsFileInput();
 			} else {
 				tuples.getlineInput();
@@ -4680,35 +4712,35 @@ public class AwkParser {
 			// 2 resultant values on the stack!
 			// 2nd - -1/0/1 for io-err,eof,success
 			// 1st(top) - the input
-			if (ast2 == null) {
+			if (getAst2() == null) {
 				tuples.assignAsInput();
 				// stack still has the input, to be popped below...
 				// (all assignment results are placed on the stack)
-			} else if (ast2 instanceof ID_AST) {
-				ID_AST id_ast = (ID_AST) ast2;
+			} else if (getAst2() instanceof ID_AST) {
+				ID_AST id_ast = (ID_AST) getAst2();
 				tuples.assign(id_ast.offset, id_ast.is_global);
 				if (id_ast.id.equals("RS")) {
 					tuples.applyRS();
 				}
-			} else if (ast2 instanceof ArrayReference_AST) {
-				ArrayReference_AST arr = (ArrayReference_AST) ast2;
+			} else if (getAst2() instanceof ArrayReference_AST) {
+				ArrayReference_AST arr = (ArrayReference_AST) getAst2();
 				// push the index
-				assert arr.ast2 != null;
-				int arr_ast2_result = arr.ast2.populateTuples(tuples);
+				assert arr.getAst2() != null;
+				int arr_ast2_result = arr.getAst2().populateTuples(tuples);
 				assert arr_ast2_result == 1;
 				// push the array ref itself
-				ID_AST id_ast = (ID_AST) arr.ast1;
+				ID_AST id_ast = (ID_AST) arr.getAst1();
 				tuples.assignArray(id_ast.offset, id_ast.is_global);
-			} else if (ast2 instanceof DollarExpression_AST) {
-				DollarExpression_AST dollar_expr = (DollarExpression_AST) ast2;
-				if (dollar_expr.ast2 != null) {
-					int ast2_result = dollar_expr.ast2.populateTuples(tuples);
+			} else if (getAst2() instanceof DollarExpression_AST) {
+				DollarExpression_AST dollar_expr = (DollarExpression_AST) getAst2();
+				if (dollar_expr.getAst2() != null) {
+					int ast2_result = dollar_expr.getAst2().populateTuples(tuples);
 					assert ast2_result == 1;
 				}
 				// stack contains eval of dollar arg
 				tuples.assignAsInputField();
 			} else {
-				throw new SemanticException("Cannot getline into a " + ast2);
+				throw new SemanticException("Cannot getline into a " + getAst2());
 			}
 			// get rid of value left by the assignment
 			tuples.pop();
@@ -4731,8 +4763,8 @@ public class AwkParser {
 			if (returnable == null) {
 				throw new SemanticException("Cannot use return here.");
 			}
-			if (ast1 != null) {
-				int ast1_result = ast1.populateTuples(tuples);
+			if (getAst1() != null) {
+				int ast1_result = getAst1().populateTuples(tuples);
 				assert ast1_result == 1;
 				tuples.setReturnResult();
 			}
@@ -4751,8 +4783,8 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (ast1 != null) {
-				int ast1_result = ast1.populateTuples(tuples);
+			if (getAst1() != null) {
+				int ast1_result = getAst1().populateTuples(tuples);
 				assert ast1_result == 1;
 				tuples.exitWithCode();
 			} else {
@@ -4772,29 +4804,29 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			assert ast1 != null;
+			assert getAst1() != null;
 
-			if (ast1 instanceof ArrayReference_AST) {
-				assert ast1.ast1 != null; // a in a[b]
-				assert ast1.ast2 != null; // b in a[b]
-				ID_AST id_ast = (ID_AST) ast1.ast1;
+			if (getAst1() instanceof ArrayReference_AST) {
+				assert getAst1().getAst1() != null; // a in a[b]
+				assert getAst1().getAst2() != null; // b in a[b]
+				ID_AST id_ast = (ID_AST) getAst1().getAst1();
 				if (id_ast.isScalar()) {
 					throw new SemanticException("delete: Cannot use a scalar as an array.");
 				}
 				id_ast.setArray(true);
-				int idx_result = ast1.ast2.populateTuples(tuples);
+				int idx_result = getAst1().getAst2().populateTuples(tuples);
 				assert idx_result == 1;
 				// idx on the stack
 				tuples.deleteArrayElement(id_ast.offset, id_ast.is_global);
-			} else if (ast1 instanceof ID_AST) {
-				ID_AST id_ast = (ID_AST) ast1;
+			} else if (getAst1() instanceof ID_AST) {
+				ID_AST id_ast = (ID_AST) getAst1();
 				if (id_ast.isScalar()) {
 					throw new SemanticException("delete: Cannot delete a scalar.");
 				}
 				id_ast.setArray(true);
 				tuples.deleteArray(id_ast.offset, id_ast.is_global);
 			} else {
-				throw new Error("Should never reach here : delete for " + ast1);
+				throw new Error("Should never reach here : delete for " + getAst1());
 			}
 
 			popSourceLineNumber(tuples);
@@ -4827,10 +4859,10 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (ast1 == null) {
+			if (getAst1() == null) {
 				tuples.sleep(0);
 			} else {
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				assert ast1_result == 1;
 				tuples.sleep(ast1_result);
 			}
@@ -4848,23 +4880,23 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (ast1 == null) {
+			if (getAst1() == null) {
 				tuples.dump(0);
 			} else {
-				assert ast1 instanceof FunctionCallParamList_AST;
-				AST ptr = ast1;
+				assert getAst1() instanceof FunctionCallParamList_AST;
+				AST ptr = getAst1();
 				while (ptr != null) {
-					if (!(ptr.ast1 instanceof ID_AST)) {
+					if (!(ptr.getAst1() instanceof ID_AST)) {
 						throw new SemanticException("ID required for argument(s) to _dump");
 					}
-					ID_AST id_ast = (ID_AST) ptr.ast1;
+					ID_AST id_ast = (ID_AST) ptr.getAst1();
 					if (id_ast.isScalar()) {
 						throw new SemanticException("_dump: Cannot use a scalar as an argument.");
 					}
 					id_ast.setArray(true);
-					ptr = ptr.ast2;
+					ptr = ptr.getAst2();
 				}
-				int ast1_result = ast1.populateTuples(tuples);
+				int ast1_result = getAst1().populateTuples(tuples);
 				tuples.dump(ast1_result);
 			}
 			popSourceLineNumber(tuples);

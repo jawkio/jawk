@@ -24,30 +24,30 @@ package org.metricshub.jawk.frontend;
 
 import java.io.IOException;
 import java.io.LineNumberReader;
-import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
+
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.metricshub.jawk.NotImplementedError;
 import org.metricshub.jawk.backend.AVM;
 import org.metricshub.jawk.ext.JawkExtension;
+import org.metricshub.jawk.frontend.ast.AST;
+import org.metricshub.jawk.frontend.ast.LexerException;
+import org.metricshub.jawk.frontend.ast.ParserException;
 import org.metricshub.jawk.intermediate.Address;
 import org.metricshub.jawk.intermediate.AwkTuples;
-import java.util.function.Supplier;
 import org.metricshub.jawk.util.AwkLogger;
 import org.metricshub.jawk.util.ScriptSource;
 import org.slf4j.Logger;
-import org.metricshub.jawk.frontend.ast.LexerException;
-import org.metricshub.jawk.frontend.ast.ParserException;
 
 /**
  * Converts the AWK script into a syntax tree,
@@ -60,19 +60,6 @@ import org.metricshub.jawk.frontend.ast.ParserException;
 public class AwkParser {
 
 	private static final Logger LOG = AwkLogger.getLogger(AwkParser.class);
-
-	/**
-	 * Flags that describe special behaviours of AST nodes. These replace the
-	 * previous marker interfaces such as {@code Breakable} and
-	 * {@code NonStatementAst}.
-	 */
-	private enum AstFlag {
-		BREAKABLE,
-		NEXTABLE,
-		CONTINUEABLE,
-		RETURNABLE,
-		NON_STATEMENT
-	}
 
 	/** Lexer token values, similar to yytok values in lex/yacc. */
 	private static int sIdx = 257;
@@ -289,6 +276,17 @@ public class AwkParser {
 		this.additionalFunctions = additionalFunctions;
 		this.additionalTypeFunctions = additionalTypeFunctions;
 		this.extensions = extensions == null ? Collections.emptyMap() : new HashMap<>(extensions);
+		AST.setSourceInfoProvider(new AST.SourceInfoProvider() {
+			@Override
+			public String getSourceDescription() {
+				return scriptSources.get(scriptSourcesCurrentIndex).getDescription();
+			}
+
+			@Override
+			public int getLineNumber() {
+				return reader.getLineNumber() + 1;
+			}
+		});
 	}
 
 	private List<ScriptSource> scriptSources;
@@ -1772,7 +1770,7 @@ public class AwkParser {
 		// return new ExpressionStatementAst(ASSIGNMENT_EXPRESSION(true, allowInKeyword, false));
 
 		AST exprAst = ASSIGNMENT_EXPRESSION(true, allowInKeyword, false);
-		if (!allowNonStatementAsts && exprAst.hasFlag(AstFlag.NON_STATEMENT)) {
+		if (!allowNonStatementAsts && exprAst.hasFlag(AST.AstFlag.NON_STATEMENT)) {
 			throw parserException("Not a valid statement.");
 		}
 		return new ExpressionStatementAst(exprAst);
@@ -1874,10 +1872,10 @@ public class AwkParser {
 
 		// branch here if we expect a for(... in ...) statement
 		if (token == KEYWORDS.get("in")) {
-			if (expr1.ast1 == null || expr1.ast2 != null) {
+			if (expr1.getAst1() == null || expr1.getAst2() != null) {
 				throw parserException("Invalid expression prior to 'in' statement. Got : " + expr1);
 			}
-			expr1 = expr1.ast1;
+			expr1 = expr1.getAst1();
 			// analyze expr1 to make sure it's a singleton IDAst
 			if (!(expr1 instanceof IDAst)) {
 				throw parserException("Expecting an ID for 'in' statement. Got : " + expr1);
@@ -2204,352 +2202,6 @@ public class AwkParser {
 
 	// parser
 	// ===============================================================================
-	// AST class defs
-	private abstract class AST extends AstNode {
-
-		private final String sourceDescription = scriptSources.get(scriptSourcesCurrentIndex).getDescription();
-		private final int lineNo = reader.getLineNumber() + 1;
-		private AST parent;
-		private AST ast1, ast2, ast3, ast4;
-		private final EnumSet<AstFlag> flags = EnumSet.noneOf(AstFlag.class);
-
-		protected final void addFlag(AstFlag flag) {
-			flags.add(flag);
-		}
-
-		protected final boolean hasFlag(AstFlag flag) {
-			return flags.contains(flag);
-		}
-
-		protected Address breakAddress() {
-			return null;
-		}
-
-		protected Address continueAddress() {
-			return null;
-		}
-
-		protected Address nextAddress() {
-			return null;
-		}
-
-		protected Address returnAddress() {
-			return null;
-		}
-
-		protected final AST getParent() {
-			return parent;
-		}
-
-		@SuppressWarnings("unused")
-		protected final void setParent(AST p) {
-			parent = p;
-		}
-
-		protected final AST getAst1() {
-			return ast1;
-		}
-
-		@SuppressWarnings("unused")
-		protected final void setAst1(AST a1) {
-			ast1 = a1;
-		}
-
-		protected final AST getAst2() {
-			return ast2;
-		}
-
-		@SuppressWarnings("unused")
-		protected final void setAst2(AST a2) {
-			ast2 = a2;
-		}
-
-		protected final AST getAst3() {
-			return ast3;
-		}
-
-		@SuppressWarnings("unused")
-		protected final void setAst3(AST a3) {
-			ast3 = a3;
-		}
-
-		protected final AST getAst4() {
-			return ast4;
-		}
-
-		@SuppressWarnings("unused")
-		protected final void setAst4(AST a4) {
-			ast4 = a4;
-		}
-
-		protected final AST searchFor(AstFlag flag) {
-			AST ptr = this;
-			while (ptr != null) {
-				if (ptr.hasFlag(flag)) {
-					return ptr;
-				}
-				ptr = ptr.parent;
-			}
-			return null;
-		}
-
-		protected AST() {}
-
-		protected AST(AST ast1) {
-			this.ast1 = ast1;
-
-			if (ast1 != null) {
-				ast1.parent = this;
-			}
-		}
-
-		protected AST(AST ast1, AST ast2) {
-			this.ast1 = ast1;
-			this.ast2 = ast2;
-
-			if (ast1 != null) {
-				ast1.parent = this;
-			}
-			if (ast2 != null) {
-				ast2.parent = this;
-			}
-		}
-
-		protected AST(AST ast1, AST ast2, AST ast3) {
-			this.ast1 = ast1;
-			this.ast2 = ast2;
-			this.ast3 = ast3;
-
-			if (ast1 != null) {
-				ast1.parent = this;
-			}
-			if (ast2 != null) {
-				ast2.parent = this;
-			}
-			if (ast3 != null) {
-				ast3.parent = this;
-			}
-		}
-
-		protected AST(AST ast1, AST ast2, AST ast3, AST ast4) {
-			this.ast1 = ast1;
-			this.ast2 = ast2;
-			this.ast3 = ast3;
-			this.ast4 = ast4;
-
-			if (ast1 != null) {
-				ast1.parent = this;
-			}
-			if (ast2 != null) {
-				ast2.parent = this;
-			}
-			if (ast3 != null) {
-				ast3.parent = this;
-			}
-			if (ast4 != null) {
-				ast4.parent = this;
-			}
-		}
-
-		/**
-		 * Dump a meaningful text representation of this
-		 * abstract syntax tree node to the output (print)
-		 * stream. Either it is called directly by the
-		 * application program, or it is called by the
-		 * parent node of this tree node.
-		 *
-		 * @param ps The print stream to dump the text
-		 *        representation.
-		 */
-		@Override
-		public void dump(PrintStream ps) {
-			dump(ps, 0);
-		}
-
-		private void dump(PrintStream ps, int lvl) {
-			StringBuffer spaces = new StringBuffer();
-			for (int i = 0; i < lvl; i++) {
-				spaces.append(' ');
-			}
-			ps.println(spaces + toString());
-			if (ast1 != null) {
-				ast1.dump(ps, lvl + 1);
-			}
-			if (ast2 != null) {
-				ast2.dump(ps, lvl + 1);
-			}
-			if (ast3 != null) {
-				ast3.dump(ps, lvl + 1);
-			}
-			if (ast4 != null) {
-				ast4.dump(ps, lvl + 1);
-			}
-		}
-
-		/**
-		 * Apply semantic checks to this node. The default
-		 * implementation is to simply call semanticAnalysis()
-		 * on all the children of this abstract syntax tree node.
-		 * Therefore, this method must be overridden to provide
-		 * meaningful semantic analysis / checks.
-		 *
-		 * @throws SemanticException upon a semantic error.
-		 */
-		@Override
-		public void semanticAnalysis() {
-			if (ast1 != null) {
-				ast1.semanticAnalysis();
-			}
-			if (ast2 != null) {
-				ast2.semanticAnalysis();
-			}
-			if (ast3 != null) {
-				ast3.semanticAnalysis();
-			}
-			if (ast4 != null) {
-				ast4.semanticAnalysis();
-			}
-		}
-
-		/**
-		 * Appends tuples to the AwkTuples list
-		 * for this abstract syntax tree node. Subclasses
-		 * must implement this method.
-		 * <p>
-		 * This is called either by the main program to generate a full
-		 * list of tuples for the abstract syntax tree, or it is called
-		 * by other abstract syntax tree nodes in response to their
-		 * attempt at populating tuples.
-		 *
-		 * @param tuples The tuples to populate.
-		 * @return The number of items left on the stack after
-		 *         these tuples have executed.
-		 */
-		@Override
-		public abstract int populateTuples(AwkTuples tuples);
-
-		protected final void pushSourceLineNumber(AwkTuples tuples) {
-			tuples.pushSourceLineNumber(lineNo);
-		}
-
-		protected final void popSourceLineNumber(AwkTuples tuples) {
-			tuples.popSourceLineNumber(lineNo);
-		}
-
-		private boolean isBegin = isBegin();
-
-		@SuppressWarnings("unused")
-		protected final boolean isBeginFlag() {
-			return isBegin;
-		}
-
-		protected final void setBeginFlag(boolean flag) {
-			isBegin = flag;
-		}
-
-		private boolean isBegin() {
-			boolean result = isBegin;
-			if (!result && ast1 != null) {
-				result = ast1.isBegin();
-			}
-			if (!result && ast2 != null) {
-				result = ast2.isBegin();
-			}
-			if (!result && ast3 != null) {
-				result = ast3.isBegin();
-			}
-			if (!result && ast4 != null) {
-				result = ast4.isBegin();
-			}
-			return result;
-		}
-
-		private boolean isEnd = isEnd();
-
-		@SuppressWarnings("unused")
-		protected final boolean isEndFlag() {
-			return isEnd;
-		}
-
-		protected final void setEndFlag(boolean flag) {
-			isEnd = flag;
-		}
-
-		private boolean isEnd() {
-			boolean result = isEnd;
-			if (!result && ast1 != null) {
-				result = ast1.isEnd();
-			}
-			if (!result && ast2 != null) {
-				result = ast2.isEnd();
-			}
-			if (!result && ast3 != null) {
-				result = ast3.isEnd();
-			}
-			if (!result && getAst4() != null) {
-				result = getAst4().isEnd();
-			}
-			return result;
-		}
-
-		private boolean isFunction = isFunction();
-
-		@SuppressWarnings("unused")
-		protected final boolean isFunctionFlag() {
-			return isFunction;
-		}
-
-		protected final void setFunctionFlag(boolean flag) {
-			isFunction = flag;
-		}
-
-		private boolean isFunction() {
-			boolean result = isFunction;
-			if (!result && getAst1() != null) {
-				result = getAst1().isFunction();
-			}
-			if (!result && getAst2() != null) {
-				result = getAst2().isFunction();
-			}
-			if (!result && getAst3() != null) {
-				result = getAst3().isFunction();
-			}
-			if (!result && getAst4() != null) {
-				result = getAst4().isFunction();
-			}
-			return result;
-		}
-
-		public boolean isArray() {
-			return false;
-		}
-
-		public boolean isScalar() {
-			return false;
-		}
-
-		/**
-		 * Made protected so that subclasses can access it.
-		 * Package-level access was not necessary.
-		 */
-		protected class SemanticException extends RuntimeException {
-
-			private static final long serialVersionUID = 1L;
-
-			SemanticException(String msg) {
-				super(msg + " (" + sourceDescription + ":" + lineNo + ")");
-			}
-		}
-
-		protected final void throwSemanticException(String msg) {
-			throw new SemanticException(msg);
-		}
-
-		@Override
-		public String toString() {
-			return getClass().getName().replaceFirst(".*[$.]", "");
-		}
-	}
 
 	private abstract class ScalarExpressionAst extends AST {
 
@@ -2581,7 +2233,7 @@ public class AwkParser {
 	}
 
 	private static boolean isRule(AST ast) {
-		return ast != null && !ast.isBegin() && !ast.isEnd() && !ast.isFunction();
+		return ast != null && !ast.isBeginFlag() && !ast.isEndFlag() && !ast.isFunctionFlag();
 	}
 
 	/**
@@ -2659,7 +2311,7 @@ public class AwkParser {
 			// compile functions
 			ptr = this;
 			while (ptr != null) {
-				if (ptr.getAst1() != null && ptr.getAst1().isFunction()) {
+				if (ptr.getAst1() != null && ptr.getAst1().isFunctionFlag()) {
 					assert ptr.getAst1() != null;
 					int ast1Count = ptr.getAst1().populateTuples(tuples);
 					assert ast1Count == 0;
@@ -2718,7 +2370,7 @@ public class AwkParser {
 			ptr = this;
 			// ptr.getAst1() == blank rule condition (i.e.: { print })
 			while (ptr != null) {
-				if (ptr.getAst1() != null && ptr.getAst1().isBegin()) {
+				if (ptr.getAst1() != null && ptr.getAst1().isBeginFlag()) {
 					ptr.getAst1().populateTuples(tuples);
 				}
 
@@ -2741,7 +2393,7 @@ public class AwkParser {
 			// Now check for "END" rules
 			ptr = this;
 			while (!reqInput && (ptr != null)) {
-				if (ptr.getAst1() != null && ptr.getAst1().isEnd()) {
+				if (ptr.getAst1() != null && ptr.getAst1().isEndFlag()) {
 					reqInput = true;
 				}
 				ptr = ptr.getAst2();
@@ -2786,7 +2438,7 @@ public class AwkParser {
 			// grab all ENDs
 			ptr = this;
 			while (ptr != null) {
-				if (ptr.getAst1() != null && ptr.getAst1().isEnd()) {
+				if (ptr.getAst1() != null && ptr.getAst1().isEndFlag()) {
 					ptr.getAst1().populateTuples(tuples);
 				}
 				ptr = ptr.getAst2();
@@ -2879,7 +2531,7 @@ public class AwkParser {
 			tuples.ifFalse(bypassRule);
 			// execute the optRule here!
 			if (getAst2() == null) {
-				if (getAst1() == null || (!getAst1().isBegin() && !getAst1().isEnd())) {
+				if (getAst1() == null || (!getAst1().isBeginFlag() && !getAst1().isEndFlag())) {
 					// display $0
 					tuples.print(0);
 				}

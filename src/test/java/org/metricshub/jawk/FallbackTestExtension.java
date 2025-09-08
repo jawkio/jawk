@@ -1,26 +1,23 @@
 package org.metricshub.jawk;
 
+import org.metricshub.jawk.NotImplementedError;
 import org.metricshub.jawk.ext.AbstractExtension;
-import org.metricshub.jawk.ext.JawkExtension;
-import org.metricshub.jawk.ext.JawkExtension.ExtensionFunction;
 import org.metricshub.jawk.jrt.AssocArray;
 import org.metricshub.jawk.jrt.JRT;
 import org.metricshub.jawk.jrt.VariableManager;
 import org.metricshub.jawk.util.AwkSettings;
 
-public class TestExtension extends AbstractExtension {
+public class FallbackTestExtension extends AbstractExtension {
 
 	private static final String MY_EXTENSION_FUNCTION = "myExtensionFunction";
 	private int invokeCount;
-	private int functionCallCount;
-	private int resolveCount;
 
 	@Override
 	public void init(VariableManager vm, JRT jrt, AwkSettings settings) {}
 
 	@Override
 	public String getExtensionName() {
-		return "TestExtension";
+		return "FallbackTestExtension";
 	}
 
 	@Override
@@ -32,9 +29,8 @@ public class TestExtension extends AbstractExtension {
 	public int[] getAssocArrayParameterPositions(String extensionKeyword, int numArgs) {
 		if (MY_EXTENSION_FUNCTION.equals(extensionKeyword)) {
 			return new int[] { 1 };
-		} else {
-			return new int[] {};
 		}
+		return new int[] {};
 	}
 
 	private Object doMyExtension(Object[] args) {
@@ -54,32 +50,11 @@ public class TestExtension extends AbstractExtension {
 		invokeCount++;
 		if (MY_EXTENSION_FUNCTION.equals(keyword)) {
 			return doMyExtension(args);
-		} else {
-			throw new NotImplementedError(keyword + " is not implemented by " + getExtensionName());
 		}
-	}
-
-	@Override
-	public ExtensionFunction resolve(String keyword) {
-		resolveCount++;
-		if (MY_EXTENSION_FUNCTION.equals(keyword)) {
-			return args -> {
-				functionCallCount++;
-				return doMyExtension(args);
-			};
-		}
-		return args -> invoke(keyword, args);
+		throw new NotImplementedError(keyword + " is not implemented by " + getExtensionName());
 	}
 
 	int getInvokeCount() {
 		return invokeCount;
-	}
-
-	int getFunctionCallCount() {
-		return functionCallCount;
-	}
-
-	int getResolveCount() {
-		return resolveCount;
 	}
 }

@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.Deque;
+import org.metricshub.jawk.ext.JawkExtension;
 
 /**
  * <p>
@@ -1458,8 +1459,12 @@ public class AwkTuples implements Serializable {
 	 * @param paramCount a int
 	 * @param isInitial a boolean
 	 */
-	public void extension(String extensionKeyword, int paramCount, boolean isInitial) {
-		queue.add(new Tuple(Opcode.EXTENSION, extensionKeyword, paramCount, isInitial));
+	public void extension(
+			String extensionKeyword,
+			JawkExtension.ExtensionFunction function,
+			int paramCount,
+			boolean isInitial) {
+		queue.add(new Tuple(Opcode.EXTENSION, extensionKeyword, paramCount, isInitial, function));
 	}
 
 	/**

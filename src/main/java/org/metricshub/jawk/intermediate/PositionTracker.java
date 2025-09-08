@@ -1,6 +1,7 @@
 package org.metricshub.jawk.intermediate;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.metricshub.jawk.ext.JawkExtension;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -112,6 +113,10 @@ public class PositionTracker {
 	public Class<?> classArg() {
 		assert tuple.getCls() != null;
 		return tuple.getCls();
+	}
+
+	public JawkExtension.ExtensionFunction extensionFunction() {
+		return tuple.getExtensionFunction();
 	}
 
 	public int lineNumber() {

@@ -1970,17 +1970,22 @@ public class AVM implements VariableManager {
 					long numArgs = position.intArg(1);
 					boolean isInitial = position.boolArg(2);
 
-					JawkExtension extension = extensions.get(extensionKeyword);
-					if (extension == null) {
-						throw new AwkRuntimeException("Extension for '" + extensionKeyword + "' not found.");
-					}
-
 					Object[] args = new Object[(int) numArgs];
 					for (int i = (int) numArgs - 1; i >= 0; i--) {
 						args[i] = pop();
 					}
 
-					Object retval = extension.invoke(extensionKeyword, args);
+					JawkExtension.ExtensionFunction func = position.extensionFunction();
+					Object retval;
+					if (func != null) {
+						retval = func.invoke(args);
+					} else {
+						JawkExtension extension = extensions.get(extensionKeyword);
+						if (extension == null) {
+							throw new AwkRuntimeException("Extension for '" + extensionKeyword + "' not found.");
+						}
+						retval = extension.invoke(extensionKeyword, args);
+					}
 
 					// block if necessary
 					// (convert retval into the return value

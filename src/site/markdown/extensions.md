@@ -6,6 +6,22 @@ The Jawk extension facility allows for arbitrary Java code to be called as AWK f
 
 Jawk extensions support **blocking**. You can think of blocking as a tool for extension event management. A Jawk script can block on a collection of blockable services, such as socket input availability, database triggers, user input, GUI dialog input response, or a simple fixed timeout, and, together with the `**-ni**` option, action rules can act on block events instead of input text, leveraging a powerful AWK construct originally intended for text processing, but now can be used to process blockable events. A sample enhanced echo server script is included in this article. It uses blocking to handle socket events, standard input from the user, and timeout events, all within the 47-line script (including comments).
 
+### Direct function resolution
+
+The `JawkExtension` interface exposes a `resolve(String)` method that lets an extension map a keyword to a direct Java
+functional reference. Jawk stores that function during parsing and invokes it directly at runtime, avoiding keyword lookups.
+Extensions that do not override `resolve` continue to work through the older `invoke` method.
+
+```java
+@Override
+public ExtensionFunction resolve(String keyword) {
+    if (MY_KEYWORD.equals(keyword)) {
+        return args -> doSomething(args);
+    }
+    return JawkExtension.super.resolve(keyword);
+}
+```
+
 Extensions must operate within Jawk 's memory model. Therefore, extensions must use strings, numbers, and associative arrays to interface with Jawk scripts. For example, the socket creation extension (bundled with Jawk ) passes a string handle back to the caller for referal to the newly created socket.
 
 We will first go over an example of using the extensions bundled with Jawk . Then, we'll cover creating a new extension from scratch.

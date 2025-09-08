@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.junit.Test;
+import org.metricshub.jawk.ExitException;
 import org.metricshub.jawk.backend.AVM;
 import org.metricshub.jawk.ext.JawkExtension;
 import org.metricshub.jawk.frontend.AwkParser;
@@ -17,27 +18,20 @@ import org.metricshub.jawk.intermediate.AwkTuples;
 import org.metricshub.jawk.util.AwkSettings;
 import org.metricshub.jawk.util.ScriptSource;
 
-public class ExtensionTest {
+public class ExtensionFallbackTest {
 
 	@Test
-	public void testExtension() throws Exception {
-		TestExtension myExtension = new TestExtension();
+	public void testExtensionFallback() throws Exception {
+		JawkExtension myExtension = new FallbackTestExtension();
 		Map<String, JawkExtension> myExtensionMap = Arrays
 				.stream(myExtension.extensionKeywords())
 				.collect(Collectors.toMap(k -> k, k -> myExtension));
 
 		AwkSettings settings = new AwkSettings();
-
-		// We force \n as the Record Separator (RS) because even if running on Windows
-		// we're passing Java strings, where end of lines are simple \n
 		settings.setDefaultRS("\n");
 		settings.setDefaultORS("\n");
-
-		// Create the OutputStream, to collect the result as a String
 		ByteArrayOutputStream resultBytesStream = new ByteArrayOutputStream();
 		settings.setOutputStream(new PrintStream(resultBytesStream));
-
-		// Sets the AWK script to execute
 		settings
 				.addScriptSource(
 						new ScriptSource(
@@ -45,7 +39,6 @@ public class ExtensionTest {
 								new StringReader("BEGIN { ab[1] = \"a\"; ab[2] = \"b\"; printf myExtensionFunction(3, ab) }"),
 								false));
 
-		// Execute the awk script against the specified input
 		AVM avm = null;
 		try {
 			AwkParser parser = new AwkParser(myExtensionMap);
@@ -69,8 +62,6 @@ public class ExtensionTest {
 		}
 		String resultString = resultBytesStream.toString("UTF-8");
 		assertEquals("ababab", resultString);
-		assertEquals(1, myExtension.getResolveCount());
-		assertEquals(1, myExtension.getFunctionCallCount());
-		assertEquals(0, myExtension.getInvokeCount());
+		assertEquals(1, ((FallbackTestExtension) myExtension).getInvokeCount());
 	}
 }

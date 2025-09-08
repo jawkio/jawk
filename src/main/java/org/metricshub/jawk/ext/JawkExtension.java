@@ -66,6 +66,20 @@ import org.metricshub.jawk.util.AwkSettings;
  */
 public interface JawkExtension {
 	/**
+	 * Functional reference to an extension method.
+	 */
+	@FunctionalInterface
+	interface ExtensionFunction {
+		/**
+		 * Invoke the extension.
+		 *
+		 * @param args Arguments to the extension
+		 * @return The return value (result) of the extension
+		 */
+		Object invoke(Object[] args);
+	}
+
+	/**
 	 * Called after the creation and before normal processing of the
 	 * extension, pass in the Jawk Runtime Manager
 	 * and the Variable Manager once.
@@ -115,6 +129,17 @@ public interface JawkExtension {
 	 *         that its type is not guaranteed to be an associative array.
 	 */
 	int[] getAssocArrayParameterPositions(String extensionKeyword, int numArgs);
+
+	/**
+	 * Resolve the keyword to a direct function reference. Implementations may
+	 * override this to avoid keyword dispatch at runtime.
+	 *
+	 * @param keyword The extension keyword
+	 * @return The function handling the keyword
+	 */
+	default ExtensionFunction resolve(String keyword) {
+		return args -> invoke(keyword, args);
+	}
 
 	/**
 	 * Invoke extension as a method.

@@ -4577,11 +4577,10 @@ public class AwkParser {
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 			int paramCount;
+			JawkExtension extension = extensions.get(extensionKeyword);
 			if (getAst1() == null) {
 				paramCount = 0;
 			} else {
-				/// Query for the extension.
-				JawkExtension extension = extensions.get(extensionKeyword);
 				int argCount = countParams((FunctionCallParamListAst) getAst1());
 				/// Get all required assoc array parameters:
 				int[] reqArrayIdxs = extension.getAssocArrayParameterPositions(extensionKeyword, argCount);
@@ -4624,7 +4623,8 @@ public class AwkParser {
 			} else {
 				isInitial = true;
 			}
-			tuples.extension(extensionKeyword, paramCount, isInitial);
+			JawkExtension.ExtensionFunction func = extension.resolve(extensionKeyword);
+			tuples.extension(extensionKeyword, func, paramCount, isInitial);
 			popSourceLineNumber(tuples);
 			// an extension always returns a value, even if it is blank/null
 			return 1;

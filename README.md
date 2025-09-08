@@ -29,6 +29,13 @@ String result = awk.run("{ print toupper($0) }", "hello world");
 
 See [AWK in Java documentation](https://metricshub.org/Jawk/java.html) for more details and advanced usage.
 
+## Extensions
+
+Jawk supports Java-based extension modules. Extensions can now resolve keywords
+to direct Java method references through the `resolve(String)` API, bypassing
+string-based dispatch. See the [extensions documentation](https://metricshub.org/Jawk/extensions.html)
+for more information.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).

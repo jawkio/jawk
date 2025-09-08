@@ -24,6 +24,7 @@ package org.metricshub.jawk.intermediate;
 
 import java.io.Serializable;
 import java.util.function.Supplier;
+import org.metricshub.jawk.ext.JawkExtension;
 
 /**
  * Represents a single opcode and its arguments within the tuple stream produced
@@ -49,6 +50,7 @@ class Tuple implements Serializable {
 	private Address address = null;
 	private Class<?> cls = null;
 	private transient Supplier<Address> addressSupplier = null;
+	private transient JawkExtension.ExtensionFunction extensionFunction = null;
 	private int lineno = -1;
 	private Tuple next = null;
 
@@ -114,6 +116,12 @@ class Tuple implements Serializable {
 		this(opcode, strarg, intarg);
 		bools[2] = boolarg;
 		types[2] = Boolean.class;
+	}
+
+	Tuple(Opcode opcode, String strarg, long intarg, boolean boolarg,
+			JawkExtension.ExtensionFunction func) {
+		this(opcode, strarg, intarg, boolarg);
+		this.extensionFunction = func;
 	}
 
 	Tuple(Opcode opcode, Supplier<Address> addressSupplier, String s2, long i3, long i4) {
@@ -237,6 +245,10 @@ class Tuple implements Serializable {
 
 	Supplier<Address> getAddressSupplier() {
 		return addressSupplier;
+	}
+
+	JawkExtension.ExtensionFunction getExtensionFunction() {
+		return extensionFunction;
 	}
 
 	void setAddress(Address address) {

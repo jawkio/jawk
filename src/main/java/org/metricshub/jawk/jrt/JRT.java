@@ -987,7 +987,7 @@ public class JRT {
 	 * @param value new ARGC value
 	 */
 	public void setARGC(Object value) {
-		// ARGC is managed by the VariableManager.
+		vm.assignVariable("ARGC", value);
 	}
 
 	/**

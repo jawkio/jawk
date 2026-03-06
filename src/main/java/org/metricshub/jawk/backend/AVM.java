@@ -2436,10 +2436,14 @@ public class AVM implements VariableManager {
 		if (argc <= 0) {
 			return new String[0];
 		}
-		String[] argv = new String[argc];
 		if (argvOffset == NULL_OFFSET) {
+			int fallbackArgc = Math.min(argc, arguments.size() + 1);
+			String[] argv = new String[fallbackArgc];
+			if (fallbackArgc == 0) {
+				return argv;
+			}
 			argv[0] = "jawk";
-			for (int i = 1; i < argc && i <= arguments.size(); i++) {
+			for (int i = 1; i < fallbackArgc && i <= arguments.size(); i++) {
 				argv[i] = arguments.get(i - 1);
 			}
 			return argv;
@@ -2447,10 +2451,12 @@ public class AVM implements VariableManager {
 
 		Object arrayObj = runtimeStack.getVariable(argvOffset, true);
 		if (!(arrayObj instanceof AssocArray)) {
-			return argv;
+			return new String[0];
 		}
 		AssocArray argvAssoc = (AssocArray) arrayObj;
-		for (int i = 0; i < argc; i++) {
+		int argvLength = computeMaterializedArgvLength(argvAssoc, argc);
+		String[] argv = new String[argvLength];
+		for (int i = 0; i < argvLength; i++) {
 			if (argvAssoc.isIn(i)) {
 				Object value = argvAssoc.get(i);
 				if (!(value instanceof UninitializedObject)) {
@@ -2459,6 +2465,35 @@ public class AVM implements VariableManager {
 			}
 		}
 		return argv;
+	}
+
+	private int computeMaterializedArgvLength(AssocArray argvAssoc, int argc) {
+		long denseBoundLong = (long) arguments.size() + 1L + (long) argvAssoc.size();
+		int denseBound = denseBoundLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) denseBoundLong;
+		int cappedArgc = Math.min(argc, denseBound);
+		int maxIndexPlusOne = Math.min(cappedArgc, arguments.size() + 1);
+		for (Object key : argvAssoc.keySet()) {
+			int index = toArgvIndex(key);
+			if (index >= 0 && index < cappedArgc && index + 1 > maxIndexPlusOne) {
+				maxIndexPlusOne = index + 1;
+			}
+		}
+		return Math.max(0, maxIndexPlusOne);
+	}
+
+	private int toArgvIndex(Object key) {
+		if (key instanceof Number) {
+			long index = ((Number) key).longValue();
+			if (index >= Integer.MIN_VALUE && index <= Integer.MAX_VALUE) {
+				return (int) index;
+			}
+			return -1;
+		}
+		try {
+			return Integer.parseInt(key.toString());
+		} catch (NumberFormatException nfe) {
+			return -1;
+		}
 	}
 
 	/** {@inheritDoc} */

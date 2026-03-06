@@ -134,7 +134,6 @@ public class JRT {
 	private String convfmt; // number-to-string format
 	private String ofmt; // number-to-string for output
 	private String subsep; // subscript separator
-	private long argc; // number of arguments
 	private Locale locale; // locale for number formatting
 
 	/**
@@ -168,7 +167,6 @@ public class JRT {
 		this.convfmt = "%.6g";
 		this.ofmt = "%.6g";
 		this.subsep = String.valueOf((char) 28);
-		this.argc = 0L;
 	}
 
 	/**
@@ -980,7 +978,7 @@ public class JRT {
 	 * @return ARGC value
 	 */
 	public Object getARGCVar() {
-		return Long.valueOf(argc);
+		return Long.valueOf(vm.getARGC());
 	}
 
 	/**
@@ -989,7 +987,7 @@ public class JRT {
 	 * @param value new ARGC value
 	 */
 	public void setARGC(Object value) {
-		this.argc = toLong(value);
+		// ARGC is managed by the VariableManager.
 	}
 
 	/**
@@ -1054,9 +1052,20 @@ public class JRT {
 		if (arglistAa != null) {
 			return;
 		}
-		arglistAa = (AssocArray) vm.getARGV();
+		refreshArgListState();
 		arglistIdx = 1;
 		hasFilenames = detectFilenames();
+	}
+
+	private void refreshArgListState() {
+		arglistAa = new AssocArray(false);
+		String[] argv = vm.getARGV();
+		for (int i = 0; i < argv.length; i++) {
+			String value = argv[i];
+			if (value != null) {
+				arglistAa.put(i, value);
+			}
+		}
 	}
 
 	/**
@@ -1084,7 +1093,7 @@ public class JRT {
 	 * @return {@code ARGC} converted to an {@code int}
 	 */
 	private int getArgCount() {
-		return Math.toIntExact(argc);
+		return vm.getARGC();
 	}
 
 	/**
@@ -1116,6 +1125,8 @@ public class JRT {
 	 */
 	private boolean prepareNextReader(InputStream input) throws IOException {
 		boolean ready = false;
+		refreshArgListState();
+		hasFilenames = detectFilenames();
 		while (!ready) {
 			String arg = nextArgument();
 			if (arg == null) {

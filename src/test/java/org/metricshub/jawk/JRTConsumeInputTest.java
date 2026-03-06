@@ -47,4 +47,22 @@ public class JRTConsumeInputTest {
 				.expectLines("3")
 				.runAndAssert();
 	}
+
+	/**
+	 * Ensures ARGC-only scripts can still control input traversal when ARGV is not
+	 * materialized.
+	 *
+	 * @throws Exception if the AWK invocation fails
+	 */
+	@Test
+	public void testArgcOnlyScriptCanForceStdinTraversal() throws Exception {
+		AwkTestSupport
+				.awkTest("argc-only script forces stdin traversal")
+				.file("file1", "from-file\n")
+				.script("BEGIN { ARGC = 0 } { print $0 }")
+				.operand("{{file1}}")
+				.stdin("from-stdin\n")
+				.expectLines("from-stdin")
+				.runAndAssert();
+	}
 }

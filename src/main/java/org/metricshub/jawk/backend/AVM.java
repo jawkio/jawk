@@ -195,7 +195,7 @@ public class AVM implements VariableManager {
 	}
 
 	// Offsets for legacy global variables removed for JRT-managed specials.
-	// ENVIRON/ARGC/ARGV remain managed as globals via offsets emitted by the parser.
+	// ENVIRON/ARGC/ARGV may still be emitted when referenced by a script.
 	private long environOffset = NULL_OFFSET;
 	private long argcOffset = NULL_OFFSET;
 	private long argvOffset = NULL_OFFSET;
@@ -336,7 +336,6 @@ public class AVM implements VariableManager {
 		jrt.setFNR(0);
 		jrt.setRSTART(0);
 		jrt.setRLENGTH(0);
-		jrt.setARGC(arguments.size() + 1);
 
 		try {
 			while (!position.isEOF()) {
@@ -1496,10 +1495,9 @@ public class AVM implements VariableManager {
 					argcOffset = position.intArg(0);
 					assert argcOffset != NULL_OFFSET;
 					// assign(argcOffset, arguments.size(), true, position); // true = global
-					// +1 to include the "java Awk" (ARGV[0])
+					// +1 to include the "jawk" program name (ARGV[0])
 					assign(argcOffset, arguments.size() + 1, true, position); // true = global
 					pop(); // clean up the stack after the assignment
-					jrt.setARGC(arguments.size() + 1);
 					position.next();
 					break;
 				}
@@ -1509,7 +1507,7 @@ public class AVM implements VariableManager {
 					assert argvOffset != NULL_OFFSET;
 					// consume argv (looping from 1 to argc)
 					int argc = (int) JRT.toDouble(runtimeStack.getVariable(argcOffset, true)); // true = global
-					assignArray(argvOffset, 0, "java Awk", true);
+					assignArray(argvOffset, 0, "jawk", true);
 					pop();
 					for (int i = 1; i < argc; i++) {
 						// assignArray(argvOffset, i+1, arguments.get(i), true);
@@ -2008,13 +2006,20 @@ public class AVM implements VariableManager {
 				}
 				case ASSIGN_ARGC: {
 					Object v = pop();
-					jrt.setARGC(v);
+					if (argcOffset == NULL_OFFSET) {
+						throw new IllegalStateException("ARGC is not materialized for this script.");
+					}
+					runtimeStack.setVariable(argcOffset, v, true);
 					push(v);
 					position.next();
 					break;
 				}
 				case PUSH_ARGC: {
-					push(jrt.getARGCVar());
+					if (argcOffset == NULL_OFFSET) {
+						push(getARGC());
+					} else {
+						push(runtimeStack.getVariable(argcOffset, true));
+					}
 					position.next();
 					break;
 				}
@@ -2197,7 +2202,8 @@ public class AVM implements VariableManager {
 			o = ZERO;
 			runtimeStack.setVariable(l, o, isGlobal);
 		}
-		runtimeStack.setVariable(l, JRT.inc(o), isGlobal);
+		Object updated = JRT.inc(o);
+		runtimeStack.setVariable(l, updated, isGlobal);
 		return o;
 	}
 
@@ -2211,7 +2217,8 @@ public class AVM implements VariableManager {
 			o = ZERO;
 			runtimeStack.setVariable(l, o, isGlobal);
 		}
-		runtimeStack.setVariable(l, JRT.dec(o), isGlobal);
+		Object updated = JRT.dec(o);
+		runtimeStack.setVariable(l, updated, isGlobal);
 		return o;
 	}
 
@@ -2424,14 +2431,44 @@ public class AVM implements VariableManager {
 
 	/** {@inheritDoc} */
 	@Override
-	public Object getARGV() {
-		return runtimeStack.getVariable(argvOffset, true);
+	public String[] getARGV() {
+		int argc = getARGC();
+		if (argc <= 0) {
+			return new String[0];
+		}
+		String[] argv = new String[argc];
+		if (argvOffset == NULL_OFFSET) {
+			argv[0] = "jawk";
+			for (int i = 1; i < argc && i <= arguments.size(); i++) {
+				argv[i] = arguments.get(i - 1);
+			}
+			return argv;
+		}
+
+		Object arrayObj = runtimeStack.getVariable(argvOffset, true);
+		if (!(arrayObj instanceof AssocArray)) {
+			return argv;
+		}
+		AssocArray argvAssoc = (AssocArray) arrayObj;
+		for (int i = 0; i < argc; i++) {
+			if (argvAssoc.isIn(i)) {
+				Object value = argvAssoc.get(i);
+				if (!(value instanceof UninitializedObject)) {
+					argv[i] = jrt.toAwkString(value);
+				}
+			}
+		}
+		return argv;
 	}
 
 	/** {@inheritDoc} */
 	@Override
-	public Object getARGC() {
-		return runtimeStack.getVariable(argcOffset, true);
+	public int getARGC() {
+		if (argcOffset == NULL_OFFSET) {
+			return arguments.size() + 1;
+		}
+		Object value = runtimeStack.getVariable(argcOffset, true);
+		return Math.toIntExact(JRT.toLong(value));
 	}
 
 	private String getOFMT() {

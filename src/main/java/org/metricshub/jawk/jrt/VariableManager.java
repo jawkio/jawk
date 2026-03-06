@@ -43,18 +43,18 @@ public interface VariableManager {
 	 * getARGC.
 	 * </p>
 	 *
-	 * @return the contents of the ARGC variable.
+	 * @return the number of elements in {@code ARGV}
 	 */
-	Object getARGC();
+	int getARGC();
 
 	/**
 	 * <p>
 	 * getARGV.
 	 * </p>
 	 *
-	 * @return the contents of the ARGV variable.
+	 * @return the current contents of {@code ARGV}, indexed from {@code 0}
 	 */
-	Object getARGV();
+	String[] getARGV();
 
 	/**
 	 * <p>

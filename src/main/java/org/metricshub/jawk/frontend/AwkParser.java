@@ -2545,12 +2545,18 @@ public class AwkParser {
 			// (see above)!
 			tuples.setNumGlobals(symbolTable.numGlobals());
 
-			// Only ENVIRON/ARGC/ARGV remain regular globals
+			// Only ENVIRON/ARGC/ARGV remain regular globals.
+			// Emit ARGC/ARGV materialization only when script-referenced.
 			if (environAst.isReferenced()) {
 				tuples.environOffset(environAst.offset);
 			}
-			tuples.argcOffset(argcAst.offset);
-			tuples.argvOffset(argvAst.offset);
+			if (argvAst.isReferenced()) {
+				// ARGV traversal is bounded by ARGC, so materialize both.
+				tuples.argcOffset(argcAst.offset);
+				tuples.argvOffset(argvAst.offset);
+			} else if (argcAst.isReferenced()) {
+				tuples.argcOffset(argcAst.offset);
+			}
 
 			Address exitAddr = tuples.createAddress("end blocks start address");
 			tuples.setExitAddress(exitAddr);

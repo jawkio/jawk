@@ -156,7 +156,6 @@ public class AVM implements VariableManager {
 
 		locale = this.settings.getLocale();
 		arguments = this.settings.getNameValueOrFileNames();
-		fallbackArgc = arguments.size() + 1;
 		sortedArrayKeys = this.settings.isUseSortedArrayKeys();
 		initialVariables = this.settings.getVariables();
 		initialFsValue = this.settings.getFieldSeparator();
@@ -195,12 +194,11 @@ public class AVM implements VariableManager {
 		}
 	}
 
-	// Offsets for legacy global variables removed for JRT-managed specials.
-	// ENVIRON/ARGC/ARGV may still be emitted when referenced by a script.
+	// Offsets for globals that remain runtime-managed by the tuple stream.
+	// ARGC is always materialized; ENVIRON and ARGV are emitted on demand.
 	private long environOffset = NULL_OFFSET;
 	private long argcOffset = NULL_OFFSET;
 	private long argvOffset = NULL_OFFSET;
-	private int fallbackArgc;
 
 	private static final Integer ZERO = Integer.valueOf(0);
 	private static final Integer ONE = Integer.valueOf(1);
@@ -340,7 +338,6 @@ public class AVM implements VariableManager {
 		jrt.setFNR(0);
 		jrt.setRSTART(0);
 		jrt.setRLENGTH(0);
-		fallbackArgc = arguments.size() + 1;
 
 		try {
 			while (!position.isEOF()) {
@@ -1607,12 +1604,7 @@ public class AVM implements VariableManager {
 							} else {
 								Object obj = entry.getValue();
 								runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
-								if ("ARGC".equals(key) && argcOffset == NULL_OFFSET) {
-									setFallbackArgc(obj);
-								}
 							}
-						} else if ("ARGC".equals(key)) {
-							setFallbackArgc(entry.getValue());
 						}
 					}
 
@@ -2297,12 +2289,7 @@ public class AVM implements VariableManager {
 				throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + name + ").");
 			} else {
 				runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
-				if ("ARGC".equals(name) && argcOffset == NULL_OFFSET) {
-					setFallbackArgc(obj);
-				}
 			}
-		} else if ("ARGC".equals(name)) {
-			setFallbackArgc(obj);
 		}
 		// otherwise, do nothing
 	}
@@ -2324,12 +2311,7 @@ public class AVM implements VariableManager {
 				throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + name + ").");
 			} else {
 				runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
-				if ("ARGC".equals(name) && argcOffset == NULL_OFFSET) {
-					setFallbackArgc(obj);
-				}
 			}
-		} else if ("ARGC".equals(name)) {
-			setFallbackArgc(obj);
 		}
 	}
 
@@ -2518,14 +2500,10 @@ public class AVM implements VariableManager {
 	@Override
 	public int getARGC() {
 		if (argcOffset == NULL_OFFSET) {
-			return fallbackArgc;
+			return arguments.size() + 1;
 		}
 		Object value = runtimeStack.getVariable(argcOffset, true);
 		return Math.toIntExact(JRT.toLong(value));
-	}
-
-	private void setFallbackArgc(Object value) {
-		fallbackArgc = Math.toIntExact(JRT.toLong(value));
 	}
 
 	private String getOFMT() {

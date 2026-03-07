@@ -67,15 +67,15 @@ public class JRTConsumeInputTest {
 	}
 
 	/**
-	 * Ensures operand-list ARGC assignments still affect traversal even when ARGC
-	 * and ARGV are not referenced by the script.
+	 * Ensures operand-list ARGC assignments still affect traversal even when ARGV
+	 * is not materialized.
 	 *
 	 * @throws Exception if the AWK invocation fails
 	 */
 	@Test
-	public void testOperandArgcAssignmentAffectsTraversalWithoutArgOffsets() throws Exception {
+	public void testOperandArgcAssignmentAffectsTraversalWithoutArgvOffset() throws Exception {
 		AwkTestSupport
-				.awkTest("operand argc assignment affects traversal without arg offsets")
+				.awkTest("operand argc assignment affects traversal without argv offset")
 				.file("file1", "from-file\n")
 				.script("{ print $0 }")
 				.operand("ARGC=0", "{{file1}}")

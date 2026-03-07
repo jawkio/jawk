@@ -263,11 +263,11 @@ public class AwkTupleOptimizationTest {
 	}
 
 	@Test
-	public void doesNotEmitArgcArgvOffsetsWhenUnreferenced() throws Exception {
+	public void emitsArgcOffsetButNotArgvOffsetWhenUnreferenced() throws Exception {
 		String script = "{ print $0 }\n";
 		AwkTuples tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
-		assertFalse("ARGC offset should not be emitted when ARGC is unreferenced", opcodes.contains(Opcode.ARGC_OFFSET));
+		assertTrue("ARGC offset should always be emitted", opcodes.contains(Opcode.ARGC_OFFSET));
 		assertFalse("ARGV offset should not be emitted when ARGV is unreferenced", opcodes.contains(Opcode.ARGV_OFFSET));
 	}
 
@@ -302,10 +302,10 @@ public class AwkTupleOptimizationTest {
 	}
 
 	@Test
-	public void consumesFileOperandsWithoutArgcArgvOffsets() throws Exception {
+	public void consumesFileOperandsWithoutArgvOffset() throws Exception {
 		String script = "{ print FILENAME \":\" $0 }\n";
 		AwkTestSupport
-				.awkTest("file operands consumed without argc argv offsets")
+				.awkTest("file operands consumed without argv offset")
 				.file("file1", "a\n")
 				.file("file2", "b\n")
 				.script(script)
@@ -315,7 +315,7 @@ public class AwkTupleOptimizationTest {
 
 		AwkTuples tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
-		assertFalse("ARGC offset should not be emitted when ARGC is unreferenced", opcodes.contains(Opcode.ARGC_OFFSET));
+		assertTrue("ARGC offset should always be emitted", opcodes.contains(Opcode.ARGC_OFFSET));
 		assertFalse("ARGV offset should not be emitted when ARGV is unreferenced", opcodes.contains(Opcode.ARGV_OFFSET));
 	}
 

@@ -1078,10 +1078,15 @@ public class JRT {
 		int argCount = getArgCount();
 		for (long i = 1; i < argCount; i++) {
 			if (arglistAa.isIn(i)) {
-				String arg = toAwkString(arglistAa.get(i));
-				if (arg.indexOf('=') == -1) {
-					return true;
+				Object value = arglistAa.get(i);
+				if (value instanceof UninitializedObject) {
+					continue;
 				}
+				String arg = toAwkString(value);
+				if (arg.isEmpty() || arg.indexOf('=') != -1) {
+					continue;
+				}
+				return true;
 			}
 		}
 		return false;
@@ -1130,6 +1135,8 @@ public class JRT {
 		while (!ready) {
 			String arg = nextArgument();
 			if (arg == null) {
+				// ARGC/ARGV may have changed while evaluating assignments.
+				hasFilenames = detectFilenames();
 				if (partitioningReader == null && !hasFilenames) {
 					partitioningReader = new PartitioningReader(
 							new InputStreamReader(input, StandardCharsets.UTF_8),
@@ -1141,6 +1148,9 @@ public class JRT {
 			}
 			if (arg.indexOf('=') != -1) {
 				setFilelistVariable(arg);
+				// Rebuild from VM so ARGC/ARGV updates are reflected immediately.
+				refreshArgListState();
+				hasFilenames = detectFilenames();
 				if (partitioningReader == null && !hasFilenames) {
 					partitioningReader = new PartitioningReader(
 							new InputStreamReader(input, StandardCharsets.UTF_8),

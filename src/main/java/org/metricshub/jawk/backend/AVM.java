@@ -156,6 +156,7 @@ public class AVM implements VariableManager {
 
 		locale = this.settings.getLocale();
 		arguments = this.settings.getNameValueOrFileNames();
+		fallbackArgc = arguments.size() + 1;
 		sortedArrayKeys = this.settings.isUseSortedArrayKeys();
 		initialVariables = this.settings.getVariables();
 		initialFsValue = this.settings.getFieldSeparator();
@@ -199,9 +200,12 @@ public class AVM implements VariableManager {
 	private long environOffset = NULL_OFFSET;
 	private long argcOffset = NULL_OFFSET;
 	private long argvOffset = NULL_OFFSET;
+	private int fallbackArgc;
 
 	private static final Integer ZERO = Integer.valueOf(0);
 	private static final Integer ONE = Integer.valueOf(1);
+	/** Safety guard against script-controlled ARGV over-allocation. */
+	private static final int MAX_ARGV_EXPORT_LENGTH = 1_000_000;
 
 	/** Random number generator used for rand() */
 	private final BSDRandom randomNumberGenerator = new BSDRandom(1);
@@ -336,6 +340,7 @@ public class AVM implements VariableManager {
 		jrt.setFNR(0);
 		jrt.setRSTART(0);
 		jrt.setRLENGTH(0);
+		fallbackArgc = arguments.size() + 1;
 
 		try {
 			while (!position.isEOF()) {
@@ -1602,7 +1607,12 @@ public class AVM implements VariableManager {
 							} else {
 								Object obj = entry.getValue();
 								runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
+								if ("ARGC".equals(key) && argcOffset == NULL_OFFSET) {
+									setFallbackArgc(obj);
+								}
 							}
+						} else if ("ARGC".equals(key)) {
+							setFallbackArgc(entry.getValue());
 						}
 					}
 
@@ -2287,7 +2297,12 @@ public class AVM implements VariableManager {
 				throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + name + ").");
 			} else {
 				runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
+				if ("ARGC".equals(name) && argcOffset == NULL_OFFSET) {
+					setFallbackArgc(obj);
+				}
 			}
+		} else if ("ARGC".equals(name)) {
+			setFallbackArgc(obj);
 		}
 		// otherwise, do nothing
 	}
@@ -2309,7 +2324,12 @@ public class AVM implements VariableManager {
 				throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + name + ").");
 			} else {
 				runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
+				if ("ARGC".equals(name) && argcOffset == NULL_OFFSET) {
+					setFallbackArgc(obj);
+				}
 			}
+		} else if ("ARGC".equals(name)) {
+			setFallbackArgc(obj);
 		}
 	}
 
@@ -2437,13 +2457,13 @@ public class AVM implements VariableManager {
 			return new String[0];
 		}
 		if (argvOffset == NULL_OFFSET) {
-			int fallbackArgc = Math.min(argc, arguments.size() + 1);
-			String[] argv = new String[fallbackArgc];
-			if (fallbackArgc == 0) {
+			int fallbackArgCount = Math.min(argc, arguments.size() + 1);
+			String[] argv = new String[fallbackArgCount];
+			if (fallbackArgCount == 0) {
 				return argv;
 			}
 			argv[0] = "jawk";
-			for (int i = 1; i < fallbackArgc && i <= arguments.size(); i++) {
+			for (int i = 1; i < fallbackArgCount && i <= arguments.size(); i++) {
 				argv[i] = arguments.get(i - 1);
 			}
 			return argv;
@@ -2468,9 +2488,7 @@ public class AVM implements VariableManager {
 	}
 
 	private int computeMaterializedArgvLength(AssocArray argvAssoc, int argc) {
-		long denseBoundLong = (long) arguments.size() + 1L + (long) argvAssoc.size();
-		int denseBound = denseBoundLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) denseBoundLong;
-		int cappedArgc = Math.min(argc, denseBound);
+		int cappedArgc = Math.max(0, Math.min(argc, MAX_ARGV_EXPORT_LENGTH));
 		int maxIndexPlusOne = Math.min(cappedArgc, arguments.size() + 1);
 		for (Object key : argvAssoc.keySet()) {
 			int index = toArgvIndex(key);
@@ -2500,10 +2518,14 @@ public class AVM implements VariableManager {
 	@Override
 	public int getARGC() {
 		if (argcOffset == NULL_OFFSET) {
-			return arguments.size() + 1;
+			return fallbackArgc;
 		}
 		Object value = runtimeStack.getVariable(argcOffset, true);
 		return Math.toIntExact(JRT.toLong(value));
+	}
+
+	private void setFallbackArgc(Object value) {
+		fallbackArgc = Math.toIntExact(JRT.toLong(value));
 	}
 
 	private String getOFMT() {

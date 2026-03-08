@@ -104,6 +104,7 @@ public class AVM implements VariableManager {
 	private List<String> arguments;
 	private boolean sortedArrayKeys;
 	private Map<String, Object> initialVariables;
+	private Map<String, Object> deferredInitialVariables = new HashMap<String, Object>();
 	private String initialFsValue;
 	private boolean trapIllegalFormatExceptions;
 	private JRT jrt;
@@ -322,6 +323,10 @@ public class AVM implements VariableManager {
 		globalVariableOffsets = tuples.getGlobalVariableOffsetMap();
 		globalVariableArrays = tuples.getGlobalVariableAarrayMap();
 		functionNames = tuples.getFunctionNameSet();
+		if (!deferredInitialVariables.isEmpty()) {
+			initialVariables.putAll(deferredInitialVariables);
+			deferredInitialVariables.clear();
+		}
 
 		PositionTracker position = tuples.top();
 
@@ -2300,7 +2305,7 @@ public class AVM implements VariableManager {
 		// During eval(), JRT may assign initial variables before interpret() has
 		// initialized global offset metadata. Keep these assignments pending.
 		if (globalVariableOffsets == null || globalVariableArrays == null) {
-			initialVariables.put(name, obj);
+			deferredInitialVariables.put(name, obj);
 			return;
 		}
 

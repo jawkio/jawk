@@ -1696,6 +1696,7 @@ public class JRT {
 			p.waitFor();
 			p.exitValue();
 		} catch (InterruptedException ie) {
+			Thread.currentThread().interrupt();
 			throw new AwkRuntimeException(
 					"Caught exception while waiting for process exit: " + ie);
 		}
@@ -1738,6 +1739,7 @@ public class JRT {
 				p.waitFor();
 				p.exitValue();
 			} catch (InterruptedException ie) {
+				Thread.currentThread().interrupt();
 				throw new AwkRuntimeException(
 						"Caught exception while waiting for process exit: " + ie);
 			}

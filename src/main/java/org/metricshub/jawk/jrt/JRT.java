@@ -1756,21 +1756,25 @@ public class JRT {
 			p.getOutputStream().close();
 			Thread errorPump = DataPump.dumpAndReturnThread(cmd + " stderr", p.getErrorStream(), error);
 			Thread outputPump = DataPump.dumpAndReturnThread(cmd + " stdout", p.getInputStream(), output);
-			try {
-				int retcode = p.waitFor();
-				joinDataPump(outputPump);
-				joinDataPump(errorPump);
-				output.flush();
-				error.flush();
-				return Integer.valueOf(retcode);
-			} catch (InterruptedException ie) {
-				joinDataPump(outputPump);
-				joinDataPump(errorPump);
-				output.flush();
-				error.flush();
-				Thread.currentThread().interrupt();
-				return Integer.valueOf(p.exitValue());
+			boolean interrupted = false;
+			int retcode;
+			while (true) {
+				try {
+					retcode = p.waitFor();
+					break;
+				} catch (InterruptedException ie) {
+					// Preserve interrupt and keep waiting so process pipes can close.
+					interrupted = true;
+				}
 			}
+			joinDataPump(outputPump);
+			joinDataPump(errorPump);
+			output.flush();
+			error.flush();
+			if (interrupted) {
+				Thread.currentThread().interrupt();
+			}
+			return Integer.valueOf(retcode);
 		} catch (IOException ioe) {
 			return MINUS_ONE;
 		}

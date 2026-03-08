@@ -2441,9 +2441,6 @@ public class AVM implements VariableManager {
 		if (argvOffset == NULL_OFFSET) {
 			int fallbackArgCount = Math.min(argc, arguments.size() + 1);
 			String[] argv = new String[fallbackArgCount];
-			if (fallbackArgCount == 0) {
-				return argv;
-			}
 			argv[0] = "jawk";
 			for (int i = 1; i < fallbackArgCount && i <= arguments.size(); i++) {
 				argv[i] = arguments.get(i - 1);

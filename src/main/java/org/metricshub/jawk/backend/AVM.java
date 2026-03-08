@@ -2480,7 +2480,15 @@ public class AVM implements VariableManager {
 
 	private int toArgvIndex(Object key) {
 		if (key instanceof Number) {
-			long index = ((Number) key).longValue();
+			Number number = (Number) key;
+			double asDouble = number.doubleValue();
+			if (Double.isNaN(asDouble) || Double.isInfinite(asDouble)) {
+				return -1;
+			}
+			long index = number.longValue();
+			if ((double) index != asDouble) {
+				return -1;
+			}
 			if (index >= Integer.MIN_VALUE && index <= Integer.MAX_VALUE) {
 				return (int) index;
 			}

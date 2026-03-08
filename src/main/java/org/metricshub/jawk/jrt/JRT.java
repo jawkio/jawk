@@ -1080,11 +1080,7 @@ public class JRT {
 		int traversalArgCount = getTraversalArgCount();
 		for (int i = 1; i < traversalArgCount; i++) {
 			if (arglistAa.isIn(i)) {
-				Object value = arglistAa.get(i);
-				if (value instanceof UninitializedObject) {
-					continue;
-				}
-				String arg = toAwkString(value);
+				String arg = toAwkString(arglistAa.get(i));
 				if (arg.isEmpty() || arg.indexOf('=') != -1) {
 					continue;
 				}
@@ -1124,9 +1120,9 @@ public class JRT {
 			if (!arglistAa.isIn(idx)) {
 				continue;
 			}
-			Object o = arglistAa.get(idx);
-			if (!(o instanceof UninitializedObject || o.toString().isEmpty())) {
-				return toAwkString(o);
+			String arg = toAwkString(arglistAa.get(idx));
+			if (!arg.isEmpty()) {
+				return arg;
 			}
 		}
 		return null;
@@ -1758,16 +1754,43 @@ public class JRT {
 			Process p = spawnProcess(cmd);
 			// no input to this process!
 			p.getOutputStream().close();
-			DataPump.dump(cmd, p.getErrorStream(), error);
-			DataPump.dump(cmd, p.getInputStream(), output);
+			Thread errorPump = DataPump.dumpAndReturnThread(cmd + " stderr", p.getErrorStream(), error);
+			Thread outputPump = DataPump.dumpAndReturnThread(cmd + " stdout", p.getInputStream(), output);
 			try {
 				int retcode = p.waitFor();
+				joinDataPump(outputPump);
+				joinDataPump(errorPump);
+				output.flush();
+				error.flush();
 				return Integer.valueOf(retcode);
 			} catch (InterruptedException ie) {
+				joinDataPump(outputPump);
+				joinDataPump(errorPump);
+				output.flush();
+				error.flush();
+				Thread.currentThread().interrupt();
 				return Integer.valueOf(p.exitValue());
 			}
 		} catch (IOException ioe) {
 			return MINUS_ONE;
+		}
+	}
+
+	private static void joinDataPump(Thread pump) {
+		if (pump == null) {
+			return;
+		}
+		boolean interrupted = false;
+		while (true) {
+			try {
+				pump.join();
+				break;
+			} catch (InterruptedException ie) {
+				interrupted = true;
+			}
+		}
+		if (interrupted) {
+			Thread.currentThread().interrupt();
 		}
 	}
 

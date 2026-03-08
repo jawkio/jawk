@@ -66,7 +66,13 @@ public class DataPump implements Runnable {
 	 * @param out The output stream.
 	 */
 	public static void dump(String desc, InputStream in, PrintStream out) {
-		new Thread(new DataPump(in, out), desc).start();
+		dumpAndReturnThread(desc, in, out);
+	}
+
+	static Thread dumpAndReturnThread(String desc, InputStream in, PrintStream out) {
+		Thread thread = new Thread(new DataPump(in, out), desc);
+		thread.start();
+		return thread;
 	}
 
 	/**

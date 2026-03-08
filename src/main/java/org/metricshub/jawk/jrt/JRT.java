@@ -120,7 +120,10 @@ public class JRT {
 	private Map<String, PartitioningReader> fileReaders = new HashMap<String, PartitioningReader>();
 	private Map<String, PartitioningReader> commandReaders = new HashMap<String, PartitioningReader>();
 	private Map<String, Process> commandProcesses = new HashMap<String, Process>();
+	private Map<String, Thread> commandErrorPumps = new HashMap<String, Thread>();
 	private Map<String, PrintStream> outputFiles = new HashMap<String, PrintStream>();
+	private Map<String, Thread> outputStdoutPumps = new HashMap<String, Thread>();
+	private Map<String, Thread> outputStderrPumps = new HashMap<String, Thread>();
 
 	// JRT-managed special variables (runtime only)
 	private long nr; // total record number
@@ -1553,7 +1556,8 @@ public class JRT {
 				Process p = spawnProcess(cmd);
 				// no input to this process!
 				p.getOutputStream().close();
-				DataPump.dump(cmd, p.getErrorStream(), System.err);
+				Thread errorPump = DataPump.dumpAndReturnThread(cmd + " stderr", p.getErrorStream(), System.err);
+				commandErrorPumps.put(cmd, errorPump);
 				commandProcesses.put(cmd, p);
 				pr = new PartitioningReader(
 						new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8),
@@ -1562,11 +1566,13 @@ public class JRT {
 				this.filename = "";
 			} catch (IOException ioe) {
 				commandReaders.remove(cmd);
+				Thread errorPump = commandErrorPumps.remove(cmd);
 				Process p = commandProcesses.get(cmd);
 				commandProcesses.remove(cmd);
 				if (p != null) {
 					p.destroy();
 				}
+				joinDataPump(errorPump);
 				throw ioe;
 			}
 		}
@@ -1596,8 +1602,10 @@ public class JRT {
 			Process p;
 			try {
 				p = spawnProcess(cmd);
-				DataPump.dump(cmd, p.getErrorStream(), error);
-				DataPump.dump(cmd, p.getInputStream(), output);
+				Thread stderrPump = DataPump.dumpAndReturnThread(cmd + " stderr", p.getErrorStream(), error);
+				Thread stdoutPump = DataPump.dumpAndReturnThread(cmd + " stdout", p.getInputStream(), output);
+				outputStderrPumps.put(cmd, stderrPump);
+				outputStdoutPumps.put(cmd, stdoutPump);
 			} catch (IOException ioe) {
 				throw new AwkRuntimeException("Can't spawn " + cmd + ": " + ioe);
 			}
@@ -1676,6 +1684,8 @@ public class JRT {
 		if (ps == null) {
 			return false;
 		}
+		Thread stdoutPump = outputStdoutPumps.remove(cmd);
+		Thread stderrPump = outputStderrPumps.remove(cmd);
 		assert p != null;
 		outputProcesses.remove(cmd);
 		outputStreams.remove(cmd);
@@ -1689,6 +1699,8 @@ public class JRT {
 			throw new AwkRuntimeException(
 					"Caught exception while waiting for process exit: " + ie);
 		}
+		joinDataPump(stdoutPump);
+		joinDataPump(stderrPump);
 		output.flush();
 		error.flush();
 		return true;
@@ -1714,6 +1726,7 @@ public class JRT {
 		if (pr == null) {
 			return false;
 		}
+		Thread errorPump = commandErrorPumps.remove(cmd);
 		assert p != null;
 		commandReaders.remove(cmd);
 		commandProcesses.remove(cmd);
@@ -1728,6 +1741,7 @@ public class JRT {
 				throw new AwkRuntimeException(
 						"Caught exception while waiting for process exit: " + ie);
 			}
+			joinDataPump(errorPump);
 			output.flush();
 			error.flush();
 			return true;

@@ -100,4 +100,21 @@ public class JRTConsumeInputTest {
 				.expectLines("{{file1}}:from-file", "1")
 				.runAndAssert();
 	}
+
+	/**
+	 * Ensures oversized ARGC values are handled safely during traversal without
+	 * throwing overflow exceptions.
+	 *
+	 * @throws Exception if the AWK invocation fails
+	 */
+	@Test
+	public void testOversizedOperandArgcAssignmentDoesNotOverflowTraversal() throws Exception {
+		AwkTestSupport
+				.awkTest("oversized operand ARGC assignment is clamped for traversal")
+				.file("file1", "from-file\n")
+				.script("{ print FILENAME \":\" $0 } END { print NR }")
+				.operand("ARGC=1e309", "{{file1}}")
+				.expectLines("{{file1}}:from-file", "1")
+				.runAndAssert();
+	}
 }

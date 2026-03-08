@@ -2500,7 +2500,14 @@ public class AVM implements VariableManager {
 			return arguments.size() + 1;
 		}
 		Object value = runtimeStack.getVariable(argcOffset, true);
-		return Math.toIntExact(JRT.toLong(value));
+		long argcLong = JRT.toLong(value);
+		if (argcLong > Integer.MAX_VALUE) {
+			return Integer.MAX_VALUE;
+		}
+		if (argcLong < Integer.MIN_VALUE) {
+			return Integer.MIN_VALUE;
+		}
+		return (int) argcLong;
 	}
 
 	private String getOFMT() {

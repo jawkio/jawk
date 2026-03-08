@@ -83,4 +83,21 @@ public class JRTConsumeInputTest {
 				.expectLines("from-stdin")
 				.runAndAssert();
 	}
+
+	/**
+	 * Ensures large ARGC values assigned from operands do not prevent normal
+	 * traversal when ARGV is unreferenced.
+	 *
+	 * @throws Exception if the AWK invocation fails
+	 */
+	@Test
+	public void testLargeOperandArgcAssignmentStillTraversesBoundedArgvView() throws Exception {
+		AwkTestSupport
+				.awkTest("large operand ARGC assignment remains bounded by ARGV view")
+				.file("file1", "from-file\n")
+				.script("{ print FILENAME \":\" $0 } END { print NR }")
+				.operand("ARGC=5000000", "{{file1}}")
+				.expectLines("{{file1}}:from-file", "1")
+				.runAndAssert();
+	}
 }

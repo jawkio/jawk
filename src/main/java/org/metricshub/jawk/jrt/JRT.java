@@ -108,6 +108,7 @@ public class JRT {
 	private List<String> inputFields = new ArrayList<String>(100);
 	private AssocArray arglistAa = null;
 	private int arglistIdx;
+	private int arglistLength;
 	private boolean hasFilenames = false;
 	private static final UninitializedObject BLANK = new UninitializedObject();
 
@@ -1060,6 +1061,7 @@ public class JRT {
 	private void refreshArgListState() {
 		arglistAa = new AssocArray(false);
 		String[] argv = vm.getARGV();
+		arglistLength = argv.length;
 		for (int i = 0; i < argv.length; i++) {
 			String value = argv[i];
 			if (value != null) {
@@ -1075,8 +1077,8 @@ public class JRT {
 	 * @return {@code true} if at least one filename was found
 	 */
 	private boolean detectFilenames() {
-		int argCount = getArgCount();
-		for (long i = 1; i < argCount; i++) {
+		int traversalArgCount = getTraversalArgCount();
+		for (int i = 1; i < traversalArgCount; i++) {
 			if (arglistAa.isIn(i)) {
 				Object value = arglistAa.get(i);
 				if (value instanceof UninitializedObject) {
@@ -1101,6 +1103,14 @@ public class JRT {
 		return vm.getARGC();
 	}
 
+	private int getTraversalArgCount() {
+		int argCount = getArgCount();
+		if (argCount <= 0) {
+			return 0;
+		}
+		return Math.min(argCount, arglistLength);
+	}
+
 	/**
 	 * Obtain the next valid argument from {@code ARGV}, skipping uninitialized or
 	 * empty entries.
@@ -1108,9 +1118,13 @@ public class JRT {
 	 * @return the next argument as an AWK string, or {@code null} if none remain
 	 */
 	private String nextArgument() {
-		int argCount = getArgCount();
-		while (arglistIdx <= argCount) {
-			Object o = arglistAa.get(arglistIdx++);
+		int traversalArgCount = getTraversalArgCount();
+		while (arglistIdx < traversalArgCount) {
+			int idx = arglistIdx++;
+			if (!arglistAa.isIn(idx)) {
+				continue;
+			}
+			Object o = arglistAa.get(idx);
 			if (!(o instanceof UninitializedObject || o.toString().isEmpty())) {
 				return toAwkString(o);
 			}

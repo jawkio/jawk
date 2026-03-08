@@ -2297,8 +2297,15 @@ public class AVM implements VariableManager {
 	/** {@inheritDoc} */
 	@Override
 	public final void assignVariable(String name, Object obj) {
+		// During eval(), JRT may assign initial variables before interpret() has
+		// initialized global offset metadata. Keep these assignments pending.
+		if (globalVariableOffsets == null || globalVariableArrays == null) {
+			initialVariables.put(name, obj);
+			return;
+		}
+
 		// make sure we're not receiving funcname=value assignments
-		if (functionNames.contains(name)) {
+		if (functionNames != null && functionNames.contains(name)) {
 			throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + name + ").");
 		}
 

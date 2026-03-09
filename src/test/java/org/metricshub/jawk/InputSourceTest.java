@@ -145,6 +145,30 @@ public class InputSourceTest {
 	}
 
 	@Test
+	public void testGetlineUsesPreSplitFieldsWhenProvided() throws Exception {
+		awkTest("getline preserves pre-split fields from input source")
+				.script("BEGIN { FS = \",\" } NR==1 { getline; print $1, $2; exit }")
+				.withInputSource(
+						new ExplicitRecordInputSource(
+								Arrays
+										.asList(
+												new ExplicitRecord("ignored", Arrays.asList("first", "record")),
+												new ExplicitRecord("left|right", Arrays.asList("left", "right")))))
+				.expectLines("left right")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testFileListVariableAssignmentsAreAppliedWithInputSource() throws Exception {
+		awkTest("input source still applies name=value operands")
+				.script("{ print x }")
+				.operand("x=42")
+				.withInputSource(new TableInputSource(Collections.singletonList(Collections.singletonList("row"))))
+				.expectLines("42")
+				.runAndAssert();
+	}
+
+	@Test
 	public void testNfModificationTruncatesRecord() throws Exception {
 		awkTest("NF assignment truncates pre-split records")
 				.script("{ NF = 2; print $0 }")
@@ -199,6 +223,48 @@ public class InputSourceTest {
 		@Override
 		public boolean isFromFilenameList() {
 			return false;
+		}
+	}
+
+	private static final class ExplicitRecordInputSource implements InputSource {
+
+		private final List<ExplicitRecord> records;
+		private int index = -1;
+
+		private ExplicitRecordInputSource(List<ExplicitRecord> records) {
+			this.records = records;
+		}
+
+		@Override
+		public boolean nextRecord() throws IOException {
+			index++;
+			return index < records.size();
+		}
+
+		@Override
+		public String getRecord() {
+			return records.get(index).record;
+		}
+
+		@Override
+		public List<String> getFields() {
+			return records.get(index).fields;
+		}
+
+		@Override
+		public boolean isFromFilenameList() {
+			return false;
+		}
+	}
+
+	private static final class ExplicitRecord {
+
+		private final String record;
+		private final List<String> fields;
+
+		private ExplicitRecord(String record, List<String> fields) {
+			this.record = record;
+			this.fields = fields;
 		}
 	}
 

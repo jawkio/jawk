@@ -74,8 +74,8 @@ to text and reparsing it.
 Important: Jawk intentionally ships only the `InputSource` interface. It does
 not provide a built-in `ListInputSource` implementation.
 
-When `AwkSettings#setInputSource(...)` is set, that source takes precedence
-over `AwkSettings#setInput(...)`.
+When `AwkSettings\#setInputSource(...)` is set, that source takes precedence
+over `AwkSettings\#setInput(...)`.
 
 #### Contract summary
 
@@ -144,6 +144,8 @@ public final class TableInputSource implements InputSource {
 #### Using a custom `InputSource`
 
 ```java
+import java.util.Arrays;
+
 Awk awk = new Awk();
 AwkSettings settings = new AwkSettings();
 settings.setInputSource(new TableInputSource(Arrays.asList(

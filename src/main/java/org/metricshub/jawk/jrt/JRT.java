@@ -107,6 +107,9 @@ public class JRT {
 	private String inputLine = null;
 	// Current input fields ($0, $1, $2, ...).
 	private List<String> inputFields = new ArrayList<String>(100);
+	// Pre-split fields captured during structured getline for bare getline assignment.
+	private List<String> pendingGetlineFields = null;
+	private String pendingGetlineRecord = null;
 	private AssocArray arglistAa = null;
 	private int arglistIdx;
 	private int arglistMaxKey;
@@ -1004,6 +1007,29 @@ public class JRT {
 	 */
 	public void setInputLine(String inputLine) {
 		this.inputLine = inputLine;
+		clearPendingGetlineFields();
+	}
+
+	/**
+	 * Assigns {@code $0} from a getline result and initializes {@code $1..$NF}.
+	 * <p>
+	 * When the previous getline consumed a structured {@link InputSource} record
+	 * with pre-split fields, those fields are applied directly. Otherwise fields
+	 * are parsed from {@code $0} using FS.
+	 * </p>
+	 *
+	 * @param value getline result assigned to {@code $0}
+	 */
+	public void assignInputLineFromGetline(String value) {
+		inputLine = value;
+		if (pendingGetlineRecord != null
+				&& pendingGetlineRecord.equals(value)
+				&& pendingGetlineFields != null) {
+			initializeInputFields(value, pendingGetlineFields);
+		} else {
+			jrtParseFields();
+		}
+		clearPendingGetlineFields();
 	}
 
 	/**
@@ -1020,6 +1046,7 @@ public class JRT {
 	public boolean consumeInput(final InputSource source, boolean forGetline) throws IOException {
 		Objects.requireNonNull(source, "source");
 		if (!source.nextRecord()) {
+			clearPendingGetlineFields();
 			return false;
 		}
 
@@ -1028,9 +1055,12 @@ public class JRT {
 			throw new IllegalStateException("InputSource#getRecord() returned null after nextRecord()");
 		}
 		inputLine = record;
+		List<String> preFields = source.getFields();
 
-		if (!forGetline) {
-			List<String> preFields = source.getFields();
+		if (forGetline) {
+			cacheGetlineFields(record, preFields);
+		} else {
+			clearPendingGetlineFields();
 			if (preFields == null) {
 				jrtParseFields();
 			} else {
@@ -1063,6 +1093,7 @@ public class JRT {
 	@SuppressWarnings("PMD.UnusedFormalParameter")
 	public boolean consumeInput(final InputStream input, boolean forGetline, Locale pLocale) throws IOException {
 		initializeArgList();
+		clearPendingGetlineFields();
 
 		while (true) {
 			if ((partitioningReader == null || inputLine == null)
@@ -1266,6 +1297,7 @@ public class JRT {
 	 * @throws IOException if couldn't read stdin (should never happen, as it's based on a String)
 	 */
 	public void setInputLineforEval(InputStream input) throws IOException {
+		clearPendingGetlineFields();
 		partitioningReader = new PartitioningReader(
 				new InputStreamReader(input, StandardCharsets.UTF_8),
 				this.rs);
@@ -1289,6 +1321,20 @@ public class JRT {
 			inputFields.add(field == null ? "" : field);
 		}
 		recalculateNF();
+	}
+
+	private void cacheGetlineFields(String record, List<String> preFields) {
+		if (preFields == null) {
+			clearPendingGetlineFields();
+			return;
+		}
+		pendingGetlineRecord = record;
+		pendingGetlineFields = new ArrayList<String>(preFields);
+	}
+
+	private void clearPendingGetlineFields() {
+		pendingGetlineRecord = null;
+		pendingGetlineFields = null;
 	}
 
 	/**

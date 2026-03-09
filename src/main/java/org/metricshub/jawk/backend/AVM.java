@@ -126,6 +126,7 @@ public class AVM implements VariableManager {
 	}
 
 	private final AwkSettings settings;
+	private boolean inputSourceFilelistAssignmentsApplied;
 
 	/**
 	 * Construct the interpreter.
@@ -661,8 +662,7 @@ public class AVM implements VariableManager {
 
 				case ASSIGN_AS_INPUT: {
 					// stack[0] = value
-					jrt.setInputLine(pop().toString());
-					jrt.jrtParseFields();
+					jrt.assignInputLineFromGetline(pop().toString());
 					push(jrt.getInputLine());
 					position.next();
 					break;
@@ -1460,6 +1460,7 @@ public class AVM implements VariableManager {
 				case SET_INPUT_FOR_EVAL: {
 					InputSource inputSource = settings.getInputSource();
 					if (inputSource != null) {
+						applyInputSourceFilelistAssignmentsIfNeeded();
 						jrt.consumeInputForEval(inputSource);
 					} else {
 						jrt.setInputLineforEval(settings.getInput());
@@ -2399,6 +2400,7 @@ public class AVM implements VariableManager {
 		InputSource inputSource = settings.getInputSource();
 		boolean retval;
 		if (inputSource != null) {
+			applyInputSourceFilelistAssignmentsIfNeeded();
 			retval = jrt.consumeInput(inputSource, forGetline);
 		} else {
 			retval = jrt.consumeInput(settings.getInput(), forGetline, locale);
@@ -2407,6 +2409,18 @@ public class AVM implements VariableManager {
 			push(jrt.getInputLine());
 		}
 		return retval;
+	}
+
+	private void applyInputSourceFilelistAssignmentsIfNeeded() {
+		if (inputSourceFilelistAssignmentsApplied || settings.getInputSource() == null) {
+			return;
+		}
+		for (String argument : arguments) {
+			if (argument.indexOf('=') > 0) {
+				setFilelistVariable(argument);
+			}
+		}
+		inputSourceFilelistAssignmentsApplied = true;
 	}
 
 	/** {@inheritDoc} */

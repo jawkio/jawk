@@ -1684,8 +1684,8 @@ public class JRT {
 		if (ps == null) {
 			return false;
 		}
-		Thread stdoutPump = outputStdoutPumps.remove(cmd);
-		Thread stderrPump = outputStderrPumps.remove(cmd);
+		Thread stdoutPump = outputStdoutPumps.get(cmd);
+		Thread stderrPump = outputStderrPumps.get(cmd);
 		assert p != null;
 		outputProcesses.remove(cmd);
 		outputStreams.remove(cmd);
@@ -1697,13 +1697,17 @@ public class JRT {
 			p.exitValue();
 		} catch (InterruptedException ie) {
 			Thread.currentThread().interrupt();
+			p.destroyForcibly();
 			throw new AwkRuntimeException(
 					"Caught exception while waiting for process exit: " + ie);
+		} finally {
+			joinDataPump(stdoutPump);
+			joinDataPump(stderrPump);
+			outputStdoutPumps.remove(cmd);
+			outputStderrPumps.remove(cmd);
+			output.flush();
+			error.flush();
 		}
-		joinDataPump(stdoutPump);
-		joinDataPump(stderrPump);
-		output.flush();
-		error.flush();
 		return true;
 	}
 
@@ -1727,7 +1731,7 @@ public class JRT {
 		if (pr == null) {
 			return false;
 		}
-		Thread errorPump = commandErrorPumps.remove(cmd);
+		Thread errorPump = commandErrorPumps.get(cmd);
 		assert p != null;
 		commandReaders.remove(cmd);
 		commandProcesses.remove(cmd);
@@ -1740,15 +1744,18 @@ public class JRT {
 				p.exitValue();
 			} catch (InterruptedException ie) {
 				Thread.currentThread().interrupt();
+				p.destroyForcibly();
 				throw new AwkRuntimeException(
 						"Caught exception while waiting for process exit: " + ie);
 			}
-			joinDataPump(errorPump);
-			output.flush();
-			error.flush();
 			return true;
 		} catch (IOException ioe) {
 			return false;
+		} finally {
+			joinDataPump(errorPump);
+			commandErrorPumps.remove(cmd);
+			output.flush();
+			error.flush();
 		}
 	}
 

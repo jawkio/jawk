@@ -43,7 +43,8 @@ public interface VariableManager {
 	 * getARGC.
 	 * </p>
 	 *
-	 * @return the number of elements in {@code ARGV}
+	 * @return the current scalar value of {@code ARGC}, used to bound
+	 *         traversal of {@code ARGV}
 	 */
 	int getARGC();
 

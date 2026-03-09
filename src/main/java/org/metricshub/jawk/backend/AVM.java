@@ -4,7 +4,7 @@ package org.metricshub.jawk.backend;
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
- * Copyright (C) 2006 - 2025 MetricsHub
+ * Copyright 2006 - 2026 MetricsHub
  * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -203,8 +203,6 @@ public class AVM implements VariableManager {
 
 	private static final Integer ZERO = Integer.valueOf(0);
 	private static final Integer ONE = Integer.valueOf(1);
-	/** Safety guard against script-controlled ARGV over-allocation. */
-	private static final int MAX_ARGV_EXPORT_LENGTH = 1_000_000;
 
 	/** Random number generator used for rand() */
 	private final BSDRandom randomNumberGenerator = new BSDRandom(1);
@@ -2014,7 +2012,7 @@ public class AVM implements VariableManager {
 				case ASSIGN_ARGC: {
 					Object v = pop();
 					if (argcOffset == NULL_OFFSET) {
-						throw new IllegalStateException("ARGC is not materialized for this script.");
+						throw new AwkRuntimeException("ARGC is read-only (not materialized).");
 					}
 					runtimeStack.setVariable(argcOffset, v, true);
 					push(v);
@@ -2445,89 +2443,26 @@ public class AVM implements VariableManager {
 
 	/** {@inheritDoc} */
 	@Override
-	public String[] getARGV() {
-		int argc = getARGC();
-		if (argc <= 0) {
-			return new String[0];
-		}
+	public Object getARGV() {
 		if (argvOffset == NULL_OFFSET) {
-			int fallbackArgCount = Math.min(argc, arguments.size() + 1);
-			String[] argv = new String[fallbackArgCount];
-			argv[0] = "jawk";
-			for (int i = 1; i < fallbackArgCount && i <= arguments.size(); i++) {
-				argv[i] = arguments.get(i - 1);
+			// Build a synthetic ARGV AssocArray from command-line arguments
+			AssocArray argv = new AssocArray(sortedArrayKeys);
+			argv.put(0, "jawk");
+			for (int i = 0; i < arguments.size(); i++) {
+				argv.put(i + 1, arguments.get(i));
 			}
 			return argv;
 		}
-
-		Object arrayObj = runtimeStack.getVariable(argvOffset, true);
-		if (!(arrayObj instanceof AssocArray)) {
-			return new String[0];
-		}
-		AssocArray argvAssoc = (AssocArray) arrayObj;
-		int argvLength = computeMaterializedArgvLength(argvAssoc, argc);
-		String[] argv = new String[argvLength];
-		for (int i = 0; i < argvLength; i++) {
-			if (argvAssoc.isIn(i)) {
-				Object value = argvAssoc.get(i);
-				if (!(value instanceof UninitializedObject)) {
-					argv[i] = jrt.toAwkString(value);
-				}
-			}
-		}
-		return argv;
-	}
-
-	private int computeMaterializedArgvLength(AssocArray argvAssoc, int argc) {
-		int cappedArgc = Math.max(0, Math.min(argc, MAX_ARGV_EXPORT_LENGTH));
-		int maxIndexPlusOne = Math.min(cappedArgc, arguments.size() + 1);
-		for (Object key : argvAssoc.keySet()) {
-			int index = toArgvIndex(key);
-			if (index >= 0 && index < cappedArgc && index + 1 > maxIndexPlusOne) {
-				maxIndexPlusOne = index + 1;
-			}
-		}
-		return Math.max(0, maxIndexPlusOne);
-	}
-
-	private int toArgvIndex(Object key) {
-		if (key instanceof Number) {
-			Number number = (Number) key;
-			double asDouble = number.doubleValue();
-			if (Double.isNaN(asDouble) || Double.isInfinite(asDouble)) {
-				return -1;
-			}
-			long index = number.longValue();
-			if ((double) index != asDouble) {
-				return -1;
-			}
-			if (index >= Integer.MIN_VALUE && index <= Integer.MAX_VALUE) {
-				return (int) index;
-			}
-			return -1;
-		}
-		try {
-			return Integer.parseInt(key.toString());
-		} catch (NumberFormatException nfe) {
-			return -1;
-		}
+		return runtimeStack.getVariable(argvOffset, true);
 	}
 
 	/** {@inheritDoc} */
 	@Override
-	public int getARGC() {
+	public Object getARGC() {
 		if (argcOffset == NULL_OFFSET) {
-			return arguments.size() + 1;
+			return Long.valueOf(arguments.size() + 1);
 		}
-		Object value = runtimeStack.getVariable(argcOffset, true);
-		long argcLong = JRT.toLong(value);
-		if (argcLong > Integer.MAX_VALUE) {
-			return Integer.MAX_VALUE;
-		}
-		if (argcLong < Integer.MIN_VALUE) {
-			return Integer.MIN_VALUE;
-		}
-		return (int) argcLong;
+		return runtimeStack.getVariable(argcOffset, true);
 	}
 
 	private String getOFMT() {

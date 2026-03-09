@@ -4,7 +4,7 @@ package org.metricshub.jawk.jrt;
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
- * Copyright (C) 2006 - 2025 MetricsHub
+ * Copyright 2006 - 2026 MetricsHub
  * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -108,7 +108,7 @@ public class JRT {
 	private List<String> inputFields = new ArrayList<String>(100);
 	private AssocArray arglistAa = null;
 	private int arglistIdx;
-	private int arglistLength;
+	private int arglistMaxKey;
 	private boolean hasFilenames = false;
 	private static final UninitializedObject BLANK = new UninitializedObject();
 
@@ -982,7 +982,7 @@ public class JRT {
 	 * @return ARGC value
 	 */
 	public Object getARGCVar() {
-		return Long.valueOf(vm.getARGC());
+		return vm.getARGC();
 	}
 
 	/**
@@ -1056,21 +1056,26 @@ public class JRT {
 		if (arglistAa != null) {
 			return;
 		}
-		refreshArgListState();
+		arglistAa = (AssocArray) vm.getARGV();
+		arglistMaxKey = computeMaxArgvKey();
 		arglistIdx = 1;
 		hasFilenames = detectFilenames();
 	}
 
-	private void refreshArgListState() {
-		arglistAa = new AssocArray(false);
-		String[] argv = vm.getARGV();
-		arglistLength = argv.length;
-		for (int i = 0; i < argv.length; i++) {
-			String value = argv[i];
-			if (value != null) {
-				arglistAa.put(i, value);
+	/**
+	 * Compute the highest numeric key present in the current {@code arglistAa}.
+	 *
+	 * @return the maximum integer key, or {@code 0} when the array is empty
+	 */
+	private int computeMaxArgvKey() {
+		int max = 0;
+		for (Object key : arglistAa.keySet()) {
+			int idx = (int) toLong(key);
+			if (idx > max) {
+				max = idx;
 			}
 		}
+		return max;
 	}
 
 	/**
@@ -1099,15 +1104,29 @@ public class JRT {
 	 * @return {@code ARGC} converted to an {@code int}
 	 */
 	private int getArgCount() {
-		return vm.getARGC();
+		long raw = toLong(vm.getARGC());
+		if (raw <= 0) {
+			return 0;
+		}
+		if (raw > Integer.MAX_VALUE) {
+			return Integer.MAX_VALUE;
+		}
+		return (int) raw;
 	}
 
+	/**
+	 * Return the effective upper bound for ARGV traversal, capped by the
+	 * highest known ARGV key so that absurdly large ARGC values do not
+	 * cause unbounded iteration over missing entries.
+	 *
+	 * @return the capped traversal count
+	 */
 	private int getTraversalArgCount() {
 		int argCount = getArgCount();
 		if (argCount <= 0) {
 			return 0;
 		}
-		return Math.min(argCount, arglistLength);
+		return Math.min(argCount, arglistMaxKey + 1);
 	}
 
 	/**
@@ -1143,7 +1162,7 @@ public class JRT {
 	 */
 	private boolean prepareNextReader(InputStream input) throws IOException {
 		boolean ready = false;
-		refreshArgListState();
+		arglistMaxKey = computeMaxArgvKey();
 		hasFilenames = detectFilenames();
 		while (!ready) {
 			String arg = nextArgument();
@@ -1161,8 +1180,8 @@ public class JRT {
 			}
 			if (arg.indexOf('=') != -1) {
 				setFilelistVariable(arg);
-				// Rebuild from VM so ARGC/ARGV updates are reflected immediately.
-				refreshArgListState();
+				// Recompute bounds so ARGC changes are reflected immediately.
+				arglistMaxKey = computeMaxArgvKey();
 				hasFilenames = detectFilenames();
 				if (partitioningReader == null && !hasFilenames) {
 					partitioningReader = new PartitioningReader(

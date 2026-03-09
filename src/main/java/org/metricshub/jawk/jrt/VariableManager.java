@@ -4,7 +4,7 @@ package org.metricshub.jawk.jrt;
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
- * Copyright (C) 2006 - 2025 MetricsHub
+ * Copyright 2006 - 2026 MetricsHub
  * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -43,19 +43,18 @@ public interface VariableManager {
 	 * getARGC.
 	 * </p>
 	 *
-	 * @return the current scalar value of {@code ARGC}, used to bound
-	 *         traversal of {@code ARGV}
+	 * @return the contents of the ARGC variable.
 	 */
-	int getARGC();
+	Object getARGC();
 
 	/**
 	 * <p>
 	 * getARGV.
 	 * </p>
 	 *
-	 * @return the current contents of {@code ARGV}, indexed from {@code 0}
+	 * @return the contents of the ARGV variable.
 	 */
-	String[] getARGV();
+	Object getARGV();
 
 	/**
 	 * <p>

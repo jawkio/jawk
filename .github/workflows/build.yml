@@ -64,7 +64,7 @@ jobs:
 
       - name: Upload Surefire reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: surefire-reports-${{ runner.os }}
           path: target/surefire-reports
@@ -72,7 +72,7 @@ jobs:
 
       - name: Upload Failsafe reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: failsafe-reports-${{ runner.os }}
           path: target/failsafe-reports
@@ -102,7 +102,7 @@ jobs:
 
       - name: Upload static analysis reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: static-analysis-${{ runner.os }}
           path: |
@@ -113,7 +113,7 @@ jobs:
 
       - name: Upload Maven site
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: site-${{ runner.os }}
           path: target/site

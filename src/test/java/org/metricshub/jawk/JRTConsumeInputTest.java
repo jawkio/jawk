@@ -47,4 +47,74 @@ public class JRTConsumeInputTest {
 				.expectLines("3")
 				.runAndAssert();
 	}
+
+	/**
+	 * Ensures ARGC-only scripts can still control input traversal when ARGV is not
+	 * materialized.
+	 *
+	 * @throws Exception if the AWK invocation fails
+	 */
+	@Test
+	public void testArgcOnlyScriptCanForceStdinTraversal() throws Exception {
+		AwkTestSupport
+				.awkTest("argc-only script forces stdin traversal")
+				.file("file1", "from-file\n")
+				.script("BEGIN { ARGC = 0 } { print $0 }")
+				.operand("{{file1}}")
+				.stdin("from-stdin\n")
+				.expectLines("from-stdin")
+				.runAndAssert();
+	}
+
+	/**
+	 * Ensures operand-list ARGC assignments still affect traversal even when ARGV
+	 * is not materialized.
+	 *
+	 * @throws Exception if the AWK invocation fails
+	 */
+	@Test
+	public void testOperandArgcAssignmentAffectsTraversalWithoutArgvOffset() throws Exception {
+		AwkTestSupport
+				.awkTest("operand argc assignment affects traversal without argv offset")
+				.file("file1", "from-file\n")
+				.script("{ print $0 }")
+				.operand("ARGC=0", "{{file1}}")
+				.stdin("from-stdin\n")
+				.expectLines("from-stdin")
+				.runAndAssert();
+	}
+
+	/**
+	 * Ensures large ARGC values assigned from operands do not prevent normal
+	 * traversal when ARGV is unreferenced.
+	 *
+	 * @throws Exception if the AWK invocation fails
+	 */
+	@Test
+	public void testLargeOperandArgcAssignmentStillTraversesBoundedArgvView() throws Exception {
+		AwkTestSupport
+				.awkTest("large operand ARGC assignment remains bounded by ARGV view")
+				.file("file1", "from-file\n")
+				.script("{ print FILENAME \":\" $0 } END { print NR }")
+				.operand("ARGC=5000000", "{{file1}}")
+				.expectLines("{{file1}}:from-file", "1")
+				.runAndAssert();
+	}
+
+	/**
+	 * Ensures oversized ARGC values are handled safely during traversal without
+	 * throwing overflow exceptions.
+	 *
+	 * @throws Exception if the AWK invocation fails
+	 */
+	@Test
+	public void testOversizedOperandArgcAssignmentDoesNotOverflowTraversal() throws Exception {
+		AwkTestSupport
+				.awkTest("oversized operand ARGC assignment is clamped for traversal")
+				.file("file1", "from-file\n")
+				.script("{ print FILENAME \":\" $0 } END { print NR }")
+				.operand("ARGC=1e309", "{{file1}}")
+				.expectLines("{{file1}}:from-file", "1")
+				.runAndAssert();
+	}
 }

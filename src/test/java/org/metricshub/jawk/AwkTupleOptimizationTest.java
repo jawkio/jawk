@@ -262,6 +262,73 @@ public class AwkTupleOptimizationTest {
 				.runAndAssert();
 	}
 
+	@Test
+	public void emitsArgcOffsetButNotArgvOffsetWhenUnreferenced() throws Exception {
+		String script = "{ print $0 }\n";
+		AwkTuples tuples = new Awk().compile(script);
+		List<Opcode> opcodes = collectOpcodes(tuples);
+		assertTrue("ARGC offset should always be emitted", opcodes.contains(Opcode.ARGC_OFFSET));
+		assertFalse("ARGV offset should not be emitted when ARGV is unreferenced", opcodes.contains(Opcode.ARGV_OFFSET));
+	}
+
+	@Test
+	public void emitsArgcOffsetWhenArgcReferencedOnly() throws Exception {
+		String script = "BEGIN { print ARGC }\n";
+		AwkTestSupport
+				.awkTest("argc offset emitted when argc referenced")
+				.script(script)
+				.expect("1\n")
+				.runAndAssert();
+
+		AwkTuples tuples = new Awk().compile(script);
+		List<Opcode> opcodes = collectOpcodes(tuples);
+		assertTrue("ARGC offset should be emitted when ARGC is referenced", opcodes.contains(Opcode.ARGC_OFFSET));
+		assertFalse("ARGV offset should not be emitted when ARGV is unreferenced", opcodes.contains(Opcode.ARGV_OFFSET));
+	}
+
+	@Test
+	public void emitsArgcAndArgvOffsetsWhenArgvReferenced() throws Exception {
+		String script = "BEGIN { print ARGV[0] }\n";
+		AwkTestSupport
+				.awkTest("argc and argv offsets emitted when argv referenced")
+				.script(script)
+				.expect("jawk\n")
+				.runAndAssert();
+
+		AwkTuples tuples = new Awk().compile(script);
+		List<Opcode> opcodes = collectOpcodes(tuples);
+		assertTrue("ARGC offset should be emitted when ARGV is referenced", opcodes.contains(Opcode.ARGC_OFFSET));
+		assertTrue("ARGV offset should be emitted when ARGV is referenced", opcodes.contains(Opcode.ARGV_OFFSET));
+	}
+
+	@Test
+	public void consumesFileOperandsWithoutArgvOffset() throws Exception {
+		String script = "{ print FILENAME \":\" $0 }\n";
+		AwkTestSupport
+				.awkTest("file operands consumed without argv offset")
+				.file("file1", "a\n")
+				.file("file2", "b\n")
+				.script(script)
+				.operand("{{file1}}", "{{file2}}")
+				.expectLines("{{file1}}:a", "{{file2}}:b")
+				.runAndAssert();
+
+		AwkTuples tuples = new Awk().compile(script);
+		List<Opcode> opcodes = collectOpcodes(tuples);
+		assertTrue("ARGC offset should always be emitted", opcodes.contains(Opcode.ARGC_OFFSET));
+		assertFalse("ARGV offset should not be emitted when ARGV is unreferenced", opcodes.contains(Opcode.ARGV_OFFSET));
+	}
+
+	@Test
+	public void keepsArgcSynchronizedForPreIncrement() throws Exception {
+		String script = "BEGIN { ++ARGC; print ARGC }\n";
+		AwkTestSupport
+				.awkTest("argc preincrement stays synchronized")
+				.script(script)
+				.expect("2\n")
+				.runAndAssert();
+	}
+
 	private static List<Opcode> collectOpcodes(AwkTuples tuples) {
 		List<Opcode> opcodes = new ArrayList<>();
 		PositionTracker tracker = tuples.top();

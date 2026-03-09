@@ -4,7 +4,7 @@ package org.metricshub.jawk.jrt;
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
- * Copyright (C) 2006 - 2025 MetricsHub
+ * Copyright 2006 - 2026 MetricsHub
  * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -66,7 +66,13 @@ public class DataPump implements Runnable {
 	 * @param out The output stream.
 	 */
 	public static void dump(String desc, InputStream in, PrintStream out) {
-		new Thread(new DataPump(in, out), desc).start();
+		dumpAndReturnThread(desc, in, out);
+	}
+
+	static Thread dumpAndReturnThread(String desc, InputStream in, PrintStream out) {
+		Thread thread = new Thread(new DataPump(in, out), desc);
+		thread.start();
+		return thread;
 	}
 
 	/**

@@ -4,7 +4,7 @@ package org.metricshub.jawk.intermediate;
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
- * Copyright (C) 2006 - 2025 MetricsHub
+ * Copyright 2006 - 2026 MetricsHub
  * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -69,5 +69,36 @@ public class SandboxedAwkTuples extends AwkTuples {
 	@Override
 	public void useAsFileInput() {
 		deny("Input redirection is disabled in sandbox mode");
+	}
+
+	/**
+	 * In sandbox mode, ARGC is read-only. Block any script attempt to assign
+	 * to ARGC at compile time.
+	 */
+	@Override
+	public void assignARGC() {
+		deny("Assigning to ARGC is disabled in sandbox mode");
+	}
+
+	/**
+	 * In sandbox mode, ARGC does not need to be materialized as a global
+	 * variable because the script cannot alter it. The runtime falls back
+	 * to the command-line argument count.
+	 */
+	@Override
+	public void argcOffset(int offset) {
+		// no-op: keep argcOffset at NULL_OFFSET; AVM.getARGC() returns the
+		// command-line argument count when ARGC is not materialized.
+	}
+
+	/**
+	 * In sandbox mode, ARGV does not need to be materialized as a global
+	 * variable because the script cannot alter it. The runtime falls back
+	 * to a synthetic ARGV built from command-line arguments.
+	 */
+	@Override
+	public void argvOffset(int offset) {
+		// no-op: keep argvOffset at NULL_OFFSET; AVM.getARGV() returns a
+		// synthetic AssocArray when ARGV is not materialized.
 	}
 }

@@ -4,7 +4,7 @@ package org.metricshub.jawk.jrt;
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
- * Copyright (C) 2006 - 2025 MetricsHub
+ * Copyright 2006 - 2026 MetricsHub
  * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -108,6 +108,7 @@ public class JRT {
 	private List<String> inputFields = new ArrayList<String>(100);
 	private AssocArray arglistAa = null;
 	private int arglistIdx;
+	private int arglistMaxKey;
 	private boolean hasFilenames = false;
 	private static final UninitializedObject BLANK = new UninitializedObject();
 
@@ -119,7 +120,10 @@ public class JRT {
 	private Map<String, PartitioningReader> fileReaders = new HashMap<String, PartitioningReader>();
 	private Map<String, PartitioningReader> commandReaders = new HashMap<String, PartitioningReader>();
 	private Map<String, Process> commandProcesses = new HashMap<String, Process>();
+	private Map<String, Thread> commandErrorPumps = new HashMap<String, Thread>();
 	private Map<String, PrintStream> outputFiles = new HashMap<String, PrintStream>();
+	private Map<String, Thread> outputStdoutPumps = new HashMap<String, Thread>();
+	private Map<String, Thread> outputStderrPumps = new HashMap<String, Thread>();
 
 	// JRT-managed special variables (runtime only)
 	private long nr; // total record number
@@ -134,7 +138,6 @@ public class JRT {
 	private String convfmt; // number-to-string format
 	private String ofmt; // number-to-string for output
 	private String subsep; // subscript separator
-	private long argc; // number of arguments
 	private Locale locale; // locale for number formatting
 
 	/**
@@ -168,7 +171,6 @@ public class JRT {
 		this.convfmt = "%.6g";
 		this.ofmt = "%.6g";
 		this.subsep = String.valueOf((char) 28);
-		this.argc = 0L;
 	}
 
 	/**
@@ -980,7 +982,7 @@ public class JRT {
 	 * @return ARGC value
 	 */
 	public Object getARGCVar() {
-		return Long.valueOf(argc);
+		return vm.getARGC();
 	}
 
 	/**
@@ -989,7 +991,7 @@ public class JRT {
 	 * @param value new ARGC value
 	 */
 	public void setARGC(Object value) {
-		this.argc = toLong(value);
+		vm.assignVariable("ARGC", value);
 	}
 
 	/**
@@ -1055,8 +1057,25 @@ public class JRT {
 			return;
 		}
 		arglistAa = (AssocArray) vm.getARGV();
+		arglistMaxKey = computeMaxArgvKey();
 		arglistIdx = 1;
 		hasFilenames = detectFilenames();
+	}
+
+	/**
+	 * Compute the highest numeric key present in the current {@code arglistAa}.
+	 *
+	 * @return the maximum integer key, or {@code 0} when the array is empty
+	 */
+	private int computeMaxArgvKey() {
+		int max = 0;
+		for (Object key : arglistAa.keySet()) {
+			int idx = (int) toLong(key);
+			if (idx > max) {
+				max = idx;
+			}
+		}
+		return max;
 	}
 
 	/**
@@ -1066,13 +1085,14 @@ public class JRT {
 	 * @return {@code true} if at least one filename was found
 	 */
 	private boolean detectFilenames() {
-		int argCount = getArgCount();
-		for (long i = 1; i < argCount; i++) {
+		int traversalArgCount = getTraversalArgCount();
+		for (int i = 1; i < traversalArgCount; i++) {
 			if (arglistAa.isIn(i)) {
 				String arg = toAwkString(arglistAa.get(i));
-				if (arg.indexOf('=') == -1) {
-					return true;
+				if (arg.isEmpty() || arg.indexOf('=') != -1) {
+					continue;
 				}
+				return true;
 			}
 		}
 		return false;
@@ -1084,7 +1104,29 @@ public class JRT {
 	 * @return {@code ARGC} converted to an {@code int}
 	 */
 	private int getArgCount() {
-		return Math.toIntExact(argc);
+		long raw = toLong(vm.getARGC());
+		if (raw <= 0) {
+			return 0;
+		}
+		if (raw > Integer.MAX_VALUE) {
+			return Integer.MAX_VALUE;
+		}
+		return (int) raw;
+	}
+
+	/**
+	 * Return the effective upper bound for ARGV traversal, capped by the
+	 * highest known ARGV key so that absurdly large ARGC values do not
+	 * cause unbounded iteration over missing entries.
+	 *
+	 * @return the capped traversal count
+	 */
+	private int getTraversalArgCount() {
+		int argCount = getArgCount();
+		if (argCount <= 0) {
+			return 0;
+		}
+		return Math.min(argCount, arglistMaxKey + 1);
 	}
 
 	/**
@@ -1094,11 +1136,15 @@ public class JRT {
 	 * @return the next argument as an AWK string, or {@code null} if none remain
 	 */
 	private String nextArgument() {
-		int argCount = getArgCount();
-		while (arglistIdx <= argCount) {
-			Object o = arglistAa.get(arglistIdx++);
-			if (!(o instanceof UninitializedObject || o.toString().isEmpty())) {
-				return toAwkString(o);
+		int traversalArgCount = getTraversalArgCount();
+		while (arglistIdx < traversalArgCount) {
+			int idx = arglistIdx++;
+			if (!arglistAa.isIn(idx)) {
+				continue;
+			}
+			String arg = toAwkString(arglistAa.get(idx));
+			if (!arg.isEmpty()) {
+				return arg;
 			}
 		}
 		return null;
@@ -1116,9 +1162,13 @@ public class JRT {
 	 */
 	private boolean prepareNextReader(InputStream input) throws IOException {
 		boolean ready = false;
+		arglistMaxKey = computeMaxArgvKey();
+		hasFilenames = detectFilenames();
 		while (!ready) {
 			String arg = nextArgument();
 			if (arg == null) {
+				// ARGC/ARGV may have changed while evaluating assignments.
+				hasFilenames = detectFilenames();
 				if (partitioningReader == null && !hasFilenames) {
 					partitioningReader = new PartitioningReader(
 							new InputStreamReader(input, StandardCharsets.UTF_8),
@@ -1130,6 +1180,9 @@ public class JRT {
 			}
 			if (arg.indexOf('=') != -1) {
 				setFilelistVariable(arg);
+				// Recompute bounds so ARGC changes are reflected immediately.
+				arglistMaxKey = computeMaxArgvKey();
+				hasFilenames = detectFilenames();
 				if (partitioningReader == null && !hasFilenames) {
 					partitioningReader = new PartitioningReader(
 							new InputStreamReader(input, StandardCharsets.UTF_8),
@@ -1522,7 +1575,8 @@ public class JRT {
 				Process p = spawnProcess(cmd);
 				// no input to this process!
 				p.getOutputStream().close();
-				DataPump.dump(cmd, p.getErrorStream(), System.err);
+				Thread errorPump = DataPump.dumpAndReturnThread(cmd + " stderr", p.getErrorStream(), System.err);
+				commandErrorPumps.put(cmd, errorPump);
 				commandProcesses.put(cmd, p);
 				pr = new PartitioningReader(
 						new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8),
@@ -1531,11 +1585,13 @@ public class JRT {
 				this.filename = "";
 			} catch (IOException ioe) {
 				commandReaders.remove(cmd);
+				Thread errorPump = commandErrorPumps.remove(cmd);
 				Process p = commandProcesses.get(cmd);
 				commandProcesses.remove(cmd);
 				if (p != null) {
 					p.destroy();
 				}
+				joinDataPump(errorPump);
 				throw ioe;
 			}
 		}
@@ -1565,8 +1621,10 @@ public class JRT {
 			Process p;
 			try {
 				p = spawnProcess(cmd);
-				DataPump.dump(cmd, p.getErrorStream(), error);
-				DataPump.dump(cmd, p.getInputStream(), output);
+				Thread stderrPump = DataPump.dumpAndReturnThread(cmd + " stderr", p.getErrorStream(), error);
+				Thread stdoutPump = DataPump.dumpAndReturnThread(cmd + " stdout", p.getInputStream(), output);
+				outputStderrPumps.put(cmd, stderrPump);
+				outputStdoutPumps.put(cmd, stdoutPump);
 			} catch (IOException ioe) {
 				throw new AwkRuntimeException("Can't spawn " + cmd + ": " + ioe);
 			}
@@ -1645,6 +1703,8 @@ public class JRT {
 		if (ps == null) {
 			return false;
 		}
+		Thread stdoutPump = outputStdoutPumps.get(cmd);
+		Thread stderrPump = outputStderrPumps.get(cmd);
 		assert p != null;
 		outputProcesses.remove(cmd);
 		outputStreams.remove(cmd);
@@ -1655,11 +1715,18 @@ public class JRT {
 			p.waitFor();
 			p.exitValue();
 		} catch (InterruptedException ie) {
+			Thread.currentThread().interrupt();
+			p.destroyForcibly();
 			throw new AwkRuntimeException(
 					"Caught exception while waiting for process exit: " + ie);
+		} finally {
+			joinDataPump(stdoutPump);
+			joinDataPump(stderrPump);
+			outputStdoutPumps.remove(cmd);
+			outputStderrPumps.remove(cmd);
+			output.flush();
+			error.flush();
 		}
-		output.flush();
-		error.flush();
 		return true;
 	}
 
@@ -1683,6 +1750,7 @@ public class JRT {
 		if (pr == null) {
 			return false;
 		}
+		Thread errorPump = commandErrorPumps.get(cmd);
 		assert p != null;
 		commandReaders.remove(cmd);
 		commandProcesses.remove(cmd);
@@ -1694,14 +1762,19 @@ public class JRT {
 				p.waitFor();
 				p.exitValue();
 			} catch (InterruptedException ie) {
+				Thread.currentThread().interrupt();
+				p.destroyForcibly();
 				throw new AwkRuntimeException(
 						"Caught exception while waiting for process exit: " + ie);
 			}
-			output.flush();
-			error.flush();
 			return true;
 		} catch (IOException ioe) {
 			return false;
+		} finally {
+			joinDataPump(errorPump);
+			commandErrorPumps.remove(cmd);
+			output.flush();
+			error.flush();
 		}
 	}
 
@@ -1723,16 +1796,47 @@ public class JRT {
 			Process p = spawnProcess(cmd);
 			// no input to this process!
 			p.getOutputStream().close();
-			DataPump.dump(cmd, p.getErrorStream(), error);
-			DataPump.dump(cmd, p.getInputStream(), output);
-			try {
-				int retcode = p.waitFor();
-				return Integer.valueOf(retcode);
-			} catch (InterruptedException ie) {
-				return Integer.valueOf(p.exitValue());
+			Thread errorPump = DataPump.dumpAndReturnThread(cmd + " stderr", p.getErrorStream(), error);
+			Thread outputPump = DataPump.dumpAndReturnThread(cmd + " stdout", p.getInputStream(), output);
+			boolean interrupted = false;
+			int retcode;
+			while (true) {
+				try {
+					retcode = p.waitFor();
+					break;
+				} catch (InterruptedException ie) {
+					// Preserve interrupt and keep waiting so process pipes can close.
+					interrupted = true;
+				}
 			}
+			joinDataPump(outputPump);
+			joinDataPump(errorPump);
+			output.flush();
+			error.flush();
+			if (interrupted) {
+				Thread.currentThread().interrupt();
+			}
+			return Integer.valueOf(retcode);
 		} catch (IOException ioe) {
 			return MINUS_ONE;
+		}
+	}
+
+	private static void joinDataPump(Thread pump) {
+		if (pump == null) {
+			return;
+		}
+		boolean interrupted = false;
+		while (true) {
+			try {
+				pump.join();
+				break;
+			} catch (InterruptedException ie) {
+				interrupted = true;
+			}
+		}
+		if (interrupted) {
+			Thread.currentThread().interrupt();
 		}
 	}
 

@@ -4,7 +4,7 @@ package org.metricshub.jawk.backend;
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
- * Copyright (C) 2006 - 2025 MetricsHub
+ * Copyright 2006 - 2026 MetricsHub
  * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -104,6 +104,7 @@ public class AVM implements VariableManager {
 	private List<String> arguments;
 	private boolean sortedArrayKeys;
 	private Map<String, Object> initialVariables;
+	private Map<String, Object> deferredInitialVariables = new HashMap<String, Object>();
 	private String initialFsValue;
 	private boolean trapIllegalFormatExceptions;
 	private JRT jrt;
@@ -194,8 +195,8 @@ public class AVM implements VariableManager {
 		}
 	}
 
-	// Offsets for legacy global variables removed for JRT-managed specials.
-	// ENVIRON/ARGC/ARGV remain managed as globals via offsets emitted by the parser.
+	// Offsets for globals that remain runtime-managed by the tuple stream.
+	// ARGC is always materialized; ENVIRON and ARGV are emitted on demand.
 	private long environOffset = NULL_OFFSET;
 	private long argcOffset = NULL_OFFSET;
 	private long argvOffset = NULL_OFFSET;
@@ -320,6 +321,10 @@ public class AVM implements VariableManager {
 		globalVariableOffsets = tuples.getGlobalVariableOffsetMap();
 		globalVariableArrays = tuples.getGlobalVariableAarrayMap();
 		functionNames = tuples.getFunctionNameSet();
+		if (!deferredInitialVariables.isEmpty()) {
+			initialVariables.putAll(deferredInitialVariables);
+			deferredInitialVariables.clear();
+		}
 
 		PositionTracker position = tuples.top();
 
@@ -336,7 +341,6 @@ public class AVM implements VariableManager {
 		jrt.setFNR(0);
 		jrt.setRSTART(0);
 		jrt.setRLENGTH(0);
-		jrt.setARGC(arguments.size() + 1);
 
 		try {
 			while (!position.isEOF()) {
@@ -1496,10 +1500,9 @@ public class AVM implements VariableManager {
 					argcOffset = position.intArg(0);
 					assert argcOffset != NULL_OFFSET;
 					// assign(argcOffset, arguments.size(), true, position); // true = global
-					// +1 to include the "java Awk" (ARGV[0])
+					// +1 to include the "jawk" program name (ARGV[0])
 					assign(argcOffset, arguments.size() + 1, true, position); // true = global
 					pop(); // clean up the stack after the assignment
-					jrt.setARGC(arguments.size() + 1);
 					position.next();
 					break;
 				}
@@ -1509,7 +1512,7 @@ public class AVM implements VariableManager {
 					assert argvOffset != NULL_OFFSET;
 					// consume argv (looping from 1 to argc)
 					int argc = (int) JRT.toDouble(runtimeStack.getVariable(argcOffset, true)); // true = global
-					assignArray(argvOffset, 0, "java Awk", true);
+					assignArray(argvOffset, 0, "jawk", true);
 					pop();
 					for (int i = 1; i < argc; i++) {
 						// assignArray(argvOffset, i+1, arguments.get(i), true);
@@ -2008,13 +2011,20 @@ public class AVM implements VariableManager {
 				}
 				case ASSIGN_ARGC: {
 					Object v = pop();
-					jrt.setARGC(v);
+					if (argcOffset == NULL_OFFSET) {
+						throw new AwkRuntimeException("ARGC is read-only (not materialized).");
+					}
+					runtimeStack.setVariable(argcOffset, v, true);
 					push(v);
 					position.next();
 					break;
 				}
 				case PUSH_ARGC: {
-					push(jrt.getARGCVar());
+					if (argcOffset == NULL_OFFSET) {
+						push(getARGC());
+					} else {
+						push(runtimeStack.getVariable(argcOffset, true));
+					}
 					position.next();
 					break;
 				}
@@ -2197,7 +2207,8 @@ public class AVM implements VariableManager {
 			o = ZERO;
 			runtimeStack.setVariable(l, o, isGlobal);
 		}
-		runtimeStack.setVariable(l, JRT.inc(o), isGlobal);
+		Object updated = JRT.inc(o);
+		runtimeStack.setVariable(l, updated, isGlobal);
 		return o;
 	}
 
@@ -2211,7 +2222,8 @@ public class AVM implements VariableManager {
 			o = ZERO;
 			runtimeStack.setVariable(l, o, isGlobal);
 		}
-		runtimeStack.setVariable(l, JRT.dec(o), isGlobal);
+		Object updated = JRT.dec(o);
+		runtimeStack.setVariable(l, updated, isGlobal);
 		return o;
 	}
 
@@ -2288,8 +2300,15 @@ public class AVM implements VariableManager {
 	/** {@inheritDoc} */
 	@Override
 	public final void assignVariable(String name, Object obj) {
+		// During eval(), JRT may assign initial variables before interpret() has
+		// initialized global offset metadata. Keep these assignments pending.
+		if (globalVariableOffsets == null || globalVariableArrays == null) {
+			deferredInitialVariables.put(name, obj);
+			return;
+		}
+
 		// make sure we're not receiving funcname=value assignments
-		if (functionNames.contains(name)) {
+		if (functionNames != null && functionNames.contains(name)) {
 			throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + name + ").");
 		}
 
@@ -2425,12 +2444,24 @@ public class AVM implements VariableManager {
 	/** {@inheritDoc} */
 	@Override
 	public Object getARGV() {
+		if (argvOffset == NULL_OFFSET) {
+			// Build a synthetic ARGV AssocArray from command-line arguments
+			AssocArray argv = new AssocArray(sortedArrayKeys);
+			argv.put(0, "jawk");
+			for (int i = 0; i < arguments.size(); i++) {
+				argv.put(i + 1, arguments.get(i));
+			}
+			return argv;
+		}
 		return runtimeStack.getVariable(argvOffset, true);
 	}
 
 	/** {@inheritDoc} */
 	@Override
 	public Object getARGC() {
+		if (argcOffset == NULL_OFFSET) {
+			return Long.valueOf(arguments.size() + 1);
+		}
 		return runtimeStack.getVariable(argcOffset, true);
 	}
 

@@ -4,7 +4,7 @@ package org.metricshub.jawk.frontend;
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
- * Copyright (C) 2006 - 2025 MetricsHub
+ * Copyright 2006 - 2026 MetricsHub
  * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -2545,12 +2545,15 @@ public class AwkParser {
 			// (see above)!
 			tuples.setNumGlobals(symbolTable.numGlobals());
 
-			// Only ENVIRON/ARGC/ARGV remain regular globals
+			// Only ENVIRON/ARGC/ARGV remain regular globals.
+			// Always materialize ARGC; ARGV remains lazily materialized.
 			if (environAst.isReferenced()) {
 				tuples.environOffset(environAst.offset);
 			}
 			tuples.argcOffset(argcAst.offset);
-			tuples.argvOffset(argvAst.offset);
+			if (argvAst.isReferenced()) {
+				tuples.argvOffset(argvAst.offset);
+			}
 
 			Address exitAddr = tuples.createAddress("end blocks start address");
 			tuples.setExitAddress(exitAddr);

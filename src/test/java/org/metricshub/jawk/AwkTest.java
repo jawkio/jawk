@@ -987,4 +987,47 @@ public class AwkTest {
 		assertTrue(cli.isSandbox());
 	}
 
+	@Test
+	public void sandboxRejectsArgcAssignment() {
+		Awk awk = new SandboxedAwk();
+		assertThrows(
+				AwkSandboxException.class,
+				() -> awk.compile("BEGIN { ARGC = 5 }"));
+	}
+
+	@Test
+	public void sandboxAllowsReadingArgc() throws Exception {
+		AwkTestSupport
+				.awkTest("sandbox allows reading ARGC")
+				.withAwk(new SandboxedAwk())
+				.script("BEGIN { print ARGC }")
+				.expect("1\n")
+				.runAndAssert();
+	}
+
+	@Test
+	public void sandboxAllowsReadingArgv() throws Exception {
+		// In sandbox mode ARGV is not materialized as a global variable, so
+		// direct references to ARGV[n] in the script see an empty array.
+		// The JRT input traversal still works correctly through the
+		// AVM.getARGV() fallback.
+		AwkTestSupport
+				.awkTest("sandbox ARGV reads return empty strings")
+				.withAwk(new SandboxedAwk())
+				.script("BEGIN { print ARGV[0] }")
+				.expect("\n")
+				.runAndAssert();
+	}
+
+	@Test
+	public void sandboxSkipsArgcAndArgvOffsetsWhenUnreferenced() throws Exception {
+		AwkTestSupport
+				.awkTest("sandbox with unreferenced ARGC/ARGV still processes stdin")
+				.withAwk(new SandboxedAwk())
+				.script("{ print \"got:\" $0 }")
+				.stdin("hello\n")
+				.expect("got:hello\n")
+				.runAndAssert();
+	}
+
 }

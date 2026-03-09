@@ -4,7 +4,7 @@ package org.metricshub.jawk.util;
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
- * Copyright 2006 - 2026 MetricsHub
+ * Copyright (C) 2006 - 2026 MetricsHub
  * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import org.metricshub.jawk.jrt.InputSource;
 
 /**
  * A simple container for the parameters of a single AWK invocation.
@@ -52,6 +53,12 @@ public class AwkSettings {
 	 * By default, this is {@link System#in}.
 	 */
 	private InputStream input = System.in;
+
+	/**
+	 * Optional structured input provider. When non-null, this source is consumed
+	 * instead of {@link #input}.
+	 */
+	private InputSource inputSource;
 
 	/**
 	 * Contains variable assignments which are applied prior to
@@ -123,6 +130,7 @@ public class AwkSettings {
 		final char newLine = '\n';
 
 		desc.append("variables = ").append(getVariables()).append(newLine);
+		desc.append("inputSource = ").append(getInputSource()).append(newLine);
 		desc.append("nameValueOrFileNames = ").append(getNameValueOrFileNames()).append(newLine);
 		desc.append("fieldSeparator = ").append(getFieldSeparator()).append(newLine);
 		desc.append("useSortedArrayKeys = ").append(isUseSortedArrayKeys()).append(newLine);
@@ -194,6 +202,26 @@ public class AwkSettings {
 	 */
 	public void setInput(InputStream input) {
 		this.input = Objects.requireNonNull(input, "input");
+	}
+
+	/**
+	 * Returns the optional structured input source consumed by the runtime.
+	 * When non-null, this source takes precedence over {@link #getInput()}.
+	 *
+	 * @return configured {@link InputSource}, or {@code null} when disabled
+	 */
+	public InputSource getInputSource() {
+		return inputSource;
+	}
+
+	/**
+	 * Sets an optional structured input source for the runtime. When non-null,
+	 * this source takes precedence over {@link #setInput(InputStream)}.
+	 *
+	 * @param inputSource source to consume, or {@code null} to disable
+	 */
+	public void setInputSource(InputSource inputSource) {
+		this.inputSource = inputSource;
 	}
 
 	/**
@@ -401,6 +429,11 @@ public class AwkSettings {
 
 		@Override
 		public void setInput(InputStream input) {
+			throw unsupported();
+		}
+
+		@Override
+		public void setInputSource(InputSource inputSource) {
 			throw unsupported();
 		}
 

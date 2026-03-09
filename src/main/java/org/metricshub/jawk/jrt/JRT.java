@@ -4,7 +4,7 @@ package org.metricshub.jawk.jrt;
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
- * Copyright 2006 - 2026 MetricsHub
+ * Copyright (C) 2006 - 2026 MetricsHub
  * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -44,6 +44,7 @@ import java.util.IllegalFormatException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.regex.Matcher;
@@ -1006,6 +1007,45 @@ public class JRT {
 	}
 
 	/**
+	 * Attempt to consume one record from a structured input source.
+	 *
+	 * @param source source strategy that provides records and optional
+	 *        pre-split fields
+	 * @param forGetline {@code true} when called for {@code getline}; when
+	 *        {@code false} the runtime initializes {@code $0..$NF}
+	 * @return {@code true} if a record was consumed; {@code false} when the
+	 *         source is exhausted
+	 * @throws IOException if the source raises an I/O error
+	 */
+	public boolean consumeInput(final InputSource source, boolean forGetline) throws IOException {
+		Objects.requireNonNull(source, "source");
+		if (!source.nextRecord()) {
+			return false;
+		}
+
+		String record = source.getRecord();
+		if (record == null) {
+			throw new IllegalStateException("InputSource#getRecord() returned null after nextRecord()");
+		}
+		inputLine = record;
+
+		if (!forGetline) {
+			List<String> preFields = source.getFields();
+			if (preFields == null) {
+				jrtParseFields();
+			} else {
+				initializeInputFields(record, preFields);
+			}
+		}
+
+		this.nr++;
+		if (source.isFromFilenameList()) {
+			this.fnr++;
+		}
+		return true;
+	}
+
+	/**
 	 * Attempt to consume one line of input. Input may come from standard input or
 	 * from files/variable assignments supplied on the command line via
 	 * {@code ARGV}. Variable assignment arguments are evaluated lazily when
@@ -1207,8 +1247,20 @@ public class JRT {
 	}
 
 	/**
+	 * Consume at most one record from a structured source for expression
+	 * evaluation.
+	 *
+	 * @param source source strategy that provides records and optional
+	 *        pre-split fields
+	 * @return {@code true} if a record was consumed, {@code false} otherwise
+	 * @throws IOException if the source raises an I/O error
+	 */
+	public boolean consumeInputForEval(InputSource source) throws IOException {
+		return consumeInput(source, false);
+	}
+
+	/**
 	 * Read input from stdin, only once, and just for simple AWK expression evaluation
-	 * <p>
 	 *
 	 * @param input Stdin
 	 * @throws IOException if couldn't read stdin (should never happen, as it's based on a String)
@@ -1222,6 +1274,21 @@ public class JRT {
 			jrtParseFields();
 			this.nr++;
 		}
+	}
+
+	/**
+	 * Initialize {@code $0..$NF} from a pre-split field list.
+	 *
+	 * @param record current {@code $0} text
+	 * @param preFields current fields where index {@code 0} is {@code $1}
+	 */
+	private void initializeInputFields(String record, List<String> preFields) {
+		inputFields.clear();
+		inputFields.add(record);
+		for (String field : preFields) {
+			inputFields.add(field == null ? "" : field);
+		}
+		recalculateNF();
 	}
 
 	/**
@@ -1425,7 +1492,7 @@ public class JRT {
 	 * jrtConsumeFileInputForGetline.
 	 * </p>
 	 *
-	 * @param filename a {@link java.lang.String} object
+	 * @param fileNameParam a {@link java.lang.String} object
 	 * @return a {@link java.lang.Integer} object
 	 */
 	public Integer jrtConsumeFileInputForGetline(String fileNameParam) {
@@ -1514,7 +1581,7 @@ public class JRT {
 	 * jrtConsumeFileInput.
 	 * </p>
 	 *
-	 * @param filename a {@link java.lang.String} object
+	 * @param fileNameParam a {@link java.lang.String} object
 	 * @return a boolean
 	 * @throws java.io.IOException if any.
 	 */
@@ -1651,7 +1718,7 @@ public class JRT {
 	 * <em>all</em> open streams with this name
 	 * are closed.
 	 *
-	 * @param filename The filename/command process to close.
+	 * @param fileNameParam The filename/command process to close.
 	 * @return Integer(0) upon a successful close, Integer(-1)
 	 *         otherwise.
 	 */

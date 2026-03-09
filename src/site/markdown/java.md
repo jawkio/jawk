@@ -65,6 +65,97 @@ awk.invoke(tuples, settings);
 System.out.println(out.toString(StandardCharsets.UTF_8.name()));
 ```
 
+### Provide structured input with `InputSource`
+
+Jawk exposes the `org.metricshub.jawk.jrt.InputSource` interface so embedding
+applications can push records directly to the runtime without serializing data
+to text and reparsing it.
+
+Important: Jawk intentionally ships only the `InputSource` interface. It does
+not provide a built-in `ListInputSource` implementation.
+
+When `AwkSettings#setInputSource(...)` is set, that source takes precedence
+over `AwkSettings#setInput(...)`.
+
+#### Contract summary
+
+* `nextRecord()` advances to the next record.
+* `getRecord()` returns `\$0` for the current record.
+* `getFields()` returns pre-split fields (`\$1`, `\$2`, ...), or `null` to let
+  Jawk split `\$0` using `FS`.
+* `isFromFilenameList()` controls whether `FNR` should be incremented like
+  file-based input.
+
+#### Example implementation (`List<List<String>>` table)
+
+```java
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import org.metricshub.jawk.jrt.InputSource;
+
+public final class TableInputSource implements InputSource {
+    private final List<List<String>> rows;
+    private final String separator;
+    private int index = -1;
+    private List<String> fields;
+    private String record;
+
+    public TableInputSource(List<List<String>> rows) {
+        this(rows, " ");
+    }
+
+    public TableInputSource(List<List<String>> rows, String separator) {
+        this.rows = rows;
+        this.separator = separator;
+    }
+
+    @Override
+    public boolean nextRecord() {
+        int next = index + 1;
+        if (next >= rows.size()) {
+            fields = null;
+            record = null;
+            return false;
+        }
+        index = next;
+        fields = Collections.unmodifiableList(new ArrayList<>(rows.get(index)));
+        record = String.join(separator, fields);
+        return true;
+    }
+
+    @Override
+    public String getRecord() {
+        return record;
+    }
+
+    @Override
+    public List<String> getFields() {
+        return fields;
+    }
+
+    @Override
+    public boolean isFromFilenameList() {
+        return false;
+    }
+}
+```
+
+#### Using a custom `InputSource`
+
+```java
+Awk awk = new Awk();
+AwkSettings settings = new AwkSettings();
+settings.setInputSource(new TableInputSource(Arrays.asList(
+        Arrays.asList("Alice", "30", "Engineering"),
+        Arrays.asList("Bob", "25", "Marketing")
+)));
+
+awk.invoke("{ print $1, $3 }", settings);
+// Alice Engineering
+// Bob Marketing
+```
+
 To supply custom extensions, create the `Awk` instance with the extension
 instances. Built-in extensions expose convenient singletons such as
 `CoreExtension.INSTANCE` and `StdinExtension.INSTANCE`:

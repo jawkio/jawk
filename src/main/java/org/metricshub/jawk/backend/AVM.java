@@ -4,7 +4,7 @@ package org.metricshub.jawk.backend;
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
- * Copyright 2006 - 2026 MetricsHub
+ * Copyright (C) 2006 - 2026 MetricsHub
  * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -56,6 +56,7 @@ import org.metricshub.jawk.jrt.BlockManager;
 import org.metricshub.jawk.jrt.BlockObject;
 import org.metricshub.jawk.jrt.CharacterTokenizer;
 import org.metricshub.jawk.jrt.ConditionPair;
+import org.metricshub.jawk.jrt.InputSource;
 import org.metricshub.jawk.jrt.JRT;
 import java.util.ArrayDeque;
 import org.metricshub.jawk.jrt.RegexTokenizer;
@@ -1457,7 +1458,12 @@ public class AVM implements VariableManager {
 				}
 
 				case SET_INPUT_FOR_EVAL: {
-					jrt.setInputLineforEval(settings.getInput());
+					InputSource inputSource = settings.getInputSource();
+					if (inputSource != null) {
+						jrt.consumeInputForEval(inputSource);
+					} else {
+						jrt.setInputLineforEval(settings.getInput());
+					}
 					position.next();
 					break;
 				}
@@ -2390,7 +2396,13 @@ public class AVM implements VariableManager {
 	 * @throws IOException if an I/O error occurs while reading input
 	 */
 	private boolean avmConsumeInput(boolean forGetline) throws IOException {
-		boolean retval = jrt.consumeInput(settings.getInput(), forGetline, locale);
+		InputSource inputSource = settings.getInputSource();
+		boolean retval;
+		if (inputSource != null) {
+			retval = jrt.consumeInput(inputSource, forGetline);
+		} else {
+			retval = jrt.consumeInput(settings.getInput(), forGetline, locale);
+		}
 		if (retval && forGetline) {
 			push(jrt.getInputLine());
 		}

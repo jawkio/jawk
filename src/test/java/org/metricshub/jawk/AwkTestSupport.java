@@ -29,6 +29,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.metricshub.jawk.ext.JawkExtension;
+import org.metricshub.jawk.jrt.InputSource;
 import org.metricshub.jawk.util.AwkSettings;
 import org.metricshub.jawk.util.ScriptSource;
 
@@ -312,6 +313,7 @@ public final class AwkTestSupport {
 		private final Map<String, Object> preAssignments = new LinkedHashMap<>();
 		private Awk customAwk;
 		private final List<JawkExtension> extensions = new ArrayList<>();
+		private InputSource inputSource;
 
 		private AwkTestBuilder(String description) {
 			super(description);
@@ -375,6 +377,23 @@ public final class AwkTestSupport {
 			return this;
 		}
 
+		/**
+		 * Configures a structured input source consumed by the runtime instead of
+		 * stdin.
+		 *
+		 * @param inputSourceParam input source to consume
+		 * @return this builder for method chaining
+		 * @throws IllegalArgumentException when {@code inputSourceParam} is
+		 *         {@code null}
+		 */
+		public AwkTestBuilder withInputSource(InputSource inputSourceParam) {
+			if (inputSourceParam == null) {
+				throw new IllegalArgumentException("InputSource must not be null");
+			}
+			this.inputSource = inputSourceParam;
+			return this;
+		}
+
 		@Override
 		protected AwkTestCase buildTestCase(
 				TestLayout layout,
@@ -392,7 +411,8 @@ public final class AwkTestSupport {
 					requiresPosix,
 					preAssignments,
 					customAwk,
-					extensions);
+					extensions,
+					inputSource);
 		}
 	}
 
@@ -887,6 +907,7 @@ public final class AwkTestSupport {
 		private final Map<String, Object> preAssignments;
 		private final Awk customAwk;
 		private final List<JawkExtension> extensions;
+		private final InputSource inputSource;
 
 		AwkTestCase(
 				TestLayout layout,
@@ -896,11 +917,13 @@ public final class AwkTestSupport {
 				boolean requiresPosix,
 				Map<String, Object> preAssignments,
 				Awk customAwk,
-				List<JawkExtension> extensions) {
+				List<JawkExtension> extensions,
+				InputSource inputSource) {
 			super(layout, fileContents, operandSpecs, pathPlaceholders, requiresPosix);
 			this.preAssignments = new LinkedHashMap<>(preAssignments);
 			this.customAwk = customAwk;
 			this.extensions = new ArrayList<>(extensions);
+			this.inputSource = inputSource;
 		}
 
 		@Override
@@ -908,6 +931,9 @@ public final class AwkTestSupport {
 			AwkSettings settings = new AwkSettings();
 			for (Map.Entry<String, Object> entry : preAssignments.entrySet()) {
 				settings.putVariable(entry.getKey(), entry.getValue());
+			}
+			if (inputSource != null) {
+				settings.setInputSource(inputSource);
 			}
 			String stdin = resolvedStdin(env);
 			if (stdin != null) {

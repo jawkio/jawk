@@ -71,8 +71,11 @@ Jawk exposes the `org.metricshub.jawk.jrt.InputSource` interface so embedding
 applications can push records directly to the runtime without serializing data
 to text and reparsing it.
 
-Important: Jawk intentionally ships only the `InputSource` interface. It does
-not provide a built-in `ListInputSource` implementation.
+Important: Jawk intentionally ships only the `InputSource` interface — it does
+not provide a built-in `ListInputSource` or similar convenience class.
+Internally Jawk uses `StreamInputSource` to handle stdin / file-list input, but
+that class is an implementation detail and should not be used by embedding code.
+Implement `InputSource` directly for your own data structures.
 
 When `AwkSettings\#setInputSource(...)` is set, that source takes precedence
 over `AwkSettings\#setInput(...)`.

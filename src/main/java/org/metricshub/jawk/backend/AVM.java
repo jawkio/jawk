@@ -57,6 +57,7 @@ import org.metricshub.jawk.jrt.BlockObject;
 import org.metricshub.jawk.jrt.CharacterTokenizer;
 import org.metricshub.jawk.jrt.ConditionPair;
 import org.metricshub.jawk.jrt.InputSource;
+import org.metricshub.jawk.jrt.StreamInputSource;
 import org.metricshub.jawk.jrt.JRT;
 import java.util.ArrayDeque;
 import org.metricshub.jawk.jrt.RegexTokenizer;
@@ -127,6 +128,7 @@ public class AVM implements VariableManager {
 
 	private final AwkSettings settings;
 	private boolean inputSourceFilelistAssignmentsApplied;
+	private InputSource resolvedInputSource;
 
 	/**
 	 * Construct the interpreter.
@@ -343,6 +345,12 @@ public class AVM implements VariableManager {
 		jrt.setFNR(0);
 		jrt.setRSTART(0);
 		jrt.setRLENGTH(0);
+
+		// Resolve the InputSource once: use the user-supplied one or wrap the InputStream
+		resolvedInputSource = settings.getInputSource();
+		if (resolvedInputSource == null) {
+			resolvedInputSource = new StreamInputSource(settings.getInput(), this, jrt);
+		}
 
 		try {
 			while (!position.isEOF()) {
@@ -1458,13 +1466,8 @@ public class AVM implements VariableManager {
 				}
 
 				case SET_INPUT_FOR_EVAL: {
-					InputSource inputSource = settings.getInputSource();
-					if (inputSource != null) {
-						applyInputSourceFilelistAssignmentsIfNeeded();
-						jrt.consumeInputForEval(inputSource);
-					} else {
-						jrt.setInputLineforEval(settings.getInput());
-					}
+					applyInputSourceFilelistAssignmentsIfNeeded();
+					jrt.consumeInputForEval(resolvedInputSource);
 					position.next();
 					break;
 				}
@@ -2397,14 +2400,8 @@ public class AVM implements VariableManager {
 	 * @throws IOException if an I/O error occurs while reading input
 	 */
 	private boolean avmConsumeInput(boolean forGetline) throws IOException {
-		InputSource inputSource = settings.getInputSource();
-		boolean retval;
-		if (inputSource != null) {
-			applyInputSourceFilelistAssignmentsIfNeeded();
-			retval = jrt.consumeInput(inputSource, forGetline);
-		} else {
-			retval = jrt.consumeInput(settings.getInput(), forGetline, locale);
-		}
+		applyInputSourceFilelistAssignmentsIfNeeded();
+		boolean retval = jrt.consumeInput(resolvedInputSource, forGetline);
 		if (retval && forGetline) {
 			push(jrt.getInputLine());
 		}
@@ -2412,7 +2409,7 @@ public class AVM implements VariableManager {
 	}
 
 	private void applyInputSourceFilelistAssignmentsIfNeeded() {
-		if (inputSourceFilelistAssignmentsApplied || settings.getInputSource() == null) {
+		if (inputSourceFilelistAssignmentsApplied || resolvedInputSource instanceof StreamInputSource) {
 			return;
 		}
 		for (String argument : arguments) {

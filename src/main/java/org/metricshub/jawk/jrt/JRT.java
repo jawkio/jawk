@@ -106,7 +106,8 @@ public class JRT {
 	private List<String> inputFields = new ArrayList<String>(100);
 	// Pre-split fields captured during structured getline for bare getline assignment.
 	private List<String> pendingGetlineFields = null;
-	private String pendingGetlineRecord = null;
+	// Cached object reference pushed by GETLINE_INPUT when pendingGetlineFields is valid.
+	private Object pendingGetlineValueRef = null;
 	// The currently active InputSource (set during consumeInput calls).
 	private InputSource activeSource;
 	private static final UninitializedObject BLANK = new UninitializedObject();
@@ -1017,12 +1018,12 @@ public class JRT {
 	 *
 	 * @param value getline result assigned to {@code $0}
 	 */
-	public void assignInputLineFromGetline(String value) {
-		inputLine = value;
-		if (pendingGetlineRecord != null
-				&& pendingGetlineRecord.equals(value)
+	public void assignInputLineFromGetline(Object value) {
+		String inputValue = value == null ? "" : value.toString();
+		inputLine = inputValue;
+		if (pendingGetlineValueRef == value
 				&& pendingGetlineFields != null) {
-			initializeInputFields(value, pendingGetlineFields);
+			initializeInputFields(inputValue, pendingGetlineFields);
 		} else {
 			jrtParseFields();
 		}
@@ -1106,12 +1107,12 @@ public class JRT {
 			clearPendingGetlineFields();
 			return;
 		}
-		pendingGetlineRecord = record;
+		pendingGetlineValueRef = record;
 		pendingGetlineFields = new ArrayList<String>(preFields);
 	}
 
 	private void clearPendingGetlineFields() {
-		pendingGetlineRecord = null;
+		pendingGetlineValueRef = null;
 		pendingGetlineFields = null;
 	}
 
@@ -1381,6 +1382,7 @@ public class JRT {
 	 * @throws java.io.IOException if any.
 	 */
 	public boolean jrtConsumeFileInput(String fileNameParam) throws IOException {
+		clearPendingGetlineFields();
 		PartitioningReader pr = fileReaders.get(fileNameParam);
 		if (pr == null) {
 			try {
@@ -1431,6 +1433,7 @@ public class JRT {
 	 * @throws java.io.IOException if any.
 	 */
 	public boolean jrtConsumeCommandInput(String cmd) throws IOException {
+		clearPendingGetlineFields();
 		PartitioningReader pr = commandReaders.get(cmd);
 		if (pr == null) {
 			try {

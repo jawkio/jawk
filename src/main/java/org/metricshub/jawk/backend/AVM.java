@@ -670,7 +670,7 @@ public class AVM implements VariableManager {
 
 				case ASSIGN_AS_INPUT: {
 					// stack[0] = value
-					jrt.assignInputLineFromGetline(pop().toString());
+					jrt.assignInputLineFromGetline(pop());
 					push(jrt.getInputLine());
 					position.next();
 					break;

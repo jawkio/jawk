@@ -169,6 +169,22 @@ public class InputSourceTest {
 	}
 
 	@Test
+	public void testRedirectedGetlineDoesNotReuseInputSourceFields() throws Exception {
+		awkTest("redirected getline parses fields from redirected stream")
+				.script(
+						"BEGIN { FS = \",\" } NR == 1 { getline x; getline < \"{{side.txt}}\"; print \"[\" $1 \"]\", \"[\" $2 \"]\"; exit }")
+				.file("side.txt", "left|right\n")
+				.withInputSource(
+						new ExplicitRecordInputSource(
+								Arrays
+										.asList(
+												new ExplicitRecord("trigger", Collections.singletonList("trigger")),
+												new ExplicitRecord("left|right", Arrays.asList("left", "right")))))
+				.expectLines("[left|right] []")
+				.runAndAssert();
+	}
+
+	@Test
 	public void testNfModificationTruncatesRecord() throws Exception {
 		awkTest("NF assignment truncates pre-split records")
 				.script("{ NF = 2; print $0 }")

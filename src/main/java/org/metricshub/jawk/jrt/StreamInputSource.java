@@ -42,6 +42,12 @@ import java.util.Objects;
  * runtime when no custom source has been configured via
  * {@code AwkSettings#setInputSource(...)}.
  * </p>
+ * <p>
+ * API note: this type is public to allow runtime wiring between packages, but
+ * it is considered an internal implementation detail. Embedding applications
+ * should implement {@link InputSource} directly rather than depend on this
+ * class, whose behavior may change in future releases.
+ * </p>
  *
  * @see InputSource
  */

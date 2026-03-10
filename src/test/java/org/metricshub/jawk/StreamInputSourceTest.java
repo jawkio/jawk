@@ -24,6 +24,7 @@ package org.metricshub.jawk;
 
 import static org.metricshub.jawk.AwkTestSupport.awkTest;
 
+import java.io.FileNotFoundException;
 import org.junit.Test;
 
 /**
@@ -126,6 +127,16 @@ public class StreamInputSourceTest {
 				.script("$1 > 1 { print $0 }")
 				.stdin("1 low\n2 high\n3 higher\n")
 				.expectLines("2 high", "3 higher")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testMissingArgvFilePropagatesFileNotFoundException() throws Exception {
+		awkTest("missing ARGV file propagates FileNotFoundException")
+				.script("{ print $0 }")
+				.path("missing.txt")
+				.operand("{{missing.txt}}")
+				.expectThrow(FileNotFoundException.class)
 				.runAndAssert();
 	}
 }

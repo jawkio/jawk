@@ -163,6 +163,19 @@ awk.invoke("{ print $1, $3 }", settings);
 // Bob Marketing
 ```
 
+#### Evaluating expressions with `InputSource`
+
+`Awk.eval()` also accepts an `InputSource` so that structured records can
+feed field references like `$1`, `$2`, etc. without going through text
+serialization:
+
+```java
+InputSource source = new TableInputSource(
+        Collections.singletonList(Arrays.asList("Alice", "30", "Engineering")));
+Object result = awk.eval("$1 \"-\" $3", source);
+// result: "Alice-Engineering"
+```
+
 To supply custom extensions, create the `Awk` instance with the extension
 instances. Built-in extensions expose convenient singletons such as
 `CoreExtension.INSTANCE` and `StdinExtension.INSTANCE`:

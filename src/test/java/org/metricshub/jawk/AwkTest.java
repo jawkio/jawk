@@ -776,7 +776,7 @@ public class AwkTest {
 
 	@Test
 	public void testEvalNumericExpression() throws Exception {
-		Object result = AWK.eval("1 + 2", null);
+		Object result = AWK.eval("1 + 2", (String) null);
 		assertTrue(result instanceof Number);
 		assertEquals(3, ((Number) result).intValue());
 	}
@@ -795,10 +795,10 @@ public class AwkTest {
 
 	@Test
 	public void testEvalFailsStatement() throws Exception {
-		assertThrows(ParserException.class, () -> AWK.eval("print 3.14", null));
-		assertThrows(ParserException.class, () -> AWK.eval("1 + 2, 3", null));
-		assertThrows(ParserException.class, () -> AWK.eval("1 + 2 ; 3 + 4", null));
-		assertThrows(ParserException.class, () -> AWK.eval("BEGIN { print 5 }", null));
+		assertThrows(ParserException.class, () -> AWK.eval("print 3.14", (String) null));
+		assertThrows(ParserException.class, () -> AWK.eval("1 + 2, 3", (String) null));
+		assertThrows(ParserException.class, () -> AWK.eval("1 + 2 ; 3 + 4", (String) null));
+		assertThrows(ParserException.class, () -> AWK.eval("BEGIN { print 5 }", (String) null));
 	}
 
 	/**

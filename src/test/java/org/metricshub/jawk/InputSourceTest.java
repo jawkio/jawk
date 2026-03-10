@@ -22,6 +22,7 @@ package org.metricshub.jawk;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import static org.junit.Assert.assertEquals;
 import static org.metricshub.jawk.AwkTestSupport.awkTest;
 
 import java.io.IOException;
@@ -30,6 +31,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.junit.Test;
+import org.metricshub.jawk.intermediate.AwkTuples;
 import org.metricshub.jawk.jrt.InputSource;
 
 /**
@@ -313,5 +315,45 @@ public class InputSourceTest {
 		public boolean isFromFilenameList() {
 			return false;
 		}
+	}
+
+	// ---- Tests for Awk.eval(expression, InputSource) ----
+
+	private static final Awk AWK = new Awk();
+
+	@Test
+	public void testEvalWithInputSourceFieldAccess() throws Exception {
+		InputSource source = new TableInputSource(
+				Collections.singletonList(Arrays.asList("Alice", "30", "Engineering")));
+		assertEquals("Alice-Engineering", AWK.eval("$1 \"-\" $3", source));
+	}
+
+	@Test
+	public void testEvalWithInputSourcePreSplitFields() throws Exception {
+		InputSource source = new TableInputSource(
+				Collections.singletonList(Arrays.asList("x", "y", "z")));
+		assertEquals(3, ((Number) AWK.eval("NF", source)).intValue());
+	}
+
+	@Test
+	public void testEvalWithInputSourceNoInput() throws Exception {
+		assertEquals(5L, AWK.eval("2 + 3"));
+	}
+
+	@Test
+	public void testEvalWithInputSourceAndFieldSeparator() throws Exception {
+		// When InputSource provides pre-split fields, FS is not used for splitting
+		// but it is still set as a variable
+		InputSource source = new TableInputSource(
+				Collections.singletonList(Arrays.asList("a", "b", "c")));
+		assertEquals("a", AWK.eval("$1", source, ","));
+	}
+
+	@Test
+	public void testEvalWithPrecompiledTuplesAndInputSource() throws Exception {
+		InputSource source = new TableInputSource(
+				Collections.singletonList(Arrays.asList("10", "20", "30")));
+		AwkTuples tuples = AWK.compileForEval("$1 + $2 + $3");
+		assertEquals(60, ((Number) AWK.eval(tuples, source, null)).intValue());
 	}
 }

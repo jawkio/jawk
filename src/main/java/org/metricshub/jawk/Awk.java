@@ -47,6 +47,7 @@ import org.metricshub.jawk.ext.JawkExtension;
 import org.metricshub.jawk.frontend.AwkParser;
 import org.metricshub.jawk.frontend.AstNode;
 import org.metricshub.jawk.intermediate.AwkTuples;
+import org.metricshub.jawk.jrt.InputSource;
 import org.metricshub.jawk.util.AwkSettings;
 import org.metricshub.jawk.util.ScriptSource;
 
@@ -836,7 +837,7 @@ public class Awk {
 	 * @throws IOException if anything goes wrong with the evaluation
 	 */
 	public Object eval(String expression) throws IOException {
-		return eval(expression, null, null);
+		return eval(expression, (String) null, null);
 	}
 
 	/**
@@ -895,6 +896,61 @@ public class Awk {
 
 		AVM avm = createAvm(settings);
 		return avm.eval(tuples, input);
+	}
+
+	/**
+	 * Evaluates the specified AWK expression using a structured {@link InputSource}
+	 * to populate {@code $0}, {@code $1}, etc.
+	 *
+	 * @param expression Expression to evaluate (e.g. {@code $2 "-" $3})
+	 * @param source structured input source providing the current record
+	 * @return the value of the specified expression
+	 * @throws IOException if anything goes wrong with the evaluation
+	 */
+	public Object eval(String expression, InputSource source) throws IOException {
+		return eval(expression, source, null);
+	}
+
+	/**
+	 * Evaluates the specified AWK expression using a structured {@link InputSource}
+	 * to populate {@code $0}, {@code $1}, etc.
+	 *
+	 * @param expression Expression to evaluate (e.g. {@code $2 "-" $3})
+	 * @param source structured input source providing the current record
+	 * @param fieldSeparator Value of the FS global variable (may be {@code null})
+	 * @return the value of the specified expression
+	 * @throws IOException if anything goes wrong with the evaluation
+	 */
+	public Object eval(String expression, InputSource source, String fieldSeparator) throws IOException {
+		return eval(compileForEval(expression), source, fieldSeparator);
+	}
+
+	/**
+	 * Evaluates pre-compiled AWK tuples using a structured {@link InputSource}
+	 * to populate {@code $0}, {@code $1}, etc.
+	 *
+	 * @param tuples Tuples returned by {@link Awk#compileForEval(String)}
+	 * @param source structured input source providing the current record
+	 * @param fieldSeparator Value of the FS global variable (may be {@code null})
+	 * @return the value of the specified expression
+	 * @throws IOException if anything goes wrong with the evaluation
+	 */
+	public Object eval(AwkTuples tuples, InputSource source, String fieldSeparator) throws IOException {
+
+		AwkSettings settings = new AwkSettings();
+		settings.setInputSource(source);
+		settings.setInput(new ByteArrayInputStream(new byte[0]));
+
+		settings.setDefaultRS("\n");
+		settings.setDefaultORS("\n");
+		settings.setFieldSeparator(fieldSeparator);
+
+		settings
+				.setOutputStream(
+						new PrintStream(new ByteArrayOutputStream(), false, StandardCharsets.UTF_8.name()));
+
+		AVM avm = createAvm(settings);
+		return avm.eval(tuples, null);
 	}
 
 	protected AwkTuples createTuples() {

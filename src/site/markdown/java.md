@@ -77,8 +77,8 @@ Internally Jawk uses `StreamInputSource` to handle stdin / file-list input, but
 that class is an implementation detail and should not be used by embedding code.
 Implement `InputSource` directly for your own data structures.
 
-When `AwkSettings#setInputSource(...)` is set, that source takes precedence
-over `AwkSettings#setInput(...)`.
+When `AwkSettings\#setInputSource(...)` is set, that source takes precedence
+over `AwkSettings\#setInput(...)`.
 
 #### Contract summary
 
@@ -114,7 +114,7 @@ public final class TableInputSource implements InputSource {
     }
 
     @Override
-    public boolean nextRecord() {
+    public boolean nextRecord() throws IOException {
         int next = index + 1;
         if (next >= rows.size()) {
             fields = null;
@@ -147,6 +147,7 @@ public final class TableInputSource implements InputSource {
 #### Using a custom `InputSource`
 
 ```java
+import java.io.IOException;
 import java.util.Arrays;
 
 Awk awk = new Awk();

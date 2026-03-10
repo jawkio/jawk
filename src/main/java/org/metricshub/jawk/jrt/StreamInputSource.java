@@ -192,7 +192,7 @@ public class StreamInputSource implements InputSource {
 		for (int i = 1; i < traversalArgCount; i++) {
 			if (arglistAa.isIn(i)) {
 				String arg = jrt.toAwkString(arglistAa.get(i));
-				if (arg.isEmpty() || arg.indexOf('=') != -1) {
+				if (arg.isEmpty() || arg.indexOf('=') > 0) {
 					continue;
 				}
 				return true;
@@ -281,7 +281,7 @@ public class StreamInputSource implements InputSource {
 				}
 				return false;
 			}
-			if (arg.indexOf('=') != -1) {
+			if (arg.indexOf('=') > 0) {
 				setFilelistVariable(arg);
 				// Recompute bounds so ARGC changes are reflected immediately.
 				arglistMaxKey = computeMaxArgvKey();
@@ -297,6 +297,7 @@ public class StreamInputSource implements InputSource {
 					jrt.setNR(jrt.getNR() + 1);
 				}
 			} else {
+				closeCurrentReaderIfFileStream();
 				partitioningReader = new PartitioningReader(
 						new InputStreamReader(new FileInputStream(arg), StandardCharsets.UTF_8),
 						jrt.getRSString(),
@@ -307,6 +308,21 @@ public class StreamInputSource implements InputSource {
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * Closes the current {@link PartitioningReader} if it wraps a file stream
+	 * (not {@code defaultInput}). This prevents file-descriptor leaks when
+	 * traversing multiple ARGV files.
+	 */
+	private void closeCurrentReaderIfFileStream() {
+		if (partitioningReader != null && partitioningReader.fromFilenameList()) {
+			try {
+				partitioningReader.close();
+			} catch (IOException ignored) {
+				// Best-effort close; the file is no longer needed.
+			}
+		}
 	}
 
 	/**

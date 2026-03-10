@@ -279,6 +279,7 @@ public class StreamInputSource implements InputSource {
 					jrt.setFILENAMEViaJrt("");
 					return true;
 				}
+				closeCurrentReaderIfFileStream();
 				return false;
 			}
 			if (arg.indexOf('=') > 0) {

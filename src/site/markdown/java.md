@@ -92,6 +92,7 @@ over `AwkSettings\#setInput(...)`.
 #### Example implementation (`List<List<String>>` table)
 
 ```java
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

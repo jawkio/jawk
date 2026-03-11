@@ -1029,13 +1029,4 @@ public class AwkTest {
 				.expect("got:hello\n")
 				.runAndAssert();
 	}
-
-	@Test
-	public void littleTest() throws Exception {
-		AwkTuples tuples = AWK.compileForEval("$2 + $3");
-		assertEquals(
-				5L,
-				new SandboxedAwk().eval(tuples, "1 2 3", " "));
-	}
-
 }

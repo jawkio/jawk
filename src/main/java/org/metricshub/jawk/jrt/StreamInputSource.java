@@ -22,6 +22,7 @@ package org.metricshub.jawk.jrt;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import java.io.Closeable;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -51,7 +52,7 @@ import java.util.Objects;
  *
  * @see InputSource
  */
-public class StreamInputSource implements InputSource {
+public class StreamInputSource implements InputSource, Closeable {
 
 	private final InputStream defaultInput;
 	private final VariableManager vm;
@@ -324,6 +325,20 @@ public class StreamInputSource implements InputSource {
 				// Best-effort close; the file is no longer needed.
 			}
 		}
+	}
+
+	/**
+	 * Releases any open file-backed reader held by this source.
+	 * <p>
+	 * This method is idempotent and safe to call multiple times. It does
+	 * <em>not</em> close the default input stream ({@code System.in}).
+	 * </p>
+	 *
+	 * @throws IOException never thrown; signature required by {@link Closeable}
+	 */
+	@Override
+	public void close() throws IOException {
+		closeCurrentReaderIfFileStream();
 	}
 
 	/**

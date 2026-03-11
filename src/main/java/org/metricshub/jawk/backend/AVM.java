@@ -22,6 +22,7 @@ package org.metricshub.jawk.backend;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.StringReader;
@@ -1708,6 +1709,7 @@ public class AVM implements VariableManager {
 					} else {
 						// Exit immediately with ExitException
 						jrt.jrtCloseAll();
+						closeResolvedInputSource();
 						// clear operand stack
 						operandStack.clear();
 						throw new ExitException(exitCode, "The AWK script requested an exit");
@@ -2045,6 +2047,7 @@ public class AVM implements VariableManager {
 
 			// End of the instructions
 			jrt.jrtCloseAll();
+			closeResolvedInputSource();
 		} catch (RuntimeException re) {
 			// clear runtime stack
 			runtimeStack.popAllFrames();
@@ -2073,6 +2076,21 @@ public class AVM implements VariableManager {
 	 */
 	public void waitForIO() {
 		jrt.jrtCloseAll();
+	}
+
+	/**
+	 * Close the resolved {@link InputSource} if it implements {@link Closeable}.
+	 * Called from all interpreter exit paths to prevent file-descriptor leaks
+	 * (e.g. when the script exits early via {@code exit}).
+	 */
+	private void closeResolvedInputSource() {
+		if (resolvedInputSource instanceof Closeable) {
+			try {
+				((Closeable) resolvedInputSource).close();
+			} catch (IOException ignored) {
+				// Best-effort close.
+			}
+		}
 	}
 
 	private void printTo(PrintStream ps, long numArgs) {

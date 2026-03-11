@@ -1029,5 +1029,4 @@ public class AwkTest {
 				.expect("got:hello\n")
 				.runAndAssert();
 	}
-
 }

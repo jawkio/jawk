@@ -4,7 +4,7 @@ package org.metricshub.jawk.backend;
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
- * Copyright 2006 - 2026 MetricsHub
+ * Copyright (C) 2006 - 2026 MetricsHub
  * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -22,6 +22,7 @@ package org.metricshub.jawk.backend;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.StringReader;
@@ -56,6 +57,8 @@ import org.metricshub.jawk.jrt.BlockManager;
 import org.metricshub.jawk.jrt.BlockObject;
 import org.metricshub.jawk.jrt.CharacterTokenizer;
 import org.metricshub.jawk.jrt.ConditionPair;
+import org.metricshub.jawk.jrt.InputSource;
+import org.metricshub.jawk.jrt.StreamInputSource;
 import org.metricshub.jawk.jrt.JRT;
 import java.util.ArrayDeque;
 import org.metricshub.jawk.jrt.RegexTokenizer;
@@ -125,6 +128,8 @@ public class AVM implements VariableManager {
 	}
 
 	private final AwkSettings settings;
+	private boolean inputSourceFilelistAssignmentsApplied;
+	private InputSource resolvedInputSource;
 
 	/**
 	 * Construct the interpreter.
@@ -342,6 +347,12 @@ public class AVM implements VariableManager {
 		jrt.setRSTART(0);
 		jrt.setRLENGTH(0);
 
+		// Resolve the InputSource once: use the user-supplied one or wrap the InputStream
+		resolvedInputSource = settings.getInputSource();
+		if (resolvedInputSource == null) {
+			resolvedInputSource = new StreamInputSource(settings.getInput(), this, jrt);
+		}
+
 		try {
 			while (!position.isEOF()) {
 				// System_out.println("--> "+position);
@@ -359,7 +370,7 @@ public class AVM implements VariableManager {
 					break;
 				}
 				case PRINT_TO_FILE: {
-// arg[0] = # of items to print on the stack
+					// arg[0] = # of items to print on the stack
 					// arg[1] = true=append, false=overwrite
 					// stack[0] = output filename
 					// stack[1] = item 1
@@ -374,7 +385,7 @@ public class AVM implements VariableManager {
 					break;
 				}
 				case PRINT_TO_PIPE: {
-// arg[0] = # of items to print on the stack
+					// arg[0] = # of items to print on the stack
 					// stack[0] = command to execute
 					// stack[1] = item 1
 					// stack[2] = item 2
@@ -397,7 +408,7 @@ public class AVM implements VariableManager {
 					break;
 				}
 				case PRINTF_TO_FILE: {
-// arg[0] = # of items to print on the stack (includes format string)
+					// arg[0] = # of items to print on the stack (includes format string)
 					// arg[1] = true=append, false=overwrite
 					// stack[0] = output filename
 					// stack[1] = format string
@@ -412,7 +423,7 @@ public class AVM implements VariableManager {
 					break;
 				}
 				case PRINTF_TO_PIPE: {
-// arg[0] = # of items to print on the stack (includes format string)
+					// arg[0] = # of items to print on the stack (includes format string)
 					// stack[0] = command to execute
 					// stack[1] = format string
 					// stack[2] = item 1
@@ -660,8 +671,7 @@ public class AVM implements VariableManager {
 
 				case ASSIGN_AS_INPUT: {
 					// stack[0] = value
-					jrt.setInputLine(pop().toString());
-					jrt.jrtParseFields();
+					jrt.assignInputLineFromGetline(pop());
 					push(jrt.getInputLine());
 					position.next();
 					break;
@@ -743,11 +753,11 @@ public class AVM implements VariableManager {
 					// stack[0] = dollar_fieldNumber
 					// stack[1] = inc value
 
-// same code as GET_INPUT_FIELD:
+					// same code as GET_INPUT_FIELD:
 					long fieldnum = JRT.parseFieldNumber(pop(), position);
 					double incval = JRT.toDouble(pop());
 
-// except here, get the number, and add the incvalue
+					// except here, get the number, and add the incvalue
 					Object numObj = jrt.jrtGetInputField(fieldnum, position);
 					double num;
 					switch (opcode) {
@@ -1218,7 +1228,7 @@ public class AVM implements VariableManager {
 					break;
 				}
 				case SYSTEM: {
-// stack[0] = command string
+					// stack[0] = command string
 					String s = jrt.toAwkString(pop());
 					push(jrt.jrtSystem(s));
 					position.next();
@@ -1457,7 +1467,8 @@ public class AVM implements VariableManager {
 				}
 
 				case SET_INPUT_FOR_EVAL: {
-					jrt.setInputLineforEval(settings.getInput());
+					applyInputSourceFilelistAssignmentsIfNeeded();
+					jrt.consumeInputForEval(resolvedInputSource);
 					position.next();
 					break;
 				}
@@ -1523,7 +1534,7 @@ public class AVM implements VariableManager {
 					break;
 				}
 				case GET_INPUT_FIELD: {
-// stack[0] = field number
+					// stack[0] = field number
 					Object fieldNumber = pop();
 					push(jrt.jrtGetInputField(fieldNumber, position));
 					position.next();
@@ -1698,6 +1709,7 @@ public class AVM implements VariableManager {
 					} else {
 						// Exit immediately with ExitException
 						jrt.jrtCloseAll();
+						closeResolvedInputSource();
 						// clear operand stack
 						operandStack.clear();
 						throw new ExitException(exitCode, "The AWK script requested an exit");
@@ -2035,19 +2047,20 @@ public class AVM implements VariableManager {
 
 			// End of the instructions
 			jrt.jrtCloseAll();
+			closeResolvedInputSource();
 		} catch (RuntimeException re) {
-// clear runtime stack
+			// clear runtime stack
 			runtimeStack.popAllFrames();
-// clear operand stack
+			// clear operand stack
 			operandStack.clear();
 			if (re instanceof AwkSandboxException) {
 				throw re;
 			}
 			throw new AwkRuntimeException(position.lineNumber(), re.getMessage(), re);
 		} catch (AssertionError ae) {
-// clear runtime stack
+			// clear runtime stack
 			runtimeStack.popAllFrames();
-// clear operand stack
+			// clear operand stack
 			operandStack.clear();
 			throw ae;
 		}
@@ -2063,6 +2076,21 @@ public class AVM implements VariableManager {
 	 */
 	public void waitForIO() {
 		jrt.jrtCloseAll();
+	}
+
+	/**
+	 * Close the resolved {@link InputSource} if it implements {@link Closeable}.
+	 * Called from all interpreter exit paths to prevent file-descriptor leaks
+	 * (e.g. when the script exits early via {@code exit}).
+	 */
+	private void closeResolvedInputSource() {
+		if (resolvedInputSource instanceof Closeable) {
+			try {
+				((Closeable) resolvedInputSource).close();
+			} catch (IOException ignored) {
+				// Best-effort close.
+			}
+		}
 	}
 
 	private void printTo(PrintStream ps, long numArgs) {
@@ -2390,11 +2418,24 @@ public class AVM implements VariableManager {
 	 * @throws IOException if an I/O error occurs while reading input
 	 */
 	private boolean avmConsumeInput(boolean forGetline) throws IOException {
-		boolean retval = jrt.consumeInput(settings.getInput(), forGetline, locale);
+		applyInputSourceFilelistAssignmentsIfNeeded();
+		boolean retval = jrt.consumeInput(resolvedInputSource, forGetline);
 		if (retval && forGetline) {
 			push(jrt.getInputLine());
 		}
 		return retval;
+	}
+
+	private void applyInputSourceFilelistAssignmentsIfNeeded() {
+		if (inputSourceFilelistAssignmentsApplied || resolvedInputSource instanceof StreamInputSource) {
+			return;
+		}
+		for (String argument : arguments) {
+			if (argument.indexOf('=') > 0) {
+				setFilelistVariable(argument);
+			}
+		}
+		inputSourceFilelistAssignmentsApplied = true;
 	}
 
 	/** {@inheritDoc} */

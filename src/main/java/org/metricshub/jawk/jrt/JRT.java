@@ -4,7 +4,7 @@ package org.metricshub.jawk.jrt;
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
- * Copyright 2006 - 2026 MetricsHub
+ * Copyright (C) 2006 - 2026 MetricsHub
  * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -31,7 +31,6 @@ package org.metricshub.jawk.jrt;
 import java.io.FileOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -44,6 +43,7 @@ import java.util.IllegalFormatException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.regex.Matcher;
@@ -100,16 +100,14 @@ public class JRT {
 	/** PrintStream used for command error output */
 	private PrintStream error = System.err;
 
-	// Partitioning reader for stdin.
-	private PartitioningReader partitioningReader = null;
 	// Current input line ($0).
 	private String inputLine = null;
 	// Current input fields ($0, $1, $2, ...).
 	private List<String> inputFields = new ArrayList<String>(100);
-	private AssocArray arglistAa = null;
-	private int arglistIdx;
-	private int arglistMaxKey;
-	private boolean hasFilenames = false;
+	// Pre-split fields captured during structured getline for bare getline assignment.
+	private boolean lastGetlineFromInputSource;
+	// The currently active InputSource (set during consumeInput calls).
+	private InputSource activeSource;
 	private static final UninitializedObject BLANK = new UninitializedObject();
 
 	private static final Integer ONE = Integer.valueOf(1);
@@ -693,15 +691,17 @@ public class JRT {
 	}
 
 	/**
-	 * <p>
-	 * Getter for the field <code>partitioningReader</code>.
-	 * </p>
+	 * Returns the underlying {@link PartitioningReader} currently in use by
+	 * the active {@link InputSource}, or {@code null} if the source is not
+	 * stream-based.
 	 *
-	 * @return a {@link org.metricshub.jawk.jrt.PartitioningReader} object
+	 * @return the active reader, or {@code null}
 	 */
-	@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "PartitioningReader is shared across callers")
 	public PartitioningReader getPartitioningReader() {
-		return partitioningReader;
+		if (activeSource instanceof StreamInputSource) {
+			return ((StreamInputSource) activeSource).getPartitioningReader();
+		}
+		return null;
 	}
 
 	/**
@@ -1003,254 +1003,110 @@ public class JRT {
 	 */
 	public void setInputLine(String inputLine) {
 		this.inputLine = inputLine;
+		clearPendingGetlineFields();
 	}
 
 	/**
-	 * Attempt to consume one line of input. Input may come from standard input or
-	 * from files/variable assignments supplied on the command line via
-	 * {@code ARGV}. Variable assignment arguments are evaluated lazily when
-	 * encountered.
+	 * Assigns {@code $0} from a getline result and initializes {@code $1..$NF}.
+	 * <p>
+	 * When the previous getline consumed a structured {@link InputSource} record
+	 * with pre-split fields, those fields are applied directly. Otherwise fields
+	 * are parsed from {@code $0} using FS.
+	 * </p>
 	 *
-	 * @param input stream used when consuming from standard input
-	 * @param forGetline {@code true} if the call is for {@code getline}; when
-	 *        {@code false} the fields of {@code $0} are parsed
-	 *        automatically
-	 * @param pLocale locale used for string conversion
-	 * @return {@code true} if a line was consumed, {@code false} if no more input
-	 *         is available
-	 * @throws IOException upon an IO error
+	 * @param value getline result assigned to {@code $0}
 	 */
-	@SuppressWarnings("PMD.UnusedFormalParameter")
-	public boolean consumeInput(final InputStream input, boolean forGetline, Locale pLocale) throws IOException {
-		initializeArgList();
+	public void assignInputLineFromGetline(Object value) {
+		String inputValue = value == null ? "" : value.toString();
+		inputLine = inputValue;
+		if (lastGetlineFromInputSource
+				&& activeSource != null
+				&& activeSource.getFields() != null) {
+			initializeInputFields(inputValue, activeSource.getFields());
+		} else {
+			jrtParseFields();
+		}
+		lastGetlineFromInputSource = false;
+	}
 
-		while (true) {
-			if ((partitioningReader == null || inputLine == null)
-					&& !prepareNextReader(input)) {
-				return false;
-			}
+	/**
+	 * Attempt to consume one record from a structured input source.
+	 *
+	 * @param source source strategy that provides records and optional
+	 *        pre-split fields
+	 * @param forGetline {@code true} when called for {@code getline}; when
+	 *        {@code false} the runtime initializes {@code $0..$NF}
+	 * @return {@code true} if a record was consumed; {@code false} when the
+	 *         source is exhausted
+	 * @throws IOException if the source raises an I/O error
+	 */
+	public boolean consumeInput(final InputSource source, boolean forGetline) throws IOException {
+		Objects.requireNonNull(source, "source");
+		activeSource = source;
+		if (!source.nextRecord()) {
+			clearPendingGetlineFields();
+			return false;
+		}
 
-			inputLine = partitioningReader.readRecord();
-			if (inputLine == null) {
-				continue;
-			}
+		String record = source.getRecord();
+		if (record == null) {
+			throw new IllegalStateException("InputSource#getRecord() returned null after nextRecord()");
+		}
+		inputLine = record;
+		List<String> preFields = source.getFields();
 
-			if (!forGetline) {
-				// For getline the caller will re-acquire $0; otherwise parse fields
+		if (forGetline) {
+			cacheGetlineFields(preFields);
+		} else {
+			clearPendingGetlineFields();
+			if (preFields == null) {
 				jrtParseFields();
-			}
-			// NR is managed by JRT
-			this.nr++;
-			if (partitioningReader.fromFilenameList()) {
-				// FNR is managed by JRT
-				this.fnr++;
-			}
-			return true; // NOPMD - loop ends when a line is consumed
-		}
-	}
-
-	/**
-	 * Initialize internal state for traversing {@code ARGV}.
-	 */
-	private void initializeArgList() {
-		if (arglistAa != null) {
-			return;
-		}
-		arglistAa = (AssocArray) vm.getARGV();
-		arglistMaxKey = computeMaxArgvKey();
-		arglistIdx = 1;
-		hasFilenames = detectFilenames();
-	}
-
-	/**
-	 * Compute the highest numeric key present in the current {@code arglistAa}.
-	 *
-	 * @return the maximum integer key, or {@code 0} when the array is empty
-	 */
-	private int computeMaxArgvKey() {
-		int max = 0;
-		for (Object key : arglistAa.keySet()) {
-			int idx = (int) toLong(key);
-			if (idx > max) {
-				max = idx;
-			}
-		}
-		return max;
-	}
-
-	/**
-	 * Determine whether {@code ARGV} contains any filename entries (arguments
-	 * without an equals sign).
-	 *
-	 * @return {@code true} if at least one filename was found
-	 */
-	private boolean detectFilenames() {
-		int traversalArgCount = getTraversalArgCount();
-		for (int i = 1; i < traversalArgCount; i++) {
-			if (arglistAa.isIn(i)) {
-				String arg = toAwkString(arglistAa.get(i));
-				if (arg.isEmpty() || arg.indexOf('=') != -1) {
-					continue;
-				}
-				return true;
-			}
-		}
-		return false;
-	}
-
-	/**
-	 * Retrieve the number of command-line arguments supplied to the script.
-	 *
-	 * @return {@code ARGC} converted to an {@code int}
-	 */
-	private int getArgCount() {
-		long raw = toLong(vm.getARGC());
-		if (raw <= 0) {
-			return 0;
-		}
-		if (raw > Integer.MAX_VALUE) {
-			return Integer.MAX_VALUE;
-		}
-		return (int) raw;
-	}
-
-	/**
-	 * Return the effective upper bound for ARGV traversal, capped by the
-	 * highest known ARGV key so that absurdly large ARGC values do not
-	 * cause unbounded iteration over missing entries.
-	 *
-	 * @return the capped traversal count
-	 */
-	private int getTraversalArgCount() {
-		int argCount = getArgCount();
-		if (argCount <= 0) {
-			return 0;
-		}
-		return Math.min(argCount, arglistMaxKey + 1);
-	}
-
-	/**
-	 * Obtain the next valid argument from {@code ARGV}, skipping uninitialized or
-	 * empty entries.
-	 *
-	 * @return the next argument as an AWK string, or {@code null} if none remain
-	 */
-	private String nextArgument() {
-		int traversalArgCount = getTraversalArgCount();
-		while (arglistIdx < traversalArgCount) {
-			int idx = arglistIdx++;
-			if (!arglistAa.isIn(idx)) {
-				continue;
-			}
-			String arg = toAwkString(arglistAa.get(idx));
-			if (!arg.isEmpty()) {
-				return arg;
-			}
-		}
-		return null;
-	}
-
-	/**
-	 * Prepare the {@link PartitioningReader} for the next input source. This may
-	 * be a filename, a variable assignment, or standard input if no filenames
-	 * remain.
-	 *
-	 * @param input default input stream used when reading from standard input
-	 * @return {@code true} if a reader was prepared, {@code false} if no more
-	 *         input is available
-	 * @throws IOException if an I/O error occurs while opening a file
-	 */
-	private boolean prepareNextReader(InputStream input) throws IOException {
-		boolean ready = false;
-		arglistMaxKey = computeMaxArgvKey();
-		hasFilenames = detectFilenames();
-		while (!ready) {
-			String arg = nextArgument();
-			if (arg == null) {
-				// ARGC/ARGV may have changed while evaluating assignments.
-				hasFilenames = detectFilenames();
-				if (partitioningReader == null && !hasFilenames) {
-					partitioningReader = new PartitioningReader(
-							new InputStreamReader(input, StandardCharsets.UTF_8),
-							this.rs);
-					this.filename = "";
-					return true;
-				}
-				return false;
-			}
-			if (arg.indexOf('=') != -1) {
-				setFilelistVariable(arg);
-				// Recompute bounds so ARGC changes are reflected immediately.
-				arglistMaxKey = computeMaxArgvKey();
-				hasFilenames = detectFilenames();
-				if (partitioningReader == null && !hasFilenames) {
-					partitioningReader = new PartitioningReader(
-							new InputStreamReader(input, StandardCharsets.UTF_8),
-							this.rs);
-					this.filename = "";
-					return true;
-				}
-				if (partitioningReader != null) {
-					this.nr++;
-				}
 			} else {
-				partitioningReader = new PartitioningReader(
-						new InputStreamReader(new FileInputStream(arg), StandardCharsets.UTF_8),
-						this.rs,
-						true);
-				this.filename = arg;
-				this.fnr = 0L;
-				ready = true;
+				initializeInputFields(record, preFields);
 			}
+		}
+
+		this.nr++;
+		if (source.isFromFilenameList()) {
+			this.fnr++;
 		}
 		return true;
 	}
 
 	/**
-	 * Read input from stdin, only once, and just for simple AWK expression evaluation
-	 * <p>
+	 * Consume at most one record from a structured source for expression
+	 * evaluation.
 	 *
-	 * @param input Stdin
-	 * @throws IOException if couldn't read stdin (should never happen, as it's based on a String)
+	 * @param source source strategy that provides records and optional
+	 *        pre-split fields
+	 * @return {@code true} if a record was consumed, {@code false} otherwise
+	 * @throws IOException if the source raises an I/O error
 	 */
-	public void setInputLineforEval(InputStream input) throws IOException {
-		partitioningReader = new PartitioningReader(
-				new InputStreamReader(input, StandardCharsets.UTF_8),
-				this.rs);
-		inputLine = partitioningReader.readRecord();
-		if (inputLine != null) {
-			jrtParseFields();
-			this.nr++;
-		}
+	public boolean consumeInputForEval(InputSource source) throws IOException {
+		return consumeInput(source, false);
 	}
 
 	/**
-	 * Parse a {@code name=value} argument from the command line and assign it to
-	 * the corresponding AWK variable.
+	 * Initialize {@code $0..$NF} from a pre-split field list.
 	 *
-	 * @param nameValue argument in the form {@code name=value}
+	 * @param record current {@code $0} text
+	 * @param preFields current fields where index {@code 0} is {@code $1}
 	 */
-	private void setFilelistVariable(String nameValue) {
-		int eqIdx = nameValue.indexOf('=');
-		// variable name should be non-blank
-		assert eqIdx >= 0;
-		if (eqIdx == 0) {
-			throw new IllegalArgumentException(
-					"Must have a non-blank variable name in a name=value variable assignment argument.");
+	private void initializeInputFields(String record, List<String> preFields) {
+		inputFields.clear();
+		inputFields.add(record);
+		for (String field : preFields) {
+			inputFields.add(field == null ? "" : field);
 		}
-		String name = nameValue.substring(0, eqIdx);
-		String value = nameValue.substring(eqIdx + 1);
-		Object obj;
-		try {
-			obj = Integer.parseInt(value);
-		} catch (NumberFormatException nfe) {
-			try {
-				obj = Double.parseDouble(value);
-			} catch (NumberFormatException nfe2) {
-				obj = value;
-			}
-		}
-		vm.assignVariable(name, obj);
+		recalculateNF();
+	}
+
+	private void cacheGetlineFields(List<String> preFields) {
+		lastGetlineFromInputSource = preFields != null;
+	}
+
+	private void clearPendingGetlineFields() {
+		lastGetlineFromInputSource = false;
 	}
 
 	/**
@@ -1425,7 +1281,7 @@ public class JRT {
 	 * jrtConsumeFileInputForGetline.
 	 * </p>
 	 *
-	 * @param filename a {@link java.lang.String} object
+	 * @param fileNameParam a {@link java.lang.String} object
 	 * @return a {@link java.lang.Integer} object
 	 */
 	public Integer jrtConsumeFileInputForGetline(String fileNameParam) {
@@ -1514,11 +1370,12 @@ public class JRT {
 	 * jrtConsumeFileInput.
 	 * </p>
 	 *
-	 * @param filename a {@link java.lang.String} object
+	 * @param fileNameParam a {@link java.lang.String} object
 	 * @return a boolean
 	 * @throws java.io.IOException if any.
 	 */
 	public boolean jrtConsumeFileInput(String fileNameParam) throws IOException {
+		clearPendingGetlineFields();
 		PartitioningReader pr = fileReaders.get(fileNameParam);
 		if (pr == null) {
 			try {
@@ -1569,6 +1426,7 @@ public class JRT {
 	 * @throws java.io.IOException if any.
 	 */
 	public boolean jrtConsumeCommandInput(String cmd) throws IOException {
+		clearPendingGetlineFields();
 		PartitioningReader pr = commandReaders.get(cmd);
 		if (pr == null) {
 			try {
@@ -1651,7 +1509,7 @@ public class JRT {
 	 * <em>all</em> open streams with this name
 	 * are closed.
 	 *
-	 * @param filename The filename/command process to close.
+	 * @param fileNameParam The filename/command process to close.
 	 * @return Integer(0) upon a successful close, Integer(-1)
 	 *         otherwise.
 	 */
@@ -2078,10 +1936,8 @@ public class JRT {
 	 * @param rsObj a {@link java.lang.Object} object
 	 */
 	public void applyRS(Object rsObj) {
-		// if (rsObj.toString().equals(BLANK))
-		// rs_obj = DEFAULT_RS_REGEX;
-		if (partitioningReader != null) {
-			partitioningReader.setRecordSeparator(rsObj.toString());
+		if (activeSource instanceof StreamInputSource) {
+			((StreamInputSource) activeSource).setRecordSeparator(rsObj.toString());
 		}
 	}
 }

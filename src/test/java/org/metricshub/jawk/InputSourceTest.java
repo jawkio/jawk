@@ -325,14 +325,14 @@ public class InputSourceTest {
 	public void testEvalWithInputSourceFieldAccess() throws Exception {
 		InputSource source = new TableInputSource(
 				Collections.singletonList(Arrays.asList("Alice", "30", "Engineering")));
-		assertEquals("Alice-Engineering", AWK.eval("$1 \"-\" $3", source));
+		assertEquals("Alice-Engineering", AWK.evalSource("$1 \"-\" $3", source));
 	}
 
 	@Test
 	public void testEvalWithInputSourcePreSplitFields() throws Exception {
 		InputSource source = new TableInputSource(
 				Collections.singletonList(Arrays.asList("x", "y", "z")));
-		assertEquals(3, ((Number) AWK.eval("NF", source)).intValue());
+		assertEquals(3, ((Number) AWK.evalSource("NF", source)).intValue());
 	}
 
 	@Test
@@ -346,7 +346,7 @@ public class InputSourceTest {
 		// but it is still set as a variable
 		InputSource source = new TableInputSource(
 				Collections.singletonList(Arrays.asList("a", "b", "c")));
-		assertEquals("a", AWK.eval("$1", source, ","));
+		assertEquals("a", AWK.evalSource("$1", source, ","));
 	}
 
 	@Test
@@ -354,6 +354,6 @@ public class InputSourceTest {
 		InputSource source = new TableInputSource(
 				Collections.singletonList(Arrays.asList("10", "20", "30")));
 		AwkTuples tuples = AWK.compileForEval("$1 + $2 + $3");
-		assertEquals(60, ((Number) AWK.eval(tuples, source, null)).intValue());
+		assertEquals(60, ((Number) AWK.evalSource(tuples, source, null)).intValue());
 	}
 }

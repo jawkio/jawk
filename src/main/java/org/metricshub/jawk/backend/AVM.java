@@ -369,7 +369,7 @@ public class AVM implements VariableManager {
 					break;
 				}
 				case PRINT_TO_FILE: {
-// arg[0] = # of items to print on the stack
+					// arg[0] = # of items to print on the stack
 					// arg[1] = true=append, false=overwrite
 					// stack[0] = output filename
 					// stack[1] = item 1
@@ -384,7 +384,7 @@ public class AVM implements VariableManager {
 					break;
 				}
 				case PRINT_TO_PIPE: {
-// arg[0] = # of items to print on the stack
+					// arg[0] = # of items to print on the stack
 					// stack[0] = command to execute
 					// stack[1] = item 1
 					// stack[2] = item 2
@@ -407,7 +407,7 @@ public class AVM implements VariableManager {
 					break;
 				}
 				case PRINTF_TO_FILE: {
-// arg[0] = # of items to print on the stack (includes format string)
+					// arg[0] = # of items to print on the stack (includes format string)
 					// arg[1] = true=append, false=overwrite
 					// stack[0] = output filename
 					// stack[1] = format string
@@ -422,7 +422,7 @@ public class AVM implements VariableManager {
 					break;
 				}
 				case PRINTF_TO_PIPE: {
-// arg[0] = # of items to print on the stack (includes format string)
+					// arg[0] = # of items to print on the stack (includes format string)
 					// stack[0] = command to execute
 					// stack[1] = format string
 					// stack[2] = item 1
@@ -752,11 +752,11 @@ public class AVM implements VariableManager {
 					// stack[0] = dollar_fieldNumber
 					// stack[1] = inc value
 
-// same code as GET_INPUT_FIELD:
+					// same code as GET_INPUT_FIELD:
 					long fieldnum = JRT.parseFieldNumber(pop(), position);
 					double incval = JRT.toDouble(pop());
 
-// except here, get the number, and add the incvalue
+					// except here, get the number, and add the incvalue
 					Object numObj = jrt.jrtGetInputField(fieldnum, position);
 					double num;
 					switch (opcode) {
@@ -1227,7 +1227,7 @@ public class AVM implements VariableManager {
 					break;
 				}
 				case SYSTEM: {
-// stack[0] = command string
+					// stack[0] = command string
 					String s = jrt.toAwkString(pop());
 					push(jrt.jrtSystem(s));
 					position.next();
@@ -1533,7 +1533,7 @@ public class AVM implements VariableManager {
 					break;
 				}
 				case GET_INPUT_FIELD: {
-// stack[0] = field number
+					// stack[0] = field number
 					Object fieldNumber = pop();
 					push(jrt.jrtGetInputField(fieldNumber, position));
 					position.next();
@@ -2046,18 +2046,18 @@ public class AVM implements VariableManager {
 			// End of the instructions
 			jrt.jrtCloseAll();
 		} catch (RuntimeException re) {
-// clear runtime stack
+			// clear runtime stack
 			runtimeStack.popAllFrames();
-// clear operand stack
+			// clear operand stack
 			operandStack.clear();
 			if (re instanceof AwkSandboxException) {
 				throw re;
 			}
 			throw new AwkRuntimeException(position.lineNumber(), re.getMessage(), re);
 		} catch (AssertionError ae) {
-// clear runtime stack
+			// clear runtime stack
 			runtimeStack.popAllFrames();
-// clear operand stack
+			// clear operand stack
 			operandStack.clear();
 			throw ae;
 		}

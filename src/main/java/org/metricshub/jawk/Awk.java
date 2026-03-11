@@ -837,7 +837,7 @@ public class Awk {
 	 * @throws IOException if anything goes wrong with the evaluation
 	 */
 	public Object eval(String expression) throws IOException {
-		return eval(expression, (String) null, null);
+		return eval(expression, null, null);
 	}
 
 	/**
@@ -901,19 +901,27 @@ public class Awk {
 	/**
 	 * Evaluates the specified AWK expression using a structured {@link InputSource}
 	 * to populate {@code $0}, {@code $1}, etc.
+	 * <p>
+	 * This method is named separately from the {@code eval} family to avoid
+	 * overload ambiguity when callers pass {@code null}.
+	 * </p>
 	 *
 	 * @param expression Expression to evaluate (e.g. {@code $2 "-" $3})
 	 * @param source structured input source providing the current record
 	 * @return the value of the specified expression
 	 * @throws IOException if anything goes wrong with the evaluation
 	 */
-	public Object eval(String expression, InputSource source) throws IOException {
-		return eval(expression, source, null);
+	public Object evalSource(String expression, InputSource source) throws IOException {
+		return evalSource(expression, source, null);
 	}
 
 	/**
 	 * Evaluates the specified AWK expression using a structured {@link InputSource}
 	 * to populate {@code $0}, {@code $1}, etc.
+	 * <p>
+	 * This method is named separately from the {@code eval} family to avoid
+	 * overload ambiguity when callers pass {@code null}.
+	 * </p>
 	 *
 	 * @param expression Expression to evaluate (e.g. {@code $2 "-" $3})
 	 * @param source structured input source providing the current record
@@ -921,13 +929,17 @@ public class Awk {
 	 * @return the value of the specified expression
 	 * @throws IOException if anything goes wrong with the evaluation
 	 */
-	public Object eval(String expression, InputSource source, String fieldSeparator) throws IOException {
-		return eval(compileForEval(expression), source, fieldSeparator);
+	public Object evalSource(String expression, InputSource source, String fieldSeparator) throws IOException {
+		return evalSource(compileForEval(expression), source, fieldSeparator);
 	}
 
 	/**
 	 * Evaluates pre-compiled AWK tuples using a structured {@link InputSource}
 	 * to populate {@code $0}, {@code $1}, etc.
+	 * <p>
+	 * This method is named separately from the {@code eval} family to avoid
+	 * overload ambiguity when callers pass {@code null}.
+	 * </p>
 	 *
 	 * @param tuples Tuples returned by {@link Awk#compileForEval(String)}
 	 * @param source structured input source providing the current record
@@ -935,7 +947,7 @@ public class Awk {
 	 * @return the value of the specified expression
 	 * @throws IOException if anything goes wrong with the evaluation
 	 */
-	public Object eval(AwkTuples tuples, InputSource source, String fieldSeparator) throws IOException {
+	public Object evalSource(AwkTuples tuples, InputSource source, String fieldSeparator) throws IOException {
 
 		AwkSettings settings = new AwkSettings();
 		settings.setInputSource(source);

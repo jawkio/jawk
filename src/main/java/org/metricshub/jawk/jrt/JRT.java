@@ -105,9 +105,7 @@ public class JRT {
 	// Current input fields ($0, $1, $2, ...).
 	private List<String> inputFields = new ArrayList<String>(100);
 	// Pre-split fields captured during structured getline for bare getline assignment.
-	private List<String> pendingGetlineFields = null;
-	// Cached object reference pushed by GETLINE_INPUT when pendingGetlineFields is valid.
-	private Object pendingGetlineValueRef = null;
+	private boolean lastGetlineFromInputSource;
 	// The currently active InputSource (set during consumeInput calls).
 	private InputSource activeSource;
 	private static final UninitializedObject BLANK = new UninitializedObject();
@@ -1021,13 +1019,14 @@ public class JRT {
 	public void assignInputLineFromGetline(Object value) {
 		String inputValue = value == null ? "" : value.toString();
 		inputLine = inputValue;
-		if (pendingGetlineValueRef == value
-				&& pendingGetlineFields != null) {
-			initializeInputFields(inputValue, pendingGetlineFields);
+		if (lastGetlineFromInputSource
+				&& activeSource != null
+				&& activeSource.getFields() != null) {
+			initializeInputFields(inputValue, activeSource.getFields());
 		} else {
 			jrtParseFields();
 		}
-		clearPendingGetlineFields();
+		lastGetlineFromInputSource = false;
 	}
 
 	/**
@@ -1057,7 +1056,7 @@ public class JRT {
 		List<String> preFields = source.getFields();
 
 		if (forGetline) {
-			cacheGetlineFields(record, preFields);
+			cacheGetlineFields(preFields);
 		} else {
 			clearPendingGetlineFields();
 			if (preFields == null) {
@@ -1102,18 +1101,12 @@ public class JRT {
 		recalculateNF();
 	}
 
-	private void cacheGetlineFields(String record, List<String> preFields) {
-		if (preFields == null) {
-			clearPendingGetlineFields();
-			return;
-		}
-		pendingGetlineValueRef = record;
-		pendingGetlineFields = new ArrayList<String>(preFields);
+	private void cacheGetlineFields(List<String> preFields) {
+		lastGetlineFromInputSource = preFields != null;
 	}
 
 	private void clearPendingGetlineFields() {
-		pendingGetlineValueRef = null;
-		pendingGetlineFields = null;
+		lastGetlineFromInputSource = false;
 	}
 
 	/**

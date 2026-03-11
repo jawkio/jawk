@@ -165,14 +165,14 @@ awk.invoke("{ print $1, $3 }", settings);
 
 #### Evaluating expressions with `InputSource`
 
-`Awk.eval()` also accepts an `InputSource` so that structured records can
+`Awk.evalSource()` accepts an `InputSource` so that structured records can
 feed field references like `$1`, `$2`, etc. without going through text
 serialization:
 
 ```java
 InputSource source = new TableInputSource(
         Collections.singletonList(Arrays.asList("Alice", "30", "Engineering")));
-Object result = awk.eval("$1 \"-\" $3", source);
+Object result = awk.evalSource("$1 \"-\" $3", source);
 // result: "Alice-Engineering"
 ```
 

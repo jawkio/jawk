@@ -29,6 +29,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.metricshub.jawk.ext.JawkExtension;
+import org.metricshub.jawk.intermediate.AwkTuples;
 import org.metricshub.jawk.jrt.InputSource;
 import org.metricshub.jawk.util.AwkSettings;
 import org.metricshub.jawk.util.ScriptSource;
@@ -334,6 +335,9 @@ public final class AwkTestSupport {
 
 		/**
 		 * Supplies an {@link Awk} instance to use when invoking the script.
+		 * The instance must have been created with mutable
+		 * {@link AwkSettings} so that the test framework can configure the
+		 * output stream and pre-assigned variables before execution.
 		 *
 		 * @param awkEngine the engine to execute the script with
 		 * @return this builder for method chaining
@@ -932,34 +936,43 @@ public final class AwkTestSupport {
 			for (Map.Entry<String, Object> entry : preAssignments.entrySet()) {
 				settings.putVariable(entry.getKey(), entry.getValue());
 			}
-			if (inputSource != null) {
-				settings.setInputSource(inputSource);
-			}
+			InputStream stdinStream;
 			String stdin = resolvedStdin(env);
 			if (stdin != null) {
-				settings
-						.setInput(
-								new ByteArrayInputStream(stdin.replace("\n", System.lineSeparator()).getBytes(StandardCharsets.UTF_8)));
+				stdinStream = new ByteArrayInputStream(
+						stdin.replace("\n", System.lineSeparator()).getBytes(StandardCharsets.UTF_8));
 			} else {
-				settings.setInput(new ByteArrayInputStream(new byte[0]));
+				stdinStream = new ByteArrayInputStream(new byte[0]);
 			}
 			ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
 			settings.setOutputStream(new PrintStream(outBytes, true, StandardCharsets.UTF_8.name()));
-			for (String operand : resolvedOperands(env)) {
-				settings.addNameValueOrFileName(operand);
-			}
+			List<String> operands = resolvedOperands(env);
 			Awk awk;
 			if (customAwk != null) {
 				awk = customAwk;
+				AwkSettings awkSettings = awk.getSettings();
+				for (Map.Entry<String, Object> entry : preAssignments.entrySet()) {
+					awkSettings.putVariable(entry.getKey(), entry.getValue());
+				}
+				awkSettings.setOutputStream(settings.getOutputStream());
 			} else if (!extensions.isEmpty()) {
-				awk = new Awk(extensions);
+				awk = new Awk(extensions, settings);
 			} else {
-				awk = new Awk();
+				awk = new Awk(settings);
 			}
 			int exitCode = 0;
 			try {
 				String resolvedScript = resolvedScript(env);
-				awk.invoke(new ScriptSource(description(), new StringReader(resolvedScript)), settings);
+				ScriptSource scriptSource = new ScriptSource(description(), new StringReader(resolvedScript));
+				if (inputSource != null) {
+					AwkTuples tuples = awk
+							.compile(Collections.singletonList(scriptSource));
+					awk.invoke(tuples, inputSource, operands, null);
+				} else {
+					AwkTuples tuples = awk
+							.compile(Collections.singletonList(scriptSource));
+					awk.invoke(tuples, stdinStream, operands);
+				}
 			} catch (ExitException ex) {
 				exitCode = ex.getCode();
 			}

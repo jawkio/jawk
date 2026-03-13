@@ -161,7 +161,7 @@ public class AVM implements VariableManager {
 				Collections.<String, ExtensionFunction>emptyMap() : extensionFunctions;
 
 		locale = this.settings.getLocale();
-		arguments = this.settings.getNameValueOrFileNames();
+		arguments = Collections.emptyList();
 		sortedArrayKeys = this.settings.isUseSortedArrayKeys();
 		initialVariables = this.settings.getVariables();
 		initialFsValue = this.settings.getFieldSeparator();
@@ -175,6 +175,15 @@ public class AVM implements VariableManager {
 
 	protected JRT createJrt() {
 		return new JRT(this, settings.getLocale());
+	}
+
+	/**
+	 * Returns the JRT (Jawk Runtime) instance associated with this interpreter.
+	 *
+	 * @return the JRT instance, never {@code null}
+	 */
+	public JRT getJrt() {
+		return jrt;
 	}
 
 	protected AwkTuples createTuples() {
@@ -257,16 +266,17 @@ public class AVM implements VariableManager {
 	 * Evaluate the provided tuples as an AWK expression.
 	 *
 	 * @param tuples Tuples representing the expression
+	 * @param inputSource the input source providing records for the evaluation
 	 * @param input Optional input line used to populate $0 and related fields
 	 * @return The resulting value of the expression
 	 * @throws IOException if an IO error occurs during evaluation
 	 */
-	public Object eval(AwkTuples tuples, String input) throws IOException {
+	public Object eval(AwkTuples tuples, InputSource inputSource, String input) throws IOException {
 		jrt.assignInitialVariables(initialVariables);
 
 		// Now execute the tuples
 		try {
-			interpret(tuples);
+			interpret(tuples, inputSource);
 		} catch (ExitException e) {
 			// Special case (which should never happen):
 			// return the value of the "exit" statement if any
@@ -275,6 +285,30 @@ public class AVM implements VariableManager {
 
 		// Return the top of the stack, which is the value of the specified expression
 		return operandStack.size() == 0 ? null : pop();
+	}
+
+	/**
+	 * Evaluate the provided tuples as an AWK expression with per-call variable
+	 * overrides.
+	 *
+	 * @param tuples Tuples representing the expression
+	 * @param inputSource the input source providing records for the evaluation
+	 * @param input Optional input line used to populate $0 and related fields
+	 * @param variableOverrides additional variable assignments applied on top of
+	 *        the settings-level variables (may be {@code null})
+	 * @return The resulting value of the expression
+	 * @throws IOException if an IO error occurs during evaluation
+	 */
+	public Object eval(
+			AwkTuples tuples,
+			InputSource inputSource,
+			String input,
+			Map<String, Object> variableOverrides)
+			throws IOException {
+		if (variableOverrides != null && !variableOverrides.isEmpty()) {
+			deferredInitialVariables.putAll(variableOverrides);
+		}
+		return eval(tuples, inputSource, input);
 	}
 
 	private void setNumOnJRT(long fieldNum, double num, PositionTracker position) {
@@ -318,9 +352,56 @@ public class AVM implements VariableManager {
 	 * Traverse the tuples, executing their associated opcodes to provide
 	 * an execution platform for Jawk scripts.
 	 *
+	 * @param tuples the compiled tuple instructions to execute
+	 * @param inputSource the input source providing records
 	 * @throws IOException in case of I/O problems (with getline typically)
 	 */
-	public void interpret(AwkTuples tuples) throws ExitException, IOException {
+	public void interpret(AwkTuples tuples, InputSource inputSource) throws ExitException, IOException {
+		interpret(tuples, inputSource, Collections.emptyList());
+	}
+
+	/**
+	 * Traverse the tuples, executing their associated opcodes to provide
+	 * an execution platform for Jawk scripts.
+	 *
+	 * @param tuples the compiled tuple instructions to execute
+	 * @param inputSource the input source providing records
+	 * @param runtimeArguments name=value or filename entries from the command line
+	 * @throws IOException in case of I/O problems (with getline typically)
+	 */
+	public void interpret(
+			AwkTuples tuples,
+			InputSource inputSource,
+			List<String> runtimeArguments)
+			throws ExitException,
+			IOException {
+		interpret(tuples, inputSource, runtimeArguments, null);
+	}
+
+	/**
+	 * Traverse the tuples, executing their associated opcodes to provide
+	 * an execution platform for Jawk scripts.
+	 *
+	 * @param tuples the compiled tuple instructions to execute
+	 * @param inputSource the input source providing records
+	 * @param runtimeArguments name=value or filename entries from the command line
+	 * @param variableOverrides additional variable assignments applied on top of
+	 *        the settings-level variables (may be {@code null})
+	 * @throws IOException in case of I/O problems (with getline typically)
+	 */
+	public void interpret(
+			AwkTuples tuples,
+			InputSource inputSource,
+			List<String> runtimeArguments,
+			Map<String, Object> variableOverrides)
+			throws ExitException,
+			IOException {
+		if (runtimeArguments != null && !runtimeArguments.isEmpty()) {
+			this.arguments = new ArrayList<>(runtimeArguments);
+		}
+		if (variableOverrides != null && !variableOverrides.isEmpty()) {
+			deferredInitialVariables.putAll(variableOverrides);
+		}
 		Map<Integer, ConditionPair> conditionPairs = new HashMap<Integer, ConditionPair>();
 
 		globalVariableOffsets = tuples.getGlobalVariableOffsetMap();
@@ -347,11 +428,8 @@ public class AVM implements VariableManager {
 		jrt.setRSTART(0);
 		jrt.setRLENGTH(0);
 
-		// Resolve the InputSource once: use the user-supplied one or wrap the InputStream
-		resolvedInputSource = settings.getInputSource();
-		if (resolvedInputSource == null) {
-			resolvedInputSource = new StreamInputSource(settings.getInput(), this, jrt);
-		}
+		// Resolve the InputSource once: use the user-supplied one
+		resolvedInputSource = inputSource;
 
 		try {
 			while (!position.isEOF()) {
@@ -1784,7 +1862,7 @@ public class AVM implements VariableManager {
 									extensionFunctions);
 							int subScriptExitCode = 0;
 							try {
-								newAvm.interpret(newTuples);
+								newAvm.interpret(newTuples, resolvedInputSource);
 							} catch (ExitException ex) {
 								subScriptExitCode = ex.getCode();
 							}

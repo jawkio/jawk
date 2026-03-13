@@ -68,6 +68,8 @@ public final class Cli {
 
 	private final AwkSettings settings = new AwkSettings();
 	private final PrintStream out;
+	private final InputStream inputStream;
+	private final List<String> nameValueOrFileNames = new ArrayList<String>();
 
 	private final List<ScriptSource> scriptSources = new ArrayList<ScriptSource>();
 	private AwkTuples precompiledTuples;
@@ -99,8 +101,8 @@ public final class Cli {
 	@SuppressFBWarnings("EI_EXPOSE_REP2")
 	public Cli(InputStream in, PrintStream out, @SuppressWarnings("unused") PrintStream err) {
 		this.out = out;
+		this.inputStream = in;
 		// Configure AWK settings with provided streams
-		settings.setInput(in);
 		settings.setOutputStream(out);
 	}
 
@@ -269,7 +271,7 @@ public final class Cli {
 		}
 
 		while (argIdx < args.length) {
-			settings.addNameValueOrFileName(args[argIdx++]);
+			nameValueOrFileNames.add(args[argIdx++]);
 		}
 	}
 
@@ -344,9 +346,9 @@ public final class Cli {
 
 		Awk awk;
 		if (sandbox) {
-			awk = extensions.isEmpty() ? new SandboxedAwk() : new SandboxedAwk(extensions);
+			awk = extensions.isEmpty() ? new SandboxedAwk(settings) : new SandboxedAwk(extensions, settings);
 		} else {
-			awk = extensions.isEmpty() ? new Awk() : new Awk(extensions);
+			awk = extensions.isEmpty() ? new Awk(settings) : new Awk(extensions, settings);
 		}
 		// Use precompiled tuples if provided; otherwise compile the scripts now
 		AwkTuples tuples = precompiledTuples != null ? precompiledTuples : awk.compile(scriptSources, disableOptimize);
@@ -373,8 +375,8 @@ public final class Cli {
 			// If only dumping information, no need to execute the script
 			return;
 		}
-		// Finally run the compiled tuples with the configured settings
-		awk.invoke(tuples, settings);
+		// Finally run the compiled tuples with the input and arguments
+		awk.invoke(tuples, inputStream, nameValueOrFileNames);
 	}
 
 	/**

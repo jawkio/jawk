@@ -40,8 +40,27 @@ public final class SandboxedAwk extends Awk {
 		super();
 	}
 
+	/**
+	 * Creates a sandboxed AWK instance with the specified settings.
+	 *
+	 * @param settings behavioral configuration for this engine
+	 */
+	public SandboxedAwk(AwkSettings settings) {
+		super(settings);
+	}
+
 	public SandboxedAwk(Collection<? extends JawkExtension> extensions) {
 		super(extensions);
+	}
+
+	/**
+	 * Creates a sandboxed AWK instance with extensions and settings.
+	 *
+	 * @param extensions extension instances
+	 * @param settings behavioral configuration for this engine
+	 */
+	public SandboxedAwk(Collection<? extends JawkExtension> extensions, AwkSettings settings) {
+		super(extensions, settings);
 	}
 
 	@SafeVarargs
@@ -55,7 +74,7 @@ public final class SandboxedAwk extends Awk {
 	}
 
 	@Override
-	protected AVM createAvm(AwkSettings settings) {
-		return new SandboxedAVM(settings, getExtensionInstances(), getExtensionFunctions());
+	protected AVM createAvm() {
+		return new SandboxedAVM(getSettings(), getExtensionInstances(), getExtensionFunctions());
 	}
 }

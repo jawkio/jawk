@@ -26,6 +26,7 @@ import org.metricshub.jawk.intermediate.AwkTuples;
 import org.metricshub.jawk.util.AwkSettings;
 import org.metricshub.jawk.Cli;
 import org.metricshub.jawk.AwkSandboxException;
+import org.metricshub.jawk.SandboxedAwk;
 
 public class AwkTest {
 
@@ -811,13 +812,16 @@ public class AwkTest {
 		AwkTuples tuples = AWK.compile(script);
 
 		AwkSettings settings = new AwkSettings();
-		settings.setInput(new ByteArrayInputStream("foo\nbar\n".getBytes(StandardCharsets.UTF_8)));
 		settings.setDefaultRS("\n");
 		settings.setDefaultORS("\n");
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
-		new Awk().invoke(tuples, settings);
+		new Awk(settings)
+				.invoke(
+						tuples,
+						new ByteArrayInputStream("foo\nbar\n".getBytes(StandardCharsets.UTF_8)),
+						Collections.emptyList());
 
 		assertEquals("foo\nbar\n", out.toString(StandardCharsets.UTF_8.name()));
 	}
@@ -832,13 +836,16 @@ public class AwkTest {
 		AwkTuples tuples = AWK.compile(new StringReader(script));
 
 		AwkSettings settings = new AwkSettings();
-		settings.setInput(new ByteArrayInputStream("one\n".getBytes(StandardCharsets.UTF_8)));
 		settings.setDefaultRS("\n");
 		settings.setDefaultORS("\n");
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
-		new Awk().invoke(tuples, settings);
+		new Awk(settings)
+				.invoke(
+						tuples,
+						new ByteArrayInputStream("one\n".getBytes(StandardCharsets.UTF_8)),
+						Collections.emptyList());
 
 		assertEquals("one\n", out.toString(StandardCharsets.UTF_8.name()));
 	}
@@ -853,13 +860,16 @@ public class AwkTest {
 		AwkTuples tuples = AWK.compile(script);
 
 		AwkSettings settings = new AwkSettings();
-		settings.setInput(new ByteArrayInputStream("value\n".getBytes(StandardCharsets.UTF_8)));
 		settings.setDefaultRS("\n");
 		settings.setDefaultORS("\n");
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
-		new Awk().invoke(tuples, settings);
+		new Awk(settings)
+				.invoke(
+						tuples,
+						new ByteArrayInputStream("value\n".getBytes(StandardCharsets.UTF_8)),
+						Collections.emptyList());
 
 		assertEquals("value\n", out.toString(StandardCharsets.UTF_8.name()));
 	}
@@ -880,13 +890,16 @@ public class AwkTest {
 
 		Cli cli = Cli.parseCommandLineArguments(new String[] { "-L", tmp.getAbsolutePath() });
 		AwkSettings settings = cli.getSettings();
-		settings.setInput(new ByteArrayInputStream("abc\n".getBytes(StandardCharsets.UTF_8)));
 		settings.setDefaultRS("\n");
 		settings.setDefaultORS("\n");
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
-		new Awk().invoke(cli.getPrecompiledTuples(), settings);
+		new Awk(settings)
+				.invoke(
+						cli.getPrecompiledTuples(),
+						new ByteArrayInputStream("abc\n".getBytes(StandardCharsets.UTF_8)),
+						Collections.emptyList());
 
 		assertEquals("ABC\n", out.toString(StandardCharsets.UTF_8.name()));
 	}
@@ -902,13 +915,16 @@ public class AwkTest {
 
 		Cli cli = Cli.parseCommandLineArguments(new String[] { "-L", tmp.getAbsolutePath() });
 		AwkSettings settings = cli.getSettings();
-		settings.setInput(new ByteArrayInputStream("abc\n".getBytes(StandardCharsets.UTF_8)));
 		settings.setDefaultRS("\n");
 		settings.setDefaultORS("\n");
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
-		new Awk().invoke(cli.getPrecompiledTuples(), settings);
+		new Awk(settings)
+				.invoke(
+						cli.getPrecompiledTuples(),
+						new ByteArrayInputStream("abc\n".getBytes(StandardCharsets.UTF_8)),
+						Collections.emptyList());
 
 		assertEquals("ABC\n", out.toString(StandardCharsets.UTF_8.name()));
 	}
@@ -970,15 +986,20 @@ public class AwkTest {
 		Awk nonSandboxAwk = new Awk();
 		AwkTuples tuples = nonSandboxAwk.compile("BEGIN { print \"hi\" > \"sandbox_out.txt\" } ");
 
-		Awk sandboxAwk = new SandboxedAwk();
 		AwkSettings settings = new AwkSettings();
-		settings.setInput(new ByteArrayInputStream(new byte[0]));
 		settings.setDefaultRS("\n");
 		settings.setDefaultORS("\n");
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
-		assertThrows(AwkSandboxException.class, () -> sandboxAwk.invoke(tuples, settings));
+		Awk sandboxAwk = new SandboxedAwk(settings);
+		assertThrows(
+				AwkSandboxException.class,
+				() -> sandboxAwk
+						.invoke(
+								tuples,
+								new ByteArrayInputStream(new byte[0]),
+								Collections.emptyList()));
 	}
 
 	@Test

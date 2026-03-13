@@ -88,7 +88,11 @@ public class RegexpTupleAndCachingTest {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
-		new Awk().invoke(cli.getPrecompiledTuples(), settings);
+		new Awk(settings)
+				.invoke(
+						cli.getPrecompiledTuples(),
+						new java.io.ByteArrayInputStream(new byte[0]),
+						java.util.Collections.emptyList());
 
 		// Should still match and print 1 using the serialized pattern
 		org.junit.Assert.assertEquals("1\n", out.toString(StandardCharsets.UTF_8.name()));

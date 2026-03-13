@@ -39,14 +39,18 @@ String output = new Awk().run("{ print $1 }", "foo bar");
 
 ```java
 Awk awk = new Awk();
+awk.getSettings().setDefaultRS("\n");
+ByteArrayOutputStream out = new ByteArrayOutputStream();
+awk.getSettings().setOutputStream(new PrintStream(out));
+
 AwkTuples tuples = awk.compile("{ print $0 }");
-AwkSettings settings = new AwkSettings();
-// configure input/output streams here
-awk.invoke(tuples, settings);
+InputStream input = new ByteArrayInputStream("foo\nbar\n".getBytes(StandardCharsets.UTF_8));
+awk.invoke(tuples, input, Collections.emptyList());
 ```
 
-`compileForEval(...)` and `eval(AwkTuples, ...)` provide the same workflow
-for expressions.
+Input and arguments are passed directly to the `invoke()` methods.
+`AwkSettings` is a purely behavioral configuration (field separator,
+record separator, output stream, variables, etc.).
 
 See [AWK in Java documentation](java.html) for advanced examples.
 

@@ -964,13 +964,10 @@ public final class AwkTestSupport {
 			try {
 				String resolvedScript = resolvedScript(env);
 				ScriptSource scriptSource = new ScriptSource(description(), new StringReader(resolvedScript));
+				AwkTuples tuples = awk.compile(Collections.singletonList(scriptSource));
 				if (inputSource != null) {
-					AwkTuples tuples = awk
-							.compile(Collections.singletonList(scriptSource));
 					awk.invoke(tuples, inputSource, operands, null);
 				} else {
-					AwkTuples tuples = awk
-							.compile(Collections.singletonList(scriptSource));
 					awk.invoke(tuples, stdinStream, operands);
 				}
 			} catch (ExitException ex) {

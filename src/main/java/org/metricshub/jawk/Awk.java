@@ -37,6 +37,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.metricshub.jawk.backend.AVM;
 import org.metricshub.jawk.ext.ExtensionFunction;
@@ -147,7 +148,7 @@ public class Awk {
 	protected Awk(ExtensionSetup setup, AwkSettings settings) {
 		this.extensionFunctions = setup.functions;
 		this.extensionInstances = setup.instances;
-		this.settings = settings != null ? settings : AwkSettings.DEFAULT_SETTINGS;
+		this.settings = Objects.requireNonNull(settings, "settings");
 	}
 
 	protected Map<String, ExtensionFunction> getExtensionFunctions() {
@@ -315,6 +316,7 @@ public class Awk {
 		if (tuples == null) {
 			return;
 		}
+		Objects.requireNonNull(inputSource, "inputSource");
 
 		AVM avm = null;
 		try {
@@ -368,10 +370,12 @@ public class Awk {
 			return;
 		}
 
+		InputStream effectiveStream = inputStream != null ? inputStream : new ByteArrayInputStream(new byte[0]);
+
 		AVM avm = null;
 		try {
 			avm = createAvm();
-			InputSource source = new StreamInputSource(inputStream, avm, avm.getJrt());
+			InputSource source = new StreamInputSource(effectiveStream, avm, avm.getJrt());
 			avm.interpret(tuples, source, arguments, variableOverrides);
 		} finally {
 			if (avm != null) {
@@ -687,7 +691,7 @@ public class Awk {
 	 * @throws IOException if anything goes wrong with the evaluation
 	 */
 	public Object eval(String expression, String input) throws IOException {
-		return eval(compileForEval(expression), input, null);
+		return eval(compileForEval(expression), input, settings.getFieldSeparator());
 	}
 
 	/**
@@ -714,7 +718,7 @@ public class Awk {
 		AVM avm = evalAwk.createAvm();
 		InputStream is = input != null ? toInputStream(input) : toInputStream("");
 		InputSource source = new StreamInputSource(is, avm, avm.getJrt());
-		return avm.eval(tuples, source, input);
+		return avm.eval(tuples, source);
 	}
 
 	/**
@@ -778,7 +782,7 @@ public class Awk {
 
 		Awk evalAwk = new Awk(new ExtensionSetup(this.extensionFunctions, this.extensionInstances), evalSettings);
 		AVM avm = evalAwk.createAvm();
-		return avm.eval(tuples, source, null);
+		return avm.eval(tuples, source);
 	}
 
 	protected AwkTuples createTuples() {

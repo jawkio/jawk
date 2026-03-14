@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import org.metricshub.jawk.jrt.BlockObject;
@@ -135,7 +136,7 @@ public class StdinExtension extends AbstractExtension implements JawkExtension {
 	 * @param inputStream the stream to read stdin data from
 	 */
 	public StdinExtension(InputStream inputStream) {
-		this.inputStream = inputStream;
+		this.inputStream = Objects.requireNonNull(inputStream, "inputStream");
 	}
 
 	/** {@inheritDoc} */

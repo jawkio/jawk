@@ -6,3 +6,4 @@
 *.bak
 dependency-reduced-pom.xml
 .checkstyle
+.vscode/

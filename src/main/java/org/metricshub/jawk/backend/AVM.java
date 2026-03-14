@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.LinkedHashSet;
 import java.util.StringTokenizer;
 import java.util.Deque;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.metricshub.jawk.AwkSandboxException;
@@ -267,11 +268,10 @@ public class AVM implements VariableManager {
 	 *
 	 * @param tuples Tuples representing the expression
 	 * @param inputSource the input source providing records for the evaluation
-	 * @param input Optional input line used to populate $0 and related fields
 	 * @return The resulting value of the expression
 	 * @throws IOException if an IO error occurs during evaluation
 	 */
-	public Object eval(AwkTuples tuples, InputSource inputSource, String input) throws IOException {
+	public Object eval(AwkTuples tuples, InputSource inputSource) throws IOException {
 		jrt.assignInitialVariables(initialVariables);
 
 		// Now execute the tuples
@@ -293,7 +293,6 @@ public class AVM implements VariableManager {
 	 *
 	 * @param tuples Tuples representing the expression
 	 * @param inputSource the input source providing records for the evaluation
-	 * @param input Optional input line used to populate $0 and related fields
 	 * @param variableOverrides additional variable assignments applied on top of
 	 *        the settings-level variables (may be {@code null})
 	 * @return The resulting value of the expression
@@ -302,13 +301,12 @@ public class AVM implements VariableManager {
 	public Object eval(
 			AwkTuples tuples,
 			InputSource inputSource,
-			String input,
 			Map<String, Object> variableOverrides)
 			throws IOException {
 		if (variableOverrides != null && !variableOverrides.isEmpty()) {
 			deferredInitialVariables.putAll(variableOverrides);
 		}
-		return eval(tuples, inputSource, input);
+		return eval(tuples, inputSource);
 	}
 
 	private void setNumOnJRT(long fieldNum, double num, PositionTracker position) {
@@ -429,7 +427,7 @@ public class AVM implements VariableManager {
 		jrt.setRLENGTH(0);
 
 		// Resolve the InputSource once: use the user-supplied one
-		resolvedInputSource = inputSource;
+		resolvedInputSource = Objects.requireNonNull(inputSource, "inputSource");
 
 		try {
 			while (!position.isEOF()) {

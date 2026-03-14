@@ -246,6 +246,52 @@ public class JRT {
 	}
 
 	/**
+	 * Applies only the JRT-managed special variable assignments from the
+	 * supplied map (FS, RS, OFS, ORS, CONVFMT, OFMT, SUBSEP, FILENAME, NF,
+	 * NR, FNR, ARGC). Non-special variables are silently skipped because
+	 * they require the runtime stack to be fully initialized (which happens
+	 * during tuple execution).
+	 *
+	 * @param variableMap a map of variable names to values
+	 */
+	public final void applySpecialVariables(Map<String, Object> variableMap) {
+		if (variableMap == null || variableMap.isEmpty()) {
+			return;
+		}
+		for (Map.Entry<String, Object> var : variableMap.entrySet()) {
+			String name = var.getKey();
+			Object value = var.getValue();
+			if ("FS".equals(name)) {
+				setFS(value);
+			} else if ("RS".equals(name)) {
+				setRS(value);
+			} else if ("OFS".equals(name)) {
+				setOFS(value);
+			} else if ("ORS".equals(name)) {
+				setORS(value);
+			} else if ("CONVFMT".equals(name)) {
+				setCONVFMT(value);
+			} else if ("OFMT".equals(name)) {
+				setOFMT(value);
+			} else if ("SUBSEP".equals(name)) {
+				setSUBSEP(value);
+			} else if ("FILENAME".equals(name)) {
+				setFILENAMEViaJrt(value == null ? "" : value.toString());
+			} else if ("NF".equals(name)) {
+				setNF(value);
+			} else if ("NR".equals(name)) {
+				setNR(value);
+			} else if ("FNR".equals(name)) {
+				setFNR(value);
+			} else if ("ARGC".equals(name)) {
+				setARGC(value);
+			}
+			// Non-special variables are skipped; they are assigned later
+			// via the tuple instruction stream
+		}
+	}
+
+	/**
 	 * Called by AVM/compiled modules to assign local
 	 * environment variables to an associative array
 	 * (in this case, to ENVIRON).

@@ -41,6 +41,7 @@ import java.util.Deque;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.metricshub.jawk.AwkSandboxException;
 import org.metricshub.jawk.ExitException;
 import org.metricshub.jawk.ext.AbstractExtension;
@@ -183,6 +184,7 @@ public class AVM implements VariableManager {
 	 *
 	 * @return the JRT instance, never {@code null}
 	 */
+	@SuppressFBWarnings("EI_EXPOSE_REP")
 	public JRT getJrt() {
 		return jrt;
 	}
@@ -272,7 +274,9 @@ public class AVM implements VariableManager {
 	 * @throws IOException if an IO error occurs during evaluation
 	 */
 	public Object eval(AwkTuples tuples, InputSource inputSource) throws IOException {
-		jrt.assignInitialVariables(initialVariables);
+		// Special variables are applied inside interpret() via
+		// applySpecialVariables; non-special variables are assigned
+		// during tuple execution.
 
 		// Now execute the tuples
 		try {
@@ -423,6 +427,12 @@ public class AVM implements VariableManager {
 		jrt.setFNR(0);
 		jrt.setRSTART(0);
 		jrt.setRLENGTH(0);
+
+		// Apply initial variable assignments that target JRT-managed special
+		// variables (FS, RS, OFS, ORS, etc.) so that -v FS=, or
+		// AwkSettings#putVariable("FS", ...) are honoured. Non-special
+		// variables are applied later during tuple execution.
+		jrt.applySpecialVariables(initialVariables);
 
 		// Resolve the InputSource once: use the user-supplied one
 		resolvedInputSource = Objects.requireNonNull(inputSource, "inputSource");

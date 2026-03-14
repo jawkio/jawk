@@ -41,6 +41,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.metricshub.jawk.ext.ExtensionRegistry;
 import org.metricshub.jawk.ext.JawkExtension;
+import org.metricshub.jawk.ext.StdinExtension;
 import org.metricshub.jawk.frontend.AstNode;
 import org.metricshub.jawk.intermediate.AwkTuples;
 import org.metricshub.jawk.jrt.AwkRuntimeException;
@@ -340,6 +341,12 @@ public final class Cli {
 			JawkExtension extension = ExtensionRegistry.resolve(spec);
 			if (extension == null) {
 				throw new IllegalArgumentException("Unknown extension '" + spec + "'");
+			}
+			// Replace the StdinExtension singleton with a fresh instance
+			// wired to this CLI's input stream so that StdinGetline()
+			// reads from the correct source
+			if (extension instanceof StdinExtension) {
+				extension = new StdinExtension(inputStream);
 			}
 			extensions.add(extension);
 		}

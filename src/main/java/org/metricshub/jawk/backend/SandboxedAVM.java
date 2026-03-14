@@ -23,10 +23,7 @@ package org.metricshub.jawk.backend;
  */
 
 import java.util.Map;
-import org.metricshub.jawk.ext.ExtensionFunction;
 import org.metricshub.jawk.ext.JawkExtension;
-import org.metricshub.jawk.intermediate.AwkTuples;
-import org.metricshub.jawk.intermediate.SandboxedAwkTuples;
 import org.metricshub.jawk.jrt.JRT;
 import org.metricshub.jawk.jrt.SandboxedJRT;
 import org.metricshub.jawk.util.AwkSettings;
@@ -37,9 +34,8 @@ import org.metricshub.jawk.util.AwkSettings;
 public class SandboxedAVM extends AVM {
 
 	public SandboxedAVM(AwkSettings parameters,
-			Map<String, JawkExtension> extensionInstances,
-			Map<String, ExtensionFunction> extensionFunctions) {
-		super(parameters, extensionInstances, extensionFunctions);
+			Map<String, JawkExtension> extensionInstances) {
+		super(parameters, extensionInstances);
 	}
 
 	@Override
@@ -47,16 +43,4 @@ public class SandboxedAVM extends AVM {
 		return new SandboxedJRT(this);
 	}
 
-	@Override
-	protected AwkTuples createTuples() {
-		return new SandboxedAwkTuples();
-	}
-
-	@Override
-	protected AVM createSubAvm(
-			AwkSettings parameters,
-			Map<String, JawkExtension> subExtensionInstances,
-			Map<String, ExtensionFunction> subExtensionFunctions) {
-		return new SandboxedAVM(parameters, subExtensionInstances, subExtensionFunctions);
-	}
 }

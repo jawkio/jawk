@@ -790,7 +790,7 @@ public class Awk {
 	}
 
 	protected AVM createAvm() {
-		return new AVM(this.settings, this.extensionInstances, this.extensionFunctions);
+		return new AVM(this.settings, this.extensionInstances);
 	}
 
 	/**

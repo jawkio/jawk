@@ -25,7 +25,6 @@ package org.metricshub.jawk.backend;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -47,7 +46,6 @@ import org.metricshub.jawk.ExitException;
 import org.metricshub.jawk.ext.AbstractExtension;
 import org.metricshub.jawk.ext.ExtensionFunction;
 import org.metricshub.jawk.ext.JawkExtension;
-import org.metricshub.jawk.frontend.AstNode;
 import org.metricshub.jawk.intermediate.Address;
 import org.metricshub.jawk.intermediate.AwkTuples;
 import org.metricshub.jawk.intermediate.Opcode;
@@ -67,7 +65,6 @@ import org.metricshub.jawk.jrt.RegexTokenizer;
 import org.metricshub.jawk.jrt.SingleCharacterTokenizer;
 import org.metricshub.jawk.jrt.VariableManager;
 import org.metricshub.jawk.util.AwkSettings;
-import org.metricshub.jawk.util.ScriptSource;
 import org.metricshub.jawk.jrt.BSDRandom;
 import org.metricshub.printf4j.Printf4J;
 
@@ -116,8 +113,6 @@ public class AVM implements VariableManager {
 	private final Locale locale;
 	private Map<String, JawkExtension> extensionInstances;
 
-	private Map<String, ExtensionFunction> extensionFunctions;
-
 	// stack methods
 	// private Object pop() { return operandStack.removeFirst(); }
 	// private void push(Object o) { operandStack.addLast(o); }
@@ -140,7 +135,7 @@ public class AVM implements VariableManager {
 	 * outside of the framework which is used by Jawk.
 	 */
 	public AVM() {
-		this(null, Collections.<String, JawkExtension>emptyMap(), Collections.<String, ExtensionFunction>emptyMap());
+		this(null, Collections.<String, JawkExtension>emptyMap());
 	}
 
 	/**
@@ -150,17 +145,13 @@ public class AVM implements VariableManager {
 	 * @param parameters The parameters affecting the behavior of the
 	 *        interpreter.
 	 * @param extensionInstances Map of the extensions to load
-	 * @param extensionFunctions Map of extension functions available for parsing
 	 */
 	public AVM(final AwkSettings parameters,
-			final Map<String, JawkExtension> extensionInstances,
-			final Map<String, ExtensionFunction> extensionFunctions) {
+			final Map<String, JawkExtension> extensionInstances) {
 		boolean hasProvidedSettings = parameters != null;
 		this.settings = hasProvidedSettings ? parameters : AwkSettings.DEFAULT_SETTINGS;
 		this.extensionInstances = extensionInstances == null ?
 				Collections.<String, JawkExtension>emptyMap() : extensionInstances;
-		this.extensionFunctions = extensionFunctions == null ?
-				Collections.<String, ExtensionFunction>emptyMap() : extensionFunctions;
 
 		locale = this.settings.getLocale();
 		arguments = Collections.emptyList();
@@ -187,17 +178,6 @@ public class AVM implements VariableManager {
 	@SuppressFBWarnings("EI_EXPOSE_REP")
 	public JRT getJrt() {
 		return jrt;
-	}
-
-	protected AwkTuples createTuples() {
-		return new AwkTuples();
-	}
-
-	protected AVM createSubAvm(
-			AwkSettings parameters,
-			Map<String, JawkExtension> subExtensionInstances,
-			Map<String, ExtensionFunction> subExtensionFunctions) {
-		return new AVM(parameters, subExtensionInstances, subExtensionFunctions);
 	}
 
 	private void initExtensions() {
@@ -1841,48 +1821,6 @@ public class AVM implements VariableManager {
 					position.next();
 					break;
 				}
-				case EXEC: {
-					// stack[0] = Jawk code
-
-					// Experimental feature. Use with caution.
-					String awkCode = jrt.toAwkString(pop());
-					List<ScriptSource> scriptSources = new ArrayList<ScriptSource>(1);
-					scriptSources
-							.add(new ScriptSource(ScriptSource.DESCRIPTION_COMMAND_LINE_SCRIPT, new StringReader(awkCode)));
-
-					org.metricshub.jawk.frontend.AwkParser ap = new org.metricshub.jawk.frontend.AwkParser(
-							extensionFunctions);
-					try {
-						AstNode ast = ap.parse(scriptSources);
-						if (ast != null) {
-							ast.semanticAnalysis();
-							ast.semanticAnalysis();
-							AwkTuples newTuples = createTuples();
-							int result = ast.populateTuples(newTuples);
-							assert result == 0;
-							newTuples.postProcess();
-							ap.populateGlobalVariableNameToOffsetMappings(newTuples);
-							AVM newAvm = createSubAvm(
-									settings,
-									extensionInstances,
-									extensionFunctions);
-							int subScriptExitCode = 0;
-							try {
-								newAvm.interpret(newTuples, new NonCloseableInputSource(resolvedInputSource), arguments);
-							} catch (ExitException ex) {
-								subScriptExitCode = ex.getCode();
-							}
-							push(subScriptExitCode);
-						} else {
-							push(-1);
-						}
-					} catch (IOException ioe) {
-						throw new AwkRuntimeException(position.lineNumber(), "IO Exception caught : " + ioe);
-					}
-
-					position.next();
-					break;
-				}
 				case EXTENSION: {
 					// arg[0] = extension function metadata
 					// arg[1] = # of args on the stack
@@ -2600,40 +2538,5 @@ public class AVM implements VariableManager {
 	 * The value of an address which is not yet assigned a tuple index.
 	 */
 	public static final int NULL_OFFSET = -1;
-
-	/**
-	 * An {@link InputSource} wrapper that delegates all operations to
-	 * an underlying source but is never {@link Closeable}. This prevents
-	 * sub-interpreters (e.g. the EXEC opcode) from closing an
-	 * {@link InputSource} that is still owned by the parent interpreter.
-	 */
-	private static final class NonCloseableInputSource implements InputSource {
-
-		private final InputSource delegate;
-
-		NonCloseableInputSource(InputSource delegate) {
-			this.delegate = Objects.requireNonNull(delegate);
-		}
-
-		@Override
-		public boolean nextRecord() throws IOException {
-			return delegate.nextRecord();
-		}
-
-		@Override
-		public String getRecord() {
-			return delegate.getRecord();
-		}
-
-		@Override
-		public List<String> getFields() {
-			return delegate.getFields();
-		}
-
-		@Override
-		public boolean isFromFilenameList() {
-			return delegate.isFromFilenameList();
-		}
-	}
 
 }

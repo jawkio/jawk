@@ -1172,14 +1172,6 @@ public enum Opcode {
 	EXTENSION,
 
 	/**
-	 * Execute the specified AWK code
-	 * <p>
-	 * Stack before: script <br>
-	 * Stack after: exit code of the script, or zero when successful, -1 when failed
-	 */
-	EXEC,
-
-	/**
 	 * Delete the specified array.
 	 * <p>
 	 * Stack remains unchanged.

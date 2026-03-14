@@ -75,6 +75,6 @@ public final class SandboxedAwk extends Awk {
 
 	@Override
 	protected AVM createAvm() {
-		return new SandboxedAVM(getSettings(), getExtensionInstances(), getExtensionFunctions());
+		return new SandboxedAVM(getSettings(), getExtensionInstances());
 	}
 }

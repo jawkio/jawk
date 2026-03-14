@@ -1868,7 +1868,7 @@ public class AVM implements VariableManager {
 									extensionFunctions);
 							int subScriptExitCode = 0;
 							try {
-								newAvm.interpret(newTuples, resolvedInputSource, arguments);
+								newAvm.interpret(newTuples, new NonCloseableInputSource(resolvedInputSource), arguments);
 							} catch (ExitException ex) {
 								subScriptExitCode = ex.getCode();
 							}
@@ -2600,5 +2600,40 @@ public class AVM implements VariableManager {
 	 * The value of an address which is not yet assigned a tuple index.
 	 */
 	public static final int NULL_OFFSET = -1;
+
+	/**
+	 * An {@link InputSource} wrapper that delegates all operations to
+	 * an underlying source but is never {@link Closeable}. This prevents
+	 * sub-interpreters (e.g. the EXEC opcode) from closing an
+	 * {@link InputSource} that is still owned by the parent interpreter.
+	 */
+	private static final class NonCloseableInputSource implements InputSource {
+
+		private final InputSource delegate;
+
+		NonCloseableInputSource(InputSource delegate) {
+			this.delegate = Objects.requireNonNull(delegate);
+		}
+
+		@Override
+		public boolean nextRecord() throws IOException {
+			return delegate.nextRecord();
+		}
+
+		@Override
+		public String getRecord() {
+			return delegate.getRecord();
+		}
+
+		@Override
+		public List<String> getFields() {
+			return delegate.getFields();
+		}
+
+		@Override
+		public boolean isFromFilenameList() {
+			return delegate.isFromFilenameList();
+		}
+	}
 
 }

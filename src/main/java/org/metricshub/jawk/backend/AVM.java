@@ -394,9 +394,7 @@ public class AVM implements VariableManager {
 			Map<String, Object> variableOverrides)
 			throws ExitException,
 			IOException {
-		if (runtimeArguments != null && !runtimeArguments.isEmpty()) {
-			this.arguments = new ArrayList<>(runtimeArguments);
-		}
+		this.arguments = (runtimeArguments != null) ? new ArrayList<>(runtimeArguments) : new ArrayList<>();
 		if (variableOverrides != null && !variableOverrides.isEmpty()) {
 			deferredInitialVariables.putAll(variableOverrides);
 		}
@@ -1860,7 +1858,7 @@ public class AVM implements VariableManager {
 									extensionFunctions);
 							int subScriptExitCode = 0;
 							try {
-								newAvm.interpret(newTuples, resolvedInputSource);
+								newAvm.interpret(newTuples, resolvedInputSource, arguments);
 							} catch (ExitException ex) {
 								subScriptExitCode = ex.getCode();
 							}

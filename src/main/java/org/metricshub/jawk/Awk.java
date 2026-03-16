@@ -353,7 +353,9 @@ public class Awk {
 	 * standard AWK file-list traversal.
 	 *
 	 * @param tuples precompiled tuples to interpret
-	 * @param inputStream the input stream to read from
+	 * @param inputStream the input stream to read from (must not be {@code null};
+	 *        pass {@code System.in} for standard input or
+	 *        {@code new ByteArrayInputStream(new byte[0])} for no input)
 	 * @param arguments name=value or filename entries (ARGV)
 	 * @param variableOverrides additional variable assignments (may be {@code null})
 	 * @throws IOException upon an IO error
@@ -370,12 +372,12 @@ public class Awk {
 			return;
 		}
 
-		InputStream effectiveStream = inputStream != null ? inputStream : new ByteArrayInputStream(new byte[0]);
+		Objects.requireNonNull(inputStream, "inputStream");
 
 		AVM avm = null;
 		try {
 			avm = createAvm();
-			InputSource source = new StreamInputSource(effectiveStream, avm, avm.getJrt());
+			InputSource source = new StreamInputSource(inputStream, avm, avm.getJrt());
 			avm.interpret(tuples, source, arguments, variableOverrides);
 		} finally {
 			if (avm != null) {

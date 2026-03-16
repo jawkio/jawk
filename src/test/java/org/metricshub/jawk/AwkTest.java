@@ -19,10 +19,13 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import org.junit.Test;
 import org.metricshub.jawk.frontend.ast.ParserException;
 import org.metricshub.jawk.intermediate.AwkTuples;
+import org.metricshub.jawk.jrt.InputSource;
 import org.metricshub.jawk.util.AwkSettings;
 import org.metricshub.jawk.Cli;
 import org.metricshub.jawk.AwkSandboxException;
@@ -1049,5 +1052,57 @@ public class AwkTest {
 				.stdin("hello\n")
 				.expect("got:hello\n")
 				.runAndAssert();
+	}
+
+	class TableInputSource implements InputSource {
+		private final List<List<String>> elements;
+		private int index = 0;
+
+		public TableInputSource(List<List<String>> elements) {
+			this.elements = elements;
+		}
+
+		@Override
+		public boolean nextRecord() throws IOException {
+			if (index < elements.size()) {
+				index++;
+				return true;
+			}
+			return false;
+		}
+
+		@Override
+		public String getRecord() {
+			if (index == 0 || index > elements.size()) {
+				throw new IllegalStateException("No current record");
+			}
+			return String.join(" ", elements.get(index - 1));
+		}
+
+		@Override
+		public List<String> getFields() {
+			if (index == 0 || index > elements.size()) {
+				throw new IllegalStateException("No current record");
+			}
+			return elements.get(index - 1);
+		}
+
+		@Override
+		public boolean isFromFilenameList() {
+			return false;
+		}
+	}
+
+	@Test
+	public void littleTest() throws Exception {
+		AwkTuples tuples = AWK.compileForEval("$1 + $2");
+		List<List<String>> data = Arrays
+				.asList(
+						Arrays.asList("1", "2"),
+						Arrays.asList("3", "4"));
+		TableInputSource inputSource = new TableInputSource(data);
+		assertEquals(
+				3L,
+				AWK.evalSource(tuples, inputSource, ";"));
 	}
 }

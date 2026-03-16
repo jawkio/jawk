@@ -680,7 +680,7 @@ public class Awk {
 	 * @throws IOException if anything goes wrong with the evaluation
 	 */
 	public Object eval(String expression) throws IOException {
-		return eval(compileForEval(expression), null, null);
+		return eval(compileForEval(expression), null, settings.getFieldSeparator());
 	}
 
 	/**

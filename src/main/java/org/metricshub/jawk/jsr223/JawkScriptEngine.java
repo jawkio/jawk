@@ -68,7 +68,9 @@ public class JawkScriptEngine extends AbstractScriptEngine {
 			} else if (inObj instanceof String) {
 				input = new ByteArrayInputStream(((String) inObj).getBytes(StandardCharsets.UTF_8));
 			} else {
-				input = new ByteArrayInputStream(new byte[0]);
+				// No explicit input provided; default to System.in to preserve
+				// the standard AWK behavior of reading from stdin.
+				input = System.in;
 			}
 			AwkSettings settings = new AwkSettings();
 			settings.setDefaultRS("\n");

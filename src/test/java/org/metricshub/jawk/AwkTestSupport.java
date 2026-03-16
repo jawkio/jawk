@@ -948,9 +948,15 @@ public final class AwkTestSupport {
 			settings.setOutputStream(new PrintStream(outBytes, true, StandardCharsets.UTF_8.name()));
 			List<String> operands = resolvedOperands(env);
 			Awk awk;
+			PrintStream originalOutputStream = null;
+			Map<String, Object> originalVars = null;
 			if (customAwk != null) {
 				awk = customAwk;
 				AwkSettings awkSettings = awk.getSettings();
+				// Save original state so we can restore it after execution,
+				// preventing configuration leaks across invocations.
+				originalOutputStream = awkSettings.getOutputStream();
+				originalVars = new LinkedHashMap<>(awkSettings.getVariables());
 				for (Map.Entry<String, Object> entry : preAssignments.entrySet()) {
 					awkSettings.putVariable(entry.getKey(), entry.getValue());
 				}
@@ -972,6 +978,14 @@ public final class AwkTestSupport {
 				}
 			} catch (ExitException ex) {
 				exitCode = ex.getCode();
+			} finally {
+				// Restore original settings when a custom Awk instance was used
+				if (customAwk != null) {
+					AwkSettings awkSettings = customAwk.getSettings();
+					awkSettings.setOutputStream(originalOutputStream);
+					awkSettings.getVariables().clear();
+					awkSettings.getVariables().putAll(originalVars);
+				}
 			}
 			return new ActualResult(
 					outBytes.toString(StandardCharsets.UTF_8.name()).replace(System.lineSeparator(), "\n"),

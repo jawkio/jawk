@@ -983,8 +983,7 @@ public final class AwkTestSupport {
 				if (customAwk != null) {
 					AwkSettings awkSettings = customAwk.getSettings();
 					awkSettings.setOutputStream(originalOutputStream);
-					awkSettings.getVariables().clear();
-					awkSettings.getVariables().putAll(originalVars);
+					awkSettings.setVariables(originalVars);
 				}
 			}
 			return new ActualResult(

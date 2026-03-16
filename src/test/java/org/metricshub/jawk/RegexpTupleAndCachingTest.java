@@ -22,15 +22,18 @@ package org.metricshub.jawk;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 
 import org.junit.Test;
 import org.metricshub.jawk.intermediate.AwkTuples;
@@ -88,10 +91,14 @@ public class RegexpTupleAndCachingTest {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
-		new Awk().invoke(cli.getPrecompiledTuples(), settings);
+		new Awk(settings)
+				.invoke(
+						cli.getPrecompiledTuples(),
+						new ByteArrayInputStream(new byte[0]),
+						Collections.emptyList());
 
 		// Should still match and print 1 using the serialized pattern
-		org.junit.Assert.assertEquals("1\n", out.toString(StandardCharsets.UTF_8.name()));
+		assertEquals("1\n", out.toString(StandardCharsets.UTF_8.name()));
 	}
 
 	private static String dumpTuples(AwkTuples tuples) throws Exception {

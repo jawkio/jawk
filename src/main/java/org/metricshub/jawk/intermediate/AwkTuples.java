@@ -762,15 +762,6 @@ public class AwkTuples implements Serializable {
 
 	/**
 	 * <p>
-	 * exec.
-	 * </p>
-	 */
-	public void exec() {
-		queue.add(new Tuple(Opcode.EXEC));
-	}
-
-	/**
-	 * <p>
 	 * swap.
 	 * </p>
 	 */

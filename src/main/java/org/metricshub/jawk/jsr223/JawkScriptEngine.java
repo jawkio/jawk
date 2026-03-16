@@ -61,13 +61,18 @@ public class JawkScriptEngine extends AbstractScriptEngine {
 	@Override
 	public Object eval(Reader scriptReader, ScriptContext context) throws ScriptException {
 		try {
-			AwkSettings settings = new AwkSettings();
+			InputStream input;
 			Object inObj = context.getAttribute("input");
 			if (inObj instanceof InputStream) {
-				settings.setInput((InputStream) inObj);
+				input = (InputStream) inObj;
 			} else if (inObj instanceof String) {
-				settings.setInput(new ByteArrayInputStream(((String) inObj).getBytes(StandardCharsets.UTF_8)));
+				input = new ByteArrayInputStream(((String) inObj).getBytes(StandardCharsets.UTF_8));
+			} else {
+				// No explicit input provided; default to System.in to preserve
+				// the standard AWK behavior of reading from stdin.
+				input = System.in;
 			}
+			AwkSettings settings = new AwkSettings();
 			settings.setDefaultRS("\n");
 			settings.setDefaultORS("\n");
 			ByteArrayOutputStream result = new ByteArrayOutputStream();
@@ -76,14 +81,14 @@ public class JawkScriptEngine extends AbstractScriptEngine {
 			} catch (java.io.UnsupportedEncodingException e) {
 				throw new IllegalStateException(e);
 			}
-			Awk awk = new Awk();
+			Awk awk = new Awk(settings);
 			// Execute the AWK script using the configured settings
 			awk
 					.invoke(
 							new ScriptSource(
 									ScriptSource.DESCRIPTION_COMMAND_LINE_SCRIPT,
 									scriptReader),
-							settings);
+							input);
 			String out = result.toString(StandardCharsets.UTF_8.name());
 			Writer writer = context.getWriter();
 			if (writer != null) {

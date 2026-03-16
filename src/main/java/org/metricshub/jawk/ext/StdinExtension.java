@@ -24,8 +24,10 @@ package org.metricshub.jawk.ext;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import org.metricshub.jawk.jrt.BlockObject;
@@ -99,6 +101,8 @@ public class StdinExtension extends AbstractExtension implements JawkExtension {
 	public static final StdinExtension INSTANCE = new StdinExtension();
 	private static final Object DONE = new Object();
 
+	private final InputStream inputStream;
+
 	private final BlockingQueue<Object> getLineInput = new LinkedBlockingQueue<Object>();
 
 	private final BlockObject blocker = new BlockObject() {
@@ -119,6 +123,22 @@ public class StdinExtension extends AbstractExtension implements JawkExtension {
 
 	private boolean isEof = false;
 
+	/**
+	 * Creates a {@code StdinExtension} that reads from {@link System#in}.
+	 */
+	public StdinExtension() {
+		this(System.in);
+	}
+
+	/**
+	 * Creates a {@code StdinExtension} that reads from the specified input stream.
+	 *
+	 * @param inputStream the stream to read stdin data from
+	 */
+	public StdinExtension(InputStream inputStream) {
+		this.inputStream = Objects.requireNonNull(inputStream, "inputStream");
+	}
+
 	/** {@inheritDoc} */
 	@Override
 	public void init(VariableManager vm, JRT jrt, final AwkSettings settings) {
@@ -129,7 +149,7 @@ public class StdinExtension extends AbstractExtension implements JawkExtension {
 			public void run() {
 				try (
 						BufferedReader br = new BufferedReader(
-								new InputStreamReader(settings.getInput(), StandardCharsets.UTF_8))) {
+								new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
 					String line;
 					while ((line = br.readLine()) != null) {
 						getLineInput.put(line);

@@ -50,17 +50,16 @@ option.
 
 ```java
 Awk awk = new Awk();
+awk.getSettings().setDefaultRS("\n");
+awk.getSettings().setDefaultORS("\n");
+ByteArrayOutputStream out = new ByteArrayOutputStream();
+awk.getSettings().setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
+
 String script = "{ print $0 }";
 AwkTuples tuples = awk.compile(script);
+InputStream input = new ByteArrayInputStream("foo\nbar\n".getBytes(StandardCharsets.UTF_8));
 
-AwkSettings settings = new AwkSettings();
-settings.setInput(new ByteArrayInputStream("foo\nbar\n".getBytes(StandardCharsets.UTF_8)));
-settings.setDefaultRS("\n");
-settings.setDefaultORS("\n");
-ByteArrayOutputStream out = new ByteArrayOutputStream();
-settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
-
-awk.invoke(tuples, settings);
+awk.invoke(tuples, input, Collections.emptyList());
 
 System.out.println(out.toString(StandardCharsets.UTF_8.name()));
 ```
@@ -77,8 +76,9 @@ Internally Jawk uses `StreamInputSource` to handle stdin / file-list input, but
 that class is an implementation detail and should not be used by embedding code.
 Implement `InputSource` directly for your own data structures.
 
-When `AwkSettings\#setInputSource(...)` is set, that source takes precedence
-over `AwkSettings\#setInput(...)`.
+Pass `InputSource` instances directly to the `invoke()` or `evalSource()` methods.
+`AwkSettings` is a purely behavioral configuration (field separator, record
+separator, output stream, etc.) and does not carry input or runtime arguments.
 
 #### Contract summary
 
@@ -150,17 +150,29 @@ public final class TableInputSource implements InputSource {
 ```java
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 
-Awk awk = new Awk();
-AwkSettings settings = new AwkSettings();
-settings.setInputSource(new TableInputSource(Arrays.asList(
+InputSource source = new TableInputSource(Arrays.asList(
         Arrays.asList("Alice", "30", "Engineering"),
         Arrays.asList("Bob", "25", "Marketing")
-)));
+));
 
-awk.invoke("{ print $1, $3 }", settings);
+Awk awk = new Awk();
+AwkTuples tuples = awk.compile("{ print $1, $3 }");
+awk.invoke(tuples, source, Collections.emptyList(), null);
 // Alice Engineering
 // Bob Marketing
+```
+
+For a one-liner, use the convenience overload that compiles and invokes
+in one step:
+
+```java
+Awk awk = new Awk();
+ScriptSource script = new ScriptSource(
+        ScriptSource.DESCRIPTION_COMMAND_LINE_SCRIPT,
+        new StringReader("{ print $1, $3 }"));
+awk.invoke(script, source);
 ```
 
 #### Evaluating expressions with `InputSource`
@@ -196,15 +208,25 @@ Awk.listAvailableExtensions().forEach((name, extension) ->
 
 ```java
 Awk awk = new Awk();
+Object value = awk.eval("$1 - $2", "5 3");
+```
+
+You can also precompile the expression with `compileForEval()` and evaluate
+it against a structured `InputSource` via `evalSource()`:
+
+```java
+Awk awk = new Awk();
 AwkTuples expr = awk.compileForEval("$1 - $2");
-Object value = awk.eval(expr, "5 3", " ");
+InputSource source = new TableInputSource(
+        Collections.singletonList(Arrays.asList("5", "3")));
+Object value = awk.evalSource(expr, source, " ");
 ```
 
 ### Advanced examples
 
-The examples below show how to configure `AwkSettings` directly to customize
-input sources, output handling or to register `JawkExtension`s. The
-`invoke(ScriptSource, AwkSettings)` helper compiles and runs the script in one step.
+The examples below show how to configure `AwkSettings` for behavioral options
+(output stream, record separator, etc.) while passing input and arguments
+directly to the `invoke()` methods.
 
 #### Invoke AWK script files on input files
 
@@ -220,20 +242,19 @@ input sources, output handling or to register `JawkExtension`s. The
  */
 private String runAwk(File scriptFile, List<String> inputFileList) throws IOException, ExitException {
 
-    AwkSettings settings = new AwkSettings();
-
-    // Set the input files
-    for (String name : inputFileList) {
-        settings.addNameValueOrFileName(name);
-    }
-
     // Create the OutputStream, to collect the result as a String
     ByteArrayOutputStream resultBytesStream = new ByteArrayOutputStream();
-    settings.setOutputStream(new PrintStream(resultBytesStream));
 
-    // Execute the awk script against the specified input
     Awk awk = new Awk();
-    awk.invoke(new ScriptFileSource(scriptFile.getAbsolutePath()), settings);
+    awk.getSettings().setOutputStream(new PrintStream(resultBytesStream));
+
+    // Compile the script
+    ScriptSource scriptSource = new ScriptFileSource(scriptFile.getAbsolutePath());
+    AwkTuples tuples = awk.compile(Collections.singletonList(scriptSource));
+
+    // Execute the awk script against the specified input files
+    // Input files are passed as arguments (ARGV), not through AwkSettings
+    awk.invoke(tuples, System.in, inputFileList);
 
     // Return the result as a string
     return resultBytesStream.toString(StandardCharsets.UTF_8);
@@ -256,23 +277,21 @@ private String runAwk(File scriptFile, List<String> inputFileList) throws IOExce
 private String runAwk(String script, String input) throws IOException, ExitException {
 
     Awk awk = new Awk();
-    AwkTuples tuples = awk.compile(new StringReader(script));
-
-    AwkSettings settings = new AwkSettings();
-
-    // Set the input files
-    settings.setInput(new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)));
 
     // We force \n as the Record Separator (RS) because even if running on Windows
     // we're passing Java strings, where end of lines are simple \n
-    settings.setDefaultRS("\n");
+    awk.getSettings().setDefaultRS("\n");
 
     // Create the OutputStream, to collect the result as a String
     ByteArrayOutputStream resultBytesStream = new ByteArrayOutputStream();
-    settings.setOutputStream(new PrintStream(resultBytesStream));
+    awk.getSettings().setOutputStream(new PrintStream(resultBytesStream));
+
+    // Compile the script
+    AwkTuples tuples = awk.compile(script);
 
     // Execute the awk script against the specified input
-    awk.invoke(tuples, settings);
+    InputStream inputStream = new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8));
+    awk.invoke(tuples, inputStream, Collections.emptyList());
 
     // Return the result as a string
     return resultBytesStream.toString(StandardCharsets.UTF_8);

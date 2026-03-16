@@ -22,22 +22,23 @@ package org.metricshub.jawk.util;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import java.io.InputStream;
 import java.io.PrintStream;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import org.metricshub.jawk.jrt.InputSource;
 
 /**
- * A simple container for the parameters of a single AWK invocation.
- * These values have defaults.
- * These defaults may be changed through command line arguments,
- * or when invoking Jawk programmatically, from within Java code.
+ * Reusable behavioral configuration for the Jawk engine.
+ * <p>
+ * Instances hold settings that control how the AWK interpreter behaves
+ * (field separator, locale, output stream, etc.) but do <em>not</em> carry
+ * per-execution state such as input sources or filename arguments. This
+ * separation allows a single {@code AwkSettings} object to be shared
+ * across many invocations of {@link org.metricshub.jawk.Awk#eval} or
+ * {@link org.metricshub.jawk.Awk#invoke}.
+ * </p>
  *
  * @author Danny Daglas
  */
@@ -49,31 +50,12 @@ public class AwkSettings {
 	public static final AwkSettings DEFAULT_SETTINGS = new ImmutableAwkSettings();
 
 	/**
-	 * Where input is read from.
-	 * By default, this is {@link System#in}.
-	 */
-	private InputStream input = System.in;
-
-	/**
-	 * Optional structured input provider. When non-null, this source is consumed
-	 * instead of {@link #input}.
-	 */
-	private InputSource inputSource;
-
-	/**
 	 * Contains variable assignments which are applied prior to
 	 * executing the script (-v assignments).
 	 * The values may be of type <code>Integer</code>,
 	 * <code>Double</code> or <code>String</code>.
 	 */
 	private Map<String, Object> variables = new HashMap<String, Object>();
-
-	/**
-	 * Contains name=value or filename entries.
-	 * Order is important, which is why name=value and filenames
-	 * are listed in the same List container.
-	 */
-	private List<String> nameValueOrFileNames = new ArrayList<String>();
 
 	/**
 	 * Initial Field Separator (FS) value.
@@ -130,8 +112,6 @@ public class AwkSettings {
 		final char newLine = '\n';
 
 		desc.append("variables = ").append(getVariables()).append(newLine);
-		desc.append("inputSource = ").append(getInputSource()).append(newLine);
-		desc.append("nameValueOrFileNames = ").append(getNameValueOrFileNames()).append(newLine);
 		desc.append("fieldSeparator = ").append(getFieldSeparator()).append(newLine);
 		desc.append("useSortedArrayKeys = ").append(isUseSortedArrayKeys()).append(newLine);
 		desc.append("catchIllegalFormatExceptions = ").append(isCatchIllegalFormatExceptions()).append(newLine);
@@ -185,46 +165,6 @@ public class AwkSettings {
 	}
 
 	/**
-	 * Where input is read from.
-	 * By default, this is {@link java.lang.System#in}.
-	 *
-	 * @return the input
-	 */
-	public InputStream getInput() {
-		return input;
-	}
-
-	/**
-	 * Where input is read from.
-	 * By default, this is {@link java.lang.System#in}.
-	 *
-	 * @param input the input to set
-	 */
-	public void setInput(InputStream input) {
-		this.input = Objects.requireNonNull(input, "input");
-	}
-
-	/**
-	 * Returns the optional structured input source consumed by the runtime.
-	 * When non-null, this source takes precedence over {@link #getInput()}.
-	 *
-	 * @return configured {@link InputSource}, or {@code null} when disabled
-	 */
-	public InputSource getInputSource() {
-		return inputSource;
-	}
-
-	/**
-	 * Sets an optional structured input source for the runtime. When non-null,
-	 * this source takes precedence over {@link #setInput(InputStream)}.
-	 *
-	 * @param inputSource source to consume, or {@code null} to disable
-	 */
-	public void setInputSource(InputSource inputSource) {
-		this.inputSource = inputSource;
-	}
-
-	/**
 	 * Contains variable assignments which are applied prior to
 	 * executing the script (-v assignments).
 	 * The values may be of type <code>Integer</code>,
@@ -256,26 +196,6 @@ public class AwkSettings {
 	 */
 	public void putVariable(String name, Object value) {
 		variables.put(name, value);
-	}
-
-	/**
-	 * Contains name=value or filename entries.
-	 * Order is important, which is why name=value and filenames
-	 * are listed in the same List container.
-	 *
-	 * @return the nameValueOrFileNames
-	 */
-	public List<String> getNameValueOrFileNames() {
-		return new ArrayList<String>(nameValueOrFileNames);
-	}
-
-	/**
-	 * Add a name=value or filename entry.
-	 *
-	 * @param entry entry to add
-	 */
-	public void addNameValueOrFileName(String entry) {
-		nameValueOrFileNames.add(entry);
 	}
 
 	/**
@@ -428,27 +348,12 @@ public class AwkSettings {
 		}
 
 		@Override
-		public void setInput(InputStream input) {
-			throw unsupported();
-		}
-
-		@Override
-		public void setInputSource(InputSource inputSource) {
-			throw unsupported();
-		}
-
-		@Override
 		public void setVariables(Map<String, Object> variables) {
 			throw unsupported();
 		}
 
 		@Override
 		public void putVariable(String name, Object value) {
-			throw unsupported();
-		}
-
-		@Override
-		public void addNameValueOrFileName(String entry) {
 			throw unsupported();
 		}
 

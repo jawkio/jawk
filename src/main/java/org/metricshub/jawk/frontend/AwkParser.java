@@ -227,7 +227,6 @@ public class AwkParser {
 		BUILTIN_FUNC_NAMES.put("system", fIdx++);
 		BUILTIN_FUNC_NAMES.put("tolower", fIdx++);
 		BUILTIN_FUNC_NAMES.put("toupper", fIdx++);
-		BUILTIN_FUNC_NAMES.put("exec", fIdx++);
 	}
 
 	private static final int SP_IDX = 257;
@@ -4198,17 +4197,6 @@ public class AwkParser {
 					throw new SemanticException("system requires only 1 argument");
 				}
 				tuples.system();
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("exec")) {
-				if (getAst1() == null) {
-					throw new SemanticException("exec requires 1 argument");
-				}
-				int ast1Result = getAst1().populateTuples(tuples);
-				if (ast1Result != 1) {
-					throw new SemanticException("exec requires only 1 argument");
-				}
-				tuples.exec();
 				popSourceLineNumber(tuples);
 				return 1;
 			} else {

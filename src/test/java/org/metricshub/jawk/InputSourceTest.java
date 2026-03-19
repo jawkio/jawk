@@ -211,6 +211,24 @@ public class InputSourceTest {
 		assertEquals("a,b,c", commaSeparatedAwk().eval("$0", source));
 	}
 
+	@Test
+	public void testFieldsOnlyInputSourceSupportsBareRegexpRules() throws Exception {
+		awkTest("fields only input source supports bare regexp conditions")
+				.script("/right/ { print $2 }")
+				.withInputSource(new FieldsOnlyInputSource(Collections.singletonList(Arrays.asList("left", "right"))))
+				.expectLines("right")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testTextOnlyInputSourceUsesFsActiveWhenRecordWasRead() throws Exception {
+		awkTest("text only input source keeps FS semantics at record read time")
+				.script("{ FS = \":\"; print $1 }")
+				.withInputSource(new RecordOnlyInputSource("a b"))
+				.expectLines("a")
+				.runAndAssert();
+	}
+
 	private static final class TableInputSource implements InputSource {
 
 		private static final String DEFAULT_SEPARATOR = " ";

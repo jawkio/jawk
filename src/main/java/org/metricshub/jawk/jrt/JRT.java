@@ -866,7 +866,10 @@ public class JRT {
 			// match against $0
 			// ...
 			Pattern pattern = (Pattern) o;
-			String s = inputLine == null ? "" : inputLine;
+			String s = getInputLine();
+			if (s == null) {
+				s = "";
+			}
 			Matcher matcher = pattern.matcher(s);
 			val = matcher.find();
 		} else {
@@ -1303,7 +1306,12 @@ public class JRT {
 		} else {
 			inputLine = recordText;
 			clearPendingGetlineFields();
-			recordState = newRecordStateFromSource(recordText, preFields);
+			if (preFields == null) {
+				recordState = newRecordStateFromText(recordText);
+				recordState.ensureFieldsMaterialized();
+			} else {
+				recordState = newRecordStateFromSource(recordText, preFields);
+			}
 		}
 
 		this.nr++;

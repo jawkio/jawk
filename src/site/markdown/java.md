@@ -28,6 +28,40 @@ Awk awk = new Awk();
 Object value = awk.eval("2 + 3");
 ```
 
+`Awk.eval()` is the simplest entry point when you want the value of an
+expression rather than the printed output of a full AWK script. The same
+instance can also evaluate against a text record or a structured
+`InputSource`:
+
+```java
+AwkSettings settings = new AwkSettings();
+settings.setFieldSeparator(":");
+
+Awk awk = new Awk(settings);
+Object user = awk.eval("$1", "alice:admin");
+Object role = awk.eval("$2", "alice:admin");
+```
+
+When you already know you will evaluate the same expression many times,
+compile it once and reuse the resulting tuples:
+
+```java
+AwkSettings settings = new AwkSettings();
+settings.setFieldSeparator(",");
+
+Awk awk = new Awk(settings);
+AwkTuples expression = awk.compileForEval("$2");
+
+for (String line : Arrays.asList("alpha,beta", "left,right", "one,two")) {
+    Object value = awk.eval(expression, line);
+    System.out.println(value);
+}
+```
+
+`Awk.eval(...)` automatically chooses the lightweight read-only execution path
+when the compiled tuples do not mutate AWK-visible state. No extra API call is
+required for this optimization.
+
 ### Quick execution with `Awk.run()`
 
 ```java
@@ -76,18 +110,29 @@ Internally Jawk uses `StreamInputSource` to handle stdin / file-list input, but
 that class is an implementation detail and should not be used by embedding code.
 Implement `InputSource` directly for your own data structures.
 
-Pass `InputSource` instances directly to the `invoke()` or `evalSource()` methods.
+Pass `InputSource` instances directly to the `invoke()` or `eval()` methods.
 `AwkSettings` is a purely behavioral configuration (field separator, record
 separator, output stream, etc.) and does not carry input or runtime arguments.
 
 #### Contract summary
 
 * `nextRecord()` advances to the next record.
-* `getRecord()` returns `$0` for the current record.
+* `getRecordText()` returns `$0` for the current record, or `null` when the
+  source does not expose record text.
 * `getFields()` returns pre-split fields (`$1`, `$2`, ...), or `null` to let
   Jawk split `$0` using `FS`.
 * `isFromFilenameList()` controls whether `FNR` should be incremented like
   file-based input.
+
+Each record may be exposed as:
+
+* text only
+* fields only
+* text and fields
+
+When both are available, Jawk uses the field list for `$1..$NF` and the
+provided record text for the initial `$0` value. When only fields are
+available, `$0` is synthesized lazily and only if the script asks for it.
 
 #### Example implementation (`List<List<String>>` table)
 
@@ -100,18 +145,11 @@ import org.metricshub.jawk.jrt.InputSource;
 
 public final class TableInputSource implements InputSource {
     private final List<List<String>> rows;
-    private final String separator;
     private int index = -1;
     private List<String> fields;
-    private String record;
 
     public TableInputSource(List<List<String>> rows) {
-        this(rows, " ");
-    }
-
-    public TableInputSource(List<List<String>> rows, String separator) {
         this.rows = rows;
-        this.separator = separator;
     }
 
     @Override
@@ -119,18 +157,16 @@ public final class TableInputSource implements InputSource {
         int next = index + 1;
         if (next >= rows.size()) {
             fields = null;
-            record = null;
             return false;
         }
         index = next;
         fields = Collections.unmodifiableList(new ArrayList<>(rows.get(index)));
-        record = String.join(separator, fields);
         return true;
     }
 
     @Override
-    public String getRecord() {
-        return record;
+    public String getRecordText() {
+        return null;
     }
 
     @Override
@@ -144,6 +180,10 @@ public final class TableInputSource implements InputSource {
     }
 }
 ```
+
+This fields-only variant is ideal when your host application already stores
+records in structured form and wants to avoid repeatedly joining and splitting
+the same values.
 
 #### Using a custom `InputSource`
 
@@ -177,15 +217,27 @@ awk.invoke(script, source);
 
 #### Evaluating expressions with `InputSource`
 
-`Awk.evalSource()` accepts an `InputSource` so that structured records can
+`Awk.eval()` accepts an `InputSource` so that structured records can
 feed field references like `$1`, `$2`, etc. without going through text
 serialization:
 
 ```java
 InputSource source = new TableInputSource(
         Collections.singletonList(Arrays.asList("Alice", "30", "Engineering")));
-Object result = awk.evalSource("$1 \"-\" $3", source);
+Object result = awk.eval("$1 \"-\" $3", source);
 // result: "Alice-Engineering"
+```
+
+The same approach works with precompiled tuples:
+
+```java
+Awk awk = new Awk();
+AwkTuples expression = awk.compileForEval("$1 \"-\" $3");
+
+for (List<String> row : rows) {
+    Object result = awk.eval(expression, new TableInputSource(Collections.singletonList(row)));
+    System.out.println(result);
+}
 ```
 
 To supply custom extensions, create the `Awk` instance with the extension
@@ -212,15 +264,55 @@ Object value = awk.eval("$1 - $2", "5 3");
 ```
 
 You can also precompile the expression with `compileForEval()` and evaluate
-it against a structured `InputSource` via `evalSource()`:
+it against a structured `InputSource` via `eval()`:
 
 ```java
 Awk awk = new Awk();
 AwkTuples expr = awk.compileForEval("$1 - $2");
 InputSource source = new TableInputSource(
         Collections.singletonList(Arrays.asList("5", "3")));
-Object value = awk.evalSource(expr, source, " ");
+Object value = awk.eval(expr, source);
 ```
+
+This is the recommended API when you have:
+
+* one expression
+* many records
+* a tight loop where compile cost must be paid only once
+
+### Advanced runtime control with `AVM`
+
+Most embedders should stay on `Awk`, which compiles tuples, creates a fresh
+runtime per invocation, and automatically selects the read-only eval path when
+possible.
+
+If you intentionally want to reuse the same interpreter instance, you can work
+with `AVM` directly:
+
+```java
+AwkSettings settings = new AwkSettings();
+settings.setFieldSeparator(",");
+
+Awk compiler = new Awk(settings);
+AwkTuples expr = compiler.compileForEval("NF \":\" $2");
+
+AVM avm = new AVM(settings, Collections.emptyMap());
+
+for (List<String> row : Arrays.asList(
+        Arrays.asList("a", "b", "c"),
+        Arrays.asList("left", "right"))) {
+    InputSource source = new TableInputSource(Collections.singletonList(row));
+    Object value = avm.eval(expr, source);
+    System.out.println(value);
+}
+```
+
+Use this API only when you explicitly want to control the runtime lifecycle.
+The reused `AVM` API is sequential, not concurrent: do not call the same AVM
+instance from multiple threads at the same time.
+
+`AVM.eval(...)` uses the same tuple metadata as `Awk.eval(...)` and will
+automatically choose the read-only eval path when the expression is eligible.
 
 ### Advanced examples
 

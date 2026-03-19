@@ -106,7 +106,7 @@ public class StreamInputSource implements InputSource, Closeable {
 
 	/** {@inheritDoc} */
 	@Override
-	public String getRecord() {
+	public String getRecordText() {
 		return currentRecord;
 	}
 

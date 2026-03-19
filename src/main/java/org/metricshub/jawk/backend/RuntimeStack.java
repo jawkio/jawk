@@ -25,7 +25,6 @@ package org.metricshub.jawk.backend;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Deque;
-import java.util.LinkedList;
 
 import org.metricshub.jawk.intermediate.UninitializedObject;
 import org.metricshub.jawk.jrt.AssocArray;
@@ -36,10 +35,11 @@ import org.metricshub.jawk.jrt.AssocArray;
 class RuntimeStack {
 
 	static final UninitializedObject BLANK = new UninitializedObject();
+	private static final Object[] NULL_LOCALS_SENTINEL = new Object[0];
 
 	private Object[] globals = null;
 	private Object[] locals = null;
-	private Deque<Object[]> localsStack = new LinkedList<Object[]>();
+	private Deque<Object[]> localsStack = new ArrayDeque<Object[]>();
 	private Deque<Integer> returnIndexes = new ArrayDeque<Integer>();
 
 	@SuppressWarnings("unused")
@@ -52,6 +52,14 @@ class RuntimeStack {
 
 	Object[] getNumGlobals() {
 		return globals;
+	}
+
+	void reset() {
+		globals = null;
+		locals = null;
+		localsStack.clear();
+		returnIndexes.clear();
+		returnValue = null;
 	}
 
 	/** Must be one of the first methods executed. */
@@ -122,20 +130,22 @@ class RuntimeStack {
 	}
 
 	void pushFrame(long numFormalParams, int positionIdx) {
-		localsStack.push(locals);
+		localsStack.push(locals == null ? NULL_LOCALS_SENTINEL : locals);
 		locals = new Object[(int) numFormalParams];
 		returnIndexes.push(positionIdx);
 	}
 
 	/** returns the position index */
 	int popFrame() {
-		locals = localsStack.pop();
+		Object[] restoredLocals = localsStack.pop();
+		locals = restoredLocals == NULL_LOCALS_SENTINEL ? null : restoredLocals;
 		return returnIndexes.pop();
 	}
 
 	void popAllFrames() {
 		for (int i = localsStack.size(); i > 0; i--) {
-			locals = localsStack.pop();
+			Object[] restoredLocals = localsStack.pop();
+			locals = restoredLocals == NULL_LOCALS_SENTINEL ? null : restoredLocals;
 			returnIndexes.pop();
 		}
 	}

@@ -39,6 +39,34 @@ Awk awk = new Awk();
 String result = awk.run("{ print toupper($0) }", "hello world");
 ```
 
+Evaluate expressions the same way:
+
+```java
+Awk awk = new Awk();
+Object value = awk.eval("2 + 3");
+```
+
+For repeated evaluations, compile the expression once and reuse the tuples:
+
+```java
+AwkSettings settings = new AwkSettings();
+settings.setFieldSeparator(",");
+
+Awk awk = new Awk(settings);
+AwkTuples expression = awk.compileForEval("$2");
+
+Object first = awk.eval(expression, "alpha,beta");
+Object second = awk.eval(expression, "left,right");
+```
+
+Both `Awk.eval(...)` and advanced direct `AVM.eval(...)` reuse the compiled
+tuple metadata to choose the read-only eval fast path automatically when the
+expression is side-effect free.
+
+When your application already has structured rows, implement
+`org.metricshub.jawk.jrt.InputSource` and feed fields directly to
+`Awk.eval(...)` or `Awk.invoke(...)` without serializing them back to text.
+
 See [AWK in Java documentation](https://metricshub.org/Jawk/java.html) for more details and advanced usage.
 
 ## Writing tests with `AwkTestSupport`

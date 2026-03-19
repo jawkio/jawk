@@ -46,16 +46,17 @@ public interface InputSource {
 	boolean nextRecord() throws IOException;
 
 	/**
-	 * Returns the current record text ({@code $0}).
+	 * Returns the current record text ({@code $0}), or {@code null} when the
+	 * source only exposes pre-split fields for the current record.
 	 * <p>
-	 * When {@link #getFields()} returns a non-null list, this value may be used as
-	 * the authoritative textual representation of the current record.
+	 * When both {@link #getRecordText()} and {@link #getFields()} return
+	 * non-null values, the field list is authoritative for field/NF access while
+	 * the record text is authoritative for the initial {@code $0} value.
 	 * </p>
 	 *
-	 * @return current record text, never {@code null} after a successful
-	 *         {@link #nextRecord()} call
+	 * @return current record text, or {@code null} when unavailable
 	 */
-	String getRecord();
+	String getRecordText();
 
 	/**
 	 * Returns pre-split fields for the current record, or {@code null} when the

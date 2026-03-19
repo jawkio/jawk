@@ -49,9 +49,9 @@ public class ListInputSourceTest {
 								Arrays.asList("b", "c")));
 
 		assertTrue(source.nextRecord());
-		assertEquals("a", source.getRecord());
+		assertEquals("a", source.getRecordText());
 		assertTrue(source.nextRecord());
-		assertEquals("b c", source.getRecord());
+		assertEquals("b c", source.getRecordText());
 		assertFalse(source.nextRecord());
 	}
 
@@ -64,7 +64,7 @@ public class ListInputSourceTest {
 		mutableRow.set(1, "changed");
 
 		assertEquals(Arrays.asList("alpha", "beta"), source.getFields());
-		assertEquals("alpha beta", source.getRecord());
+		assertEquals("alpha beta", source.getRecordText());
 	}
 
 	@Test
@@ -72,7 +72,7 @@ public class ListInputSourceTest {
 		ListInputSource source = new ListInputSource(Collections.singletonList(Arrays.asList("a", "b", "c")), "|");
 
 		assertTrue(source.nextRecord());
-		assertEquals("a|b|c", source.getRecord());
+		assertEquals("a|b|c", source.getRecordText());
 		assertEquals(Arrays.asList("a", "b", "c"), source.getFields());
 	}
 
@@ -117,7 +117,7 @@ public class ListInputSourceTest {
 		}
 
 		@Override
-		public String getRecord() {
+		public String getRecordText() {
 			return currentRecord;
 		}
 

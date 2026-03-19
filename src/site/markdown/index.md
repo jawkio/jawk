@@ -29,6 +29,22 @@ scripts.
 Object value = new Awk().eval("2 + 3");
 ```
 
+For repeated evaluations, compile once and reuse the tuples:
+
+```java
+AwkSettings settings = new AwkSettings();
+settings.setFieldSeparator(",");
+
+Awk awk = new Awk(settings);
+AwkTuples expression = awk.compileForEval("$2");
+
+Object first = awk.eval(expression, "alpha,beta");
+Object second = awk.eval(expression, "left,right");
+```
+
+Jawk automatically uses its read-only eval fast path when the compiled
+expression does not mutate AWK-visible state.
+
 ### Run a script directly
 
 ```java
@@ -51,6 +67,11 @@ awk.invoke(tuples, input, Collections.emptyList());
 Input and arguments are passed directly to the `invoke()` methods.
 `AwkSettings` is a purely behavioral configuration (field separator,
 record separator, output stream, variables, etc.).
+
+When your host application already has structured rows, implement
+`InputSource` and call `Awk.eval(...)` or `Awk.invoke(...)` directly on that
+structured source. Jawk also exposes `AVM` for advanced runtime reuse, but the
+recommended embedding API remains `Awk`.
 
 See [AWK in Java documentation](java.html) for advanced examples.
 

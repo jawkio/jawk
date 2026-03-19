@@ -1700,6 +1700,7 @@ public class JRT {
 	 *
 	 * @return a {@link java.util.Map} object
 	 */
+	@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "Exposing the live outputFiles map is intentional; generated Jawk scripts and advanced integrations rely on mutating it directly.")
 	public Map<String, PrintStream> getOutputFiles() {
 		return getIoState().outputFiles;
 	}

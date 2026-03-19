@@ -33,7 +33,6 @@ import java.io.FileOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintStream;
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import org.junit.Test;
@@ -105,13 +104,13 @@ public class RegexpTupleAndCachingTest {
 	@Test
 	public void serializedEvalTuplesPreserveExecutionProfile() throws Exception {
 		AwkTuples tuples = new Awk().compileForEval("NF \":\" $2");
-		AwkTuples.ExecutionProfile compiledProfile = getExecutionProfileField(tuples);
+		AwkTuples.ExecutionProfile compiledProfile = tuples.getExecutionProfile();
 
 		assertTrue("Compiled tuples should eagerly carry an execution profile", compiledProfile != null);
 		assertTrue("Execution profile should retain read-only eligibility", compiledProfile.isReadOnlyEvalEligible());
 
 		AwkTuples deserialized = roundTrip(tuples);
-		AwkTuples.ExecutionProfile deserializedProfile = getExecutionProfileField(deserialized);
+		AwkTuples.ExecutionProfile deserializedProfile = deserialized.getExecutionProfile();
 
 		assertTrue("Deserialized tuples should already carry an execution profile", deserializedProfile != null);
 		assertTrue(
@@ -136,11 +135,5 @@ public class RegexpTupleAndCachingTest {
 		try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(serialized.toByteArray()))) {
 			return (AwkTuples) ois.readObject();
 		}
-	}
-
-	private static AwkTuples.ExecutionProfile getExecutionProfileField(AwkTuples tuples) throws Exception {
-		Field field = AwkTuples.class.getDeclaredField("executionProfile");
-		field.setAccessible(true);
-		return (AwkTuples.ExecutionProfile) field.get(tuples);
 	}
 }

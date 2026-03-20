@@ -22,6 +22,8 @@ package org.metricshub.jawk.intermediate;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.io.PrintStream;
 import java.io.Serializable;
 import java.util.ArrayDeque;
@@ -74,6 +76,7 @@ public class AwkTuples implements Serializable {
 		@Override
 		public boolean add(Tuple t) {
 			t.setLineNumber(linenoStack.peek());
+			executionProfile = null;
 			return super.add(t);
 		}
 	};
@@ -81,6 +84,128 @@ public class AwkTuples implements Serializable {
 	private boolean postProcessed;
 
 	private boolean optimized;
+
+	private ExecutionProfile executionProfile = computeExecutionProfile();
+
+	/**
+	 * Immutable execution metadata derived from the compiled opcode stream.
+	 * <p>
+	 * The profile lets runtimes choose the correct execution path without
+	 * re-scanning the tuple queue on every invocation.
+	 * </p>
+	 */
+	public static final class ExecutionProfile implements Serializable {
+
+		private static final long serialVersionUID = 1L;
+
+		private final boolean readOnlyEvalEligible;
+		private final boolean mayCreateJrtIoState;
+		private final boolean usesRuntimeStack;
+		private final boolean needsGlobalVariableMetadata;
+		private final boolean mayApplyInputAssignments;
+		private final boolean needsArgumentOffsets;
+		private final boolean needsExitState;
+		private final boolean needsRandomState;
+
+		private ExecutionProfile(
+				boolean readOnlyEvalEligibleParam,
+				boolean mayCreateJrtIoStateParam,
+				boolean usesRuntimeStackParam,
+				boolean needsGlobalVariableMetadataParam,
+				boolean mayApplyInputAssignmentsParam,
+				boolean needsArgumentOffsetsParam,
+				boolean needsExitStateParam,
+				boolean needsRandomStateParam) {
+			this.readOnlyEvalEligible = readOnlyEvalEligibleParam;
+			this.mayCreateJrtIoState = mayCreateJrtIoStateParam;
+			this.usesRuntimeStack = usesRuntimeStackParam;
+			this.needsGlobalVariableMetadata = needsGlobalVariableMetadataParam;
+			this.mayApplyInputAssignments = mayApplyInputAssignmentsParam;
+			this.needsArgumentOffsets = needsArgumentOffsetsParam;
+			this.needsExitState = needsExitStateParam;
+			this.needsRandomState = needsRandomStateParam;
+		}
+
+		/**
+		 * Indicates whether the tuple stream can use the read-only eval fast path.
+		 *
+		 * @return {@code true} when execution cannot mutate AWK-visible state or
+		 *         perform external I/O
+		 */
+		public boolean isReadOnlyEvalEligible() {
+			return readOnlyEvalEligible;
+		}
+
+		/**
+		 * Indicates whether execution may allocate JRT-managed file or process
+		 * resources.
+		 *
+		 * @return {@code true} when execution may create redirected files, pipes,
+		 *         or getline readers that the runtime must close afterwards
+		 */
+		public boolean mayCreateJrtIoState() {
+			return mayCreateJrtIoState;
+		}
+
+		/**
+		 * Indicates whether the tuple stream uses AVM runtime-stack state.
+		 *
+		 * @return {@code true} when execution touches variable storage, function
+		 *         frames, or other runtime-stack-backed state
+		 */
+		public boolean usesRuntimeStack() {
+			return usesRuntimeStack;
+		}
+
+		/**
+		 * Indicates whether execution needs the tuple-provided global-variable and
+		 * function metadata installed on the AVM.
+		 *
+		 * @return {@code true} when execution reads global metadata directly
+		 */
+		public boolean needsGlobalVariableMetadata() {
+			return needsGlobalVariableMetadata;
+		}
+
+		/**
+		 * Indicates whether execution may apply ARGV-style {@code name=value}
+		 * assignments while consuming the primary input stream.
+		 *
+		 * @return {@code true} when input-consumption opcodes can trigger file-list
+		 *         assignments
+		 */
+		public boolean mayApplyInputAssignments() {
+			return mayApplyInputAssignments;
+		}
+
+		/**
+		 * Indicates whether execution can observe the materialized ENVIRON/ARGC/ARGV
+		 * offsets held on the AVM.
+		 *
+		 * @return {@code true} when those offsets must be reset for a fresh run
+		 */
+		public boolean needsArgumentOffsets() {
+			return needsArgumentOffsets;
+		}
+
+		/**
+		 * Indicates whether execution can observe exit-related AVM state.
+		 *
+		 * @return {@code true} when exit-related flags must be reset for a fresh run
+		 */
+		public boolean needsExitState() {
+			return needsExitState;
+		}
+
+		/**
+		 * Indicates whether execution can observe the AVM random-number state.
+		 *
+		 * @return {@code true} when rand/srand state must be reset for a fresh run
+		 */
+		public boolean needsRandomState() {
+			return needsRandomState;
+		}
+	}
 
 	/**
 	 * <p>
@@ -1632,6 +1757,7 @@ public class AwkTuples implements Serializable {
 		}
 		if (!queue.isEmpty() && queue.get(0).hasNext()) {
 			postProcessed = true;
+			refreshExecutionProfile();
 			return;
 		}
 		assignSequentialNextPointers();
@@ -1639,6 +1765,7 @@ public class AwkTuples implements Serializable {
 			tuple.touch(queue);
 		}
 		postProcessed = true;
+		refreshExecutionProfile();
 	}
 
 	/**
@@ -1660,10 +1787,12 @@ public class AwkTuples implements Serializable {
 		if (optimized) {
 			return;
 		}
+		executionProfile = null;
 		if (!postProcessed) {
 			postProcess();
 		}
-		boolean modified = peepholeOptimize();
+		boolean modified = removeRedundantEvalSetNumGlobals();
+		modified |= peepholeOptimize();
 		if (modified) {
 			assignSequentialNextPointers();
 			for (Tuple tuple : queue) {
@@ -1672,6 +1801,68 @@ public class AwkTuples implements Serializable {
 		}
 		optimizeQueue();
 		optimized = true;
+		refreshExecutionProfile();
+	}
+
+	private void refreshExecutionProfile() {
+		executionProfile = computeExecutionProfile();
+	}
+
+	/**
+	 * Removes the synthetic {@code SET_NUM_GLOBALS} prelude from eval tuple
+	 * streams that never touch runtime-stack-backed variables or global metadata.
+	 * <p>
+	 * Expression compilation always emits the opcode up front, but field-only or
+	 * JRT-special-only expressions can execute without initializing the AVM global
+	 * frame. Dropping the tuple here keeps the runtime path lean while preserving
+	 * the parser's simpler tuple construction flow.
+	 * </p>
+	 *
+	 * @return {@code true} when a redundant eval {@code SET_NUM_GLOBALS} tuple was
+	 *         removed
+	 */
+	private boolean removeRedundantEvalSetNumGlobals() {
+		int setNumGlobalsIndex = -1;
+		boolean isEvalTupleStream = false;
+		for (int i = 0; i < queue.size(); i++) {
+			Opcode opcode = queue.get(i).getOpcode();
+			if (opcode == null) {
+				continue;
+			}
+			switch (opcode) {
+			case SET_INPUT_FOR_EVAL:
+				isEvalTupleStream = true;
+				break;
+			case SET_NUM_GLOBALS:
+				if (setNumGlobalsIndex != -1) {
+					return false;
+				}
+				setNumGlobalsIndex = i;
+				break;
+			default:
+				if (usesRuntimeStack(opcode)
+						|| needsGlobalVariableMetadata(opcode)
+						|| needsArgumentOffsets(opcode)) {
+					return false;
+				}
+				break;
+			}
+		}
+		if (!isEvalTupleStream || setNumGlobalsIndex < 0) {
+			return false;
+		}
+
+		int[] indexMapping = new int[queue.size()];
+		for (int i = 0, nextIndex = 0; i < queue.size(); i++) {
+			if (i == setNumGlobalsIndex) {
+				indexMapping[i] = nextIndex;
+			} else {
+				indexMapping[i] = nextIndex++;
+			}
+		}
+		queue.remove(setNumGlobalsIndex);
+		remapAddresses(indexMapping);
+		return true;
 	}
 
 	private boolean peepholeOptimize() {
@@ -2188,6 +2379,270 @@ public class AwkTuples implements Serializable {
 	public Set<String> getFunctionNameSet() {
 		assert functionNames != null;
 		return Collections.unmodifiableSet(functionNames);
+	}
+
+	/**
+	 * Indicates whether these tuples are eligible for the read-only eval fast path.
+	 * <p>
+	 * Read-only eval excludes any opcode that mutates AWK-visible state or performs
+	 * external I/O. The classification is conservative: tuples may be rejected from
+	 * the fast path even if some executions would be side-effect free.
+	 * </p>
+	 *
+	 * @return {@code true} when the tuple stream is safe for read-only eval
+	 */
+	public boolean isReadOnlyEvalEligible() {
+		return getExecutionProfile().isReadOnlyEvalEligible();
+	}
+
+	/**
+	 * Returns execution metadata derived from the finalized tuple stream.
+	 *
+	 * @return immutable execution metadata for these tuples
+	 */
+	public ExecutionProfile getExecutionProfile() {
+		if (executionProfile == null) {
+			throw new IllegalStateException("Execution profile unavailable before tuple finalization.");
+		}
+		return executionProfile;
+	}
+
+	private void writeObject(ObjectOutputStream out) throws IOException {
+		if (executionProfile == null) {
+			refreshExecutionProfile();
+		}
+		out.defaultWriteObject();
+	}
+
+	private ExecutionProfile computeExecutionProfile() {
+		boolean readOnlyEvalEligible = true;
+		boolean mayCreateJrtIoState = false;
+		boolean usesRuntimeStack = false;
+		boolean needsGlobalVariableMetadata = false;
+		boolean mayApplyInputAssignments = false;
+		boolean needsArgumentOffsets = false;
+		boolean needsExitState = false;
+		boolean needsRandomState = false;
+		for (Tuple tuple : queue) {
+			Opcode opcode = tuple.getOpcode();
+			if (opcode == null) {
+				continue;
+			}
+			readOnlyEvalEligible &= !isReadOnlyEvalUnsafe(opcode);
+			mayCreateJrtIoState |= mayCreateJrtIoState(opcode);
+			usesRuntimeStack |= usesRuntimeStack(opcode);
+			needsGlobalVariableMetadata |= needsGlobalVariableMetadata(opcode);
+			mayApplyInputAssignments |= mayApplyInputAssignments(opcode);
+			needsArgumentOffsets |= needsArgumentOffsets(opcode);
+			needsExitState |= needsExitState(opcode);
+			needsRandomState |= needsRandomState(opcode);
+
+			if (!readOnlyEvalEligible
+					&& mayCreateJrtIoState
+					&& usesRuntimeStack
+					&& needsGlobalVariableMetadata
+					&& mayApplyInputAssignments
+					&& needsArgumentOffsets
+					&& needsExitState
+					&& needsRandomState) {
+				break;
+			}
+		}
+		return new ExecutionProfile(
+				readOnlyEvalEligible,
+				mayCreateJrtIoState,
+				usesRuntimeStack,
+				needsGlobalVariableMetadata,
+				mayApplyInputAssignments,
+				needsArgumentOffsets,
+				needsExitState,
+				needsRandomState);
+	}
+
+	private boolean isReadOnlyEvalUnsafe(Opcode opcode) {
+		switch (opcode) {
+		case PRINT:
+		case PRINT_TO_FILE:
+		case PRINT_TO_PIPE:
+		case PRINTF:
+		case PRINTF_TO_FILE:
+		case PRINTF_TO_PIPE:
+		case ASSIGN:
+		case ASSIGN_ARRAY:
+		case ASSIGN_AS_INPUT:
+		case ASSIGN_AS_INPUT_FIELD:
+		case PLUS_EQ:
+		case MINUS_EQ:
+		case MULT_EQ:
+		case DIV_EQ:
+		case MOD_EQ:
+		case POW_EQ:
+		case PLUS_EQ_ARRAY:
+		case MINUS_EQ_ARRAY:
+		case MULT_EQ_ARRAY:
+		case DIV_EQ_ARRAY:
+		case MOD_EQ_ARRAY:
+		case POW_EQ_ARRAY:
+		case PLUS_EQ_INPUT_FIELD:
+		case MINUS_EQ_INPUT_FIELD:
+		case MULT_EQ_INPUT_FIELD:
+		case DIV_EQ_INPUT_FIELD:
+		case MOD_EQ_INPUT_FIELD:
+		case POW_EQ_INPUT_FIELD:
+		case SRAND:
+		case RAND:
+		case MATCH:
+		case SUB_FOR_DOLLAR_0:
+		case SUB_FOR_DOLLAR_REFERENCE:
+		case SUB_FOR_VARIABLE:
+		case SUB_FOR_ARRAY_REFERENCE:
+		case SPLIT:
+		case SYSTEM:
+		case INC:
+		case DEC:
+		case POSTINC:
+		case POSTDEC:
+		case INC_ARRAY_REF:
+		case DEC_ARRAY_REF:
+		case INC_DOLLAR_REF:
+		case DEC_DOLLAR_REF:
+		case CONSUME_INPUT:
+		case GETLINE_INPUT:
+		case USE_AS_FILE_INPUT:
+		case USE_AS_COMMAND_INPUT:
+		case ASSIGN_NF:
+		case ASSIGN_NR:
+		case ASSIGN_FNR:
+		case ASSIGN_FS:
+		case ASSIGN_RS:
+		case ASSIGN_OFS:
+		case ASSIGN_ORS:
+		case ASSIGN_RSTART:
+		case ASSIGN_RLENGTH:
+		case ASSIGN_FILENAME:
+		case ASSIGN_SUBSEP:
+		case ASSIGN_CONVFMT:
+		case ASSIGN_OFMT:
+		case ASSIGN_ARGC:
+		case APPLY_RS:
+		case CLOSE:
+		case DELETE_ARRAY_ELEMENT:
+		case DELETE_ARRAY:
+		case SET_EXIT_ADDRESS:
+		case SET_WITHIN_END_BLOCKS:
+		case EXIT_WITH_CODE:
+		case EXIT_WITHOUT_CODE:
+		case EXTENSION:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	private boolean mayCreateJrtIoState(Opcode opcode) {
+		switch (opcode) {
+		case PRINT_TO_FILE:
+		case PRINT_TO_PIPE:
+		case PRINTF_TO_FILE:
+		case PRINTF_TO_PIPE:
+		case USE_AS_FILE_INPUT:
+		case USE_AS_COMMAND_INPUT:
+		case CLOSE:
+		case EXTENSION:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	private boolean usesRuntimeStack(Opcode opcode) {
+		switch (opcode) {
+		case ASSIGN:
+		case ASSIGN_ARRAY:
+		case DEREFERENCE:
+		case PLUS_EQ:
+		case MINUS_EQ:
+		case MULT_EQ:
+		case DIV_EQ:
+		case MOD_EQ:
+		case POW_EQ:
+		case PLUS_EQ_ARRAY:
+		case MINUS_EQ_ARRAY:
+		case MULT_EQ_ARRAY:
+		case DIV_EQ_ARRAY:
+		case MOD_EQ_ARRAY:
+		case POW_EQ_ARRAY:
+		case CALL_FUNCTION:
+		case SET_RETURN_RESULT:
+		case RETURN_FROM_FUNCTION:
+		case SET_NUM_GLOBALS:
+		case DELETE_ARRAY_ELEMENT:
+		case DELETE_ARRAY:
+		case MATCH:
+		case ENVIRON_OFFSET:
+		case ARGC_OFFSET:
+		case ARGV_OFFSET:
+		case ASSIGN_ARGC:
+		case PUSH_ARGC:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	private boolean needsGlobalVariableMetadata(Opcode opcode) {
+		switch (opcode) {
+		case MATCH:
+		case SET_NUM_GLOBALS:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	private boolean mayApplyInputAssignments(Opcode opcode) {
+		switch (opcode) {
+		case CONSUME_INPUT:
+		case GETLINE_INPUT:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	private boolean needsArgumentOffsets(Opcode opcode) {
+		switch (opcode) {
+		case ENVIRON_OFFSET:
+		case ARGC_OFFSET:
+		case ARGV_OFFSET:
+		case ASSIGN_ARGC:
+		case PUSH_ARGC:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	private boolean needsExitState(Opcode opcode) {
+		switch (opcode) {
+		case SET_EXIT_ADDRESS:
+		case SET_WITHIN_END_BLOCKS:
+		case EXIT_WITH_CODE:
+		case EXIT_WITHOUT_CODE:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	private boolean needsRandomState(Opcode opcode) {
+		switch (opcode) {
+		case SRAND:
+		case RAND:
+			return true;
+		default:
+			return false;
+		}
 	}
 
 	/** linenumber stack ... */

@@ -30,11 +30,11 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
-
 import org.junit.Test;
 import org.metricshub.jawk.intermediate.AwkTuples;
 import org.metricshub.jawk.util.AwkSettings;
@@ -101,11 +101,39 @@ public class RegexpTupleAndCachingTest {
 		assertEquals("1\n", out.toString(StandardCharsets.UTF_8.name()));
 	}
 
+	@Test
+	public void serializedEvalTuplesPreserveExecutionProfile() throws Exception {
+		AwkTuples tuples = new Awk().compileForEval("NF \":\" $2");
+		AwkTuples.ExecutionProfile compiledProfile = tuples.getExecutionProfile();
+
+		assertTrue("Compiled tuples should eagerly carry an execution profile", compiledProfile != null);
+		assertTrue("Execution profile should retain read-only eligibility", compiledProfile.isReadOnlyEvalEligible());
+
+		AwkTuples deserialized = roundTrip(tuples);
+		AwkTuples.ExecutionProfile deserializedProfile = deserialized.getExecutionProfile();
+
+		assertTrue("Deserialized tuples should already carry an execution profile", deserializedProfile != null);
+		assertTrue(
+				"Serialized execution profile should remain read-only-eligible",
+				deserializedProfile.isReadOnlyEvalEligible());
+		assertEquals("2:right", new Awk().eval(deserialized, "left right"));
+	}
+
 	private static String dumpTuples(AwkTuples tuples) throws Exception {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		try (PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8.name())) {
 			tuples.dump(ps);
 		}
 		return out.toString(StandardCharsets.UTF_8.name());
+	}
+
+	private static AwkTuples roundTrip(AwkTuples tuples) throws Exception {
+		ByteArrayOutputStream serialized = new ByteArrayOutputStream();
+		try (ObjectOutputStream oos = new ObjectOutputStream(serialized)) {
+			oos.writeObject(tuples);
+		}
+		try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(serialized.toByteArray()))) {
+			return (AwkTuples) ois.readObject();
+		}
 	}
 }

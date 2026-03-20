@@ -39,6 +39,7 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.IllegalFormatException;
 import java.util.List;
 import java.util.Locale;
@@ -89,23 +90,43 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
  */
 public class JRT {
 
+	/**
+	 * Abstraction used by the runtime to write AWK output. The default
+	 * implementation delegates to a {@link PrintStream}, but subclasses may
+	 * return sinks backed by structured writers or in-memory buffers.
+	 */
+	public interface OutputSink {
+
+		/**
+		 * Writes the provided string to the sink.
+		 *
+		 * @param value text to write
+		 */
+		void write(String value);
+
+		/**
+		 * Flushes any buffered output held by the sink.
+		 */
+		void flush();
+	}
+
 	private static final boolean IS_WINDOWS = System.getProperty("os.name").indexOf("Windows") >= 0;
 
 	private VariableManager vm;
 
-	private Map<String, Process> outputProcesses = new HashMap<String, Process>();
-	private Map<String, PrintStream> outputStreams = new HashMap<String, PrintStream>();
+	private IoState ioState;
+	private final Map<PrintStream, OutputSink> outputSinkCache = new IdentityHashMap<PrintStream, OutputSink>();
 	/** PrintStream used for command output */
 	private PrintStream output = System.out;
 	/** PrintStream used for command error output */
 	private PrintStream error = System.err;
 
-	// Current input line ($0).
+	// Last input line consumed for getline-style transport.
 	private String inputLine = null;
-	// Current input fields ($0, $1, $2, ...).
-	private List<String> inputFields = new ArrayList<String>(100);
+	// Current record state ($0, $1, $2, ...).
+	private RecordState recordState;
 	// Pre-split fields captured during structured getline for bare getline assignment.
-	private boolean lastGetlineFromInputSource;
+	private List<String> pendingGetlineFields;
 	// The currently active InputSource (set during consumeInput calls).
 	private InputSource activeSource;
 	private static final UninitializedObject BLANK = new UninitializedObject();
@@ -114,14 +135,6 @@ public class JRT {
 	private static final Integer ZERO = Integer.valueOf(0);
 	private static final Integer MINUS_ONE = Integer.valueOf(-1);
 	private String jrtInputString;
-
-	private Map<String, PartitioningReader> fileReaders = new HashMap<String, PartitioningReader>();
-	private Map<String, PartitioningReader> commandReaders = new HashMap<String, PartitioningReader>();
-	private Map<String, Process> commandProcesses = new HashMap<String, Process>();
-	private Map<String, Thread> commandErrorPumps = new HashMap<String, Thread>();
-	private Map<String, PrintStream> outputFiles = new HashMap<String, PrintStream>();
-	private Map<String, Thread> outputStdoutPumps = new HashMap<String, Thread>();
-	private Map<String, Thread> outputStderrPumps = new HashMap<String, Thread>();
 
 	// JRT-managed special variables (runtime only)
 	private long nr; // total record number
@@ -137,6 +150,38 @@ public class JRT {
 	private String ofmt; // number-to-string for output
 	private String subsep; // subscript separator
 	private Locale locale; // locale for number formatting
+
+	private static final class PrintStreamOutputSink implements OutputSink {
+
+		private final PrintStream printStream;
+
+		private PrintStreamOutputSink(PrintStream printStream) {
+			this.printStream = printStream;
+		}
+
+		@Override
+		public void write(String value) {
+			printStream.print(value);
+		}
+
+		@Override
+		public void flush() {
+			printStream.flush();
+		}
+	}
+
+	private static final class IoState {
+
+		private final Map<String, Process> outputProcesses = new HashMap<String, Process>();
+		private final Map<String, PrintStream> outputStreams = new HashMap<String, PrintStream>();
+		private final Map<String, PartitioningReader> fileReaders = new HashMap<String, PartitioningReader>();
+		private final Map<String, PartitioningReader> commandReaders = new HashMap<String, PartitioningReader>();
+		private final Map<String, Process> commandProcesses = new HashMap<String, Process>();
+		private final Map<String, Thread> commandErrorPumps = new HashMap<String, Thread>();
+		private final Map<String, PrintStream> outputFiles = new HashMap<String, PrintStream>();
+		private final Map<String, Thread> outputStdoutPumps = new HashMap<String, Thread>();
+		private final Map<String, Thread> outputStderrPumps = new HashMap<String, Thread>();
+	}
 
 	/**
 	 * Create a JRT with a VariableManager
@@ -180,6 +225,153 @@ public class JRT {
 	public void setStreams(PrintStream ps, PrintStream err) {
 		output = ps == null ? System.out : ps;
 		error = err == null ? System.err : err;
+	}
+
+	private IoState getIoState() {
+		if (ioState == null) {
+			ioState = new IoState();
+		}
+		return ioState;
+	}
+
+	/**
+	 * Returns whether the supplied variable name is managed directly by JRT
+	 * rather than through the AVM runtime stack.
+	 *
+	 * @param name variable name to inspect
+	 * @return {@code true} when the variable is a JRT-managed special variable
+	 */
+	public static boolean isJrtManagedSpecialVariable(String name) {
+		return "FS".equals(name)
+				|| "RS".equals(name)
+				|| "OFS".equals(name)
+				|| "ORS".equals(name)
+				|| "CONVFMT".equals(name)
+				|| "OFMT".equals(name)
+				|| "SUBSEP".equals(name)
+				|| "FILENAME".equals(name)
+				|| "NF".equals(name)
+				|| "NR".equals(name)
+				|| "FNR".equals(name)
+				|| "ARGC".equals(name);
+	}
+
+	/**
+	 * Copies only the JRT-managed special variables from the supplied map.
+	 *
+	 * @param variableMap source variable map
+	 * @return a new map containing only JRT-managed special variables
+	 */
+	public static Map<String, Object> copySpecialVariables(Map<String, Object> variableMap) {
+		Map<String, Object> specialVariables = new HashMap<String, Object>();
+		if (variableMap == null || variableMap.isEmpty()) {
+			return specialVariables;
+		}
+		for (Map.Entry<String, Object> entry : variableMap.entrySet()) {
+			if (isJrtManagedSpecialVariable(entry.getKey())) {
+				specialVariables.put(entry.getKey(), entry.getValue());
+			}
+		}
+		return specialVariables;
+	}
+
+	/**
+	 * Clears execution-specific state so the same JRT instance can be reused for
+	 * another evaluation or interpretation run.
+	 */
+	public void resetRuntimeState() {
+		jrtCloseAll();
+		clearExecutionState();
+	}
+
+	/**
+	 * Clears per-execution JRT state and re-applies the default runtime special
+	 * variables for a new script or expression execution.
+	 *
+	 * @param initialFsValue initial field separator, or {@code null} to use the
+	 *        AWK default
+	 * @param defaultRs default record separator
+	 * @param defaultOrs default output record separator
+	 */
+	public void prepareForExecution(String initialFsValue, String defaultRs, String defaultOrs) {
+		clearExecutionState();
+		applyDefaultRuntimeVariables(initialFsValue, defaultRs, defaultOrs);
+	}
+
+	/**
+	 * Initializes JRT-managed special variables to their per-execution defaults
+	 * after first closing all JRT-managed resources from the previous run.
+	 *
+	 * @param initialFsValue initial field separator, or {@code null} to use the
+	 *        AWK default
+	 * @param defaultRs default record separator
+	 * @param defaultOrs default output record separator
+	 */
+	public void initializeRuntimeState(String initialFsValue, String defaultRs, String defaultOrs) {
+		resetRuntimeState();
+		applyDefaultRuntimeVariables(initialFsValue, defaultRs, defaultOrs);
+	}
+
+	/**
+	 * Initializes JRT-managed special variables for a brand-new runtime instance.
+	 * <p>
+	 * Unlike {@link #initializeRuntimeState(String, String, String)}, this method
+	 * assumes no prior execution state is present and therefore skips the full
+	 * reset/close cycle.
+	 * </p>
+	 *
+	 * @param initialFsValue initial field separator, or {@code null} to use the
+	 *        AWK default
+	 * @param defaultRs default record separator
+	 * @param defaultOrs default output record separator
+	 */
+	public void initializeFreshRuntimeState(String initialFsValue, String defaultRs, String defaultOrs) {
+		prepareForExecution(initialFsValue, defaultRs, defaultOrs);
+	}
+
+	/**
+	 * Clears all JRT state that is specific to a single execution.
+	 * <p>
+	 * Resource closing is intentionally handled by the caller before this method
+	 * is used, so the method only drops references and resets counters.
+	 * </p>
+	 */
+	private void clearExecutionState() {
+		ioState = null;
+		outputSinkCache.clear();
+		inputLine = null;
+		recordState = null;
+		pendingGetlineFields = null;
+		activeSource = null;
+		jrtInputString = null;
+		nr = 0L;
+		fnr = 0L;
+		rstart = 0;
+		rlength = 0;
+		filename = "";
+	}
+
+	/**
+	 * Restores the runtime-managed special variables to their execution defaults.
+	 *
+	 * @param initialFsValue initial field separator, or {@code null} to use the
+	 *        AWK default
+	 * @param defaultRs default record separator
+	 * @param defaultOrs default output record separator
+	 */
+	private void applyDefaultRuntimeVariables(String initialFsValue, String defaultRs, String defaultOrs) {
+		setFS(initialFsValue == null ? " " : initialFsValue);
+		setRS(defaultRs);
+		setOFS(" ");
+		setORS(defaultOrs);
+		setCONVFMT("%.6g");
+		setOFMT("%.6g");
+		setSUBSEP(String.valueOf((char) 28));
+		setFILENAMEViaJrt("");
+		setNR(0);
+		setFNR(0);
+		setRSTART(0);
+		setRLENGTH(0);
 	}
 
 	/**
@@ -677,7 +869,8 @@ public class JRT {
 			// match against $0
 			// ...
 			Pattern pattern = (Pattern) o;
-			String s = inputLine == null ? "" : inputLine;
+			Object inputField = jrtGetInputField(0);
+			String s = inputField instanceof UninitializedObject ? "" : inputField.toString();
 			Matcher matcher = pattern.matcher(s);
 			val = matcher.find();
 		} else {
@@ -758,7 +951,13 @@ public class JRT {
 	 * @return a {@link java.lang.String} object
 	 */
 	public String getInputLine() {
-		return inputLine;
+		if (inputLine != null) {
+			return inputLine;
+		}
+		if (recordState == null) {
+			return null;
+		}
+		return recordState.getRecordText();
 	}
 
 	/**
@@ -768,8 +967,10 @@ public class JRT {
 	 * @return current NF value
 	 */
 	public Integer getNF() {
-		int size = inputFields.size();
-		return Integer.valueOf(size == 0 ? 0 : size - 1);
+		if (recordState == null) {
+			return Integer.valueOf(0);
+		}
+		return Integer.valueOf(recordState.getNF());
 	}
 
 	/**
@@ -1049,6 +1250,7 @@ public class JRT {
 	 */
 	public void setInputLine(String inputLine) {
 		this.inputLine = inputLine;
+		recordState = newRecordStateFromText(inputLine);
 		clearPendingGetlineFields();
 	}
 
@@ -1065,14 +1267,12 @@ public class JRT {
 	public void assignInputLineFromGetline(Object value) {
 		String inputValue = value == null ? "" : value.toString();
 		inputLine = inputValue;
-		if (lastGetlineFromInputSource
-				&& activeSource != null
-				&& activeSource.getFields() != null) {
-			initializeInputFields(inputValue, activeSource.getFields());
+		if (pendingGetlineFields != null) {
+			initializeInputFields(inputValue, pendingGetlineFields);
 		} else {
-			jrtParseFields();
+			recordState = newRecordStateFromText(inputValue);
 		}
-		lastGetlineFromInputSource = false;
+		clearPendingGetlineFields();
 	}
 
 	/**
@@ -1094,21 +1294,25 @@ public class JRT {
 			return false;
 		}
 
-		String record = source.getRecord();
-		if (record == null) {
-			throw new IllegalStateException("InputSource#getRecord() returned null after nextRecord()");
-		}
-		inputLine = record;
+		String recordText = source.getRecordText();
 		List<String> preFields = source.getFields();
+		if (recordText == null && preFields == null) {
+			throw new IllegalStateException(
+					"InputSource must provide record text, fields, or both after nextRecord()");
+		}
 
 		if (forGetline) {
-			cacheGetlineFields(preFields);
+			List<String> sanitizedFields = preFields == null ? null : sanitizeFields(preFields);
+			inputLine = recordText != null ? recordText : joinFieldsWithLiteralSeparator(sanitizedFields, fs);
+			cacheGetlineFields(sanitizedFields);
 		} else {
+			inputLine = recordText;
 			clearPendingGetlineFields();
 			if (preFields == null) {
-				jrtParseFields();
+				recordState = newRecordStateFromText(recordText);
+				recordState.ensureFieldsMaterialized();
 			} else {
-				initializeInputFields(record, preFields);
+				recordState = newRecordStateFromSource(recordText, preFields);
 			}
 		}
 
@@ -1138,21 +1342,16 @@ public class JRT {
 	 * @param record current {@code $0} text
 	 * @param preFields current fields where index {@code 0} is {@code $1}
 	 */
-	private void initializeInputFields(String record, List<String> preFields) {
-		inputFields.clear();
-		inputFields.add(record);
-		for (String field : preFields) {
-			inputFields.add(field == null ? "" : field);
-		}
-		recalculateNF();
+	protected void initializeInputFields(String record, List<String> preFields) {
+		recordState = newRecordStateFromSource(record, preFields);
 	}
 
-	private void cacheGetlineFields(List<String> preFields) {
-		lastGetlineFromInputSource = preFields != null;
+	protected void cacheGetlineFields(List<String> preFields) {
+		pendingGetlineFields = preFields == null ? null : sanitizeFields(preFields);
 	}
 
-	private void clearPendingGetlineFields() {
-		lastGetlineFromInputSource = false;
+	protected void clearPendingGetlineFields() {
+		pendingGetlineFields = null;
 	}
 
 	/**
@@ -1160,42 +1359,15 @@ public class JRT {
 	 * Called when an update to $0 has occurred.
 	 */
 	public void jrtParseFields() {
-		String fsString = this.fs;
-		assert inputLine != null;
-
-		inputFields.clear();
-		inputFields.add(inputLine); // $0
-
-		if (!inputLine.isEmpty()) {
-			Enumeration<Object> tokenizer;
-			if (fsString.equals(" ")) {
-				tokenizer = new StringTokenizer(inputLine);
-			} else if (fsString.length() == 1) {
-				tokenizer = new SingleCharacterTokenizer(inputLine, fsString.charAt(0));
-			} else if (fsString.equals("")) {
-				tokenizer = new CharacterTokenizer(inputLine);
-			} else {
-				tokenizer = new RegexTokenizer(inputLine, fsString);
-			}
-
-			while (tokenizer.hasMoreElements()) {
-				inputFields.add((String) tokenizer.nextElement());
-			}
-		}
-
-		// recalc NF
-		recalculateNF();
-	}
-
-	private void recalculateNF() {
-		// NF is managed internally by JRT; parser reads via PUSH_NF
+		RecordState state = ensureRecordStateForTextMutation();
+		state.ensureFieldsMaterialized();
 	}
 
 	/**
 	 * @return true if at least one input field has been initialized.
 	 */
 	public boolean hasInputFields() {
-		return !inputFields.isEmpty();
+		return recordState != null;
 	}
 
 	/**
@@ -1211,19 +1383,20 @@ public class JRT {
 			nf = 0;
 		}
 
-		int currentNF = inputFields.size() - 1;
+		RecordState state = ensureRecordStateForFieldMutation();
+		int currentNF = state.getNF();
 
 		if (nf < currentNF) {
 			for (int i = currentNF; i > nf; i--) {
-				inputFields.remove(i);
+				state.removeField(i - 1);
 			}
 		} else if (nf > currentNF) {
 			for (int i = currentNF + 1; i <= nf; i++) {
-				inputFields.add("");
+				state.addField("");
 			}
 		}
 
-		rebuildDollarZeroFromFields();
+		state.markRecordTextDirty();
 	}
 
 	/**
@@ -1255,13 +1428,10 @@ public class JRT {
 			}
 			throw new AwkRuntimeException(position.lineNumber(), message);
 		}
-		int fieldIndex = (int) fieldnum;
-		if (fieldIndex < inputFields.size()) {
-			String retval = inputFields.get(fieldIndex);
-			assert retval != null;
-			return retval;
+		if (recordState == null) {
+			return BLANK;
 		}
-		return BLANK;
+		return recordState.getField((int) fieldnum);
 	}
 
 	public Object jrtGetInputField(long fieldnum) {
@@ -1291,35 +1461,185 @@ public class JRT {
 		}
 		String value = valueObj.toString();
 		int fieldIndex = (int) fieldNum;
-// if the value is BLANK
+		RecordState state = ensureRecordStateForFieldMutation();
 		if (valueObj instanceof UninitializedObject) {
-			if (fieldIndex < inputFields.size()) {
-				inputFields.set(fieldIndex, "");
+			if (fieldIndex <= state.getNF()) {
+				state.setField(fieldIndex - 1, "");
 			}
 		} else {
-// append the list to accommodate the new value
-			for (int i = inputFields.size() - 1; i < fieldIndex; i++) {
-				inputFields.add("");
+			while (state.getNF() < fieldIndex) {
+				state.addField("");
 			}
-			inputFields.set(fieldIndex, value);
+			state.setField(fieldIndex - 1, value);
 		}
-// rebuild $0
-		rebuildDollarZeroFromFields();
-		// recalc NF
-		recalculateNF();
+		state.markRecordTextDirty();
 		return value;
 	}
 
-	private void rebuildDollarZeroFromFields() {
-		StringBuilder newDollarZeroSb = new StringBuilder();
-		String ofsValue = this.ofs;
-		for (int i = 1; i < inputFields.size(); i++) {
-			if (i > 1) {
-				newDollarZeroSb.append(ofsValue);
-			}
-			newDollarZeroSb.append(inputFields.get(i));
+	protected void rebuildDollarZeroFromFields() {
+		if (recordState != null) {
+			recordState.markRecordTextDirty();
+			inputLine = recordState.getRecordText();
 		}
-		inputFields.set(0, newDollarZeroSb.toString());
+	}
+
+	private RecordState ensureRecordStateForTextMutation() {
+		if (recordState == null) {
+			recordState = newRecordStateFromText(inputLine == null ? "" : inputLine);
+		}
+		return recordState;
+	}
+
+	private RecordState ensureRecordStateForFieldMutation() {
+		RecordState state = ensureRecordStateForTextMutation();
+		state.ensureFieldsMaterialized();
+		return state;
+	}
+
+	private static List<String> sanitizeFields(List<String> rawFields) {
+		List<String> copy = new ArrayList<String>(rawFields.size());
+		for (String field : rawFields) {
+			copy.add(field == null ? "" : field);
+		}
+		return copy;
+	}
+
+	private List<String> splitRecordText(String recordText) {
+		List<String> fields = new ArrayList<String>();
+		if (recordText == null || recordText.isEmpty()) {
+			return fields;
+		}
+
+		Enumeration<Object> tokenizer;
+		if (fs.equals(" ")) {
+			tokenizer = new StringTokenizer(recordText);
+		} else if (fs.length() == 1) {
+			tokenizer = new SingleCharacterTokenizer(recordText, fs.charAt(0));
+		} else if (fs.equals("")) {
+			tokenizer = new CharacterTokenizer(recordText);
+		} else {
+			tokenizer = new RegexTokenizer(recordText, fs);
+		}
+
+		while (tokenizer.hasMoreElements()) {
+			fields.add((String) tokenizer.nextElement());
+		}
+		return fields;
+	}
+
+	private static String joinFieldsWithLiteralSeparator(List<String> fields, String separator) {
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < fields.size(); i++) {
+			if (i > 0) {
+				sb.append(separator);
+			}
+			sb.append(fields.get(i));
+		}
+		return sb.toString();
+	}
+
+	private String rebuildRecordTextFromFields(List<String> fields) {
+		return joinFieldsWithLiteralSeparator(fields, ofs);
+	}
+
+	private RecordState newRecordStateFromText(String recordText) {
+		return new RecordState(recordText, null);
+	}
+
+	private RecordState newRecordStateFromSource(String recordText, List<String> rawFields) {
+		return new RecordState(recordText, rawFields);
+	}
+
+	private final class RecordState {
+
+		private String recordText;
+		private List<String> fields;
+		private boolean recordTextAvailable;
+		private boolean fieldsAvailable;
+		private boolean recordTextDirty;
+		private boolean fieldsDirty;
+
+		private RecordState(String recordText, List<String> rawFields) {
+			if (recordText != null) {
+				this.recordText = recordText;
+				this.recordTextAvailable = true;
+			} else if (rawFields == null) {
+				this.recordText = "";
+				this.recordTextAvailable = true;
+			}
+			if (rawFields != null) {
+				this.fields = sanitizeFields(rawFields);
+				this.fieldsAvailable = true;
+			} else {
+				this.fieldsAvailable = false;
+			}
+			this.recordTextDirty = false;
+			this.fieldsDirty = rawFields == null;
+		}
+
+		private void ensureFieldsMaterialized() {
+			if (fieldsAvailable && !fieldsDirty) {
+				return;
+			}
+			fields = splitRecordText(getRecordText());
+			fieldsAvailable = true;
+			fieldsDirty = false;
+		}
+
+		private String getRecordText() {
+			if (!recordTextAvailable || recordTextDirty) {
+				if (!fieldsAvailable) {
+					recordText = "";
+				} else if (recordTextDirty) {
+					recordText = rebuildRecordTextFromFields(fields);
+				} else {
+					recordText = joinFieldsWithLiteralSeparator(fields, fs);
+				}
+				recordTextAvailable = true;
+				recordTextDirty = false;
+			}
+			return recordText;
+		}
+
+		private int getNF() {
+			ensureFieldsMaterialized();
+			return fields.size();
+		}
+
+		private Object getField(int fieldIndex) {
+			if (fieldIndex == 0) {
+				return getRecordText();
+			}
+			ensureFieldsMaterialized();
+			int zeroBasedIndex = fieldIndex - 1;
+			if (zeroBasedIndex < 0 || zeroBasedIndex >= fields.size()) {
+				return BLANK;
+			}
+			return fields.get(zeroBasedIndex);
+		}
+
+		private void setField(int zeroBasedIndex, String value) {
+			ensureFieldsMaterialized();
+			fields.set(zeroBasedIndex, value);
+			markRecordTextDirty();
+		}
+
+		private void addField(String value) {
+			ensureFieldsMaterialized();
+			fields.add(value);
+			markRecordTextDirty();
+		}
+
+		private void removeField(int zeroBasedIndex) {
+			ensureFieldsMaterialized();
+			fields.remove(zeroBasedIndex);
+			markRecordTextDirty();
+		}
+
+		private void markRecordTextDirty() {
+			recordTextDirty = true;
+			recordTextAvailable = fieldsAvailable;
+		}
 	}
 
 	/**
@@ -1382,9 +1702,151 @@ public class JRT {
 	 *
 	 * @return a {@link java.util.Map} object
 	 */
-	@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "Callers modify the map of output files directly")
 	public Map<String, PrintStream> getOutputFiles() {
-		return outputFiles;
+		return getIoState().outputFiles;
+	}
+
+	/**
+	 * Returns the default output sink used by {@code print} and {@code printf}.
+	 * Subclasses may override this to direct output somewhere other than a
+	 * {@link PrintStream}.
+	 *
+	 * @return the current default output sink
+	 */
+	protected OutputSink getOutputSink() {
+		return toOutputSink(output);
+	}
+
+	/**
+	 * Resolves the sink used by file redirection.
+	 *
+	 * @param fileNameParam target file name
+	 * @param append whether output should be appended
+	 * @return the sink that writes to the requested file
+	 */
+	protected OutputSink getFileOutputSink(String fileNameParam, boolean append) {
+		return toOutputSink(jrtGetPrintStream(fileNameParam, append));
+	}
+
+	/**
+	 * Resolves the sink used by pipe redirection.
+	 *
+	 * @param cmd command to execute
+	 * @return the sink connected to the process stdin
+	 */
+	protected OutputSink getPipeOutputSink(String cmd) {
+		return toOutputSink(jrtSpawnForOutput(cmd));
+	}
+
+	/**
+	 * Writes a standard AWK {@code print} operation to the default output.
+	 *
+	 * @param values values to print; an empty array prints {@code $0}
+	 */
+	public void printDefault(Object[] values) {
+		print(getOutputSink(), values);
+	}
+
+	/**
+	 * Writes a standard AWK {@code print} operation to a redirected file.
+	 *
+	 * @param fileNameParam target file name
+	 * @param append whether output should be appended
+	 * @param values values to print; an empty array prints {@code $0}
+	 */
+	public void printToFile(String fileNameParam, boolean append, Object[] values) {
+		print(getFileOutputSink(fileNameParam, append), values);
+	}
+
+	/**
+	 * Writes a standard AWK {@code print} operation to a redirected process.
+	 *
+	 * @param cmd command to execute
+	 * @param values values to print; an empty array prints {@code $0}
+	 */
+	public void printToProcess(String cmd, Object[] values) {
+		print(getPipeOutputSink(cmd), values);
+	}
+
+	/**
+	 * Writes a standard AWK {@code print} operation to the specified sink.
+	 *
+	 * @param sink output sink
+	 * @param values values to print; an empty array prints {@code $0}
+	 */
+	protected void print(OutputSink sink, Object[] values) {
+		if (values.length == 0) {
+			sink.write(jrtGetInputField(0).toString());
+			sink.write(getORSString());
+			sink.flush();
+			return;
+		}
+
+		String ofsString = getOFSString();
+		for (int i = 0; i < values.length; i++) {
+			sink.write(toAwkStringForOutput(values[i]));
+			if (i < values.length - 1) {
+				sink.write(ofsString);
+			}
+		}
+		sink.write(getORSString());
+		sink.flush();
+	}
+
+	/**
+	 * Writes a formatted AWK output string to the specified sink.
+	 *
+	 * @param formattedValue pre-formatted text to write
+	 * @param flush whether the sink must be flushed afterwards
+	 */
+	public void printfDefault(String formattedValue, boolean flush) {
+		writeFormatted(getOutputSink(), formattedValue, flush);
+	}
+
+	/**
+	 * Writes formatted AWK output to a redirected file.
+	 *
+	 * @param fileNameParam target file name
+	 * @param append whether output should be appended
+	 * @param formattedValue pre-formatted text to write
+	 * @param flush whether the sink must be flushed afterwards
+	 */
+	public void printfToFile(String fileNameParam, boolean append, String formattedValue, boolean flush) {
+		writeFormatted(getFileOutputSink(fileNameParam, append), formattedValue, flush);
+	}
+
+	/**
+	 * Writes formatted AWK output to a redirected process.
+	 *
+	 * @param cmd command to execute
+	 * @param formattedValue pre-formatted text to write
+	 * @param flush whether the sink must be flushed afterwards
+	 */
+	public void printfToProcess(String cmd, String formattedValue, boolean flush) {
+		writeFormatted(getPipeOutputSink(cmd), formattedValue, flush);
+	}
+
+	/**
+	 * Writes a pre-formatted string to the specified sink.
+	 *
+	 * @param sink output sink
+	 * @param formattedValue pre-formatted text to write
+	 * @param flush whether the sink must be flushed afterwards
+	 */
+	protected void writeFormatted(OutputSink sink, String formattedValue, boolean flush) {
+		sink.write(formattedValue);
+		if (flush) {
+			sink.flush();
+		}
+	}
+
+	private OutputSink toOutputSink(PrintStream printStream) {
+		OutputSink outputSink = outputSinkCache.get(printStream);
+		if (outputSink == null) {
+			outputSink = new PrintStreamOutputSink(printStream);
+			outputSinkCache.put(printStream, outputSink);
+		}
+		return outputSink;
 	}
 
 	/**
@@ -1396,6 +1858,7 @@ public class JRT {
 	 * @return a {@link java.io.PrintStream} object
 	 */
 	public PrintStream jrtGetPrintStream(String fileNameParam, boolean append) {
+		Map<String, PrintStream> outputFiles = getIoState().outputFiles;
 		PrintStream ps = outputFiles.get(fileNameParam);
 		if (ps == null) {
 			try {
@@ -1422,6 +1885,7 @@ public class JRT {
 	 */
 	public boolean jrtConsumeFileInput(String fileNameParam) throws IOException {
 		clearPendingGetlineFields();
+		Map<String, PartitioningReader> fileReaders = getIoState().fileReaders;
 		PartitioningReader pr = fileReaders.get(fileNameParam);
 		if (pr == null) {
 			try {
@@ -1473,25 +1937,26 @@ public class JRT {
 	 */
 	public boolean jrtConsumeCommandInput(String cmd) throws IOException {
 		clearPendingGetlineFields();
-		PartitioningReader pr = commandReaders.get(cmd);
+		IoState state = getIoState();
+		PartitioningReader pr = state.commandReaders.get(cmd);
 		if (pr == null) {
 			try {
 				Process p = spawnProcess(cmd);
 				// no input to this process!
 				p.getOutputStream().close();
 				Thread errorPump = DataPump.dumpAndReturnThread(cmd + " stderr", p.getErrorStream(), System.err);
-				commandErrorPumps.put(cmd, errorPump);
-				commandProcesses.put(cmd, p);
+				state.commandErrorPumps.put(cmd, errorPump);
+				state.commandProcesses.put(cmd, p);
 				pr = new PartitioningReader(
 						new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8),
 						this.rs);
-				commandReaders.put(cmd, pr);
+				state.commandReaders.put(cmd, pr);
 				this.filename = "";
 			} catch (IOException ioe) {
-				commandReaders.remove(cmd);
-				Thread errorPump = commandErrorPumps.remove(cmd);
-				Process p = commandProcesses.get(cmd);
-				commandProcesses.remove(cmd);
+				state.commandReaders.remove(cmd);
+				Thread errorPump = state.commandErrorPumps.remove(cmd);
+				Process p = state.commandProcesses.get(cmd);
+				state.commandProcesses.remove(cmd);
 				if (p != null) {
 					p.destroy();
 				}
@@ -1520,23 +1985,24 @@ public class JRT {
 	 *         input data to the process.
 	 */
 	public PrintStream jrtSpawnForOutput(String cmd) {
-		PrintStream ps = outputStreams.get(cmd);
+		IoState state = getIoState();
+		PrintStream ps = state.outputStreams.get(cmd);
 		if (ps == null) {
 			Process p;
 			try {
 				p = spawnProcess(cmd);
 				Thread stderrPump = DataPump.dumpAndReturnThread(cmd + " stderr", p.getErrorStream(), error);
 				Thread stdoutPump = DataPump.dumpAndReturnThread(cmd + " stdout", p.getInputStream(), output);
-				outputStderrPumps.put(cmd, stderrPump);
-				outputStdoutPumps.put(cmd, stdoutPump);
+				state.outputStderrPumps.put(cmd, stderrPump);
+				state.outputStdoutPumps.put(cmd, stdoutPump);
 			} catch (IOException ioe) {
 				throw new AwkRuntimeException("Can't spawn " + cmd + ": " + ioe);
 			}
-			outputProcesses.put(cmd, p);
+			state.outputProcesses.put(cmd, p);
 			try {
 				ps = new PrintStream(p.getOutputStream(), true, StandardCharsets.UTF_8.name()); // true
 				// = auto-flush
-				outputStreams.put(cmd, ps);
+				state.outputStreams.put(cmd, ps);
 			} catch (java.io.UnsupportedEncodingException e) {
 				throw new IllegalStateException(e);
 			}
@@ -1574,17 +2040,21 @@ public class JRT {
 	 * </p>
 	 */
 	public void jrtCloseAll() {
+		IoState state = ioState;
+		if (state == null) {
+			return;
+		}
 		Set<String> set = new HashSet<String>();
-		for (String s : fileReaders.keySet()) {
+		for (String s : state.fileReaders.keySet()) {
 			set.add(s);
 		}
-		for (String s : commandReaders.keySet()) {
+		for (String s : state.commandReaders.keySet()) {
 			set.add(s);
 		}
-		for (String s : outputFiles.keySet()) {
+		for (String s : state.outputFiles.keySet()) {
 			set.add(s);
 		}
-		for (String s : outputStreams.keySet()) {
+		for (String s : state.outputStreams.keySet()) {
 			set.add(s);
 		}
 		for (String s : set) {
@@ -1593,25 +2063,33 @@ public class JRT {
 	}
 
 	private boolean jrtCloseOutputFile(String fileNameParam) {
-		PrintStream ps = outputFiles.get(fileNameParam);
+		IoState state = ioState;
+		if (state == null) {
+			return false;
+		}
+		PrintStream ps = state.outputFiles.get(fileNameParam);
 		if (ps != null) {
 			ps.close();
-			outputFiles.remove(fileNameParam);
+			state.outputFiles.remove(fileNameParam);
 		}
 		return ps != null;
 	}
 
 	private boolean jrtCloseOutputStream(String cmd) {
-		Process p = outputProcesses.get(cmd);
-		PrintStream ps = outputStreams.get(cmd);
+		IoState state = ioState;
+		if (state == null) {
+			return false;
+		}
+		Process p = state.outputProcesses.get(cmd);
+		PrintStream ps = state.outputStreams.get(cmd);
 		if (ps == null) {
 			return false;
 		}
-		Thread stdoutPump = outputStdoutPumps.get(cmd);
-		Thread stderrPump = outputStderrPumps.get(cmd);
+		Thread stdoutPump = state.outputStdoutPumps.get(cmd);
+		Thread stderrPump = state.outputStderrPumps.get(cmd);
 		assert p != null;
-		outputProcesses.remove(cmd);
-		outputStreams.remove(cmd);
+		state.outputProcesses.remove(cmd);
+		state.outputStreams.remove(cmd);
 		ps.close();
 		try {
 			// wait for the spawned process to finish to make sure
@@ -1626,8 +2104,8 @@ public class JRT {
 		} finally {
 			joinDataPump(stdoutPump);
 			joinDataPump(stderrPump);
-			outputStdoutPumps.remove(cmd);
-			outputStderrPumps.remove(cmd);
+			state.outputStdoutPumps.remove(cmd);
+			state.outputStderrPumps.remove(cmd);
 			output.flush();
 			error.flush();
 		}
@@ -1635,11 +2113,15 @@ public class JRT {
 	}
 
 	private boolean jrtCloseFileReader(String fileNameParam) {
-		PartitioningReader pr = fileReaders.get(fileNameParam);
+		IoState state = ioState;
+		if (state == null) {
+			return false;
+		}
+		PartitioningReader pr = state.fileReaders.get(fileNameParam);
 		if (pr == null) {
 			return false;
 		}
-		fileReaders.remove(fileNameParam);
+		state.fileReaders.remove(fileNameParam);
 		try {
 			pr.close();
 			return true;
@@ -1649,15 +2131,19 @@ public class JRT {
 	}
 
 	private boolean jrtCloseCommandReader(String cmd) {
-		Process p = commandProcesses.get(cmd);
-		PartitioningReader pr = commandReaders.get(cmd);
+		IoState state = ioState;
+		if (state == null) {
+			return false;
+		}
+		Process p = state.commandProcesses.get(cmd);
+		PartitioningReader pr = state.commandReaders.get(cmd);
 		if (pr == null) {
 			return false;
 		}
-		Thread errorPump = commandErrorPumps.get(cmd);
+		Thread errorPump = state.commandErrorPumps.get(cmd);
 		assert p != null;
-		commandReaders.remove(cmd);
-		commandProcesses.remove(cmd);
+		state.commandReaders.remove(cmd);
+		state.commandProcesses.remove(cmd);
 		try {
 			pr.close();
 			try {
@@ -1676,7 +2162,7 @@ public class JRT {
 			return false;
 		} finally {
 			joinDataPump(errorPump);
-			commandErrorPumps.remove(cmd);
+			state.commandErrorPumps.remove(cmd);
 			output.flush();
 			error.flush();
 		}
@@ -1784,118 +2270,6 @@ public class JRT {
 	 */
 	public static void printfNoCatch(PrintStream ps, Locale locale, String fmtArg, Object... arr) {
 		ps.print(sprintfNoCatch(locale, fmtArg, arr));
-	}
-
-	/**
-	 * Transform the sub/gsub replacement string from Awk syntax
-	 * (with '&amp;') to Java (with '$') so it can be used in Matcher.appendReplacement()
-	 * <p>
-	 * Awk and Java don't use the same syntax for regex replace:
-	 * <ul>
-	 * <li>Awk uses &amp; to refer to the matched string
-	 * <li>Java uses $0, $g, or ${name} to refer to the corresponding match groups
-	 * </ul>
-	 *
-	 * @param awkRepl the replace string passed in sub() and gsub()
-	 * @return a string that can be used in Java's Matcher.appendReplacement()
-	 */
-	public static String prepareReplacement(String awkRepl) {
-		// Null
-		if (awkRepl == null) {
-			return "";
-		}
-
-		// Simple case
-		if ((awkRepl.indexOf('\\') == -1) && (awkRepl.indexOf('$') == -1) && (awkRepl.indexOf('&') == -1)) {
-			return awkRepl;
-		}
-
-		StringBuilder javaRepl = new StringBuilder();
-		for (int i = 0; i < awkRepl.length(); i++) {
-			char c = awkRepl.charAt(i);
-
-			// Backslash
-			if (c == '\\' && i < awkRepl.length() - 1) {
-				i++;
-				c = awkRepl.charAt(i);
-				if (c == '&') {
-					javaRepl.append('&');
-					continue;
-				} else if (c == '\\') {
-					javaRepl.append("\\\\");
-					continue;
-				}
-
-				// For everything else, append the backslash and continue with the logic
-				javaRepl.append('\\');
-			}
-
-			if (c == '$') {
-				javaRepl.append("\\$");
-			} else if (c == '&') {
-				javaRepl.append("$0");
-			} else {
-				javaRepl.append(c);
-			}
-		}
-
-		return javaRepl.toString();
-	}
-
-	/**
-	 * <p>
-	 * replaceFirst.
-	 * </p>
-	 *
-	 * @param origValue a {@link java.lang.String} object
-	 * @param repl a {@link java.lang.String} object
-	 * @param ere a {@link java.lang.String} object
-	 * @param sb a {@link java.lang.StringBuffer} object
-	 * @return a {@link java.lang.Integer} object
-	 */
-	public static Integer replaceFirst(String origValue, String repl, String ere, StringBuffer sb) {
-		// remove special meaning for backslash and dollar signs and handle '&'
-		repl = prepareReplacement(repl);
-
-		// Reset provided StringBuffer
-		sb.setLength(0);
-
-		Pattern p = Pattern.compile(ere);
-		Matcher m = p.matcher(origValue);
-		int cnt = 0;
-		if (m.find()) {
-			++cnt;
-			m.appendReplacement(sb, repl);
-		}
-		m.appendTail(sb);
-		return Integer.valueOf(cnt);
-	}
-
-	/**
-	 * Replace all occurrences of the regular expression with specified string
-	 *
-	 * @param origValue String where replace is done
-	 * @param repl Replacement string (with '&amp;' for referring to matching string)
-	 * @param ere Regular expression
-	 * @param sb StringBuffer we will work on
-	 * @return the number of replacements performed
-	 */
-	public static Integer replaceAll(String origValue, String repl, String ere, StringBuffer sb) {
-		// Reset the provided StringBuffer
-		sb.setLength(0);
-
-		// remove special meaning for backslash and dollar signs and handle '&'
-		repl = prepareReplacement(repl);
-
-		Pattern p = Pattern.compile(ere);
-		Matcher m = p.matcher(origValue);
-		int cnt = 0;
-		while (m.find()) {
-			++cnt;
-			m.appendReplacement(sb, repl);
-		}
-		m.appendTail(sb);
-		return Integer.valueOf(cnt);
 	}
 
 	/**

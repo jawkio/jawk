@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Reusable behavioral configuration for the Jawk engine.
@@ -55,49 +56,56 @@ public class AwkSettings {
 	 * The values may be of type <code>Integer</code>,
 	 * <code>Double</code> or <code>String</code>.
 	 */
-	private Map<String, Object> variables = new HashMap<String, Object>();
+	private final Map<String, Object> variables = new HashMap<String, Object>();
 
 	/**
 	 * Initial Field Separator (FS) value.
 	 * <code>null</code> means the default FS value.
 	 */
-	private String fieldSeparator = null;
+	private volatile String fieldSeparator = null;
 
 	/**
 	 * Whether to maintain array keys in sorted order;
 	 * <code>false</code> by default.
 	 */
-	private boolean useSortedArrayKeys = false;
+	private volatile boolean useSortedArrayKeys = false;
 
 	/**
 	 * Whether to trap <code>IllegalFormatExceptions</code>
 	 * for <code>[s]printf</code>;
 	 * <code>true</code> by default.
 	 */
-	private boolean catchIllegalFormatExceptions = true;
+	private volatile boolean catchIllegalFormatExceptions = true;
 
 	/**
 	 * Output stream;
 	 * <code>System.out</code> by default,
 	 * which means we will print to stdout by default
 	 */
-	private PrintStream outputStream = System.out;
+	private volatile PrintStream outputStream = System.out;
 
 	/**
 	 * Locale for the output of numbers
 	 * <code>US-English</code> by default.
 	 */
-	private Locale locale = Locale.US;
+	private volatile Locale locale = Locale.US;
 
 	/**
 	 * Default value for RS, when not set specifically by the AWK script
 	 */
-	private String defaultRS = System.getProperty("line.separator", "\n");
+	private volatile String defaultRS = System.getProperty("line.separator", "\n");
 
 	/**
 	 * Default value for ORS, when not set specifically by the AWK script
 	 */
-	private String defaultORS = System.getProperty("line.separator", "\n");
+	private volatile String defaultORS = System.getProperty("line.separator", "\n");
+
+	/**
+	 * Monotonically increasing counter incremented whenever the settings change.
+	 * It allows callers that cache derived runtime state to detect when a new
+	 * snapshot must be built.
+	 */
+	private final AtomicLong modificationCount = new AtomicLong();
 
 	/**
 	 * <p>
@@ -173,7 +181,24 @@ public class AwkSettings {
 	 * @return the variables
 	 */
 	public Map<String, Object> getVariables() {
-		return new HashMap<String, Object>(variables);
+		synchronized (variables) {
+			return new HashMap<String, Object>(variables);
+		}
+	}
+
+	/**
+	 * Returns the number of explicit mutations applied to this settings
+	 * instance.
+	 * <p>
+	 * The value is intended for cache invalidation only; it has no behavioral
+	 * meaning other than changing whenever one of the configuration mutators is
+	 * called.
+	 * </p>
+	 *
+	 * @return the current modification counter
+	 */
+	public long getModificationCount() {
+		return modificationCount.get();
 	}
 
 	/**
@@ -185,7 +210,11 @@ public class AwkSettings {
 	 * @param variables the variables to set
 	 */
 	public void setVariables(Map<String, Object> variables) {
-		this.variables = new HashMap<String, Object>(variables);
+		synchronized (this.variables) {
+			this.variables.clear();
+			this.variables.putAll(variables);
+		}
+		markModified();
 	}
 
 	/**
@@ -195,7 +224,10 @@ public class AwkSettings {
 	 * @param value Variable value
 	 */
 	public void putVariable(String name, Object value) {
-		variables.put(name, value);
+		synchronized (variables) {
+			variables.put(name, value);
+		}
+		markModified();
 	}
 
 	/**
@@ -216,6 +248,7 @@ public class AwkSettings {
 	 */
 	public void setFieldSeparator(String fieldSeparator) {
 		this.fieldSeparator = fieldSeparator;
+		markModified();
 	}
 
 	/**
@@ -236,6 +269,7 @@ public class AwkSettings {
 	 */
 	public void setUseSortedArrayKeys(boolean useSortedArrayKeys) {
 		this.useSortedArrayKeys = useSortedArrayKeys;
+		markModified();
 	}
 
 	/**
@@ -257,6 +291,7 @@ public class AwkSettings {
 	 */
 	public void setOutputStream(PrintStream pOutputStream) {
 		outputStream = Objects.requireNonNull(pOutputStream, "outputStream");
+		markModified();
 	}
 
 	/**
@@ -279,6 +314,7 @@ public class AwkSettings {
 	 */
 	public void setCatchIllegalFormatExceptions(boolean catchIllegalFormatExceptions) {
 		this.catchIllegalFormatExceptions = catchIllegalFormatExceptions;
+		markModified();
 	}
 
 	/**
@@ -299,6 +335,7 @@ public class AwkSettings {
 	 */
 	public void setLocale(Locale pLocale) {
 		locale = pLocale;
+		markModified();
 	}
 
 	/**
@@ -319,6 +356,7 @@ public class AwkSettings {
 	 */
 	public void setDefaultRS(String rs) {
 		defaultRS = Objects.requireNonNull(rs, "defaultRS");
+		markModified();
 	}
 
 	/**
@@ -339,6 +377,11 @@ public class AwkSettings {
 	 */
 	public void setDefaultORS(String ors) {
 		defaultORS = Objects.requireNonNull(ors, "defaultORS");
+		markModified();
+	}
+
+	protected final void markModified() {
+		modificationCount.incrementAndGet();
 	}
 
 	private static final class ImmutableAwkSettings extends AwkSettings {

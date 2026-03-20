@@ -24,19 +24,18 @@ package org.metricshub.jawk.backend;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.io.PrintStream;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.LinkedHashSet;
 import java.util.StringTokenizer;
-import java.util.Deque;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -60,7 +59,6 @@ import org.metricshub.jawk.jrt.ConditionPair;
 import org.metricshub.jawk.jrt.InputSource;
 import org.metricshub.jawk.jrt.StreamInputSource;
 import org.metricshub.jawk.jrt.JRT;
-import java.util.ArrayDeque;
 import org.metricshub.jawk.jrt.RegexTokenizer;
 import org.metricshub.jawk.jrt.SingleCharacterTokenizer;
 import org.metricshub.jawk.jrt.VariableManager;
@@ -92,6 +90,9 @@ import org.metricshub.printf4j.Printf4J;
  * Therefore, the interpreter throws AwkRuntimeExceptions upon most
  * errors/conditions. It can also throw a <code>java.lang.Error</code> if an
  * interpreter error is encountered.
+ * <p>
+ * AVM instances are reusable, but they are not thread-safe. Reuse the same
+ * interpreter only sequentially, or create one AVM per concurrent execution.
  *
  * @author Danny Daglas
  */
@@ -102,26 +103,31 @@ public class AVM implements VariableManager {
 	private RuntimeStack runtimeStack = new RuntimeStack();
 
 	// operand stack
-	private Deque<Object> operandStack = new LinkedList<Object>();
+	private Deque<Object> operandStack = new ArrayDeque<Object>();
 	private List<String> arguments;
 	private boolean sortedArrayKeys;
-	private Map<String, Object> initialVariables;
-	private Map<String, Object> deferredInitialVariables = new HashMap<String, Object>();
+	private final Map<String, Object> baseInitialVariables;
+	private final Map<String, Object> baseSpecialVariables;
+	private Map<String, Object> executionInitialVariables;
+	private Map<String, Object> executionSpecialVariables;
 	private String initialFsValue;
 	private boolean trapIllegalFormatExceptions;
 	private JRT jrt;
 	private final Locale locale;
 	private Map<String, JawkExtension> extensionInstances;
 
+	private static final Object NULL_OPERAND = new Object();
+
 	// stack methods
 	// private Object pop() { return operandStack.removeFirst(); }
 	// private void push(Object o) { operandStack.addLast(o); }
 	private Object pop() {
-		return operandStack.pop();
+		Object value = operandStack.pop();
+		return value == NULL_OPERAND ? null : value;
 	}
 
 	private void push(Object o) {
-		operandStack.push(o);
+		operandStack.push(o == null ? NULL_OPERAND : o);
 	}
 
 	private final AwkSettings settings;
@@ -156,7 +162,10 @@ public class AVM implements VariableManager {
 		locale = this.settings.getLocale();
 		arguments = Collections.emptyList();
 		sortedArrayKeys = this.settings.isUseSortedArrayKeys();
-		initialVariables = this.settings.getVariables();
+		baseInitialVariables = new HashMap<String, Object>(this.settings.getVariables());
+		baseSpecialVariables = JRT.copySpecialVariables(baseInitialVariables);
+		executionInitialVariables = baseInitialVariables;
+		executionSpecialVariables = baseSpecialVariables;
 		initialFsValue = this.settings.getFieldSeparator();
 		trapIllegalFormatExceptions = hasProvidedSettings
 				&& this.settings.isCatchIllegalFormatExceptions();
@@ -254,21 +263,7 @@ public class AVM implements VariableManager {
 	 * @throws IOException if an IO error occurs during evaluation
 	 */
 	public Object eval(AwkTuples tuples, InputSource inputSource) throws IOException {
-		// Special variables are applied inside interpret() via
-		// applySpecialVariables; non-special variables are assigned
-		// during tuple execution.
-
-		// Now execute the tuples
-		try {
-			interpret(tuples, inputSource);
-		} catch (ExitException e) {
-			// Special case (which should never happen):
-			// return the value of the "exit" statement if any
-			return e.getCode();
-		}
-
-		// Return the top of the stack, which is the value of the specified expression
-		return operandStack.size() == 0 ? null : pop();
+		return eval(tuples, inputSource, null);
 	}
 
 	/**
@@ -287,47 +282,18 @@ public class AVM implements VariableManager {
 			InputSource inputSource,
 			Map<String, Object> variableOverrides)
 			throws IOException {
-		if (variableOverrides != null && !variableOverrides.isEmpty()) {
-			deferredInitialVariables.putAll(variableOverrides);
+		AwkTuples.ExecutionProfile executionProfile = prepareExecution(
+				tuples,
+				inputSource,
+				Collections.<String>emptyList(),
+				variableOverrides);
+
+		try {
+			executePreparedTuples(tuples.top(), executionProfile);
+		} catch (ExitException e) {
+			return e.getCode();
 		}
-		return eval(tuples, inputSource);
-	}
-
-	private void setNumOnJRT(long fieldNum, double num, PositionTracker position) {
-		String numString;
-		if (JRT.isActuallyLong(num)) {
-			numString = Long.toString((long) Math.rint(num));
-		} else {
-			numString = Double.toString(num);
-		}
-
-		// same code as ASSIGN_AS_INPUT_FIELD
-		if (fieldNum == 0) {
-			jrt.setInputLine(numString.toString());
-			jrt.jrtParseFields();
-		} else {
-			jrt.jrtSetInputField(numString, fieldNum, position);
-		}
-	}
-
-	private String execSubOrGSub(PositionTracker position, int gsubArgPos) {
-		String newString;
-
-		// arg[gsubArgPos] = isGsub
-		// stack[0] = original field value
-		// stack[1] = replacement string
-		// stack[2] = ere
-		boolean isGsub = position.boolArg(gsubArgPos);
-		String orig = jrt.toAwkString(pop());
-		String repl = jrt.toAwkString(pop());
-		String ere = jrt.toAwkString(pop());
-		if (isGsub) {
-			newString = replaceAll(orig, ere, repl);
-		} else {
-			newString = replaceFirst(orig, ere, repl);
-		}
-
-		return newString;
+		return operandStack.isEmpty() ? null : pop();
 	}
 
 	/**
@@ -378,45 +344,105 @@ public class AVM implements VariableManager {
 			Map<String, Object> variableOverrides)
 			throws ExitException,
 			IOException {
-		this.arguments = (runtimeArguments != null) ? new ArrayList<>(runtimeArguments) : new ArrayList<>();
-		if (variableOverrides != null && !variableOverrides.isEmpty()) {
-			deferredInitialVariables.putAll(variableOverrides);
+		AwkTuples.ExecutionProfile executionProfile = prepareExecution(
+				tuples,
+				inputSource,
+				runtimeArguments,
+				variableOverrides);
+		executePreparedTuples(tuples.top(), executionProfile);
+	}
+
+	/**
+	 * Prepares the AVM and JRT for one execution of compiled tuples.
+	 *
+	 * @param tuples tuples to execute
+	 * @param inputSource the input source providing records
+	 * @param runtimeArguments name=value or filename entries from the command line
+	 * @param variableOverrides additional variable assignments applied on top of
+	 *        the settings-level variables (may be {@code null})
+	 * @return execution requirements derived from the tuple stream
+	 */
+	private AwkTuples.ExecutionProfile prepareExecution(
+			AwkTuples tuples,
+			InputSource inputSource,
+			List<String> runtimeArguments,
+			Map<String, Object> variableOverrides) {
+		AwkTuples compiledTuples = Objects.requireNonNull(tuples, "tuples");
+		InputSource resolvedSource = Objects.requireNonNull(inputSource, "inputSource");
+		AwkTuples.ExecutionProfile executionProfile = compiledTuples.getExecutionProfile();
+
+		// Reset the AVM-owned state that must not leak across executions.
+		operandStack.clear();
+		environOffset = NULL_OFFSET;
+		argcOffset = NULL_OFFSET;
+		argvOffset = NULL_OFFSET;
+		exitAddress = null;
+		withinEndBlocks = false;
+		exitCode = 0;
+		throwExitException = false;
+		inputSourceFilelistAssignmentsApplied = false;
+		resolvedInputSource = null;
+		globalVariableOffsets = null;
+		globalVariableArrays = null;
+		functionNames = null;
+		executionInitialVariables = baseInitialVariables;
+		executionSpecialVariables = baseSpecialVariables;
+		if (executionProfile.usesRuntimeStack()) {
+			runtimeStack.reset();
 		}
-		Map<Integer, ConditionPair> conditionPairs = new HashMap<Integer, ConditionPair>();
-
-		globalVariableOffsets = tuples.getGlobalVariableOffsetMap();
-		globalVariableArrays = tuples.getGlobalVariableAarrayMap();
-		functionNames = tuples.getFunctionNameSet();
-		if (!deferredInitialVariables.isEmpty()) {
-			initialVariables.putAll(deferredInitialVariables);
-			deferredInitialVariables.clear();
+		if (executionProfile.needsRandomState()) {
+			randomNumberGenerator.setSeed(1);
+			oldseed = 1;
 		}
 
-		PositionTracker position = tuples.top();
+		this.arguments = runtimeArguments != null ? new ArrayList<>(runtimeArguments) : Collections.<String>emptyList();
 
-		// Initialize JRT-managed special variables from settings before execution
-		jrt.setFS(initialFsValue == null ? " " : initialFsValue);
-		jrt.setRS(settings.getDefaultRS());
-		jrt.setOFS(" ");
-		jrt.setORS(settings.getDefaultORS());
-		jrt.setCONVFMT("%.6g");
-		jrt.setOFMT("%.6g");
-		jrt.setSUBSEP(String.valueOf((char) 28));
-		jrt.setFILENAMEViaJrt("");
-		jrt.setNR(0);
-		jrt.setFNR(0);
-		jrt.setRSTART(0);
-		jrt.setRLENGTH(0);
+		// Install the variable snapshot visible to this execution.
+		if (variableOverrides == null || variableOverrides.isEmpty()) {
+			executionInitialVariables = baseInitialVariables;
+			executionSpecialVariables = baseSpecialVariables;
+		} else {
+			executionInitialVariables = new HashMap<String, Object>(baseInitialVariables);
+			executionInitialVariables.putAll(variableOverrides);
 
-		// Apply initial variable assignments that target JRT-managed special
-		// variables (FS, RS, OFS, ORS, etc.) so that -v FS=, or
-		// AwkSettings#putVariable("FS", ...) are honoured. Non-special
-		// variables are applied later during tuple execution.
-		jrt.applySpecialVariables(initialVariables);
+			Map<String, Object> specialOverrides = JRT.copySpecialVariables(variableOverrides);
+			if (specialOverrides.isEmpty()) {
+				executionSpecialVariables = baseSpecialVariables;
+			} else {
+				executionSpecialVariables = new HashMap<String, Object>(baseSpecialVariables);
+				executionSpecialVariables.putAll(specialOverrides);
+			}
+		}
 
-		// Resolve the InputSource once: use the user-supplied one
-		resolvedInputSource = Objects.requireNonNull(inputSource, "inputSource");
+		// Install tuple metadata only when this execution can observe it.
+		if (executionProfile.needsGlobalVariableMetadata()
+				|| (!arguments.isEmpty() && executionProfile.mayApplyInputAssignments())) {
+			globalVariableOffsets = compiledTuples.getGlobalVariableOffsetMap();
+			globalVariableArrays = compiledTuples.getGlobalVariableAarrayMap();
+			functionNames = compiledTuples.getFunctionNameSet();
+		}
 
+		jrt.prepareForExecution(initialFsValue, settings.getDefaultRS(), settings.getDefaultORS());
+		if (!executionSpecialVariables.isEmpty()) {
+			jrt.applySpecialVariables(executionSpecialVariables);
+		}
+		resolvedInputSource = resolvedSource;
+
+		return executionProfile;
+	}
+
+	/**
+	 * Executes the tuple stream after the runtime has been fully prepared.
+	 *
+	 * @param position current position in the tuple stream
+	 * @param executionProfile execution requirements derived from the tuple stream
+	 * @throws ExitException when the AWK program executes {@code exit}
+	 * @throws IOException when runtime input operations fail
+	 */
+	private void executePreparedTuples(PositionTracker position, AwkTuples.ExecutionProfile executionProfile)
+			throws ExitException,
+			IOException {
+		Map<Integer, ConditionPair> conditionPairs = null;
 		try {
 			while (!position.isEOF()) {
 				// System_out.println("--> "+position);
@@ -429,7 +455,7 @@ public class AVM implements VariableManager {
 					// stack[1] = item 2
 					// etc.
 					long numArgs = position.intArg(0);
-					printTo(settings.getOutputStream(), numArgs);
+					jrt.printDefault(popArguments(numArgs));
 					position.next();
 					break;
 				}
@@ -443,8 +469,7 @@ public class AVM implements VariableManager {
 					long numArgs = position.intArg(0);
 					boolean append = position.boolArg(1);
 					String key = jrt.toAwkString(pop());
-					PrintStream ps = jrt.jrtGetPrintStream(key, append);
-					printTo(ps, numArgs);
+					jrt.printToFile(key, append, popArguments(numArgs));
 					position.next();
 					break;
 				}
@@ -456,8 +481,7 @@ public class AVM implements VariableManager {
 					// etc.
 					long numArgs = position.intArg(0);
 					String cmd = jrt.toAwkString(pop());
-					PrintStream ps = jrt.jrtSpawnForOutput(cmd);
-					printTo(ps, numArgs);
+					jrt.printToProcess(cmd, popArguments(numArgs));
 					position.next();
 					break;
 				}
@@ -467,7 +491,7 @@ public class AVM implements VariableManager {
 					// stack[1] = item 1
 					// etc.
 					long numArgs = position.intArg(0);
-					printfTo(settings.getOutputStream(), numArgs);
+					jrt.printfDefault(sprintfFunction(numArgs), IS_WINDOWS);
 					position.next();
 					break;
 				}
@@ -481,8 +505,7 @@ public class AVM implements VariableManager {
 					long numArgs = position.intArg(0);
 					boolean append = position.boolArg(1);
 					String key = jrt.toAwkString(pop());
-					PrintStream ps = jrt.jrtGetPrintStream(key, append);
-					printfTo(ps, numArgs);
+					jrt.printfToFile(key, append, sprintfFunction(numArgs), IS_WINDOWS);
 					position.next();
 					break;
 				}
@@ -494,8 +517,7 @@ public class AVM implements VariableManager {
 					// etc.
 					long numArgs = position.intArg(0);
 					String cmd = jrt.toAwkString(pop());
-					PrintStream ps = jrt.jrtSpawnForOutput(cmd);
-					printfTo(ps, numArgs);
+					jrt.printfToProcess(cmd, sprintfFunction(numArgs), IS_WINDOWS);
 					position.next();
 					break;
 				}
@@ -1667,8 +1689,8 @@ public class AVM implements VariableManager {
 					// now that we have the global variable size,
 					// we can allocate the initial variables
 
-					// assign -v variables (from initialVariables container)
-					for (Map.Entry<String, Object> entry : initialVariables.entrySet()) {
+					// assign -v variables and per-call overrides prepared for this execution
+					for (Map.Entry<String, Object> entry : executionInitialVariables.entrySet()) {
 						String key = entry.getKey();
 						if (functionNames.contains(key)) {
 							throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + key + ").");
@@ -1772,8 +1794,6 @@ public class AVM implements VariableManager {
 						position.jump(exitAddress);
 					} else {
 						// Exit immediately with ExitException
-						jrt.jrtCloseAll();
-						closeResolvedInputSource();
 						// clear operand stack
 						operandStack.clear();
 						throw new ExitException(exitCode, "The AWK script requested an exit");
@@ -1791,6 +1811,9 @@ public class AVM implements VariableManager {
 				case CONDITION_PAIR: {
 					// stack[0] = End condition
 					// stack[1] = Start condition
+					if (conditionPairs == null) {
+						conditionPairs = new HashMap<Integer, ConditionPair>();
+					}
 					ConditionPair cp = conditionPairs.get(position.current());
 					if (cp == null) {
 						cp = new ConditionPair();
@@ -2067,9 +2090,6 @@ public class AVM implements VariableManager {
 				}
 			}
 
-			// End of the instructions
-			jrt.jrtCloseAll();
-			closeResolvedInputSource();
 		} catch (RuntimeException re) {
 			// clear runtime stack
 			runtimeStack.popAllFrames();
@@ -2085,10 +2105,17 @@ public class AVM implements VariableManager {
 			// clear operand stack
 			operandStack.clear();
 			throw ae;
+		} finally {
+			if (executionProfile.mayCreateJrtIoState()) {
+				jrt.jrtCloseAll();
+			}
+			closeResolvedInputSource();
+			resolvedInputSource = null;
+			inputSourceFilelistAssignmentsApplied = false;
 		}
 
 		// If <code>exit</code> was called, throw an ExitException
-		if (throwExitException) {
+		if (executionProfile.needsExitState() && throwExitException) {
 			throw new ExitException(exitCode, "The AWK script requested an exit");
 		}
 	}
@@ -2115,47 +2142,12 @@ public class AVM implements VariableManager {
 		}
 	}
 
-	private void printTo(PrintStream ps, long numArgs) {
-		// print items from the top of the stack
-		// # of items
-		if (numArgs == 0) {
-			// display $0
-			ps.print(jrt.jrtGetInputField(0));
-			ps.print(jrt.getORSString());
-		} else {
-			// cache $OFS to separate fields below
-			// (no need to execute getOFS for each field)
-			String ofsString = jrt.getOFSString();
-
-			// Arguments are stacked, so we need to reverse order
-			Object[] args = new Object[(int) numArgs];
-			for (int i = (int) numArgs - 1; i >= 0; i--) {
-				args[i] = pop();
-			}
-
-			// Now print
-			for (int i = 0; i < numArgs; i++) {
-				ps.print(jrt.toAwkStringForOutput(args[i]));
-				// if more elements, display $FS
-				if (i < numArgs - 1) {
-					// use $OFS to separate fields
-					ps.print(ofsString);
-				}
-			}
-			ps.print(jrt.getORSString());
+	private Object[] popArguments(long numArgs) {
+		Object[] args = new Object[(int) numArgs];
+		for (int i = (int) numArgs - 1; i >= 0; i--) {
+			args[i] = pop();
 		}
-		// always flush to ensure ORS is written even when it does not
-		// contain a newline character
-		ps.flush();
-	}
-
-	private void printfTo(PrintStream ps, long numArgs) {
-		// assert numArgs > 0;
-		ps.print(sprintfFunction(numArgs));
-		// for now, since we are not using Process.waitFor()
-		if (IS_WINDOWS) {
-			ps.flush();
-		}
+		return args;
 	}
 
 	/**
@@ -2170,12 +2162,8 @@ public class AVM implements VariableManager {
 		// all but the format argument
 		Object[] argArray = new Object[(int) (numArgs - 1)];
 
-		// for each sprintf argument, put it into an
-		// array used in the String.format method
-		// Arguments are stacked, so we need to reverse their order
-		for (int i = (int) numArgs - 2; i >= 0; i--) {
-			argArray[i] = pop();
-		}
+		Object[] args = popArguments(numArgs - 1);
+		System.arraycopy(args, 0, argArray, 0, args.length);
 
 		// the format argument!
 		String fmt = jrt.toAwkString(pop());
@@ -2187,13 +2175,50 @@ public class AVM implements VariableManager {
 		}
 	}
 
+	private void setNumOnJRT(long fieldNum, double num, PositionTracker position) {
+		String numString;
+		if (JRT.isActuallyLong(num)) {
+			numString = Long.toString((long) Math.rint(num));
+		} else {
+			numString = Double.toString(num);
+		}
+
+		// same code as ASSIGN_AS_INPUT_FIELD
+		if (fieldNum == 0) {
+			jrt.setInputLine(numString.toString());
+			jrt.jrtParseFields();
+		} else {
+			jrt.jrtSetInputField(numString, fieldNum, position);
+		}
+	}
+
+	private String execSubOrGSub(PositionTracker position, int gsubArgPos) {
+		String newString;
+
+		// arg[gsubArgPos] = isGsub
+		// stack[0] = original field value
+		// stack[1] = replacement string
+		// stack[2] = ere
+		boolean isGsub = position.boolArg(gsubArgPos);
+		String orig = jrt.toAwkString(pop());
+		String repl = jrt.toAwkString(pop());
+		String ere = jrt.toAwkString(pop());
+		if (isGsub) {
+			newString = replaceAll(orig, ere, repl);
+		} else {
+			newString = replaceFirst(orig, ere, repl);
+		}
+
+		return newString;
+	}
+
 	private StringBuffer replaceFirstSb = new StringBuffer();
 
 	/**
 	 * sub() functionality
 	 */
 	private String replaceFirst(String orig, String ere, String repl) {
-		push(JRT.replaceFirst(orig, repl, ere, replaceFirstSb));
+		push(RegexRuntimeSupport.replaceFirst(orig, repl, ere, replaceFirstSb));
 		return replaceFirstSb.toString();
 	}
 
@@ -2203,7 +2228,7 @@ public class AVM implements VariableManager {
 	 * gsub() functionality
 	 */
 	private String replaceAll(String orig, String ere, String repl) {
-		push(JRT.replaceAll(orig, repl, ere, replaceAllSb));
+		push(RegexRuntimeSupport.replaceAll(orig, repl, ere, replaceAllSb));
 		return replaceAllSb.toString();
 	}
 
@@ -2350,10 +2375,13 @@ public class AVM implements VariableManager {
 	/** {@inheritDoc} */
 	@Override
 	public final void assignVariable(String name, Object obj) {
-		// During eval(), JRT may assign initial variables before interpret() has
-		// initialized global offset metadata. Keep these assignments pending.
+		// When offsets are not available yet, treat the assignment as part of this
+		// AVM's baseline initial-variable snapshot.
 		if (globalVariableOffsets == null || globalVariableArrays == null) {
-			deferredInitialVariables.put(name, obj);
+			baseInitialVariables.put(name, obj);
+			if (JRT.isJrtManagedSpecialVariable(name)) {
+				baseSpecialVariables.put(name, obj);
+			}
 			return;
 		}
 

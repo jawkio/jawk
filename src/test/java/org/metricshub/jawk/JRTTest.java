@@ -91,24 +91,6 @@ public class JRTTest {
 	}
 
 	@Test
-	public void testPrepareReplacement() throws Exception {
-		assertEquals("don't change", JRT.prepareReplacement("don't change"));
-		assertEquals("a$0a", JRT.prepareReplacement("a&a"));
-		assertEquals("1$01", JRT.prepareReplacement("1&1"));
-		assertEquals("a$0b$0c", JRT.prepareReplacement("a&b&c"));
-		assertEquals("a\\b", JRT.prepareReplacement("a\\b"));
-		assertEquals("a&b", JRT.prepareReplacement("a\\&b"));
-		assertEquals("a\\", JRT.prepareReplacement("a\\"));
-		assertEquals("a\\$", JRT.prepareReplacement("a$"));
-		assertEquals("a\\\\$", JRT.prepareReplacement("a\\$"));
-		assertEquals("a\\\\\\$", JRT.prepareReplacement("a\\\\$"));
-		assertEquals("a\\\\$0", JRT.prepareReplacement("a\\\\&"));
-		assertEquals("a\\\\&", JRT.prepareReplacement("a\\\\\\&"));
-		assertEquals("", JRT.prepareReplacement(""));
-		assertEquals("", JRT.prepareReplacement(null));
-	}
-
-	@Test
 	public void testSpawnProcessCat() throws Exception {
 		Assume.assumeFalse(IS_WINDOWS);
 		AwkTestSupport

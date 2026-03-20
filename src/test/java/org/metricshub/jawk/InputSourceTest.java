@@ -33,6 +33,7 @@ import java.util.List;
 import org.junit.Test;
 import org.metricshub.jawk.intermediate.AwkTuples;
 import org.metricshub.jawk.jrt.InputSource;
+import org.metricshub.jawk.util.AwkSettings;
 
 /**
  * Integration tests for {@link InputSource} support in the AWK runtime.
@@ -195,6 +196,48 @@ public class InputSourceTest {
 				.runAndAssert();
 	}
 
+	@Test
+	public void testFieldsOnlyInputSourceSupportsFieldAccessWithoutRecordText() throws Exception {
+		awkTest("fields only input source supports field access")
+				.script("{ print $2 }")
+				.withInputSource(new FieldsOnlyInputSource(Collections.singletonList(Arrays.asList("left", "right"))))
+				.expectLines("right")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testFieldsOnlyInputSourceSynthesizesDollarZeroUsingLiteralFs() throws Exception {
+		InputSource source = new FieldsOnlyInputSource(Collections.singletonList(Arrays.asList("a", "b", "c")));
+		assertEquals("a,b,c", commaSeparatedAwk().eval("$0", source));
+	}
+
+	@Test
+	public void testFieldsOnlyInputSourceSupportsBareRegexpRules() throws Exception {
+		awkTest("fields only input source supports bare regexp conditions")
+				.script("/right/ { print $2 }")
+				.withInputSource(new FieldsOnlyInputSource(Collections.singletonList(Arrays.asList("left", "right"))))
+				.expectLines("right")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testFieldsOnlyInputSourceRegexpUsesCurrentDollarZeroAfterFieldMutation() throws Exception {
+		awkTest("fields only input source regexp uses rebuilt dollar zero")
+				.script("{ $1 = \"x\"; if (/x/) print \"hit\" }")
+				.withInputSource(new FieldsOnlyInputSource(Collections.singletonList(Arrays.asList("left", "right"))))
+				.expectLines("hit")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testTextOnlyInputSourceUsesFsActiveWhenRecordWasRead() throws Exception {
+		awkTest("text only input source keeps FS semantics at record read time")
+				.script("{ FS = \":\"; print $1 }")
+				.withInputSource(new RecordOnlyInputSource("a b"))
+				.expectLines("a")
+				.runAndAssert();
+	}
+
 	private static final class TableInputSource implements InputSource {
 
 		private static final String DEFAULT_SEPARATOR = " ";
@@ -229,7 +272,7 @@ public class InputSourceTest {
 		}
 
 		@Override
-		public String getRecord() {
+		public String getRecordText() {
 			return currentRecord;
 		}
 
@@ -260,7 +303,7 @@ public class InputSourceTest {
 		}
 
 		@Override
-		public String getRecord() {
+		public String getRecordText() {
 			return records.get(index).record;
 		}
 
@@ -302,6 +345,38 @@ public class InputSourceTest {
 		}
 
 		@Override
+		public String getRecordText() {
+			return records.get(index);
+		}
+
+		@Override
+		public List<String> getFields() {
+			return null;
+		}
+
+		@Override
+		public boolean isFromFilenameList() {
+			return false;
+		}
+	}
+
+	@SuppressWarnings("deprecation")
+	private static final class DeprecatedRecordInputSource implements InputSource {
+
+		private final List<String> records;
+		private int index = -1;
+
+		private DeprecatedRecordInputSource(String... records) {
+			this.records = Arrays.asList(records);
+		}
+
+		@Override
+		public boolean nextRecord() throws IOException {
+			index++;
+			return index < records.size();
+		}
+
+		@Override
 		public String getRecord() {
 			return records.get(index);
 		}
@@ -309,6 +384,37 @@ public class InputSourceTest {
 		@Override
 		public List<String> getFields() {
 			return null;
+		}
+
+		@Override
+		public boolean isFromFilenameList() {
+			return false;
+		}
+	}
+
+	private static final class FieldsOnlyInputSource implements InputSource {
+
+		private final List<List<String>> records;
+		private int index = -1;
+
+		private FieldsOnlyInputSource(List<List<String>> records) {
+			this.records = records;
+		}
+
+		@Override
+		public boolean nextRecord() throws IOException {
+			index++;
+			return index < records.size();
+		}
+
+		@Override
+		public String getRecordText() {
+			return null;
+		}
+
+		@Override
+		public List<String> getFields() {
+			return new ArrayList<String>(records.get(index));
 		}
 
 		@Override
@@ -325,14 +431,20 @@ public class InputSourceTest {
 	public void testEvalWithInputSourceFieldAccess() throws Exception {
 		InputSource source = new TableInputSource(
 				Collections.singletonList(Arrays.asList("Alice", "30", "Engineering")));
-		assertEquals("Alice-Engineering", AWK.evalSource("$1 \"-\" $3", source));
+		assertEquals("Alice-Engineering", AWK.eval("$1 \"-\" $3", source));
 	}
 
 	@Test
 	public void testEvalWithInputSourcePreSplitFields() throws Exception {
 		InputSource source = new TableInputSource(
 				Collections.singletonList(Arrays.asList("x", "y", "z")));
-		assertEquals(3, ((Number) AWK.evalSource("NF", source)).intValue());
+		assertEquals(3, ((Number) AWK.eval("NF", source)).intValue());
+	}
+
+	@Test
+	public void testEvalWithTextOnlyInputSourceAndFieldParsing() throws Exception {
+		InputSource source = new RecordOnlyInputSource("one,two,three");
+		assertEquals(3, ((Number) commaSeparatedAwk().eval("NF", source)).intValue());
 	}
 
 	@Test
@@ -341,12 +453,12 @@ public class InputSourceTest {
 	}
 
 	@Test
-	public void testEvalWithInputSourceAndFieldSeparator() throws Exception {
-		// When InputSource provides pre-split fields, FS is not used for splitting
-		// but it is still set as a variable
+	public void testEvalWithInputSourceAndSettingsFieldSeparator() throws Exception {
+		// When InputSource provides pre-split fields, FS is not used for splitting,
+		// but it still comes from the Awk instance settings.
 		InputSource source = new TableInputSource(
 				Collections.singletonList(Arrays.asList("a", "b", "c")));
-		assertEquals("a", AWK.evalSource("$1", source, ","));
+		assertEquals("a", commaSeparatedAwk().eval("$1", source));
 	}
 
 	@Test
@@ -354,6 +466,35 @@ public class InputSourceTest {
 		InputSource source = new TableInputSource(
 				Collections.singletonList(Arrays.asList("10", "20", "30")));
 		AwkTuples tuples = AWK.compileForEval("$1 + $2 + $3");
-		assertEquals(60, ((Number) AWK.evalSource(tuples, source, null)).intValue());
+		assertEquals(60, ((Number) AWK.eval(tuples, source)).intValue());
+	}
+
+	@Test
+	public void testDeprecatedGetRecordCompatibilityStillWorks() throws Exception {
+		awkTest("deprecated getRecord input source compatibility")
+				.script("BEGIN { FS = \",\" } { print $2 }")
+				.withInputSource(new DeprecatedRecordInputSource("a,b,c"))
+				.expectLines("b")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testGetlineSynthesizesDollarZeroWithSanitizedNullFields() throws Exception {
+		awkTest("getline synthesizes dollar zero with sanitized null fields")
+				.script("NR == 1 { getline; print \"[\" $0 \"]\"; exit }")
+				.withInputSource(
+						new ExplicitRecordInputSource(
+								Arrays
+										.asList(
+												new ExplicitRecord("trigger", Collections.singletonList("trigger")),
+												new ExplicitRecord(null, Arrays.asList("left", null, "right")))))
+				.expectLines("[left  right]")
+				.runAndAssert();
+	}
+
+	private static Awk commaSeparatedAwk() {
+		AwkSettings settings = new AwkSettings();
+		settings.setFieldSeparator(",");
+		return new Awk(settings);
 	}
 }

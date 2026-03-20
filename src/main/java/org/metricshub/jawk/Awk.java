@@ -95,6 +95,10 @@ public class Awk {
 	 */
 	private AstNode lastAst;
 
+	private volatile EvalRuntimePrototype evalRuntimePrototype;
+
+	private volatile long evalRuntimePrototypeVersion = Long.MIN_VALUE;
+
 	/**
 	 * Create a new instance of Awk without extensions.
 	 */
@@ -680,7 +684,7 @@ public class Awk {
 	 * @throws IOException if anything goes wrong with the evaluation
 	 */
 	public Object eval(String expression) throws IOException {
-		return eval(compileForEval(expression), null, settings.getFieldSeparator());
+		return eval(compileForEval(expression));
 	}
 
 	/**
@@ -693,42 +697,27 @@ public class Awk {
 	 * @throws IOException if anything goes wrong with the evaluation
 	 */
 	public Object eval(String expression, String input) throws IOException {
-		return eval(compileForEval(expression), input, settings.getFieldSeparator());
+		return eval(compileForEval(expression), input);
 	}
 
 	/**
-	 * Evaluates the specified AWK tuples, i.e. the result of the execution of the
-	 * TERNARY_EXPRESSION AST (the value that has been pushed in the stack).
+	 * Evaluates the specified AWK expression using a structured {@link InputSource}
+	 * to populate {@code $0}, {@code $1}, etc.
 	 *
-	 * @param tuples Tuples returned by {@link Awk#compileForEval(String)}
-	 * @param input Optional text input (that will be available as $0, and tokenized as $1, $2, etc.)
-	 * @param fieldSeparator Value of the FS global variable used for parsing the input
+	 * @param expression Expression to evaluate (e.g. {@code $2 "-" $3})
+	 * @param source structured input source providing the current record
 	 * @return the value of the specified expression
 	 * @throws IOException if anything goes wrong with the evaluation
 	 */
-	private Object eval(AwkTuples tuples, String input, String fieldSeparator) throws IOException {
-
-		AwkSettings evalSettings = new AwkSettings();
-		evalSettings.setDefaultRS("\n");
-		evalSettings.setDefaultORS("\n");
-		evalSettings.setFieldSeparator(fieldSeparator);
-		evalSettings
-				.setOutputStream(
-						new PrintStream(new ByteArrayOutputStream(), false, StandardCharsets.UTF_8.name()));
-
-		Awk evalAwk = new Awk(new ExtensionSetup(this.extensionFunctions, this.extensionInstances), evalSettings);
-		AVM avm = evalAwk.createAvm();
-		InputStream is = input != null ? toInputStream(input) : toInputStream("");
-		InputSource source = new StreamInputSource(is, avm, avm.getJrt());
-		return avm.eval(tuples, source);
+	public Object eval(String expression, InputSource source) throws IOException {
+		return eval(compileForEval(expression), source);
 	}
 
 	/**
 	 * Evaluates the specified AWK expression using a structured {@link InputSource}
 	 * to populate {@code $0}, {@code $1}, etc.
 	 * <p>
-	 * This method is named separately from the {@code eval} family to avoid
-	 * overload ambiguity when callers pass {@code null}.
+	 * This is a source-compatible alias for {@link #eval(String, InputSource)}.
 	 * </p>
 	 *
 	 * @param expression Expression to evaluate (e.g. {@code $2 "-" $3})
@@ -737,54 +726,74 @@ public class Awk {
 	 * @throws IOException if anything goes wrong with the evaluation
 	 */
 	public Object evalSource(String expression, InputSource source) throws IOException {
-		return evalSource(expression, source, null);
+		return eval(expression, source);
 	}
 
 	/**
-	 * Evaluates the specified AWK expression using a structured {@link InputSource}
-	 * to populate {@code $0}, {@code $1}, etc.
-	 * <p>
-	 * This method is named separately from the {@code eval} family to avoid
-	 * overload ambiguity when callers pass {@code null}.
-	 * </p>
+	 * Evaluates pre-compiled tuples without input.
 	 *
-	 * @param expression Expression to evaluate (e.g. {@code $2 "-" $3})
-	 * @param source structured input source providing the current record
-	 * @param fieldSeparator Value of the FS global variable (may be {@code null})
+	 * @param tuples tuples returned by {@link Awk#compileForEval(String)}
 	 * @return the value of the specified expression
 	 * @throws IOException if anything goes wrong with the evaluation
 	 */
-	public Object evalSource(String expression, InputSource source, String fieldSeparator) throws IOException {
-		return evalSource(compileForEval(expression), source, fieldSeparator);
+	public Object eval(AwkTuples tuples) throws IOException {
+		return eval(tuples, (String) null);
 	}
 
 	/**
-	 * Evaluates pre-compiled AWK tuples using a structured {@link InputSource}
-	 * to populate {@code $0}, {@code $1}, etc.
+	 * Evaluates pre-compiled tuples using a text input value exposed as {@code $0}.
 	 * <p>
-	 * This method is named separately from the {@code eval} family to avoid
-	 * overload ambiguity when callers pass {@code null}.
+	 * The created runtime automatically uses the read-only eval fast path when the
+	 * tuple metadata allows it.
+	 * </p>
+	 *
+	 * @param tuples Tuples returned by {@link Awk#compileForEval(String)}
+	 * @param input Optional text input (that will be available as $0, and tokenized
+	 *        as $1, $2, etc.)
+	 * @return the value of the specified expression
+	 * @throws IOException if anything goes wrong with the evaluation
+	 */
+	public Object eval(AwkTuples tuples, String input) throws IOException {
+		AwkTuples compiledTuples = Objects.requireNonNull(tuples, "tuples");
+		AVM activeEvalAvm = createEvalAvm();
+		InputSource source = new SingleRecordInputSource(input);
+		return activeEvalAvm.eval(compiledTuples, source);
+	}
+
+	/**
+	 * Evaluates pre-compiled tuples using a structured {@link InputSource} to
+	 * populate {@code $0}, {@code $1}, etc.
+	 * <p>
+	 * The created runtime automatically uses the read-only eval fast path when the
+	 * tuple metadata allows it.
 	 * </p>
 	 *
 	 * @param tuples Tuples returned by {@link Awk#compileForEval(String)}
 	 * @param source structured input source providing the current record
-	 * @param fieldSeparator Value of the FS global variable (may be {@code null})
 	 * @return the value of the specified expression
 	 * @throws IOException if anything goes wrong with the evaluation
 	 */
-	public Object evalSource(AwkTuples tuples, InputSource source, String fieldSeparator) throws IOException {
+	public Object eval(AwkTuples tuples, InputSource source) throws IOException {
+		AwkTuples compiledTuples = Objects.requireNonNull(tuples, "tuples");
+		InputSource resolvedSource = Objects.requireNonNull(source, "source");
+		AVM activeEvalAvm = createEvalAvm();
+		return activeEvalAvm.eval(compiledTuples, resolvedSource);
+	}
 
-		AwkSettings evalSettings = new AwkSettings();
-		evalSettings.setDefaultRS("\n");
-		evalSettings.setDefaultORS("\n");
-		evalSettings.setFieldSeparator(fieldSeparator);
-		evalSettings
-				.setOutputStream(
-						new PrintStream(new ByteArrayOutputStream(), false, StandardCharsets.UTF_8.name()));
-
-		Awk evalAwk = new Awk(new ExtensionSetup(this.extensionFunctions, this.extensionInstances), evalSettings);
-		AVM avm = evalAwk.createAvm();
-		return avm.eval(tuples, source);
+	/**
+	 * Evaluates pre-compiled tuples using a structured {@link InputSource} to
+	 * populate {@code $0}, {@code $1}, etc.
+	 * <p>
+	 * This is a source-compatible alias for {@link #eval(AwkTuples, InputSource)}.
+	 * </p>
+	 *
+	 * @param tuples Tuples returned by {@link Awk#compileForEval(String)}
+	 * @param source structured input source providing the current record
+	 * @return the value of the specified expression
+	 * @throws IOException if anything goes wrong with the evaluation
+	 */
+	public Object evalSource(AwkTuples tuples, InputSource source) throws IOException {
+		return eval(tuples, source);
 	}
 
 	protected AwkTuples createTuples() {
@@ -792,7 +801,11 @@ public class Awk {
 	}
 
 	protected AVM createAvm() {
-		return new AVM(this.settings, this.extensionInstances);
+		return createAvm(this.settings);
+	}
+
+	protected AVM createAvm(AwkSettings settingsParam) {
+		return new AVM(settingsParam, this.extensionInstances);
 	}
 
 	/**
@@ -806,6 +819,42 @@ public class Awk {
 	}
 
 	/**
+	 * Creates the per-call AVM used by {@link #eval(AwkTuples, String)} and
+	 * {@link #eval(AwkTuples, InputSource)} from the cached eval-settings
+	 * snapshot.
+	 *
+	 * @return a fresh AVM configured for expression evaluation
+	 */
+	private AVM createEvalAvm() {
+		return createAvm(getEvalRuntimePrototype().settingsSnapshot);
+	}
+
+	/**
+	 * Returns the cached behavioral snapshot used for eval runtimes.
+	 * <p>
+	 * The snapshot is rebuilt only when the owning {@link AwkSettings} instance
+	 * changes, which keeps repeated eval calls cheap while still honoring
+	 * runtime configuration changes such as FS or locale updates.
+	 * </p>
+	 *
+	 * @return the current eval runtime prototype
+	 */
+	private EvalRuntimePrototype getEvalRuntimePrototype() {
+		long currentVersion = settings.getModificationCount();
+		EvalRuntimePrototype cachedPrototype = evalRuntimePrototype;
+		if (cachedPrototype != null && evalRuntimePrototypeVersion == currentVersion) {
+			return cachedPrototype;
+		}
+		synchronized (this) {
+			if (evalRuntimePrototype == null || evalRuntimePrototypeVersion != currentVersion) {
+				evalRuntimePrototype = EvalRuntimePrototype.fromSettings(settings);
+				evalRuntimePrototypeVersion = currentVersion;
+			}
+			return evalRuntimePrototype;
+		}
+	}
+
+	/**
 	 * Lists metadata for the {@link JawkExtension} implementations discovered on
 	 * the class path.
 	 *
@@ -813,6 +862,81 @@ public class Awk {
 	 */
 	public static Map<String, JawkExtension> listAvailableExtensions() {
 		return ExtensionRegistry.listExtensions();
+	}
+
+	private static final class EvalRuntimePrototype {
+
+		private static final PrintStream DEV_NULL = createDevNull();
+
+		private final AwkSettings settingsSnapshot;
+
+		private EvalRuntimePrototype(AwkSettings settingsSnapshot) {
+			this.settingsSnapshot = settingsSnapshot;
+		}
+
+		private static EvalRuntimePrototype fromSettings(AwkSettings source) {
+			AwkSettings snapshot = new AwkSettings();
+			snapshot.setVariables(source.getVariables());
+			snapshot.setUseSortedArrayKeys(source.isUseSortedArrayKeys());
+			snapshot.setCatchIllegalFormatExceptions(source.isCatchIllegalFormatExceptions());
+			snapshot.setLocale(source.getLocale());
+			snapshot.setDefaultRS(source.getDefaultRS());
+			snapshot.setDefaultORS(source.getDefaultORS());
+			snapshot.setFieldSeparator(source.getFieldSeparator());
+			snapshot.setOutputStream(DEV_NULL);
+			return new EvalRuntimePrototype(snapshot);
+		}
+
+		private static PrintStream createDevNull() {
+			try {
+				return new PrintStream(new NullOutputStream(), false, StandardCharsets.UTF_8.name());
+			} catch (IOException e) {
+				throw new IllegalStateException("UTF-8 must always be available", e);
+			}
+		}
+	}
+
+	private static final class SingleRecordInputSource implements InputSource {
+
+		private final String record;
+
+		private boolean consumed;
+
+		private SingleRecordInputSource(String record) {
+			this.record = record;
+		}
+
+		@Override
+		public boolean nextRecord() {
+			if (consumed || record == null) {
+				return false;
+			}
+			consumed = true;
+			return true;
+		}
+
+		@Override
+		public String getRecordText() {
+			return consumed ? record : null;
+		}
+
+		@Override
+		public List<String> getFields() {
+			return null;
+		}
+
+		@Override
+		public boolean isFromFilenameList() {
+			return false;
+		}
+	}
+
+	private static final class NullOutputStream extends OutputStream {
+
+		@Override
+		public void write(int b) {
+			// Discard eval output.
+		}
 	}
 
 }

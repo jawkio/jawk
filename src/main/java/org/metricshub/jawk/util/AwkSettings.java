@@ -104,7 +104,7 @@ public class AwkSettings {
 	 * It allows callers that cache derived runtime state to detect when a new
 	 * snapshot must be built.
 	 */
-	private long modificationCount;
+	private volatile long modificationCount;
 
 	/**
 	 * <p>

@@ -56,7 +56,25 @@ public interface InputSource {
 	 *
 	 * @return current record text, or {@code null} when unavailable
 	 */
-	String getRecordText();
+	default String getRecordText() {
+		return getRecord();
+	}
+
+	/**
+	 * Returns the current record text ({@code $0}).
+	 * <p>
+	 * Deprecated compatibility alias for embedders that still implement the
+	 * historic {@code getRecord()} method instead of {@link #getRecordText()}.
+	 * New implementations should override {@link #getRecordText()} directly.
+	 * </p>
+	 *
+	 * @return current record text, or {@code null} when unavailable
+	 * @deprecated use {@link #getRecordText()}
+	 */
+	@Deprecated
+	default String getRecord() {
+		return null;
+	}
 
 	/**
 	 * Returns pre-split fields for the current record, or {@code null} when the

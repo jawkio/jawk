@@ -869,10 +869,8 @@ public class JRT {
 			// match against $0
 			// ...
 			Pattern pattern = (Pattern) o;
-			String s = getInputLine();
-			if (s == null) {
-				s = "";
-			}
+			Object inputField = jrtGetInputField(0);
+			String s = inputField instanceof UninitializedObject ? "" : inputField.toString();
 			Matcher matcher = pattern.matcher(s);
 			val = matcher.find();
 		} else {
@@ -1304,8 +1302,9 @@ public class JRT {
 		}
 
 		if (forGetline) {
-			inputLine = recordText != null ? recordText : joinFieldsWithLiteralSeparator(preFields, fs);
-			cacheGetlineFields(preFields);
+			List<String> sanitizedFields = preFields == null ? null : sanitizeFields(preFields);
+			inputLine = recordText != null ? recordText : joinFieldsWithLiteralSeparator(sanitizedFields, fs);
+			cacheGetlineFields(sanitizedFields);
 		} else {
 			inputLine = recordText;
 			clearPendingGetlineFields();

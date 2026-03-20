@@ -221,6 +221,15 @@ public class InputSourceTest {
 	}
 
 	@Test
+	public void testFieldsOnlyInputSourceRegexpUsesCurrentDollarZeroAfterFieldMutation() throws Exception {
+		awkTest("fields only input source regexp uses rebuilt dollar zero")
+				.script("{ $1 = \"x\"; if (/x/) print \"hit\" }")
+				.withInputSource(new FieldsOnlyInputSource(Collections.singletonList(Arrays.asList("left", "right"))))
+				.expectLines("hit")
+				.runAndAssert();
+	}
+
+	@Test
 	public void testTextOnlyInputSourceUsesFsActiveWhenRecordWasRead() throws Exception {
 		awkTest("text only input source keeps FS semantics at record read time")
 				.script("{ FS = \":\"; print $1 }")
@@ -351,6 +360,38 @@ public class InputSourceTest {
 		}
 	}
 
+	@SuppressWarnings("deprecation")
+	private static final class DeprecatedRecordInputSource implements InputSource {
+
+		private final List<String> records;
+		private int index = -1;
+
+		private DeprecatedRecordInputSource(String... records) {
+			this.records = Arrays.asList(records);
+		}
+
+		@Override
+		public boolean nextRecord() throws IOException {
+			index++;
+			return index < records.size();
+		}
+
+		@Override
+		public String getRecord() {
+			return records.get(index);
+		}
+
+		@Override
+		public List<String> getFields() {
+			return null;
+		}
+
+		@Override
+		public boolean isFromFilenameList() {
+			return false;
+		}
+	}
+
 	private static final class FieldsOnlyInputSource implements InputSource {
 
 		private final List<List<String>> records;
@@ -426,6 +467,29 @@ public class InputSourceTest {
 				Collections.singletonList(Arrays.asList("10", "20", "30")));
 		AwkTuples tuples = AWK.compileForEval("$1 + $2 + $3");
 		assertEquals(60, ((Number) AWK.eval(tuples, source)).intValue());
+	}
+
+	@Test
+	public void testDeprecatedGetRecordCompatibilityStillWorks() throws Exception {
+		awkTest("deprecated getRecord input source compatibility")
+				.script("BEGIN { FS = \",\" } { print $2 }")
+				.withInputSource(new DeprecatedRecordInputSource("a,b,c"))
+				.expectLines("b")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testGetlineSynthesizesDollarZeroWithSanitizedNullFields() throws Exception {
+		awkTest("getline synthesizes dollar zero with sanitized null fields")
+				.script("NR == 1 { getline; print \"[\" $0 \"]\"; exit }")
+				.withInputSource(
+						new ExplicitRecordInputSource(
+								Arrays
+										.asList(
+												new ExplicitRecord("trigger", Collections.singletonList("trigger")),
+												new ExplicitRecord(null, Arrays.asList("left", null, "right")))))
+				.expectLines("[left  right]")
+				.runAndAssert();
 	}
 
 	private static Awk commaSeparatedAwk() {

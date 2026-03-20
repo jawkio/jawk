@@ -24,6 +24,7 @@ package org.metricshub.jawk;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -138,6 +139,32 @@ public class AwkEvalTest {
 		Awk awk = new Awk();
 
 		assertEquals("left\nright", awk.eval("$0", "left\nright"));
+	}
+
+	@Test
+	public void testEvalSourceAliasesStructuredInputEvaluation() throws Exception {
+		Awk awk = new Awk();
+		AwkTuples tuples = awk.compileForEval("NF \":\" $2");
+		InputSource source = new TableInputSource(Collections.singletonList(Arrays.asList("left", "right")));
+
+		assertEquals("2:right", awk.evalSource("NF \":\" $2", source));
+		assertEquals(
+				"2:right",
+				awk
+						.evalSource(
+								tuples,
+								new TableInputSource(Collections.singletonList(Arrays.asList("left", "right")))));
+	}
+
+	@Test
+	public void testOptimizeRemainsIdempotentForExecutionProfile() throws Exception {
+		AwkTuples tuples = new Awk().compileForEval("$2 + $3");
+		AwkTuples.ExecutionProfile initialProfile = tuples.getExecutionProfile();
+
+		tuples.optimize();
+
+		assertSame(initialProfile, tuples.getExecutionProfile());
+		assertTrue(tuples.isReadOnlyEvalEligible());
 	}
 
 	@Test

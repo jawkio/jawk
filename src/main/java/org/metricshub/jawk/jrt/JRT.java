@@ -39,6 +39,7 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.IllegalFormatException;
 import java.util.List;
 import java.util.Locale;
@@ -114,6 +115,7 @@ public class JRT {
 	private VariableManager vm;
 
 	private IoState ioState;
+	private final Map<PrintStream, OutputSink> outputSinkCache = new IdentityHashMap<PrintStream, OutputSink>();
 	/** PrintStream used for command output */
 	private PrintStream output = System.out;
 	/** PrintStream used for command error output */
@@ -336,6 +338,7 @@ public class JRT {
 	 */
 	private void clearExecutionState() {
 		ioState = null;
+		outputSinkCache.clear();
 		inputLine = null;
 		recordState = null;
 		pendingGetlineFields = null;
@@ -1700,7 +1703,6 @@ public class JRT {
 	 *
 	 * @return a {@link java.util.Map} object
 	 */
-	@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "Exposing the live outputFiles map is intentional; generated Jawk scripts and advanced integrations rely on mutating it directly.")
 	public Map<String, PrintStream> getOutputFiles() {
 		return getIoState().outputFiles;
 	}
@@ -1840,7 +1842,12 @@ public class JRT {
 	}
 
 	private OutputSink toOutputSink(PrintStream printStream) {
-		return new PrintStreamOutputSink(printStream);
+		OutputSink outputSink = outputSinkCache.get(printStream);
+		if (outputSink == null) {
+			outputSink = new PrintStreamOutputSink(printStream);
+			outputSinkCache.put(printStream, outputSink);
+		}
+		return outputSink;
 	}
 
 	/**

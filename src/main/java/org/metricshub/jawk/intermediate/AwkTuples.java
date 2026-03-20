@@ -1784,10 +1784,10 @@ public class AwkTuples implements Serializable {
 	 * no more changes occur without complicating the parser.
 	 */
 	public void optimize() {
-		executionProfile = null;
 		if (optimized) {
 			return;
 		}
+		executionProfile = null;
 		if (!postProcessed) {
 			postProcess();
 		}

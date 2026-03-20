@@ -714,6 +714,22 @@ public class Awk {
 	}
 
 	/**
+	 * Evaluates the specified AWK expression using a structured {@link InputSource}
+	 * to populate {@code $0}, {@code $1}, etc.
+	 * <p>
+	 * This is a source-compatible alias for {@link #eval(String, InputSource)}.
+	 * </p>
+	 *
+	 * @param expression Expression to evaluate (e.g. {@code $2 "-" $3})
+	 * @param source structured input source providing the current record
+	 * @return the value of the specified expression
+	 * @throws IOException if anything goes wrong with the evaluation
+	 */
+	public Object evalSource(String expression, InputSource source) throws IOException {
+		return eval(expression, source);
+	}
+
+	/**
 	 * Evaluates pre-compiled tuples without input.
 	 *
 	 * @param tuples tuples returned by {@link Awk#compileForEval(String)}
@@ -762,6 +778,22 @@ public class Awk {
 		InputSource resolvedSource = Objects.requireNonNull(source, "source");
 		AVM activeEvalAvm = createEvalAvm();
 		return activeEvalAvm.eval(compiledTuples, resolvedSource);
+	}
+
+	/**
+	 * Evaluates pre-compiled tuples using a structured {@link InputSource} to
+	 * populate {@code $0}, {@code $1}, etc.
+	 * <p>
+	 * This is a source-compatible alias for {@link #eval(AwkTuples, InputSource)}.
+	 * </p>
+	 *
+	 * @param tuples Tuples returned by {@link Awk#compileForEval(String)}
+	 * @param source structured input source providing the current record
+	 * @return the value of the specified expression
+	 * @throws IOException if anything goes wrong with the evaluation
+	 */
+	public Object evalSource(AwkTuples tuples, InputSource source) throws IOException {
+		return eval(tuples, source);
 	}
 
 	protected AwkTuples createTuples() {

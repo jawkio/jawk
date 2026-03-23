@@ -344,9 +344,10 @@ Awk compiler = new Awk(settings);
 AwkTuples expr = compiler.compileForEval("NF \":\" $2");
 
 AVM avm = new AVM(settings, Collections.emptyMap());
-avm.prepareForEval("a,b,c");
-
-Object value = avm.eval(expr);
+try (AVM avm = new AVM(settings, Collections.emptyMap())) {
+    avm.prepareForEval("a,b,c");
+    Object value = avm.eval(expr);
+}
 ```
 
 The relationship between the two APIs is:

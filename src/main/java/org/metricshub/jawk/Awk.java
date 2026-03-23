@@ -815,8 +815,17 @@ public class Awk {
 	public AVM prepareEval(String input) throws IOException {
 		String resolvedInput = Objects.requireNonNull(input, "input");
 		AVM evalAvm = createEvalAvm();
-		evalAvm.prepareForEval(resolvedInput);
-		return evalAvm;
+		try {
+			evalAvm.prepareForEval(resolvedInput);
+			return evalAvm;
+		} catch (IOException | RuntimeException e) {
+			try {
+				evalAvm.close();
+			} catch (IOException closeException) {
+				e.addSuppressed(closeException);
+			}
+			throw e;
+		}
 	}
 
 	/**
@@ -840,11 +849,19 @@ public class Awk {
 	public AVM prepareEval(InputSource source) throws IOException {
 		InputSource resolvedSource = Objects.requireNonNull(source, "source");
 		AVM evalAvm = createEvalAvm();
-		if (!evalAvm.prepareForEval(resolvedSource)) {
-			evalAvm.close();
-			throw new IOException("No record available from source.");
+		try {
+			if (!evalAvm.prepareForEval(resolvedSource)) {
+				throw new IOException("No record available from source.");
+			}
+			return evalAvm;
+		} catch (IOException | RuntimeException e) {
+			try {
+				evalAvm.close();
+			} catch (IOException closeException) {
+				e.addSuppressed(closeException);
+			}
+			throw e;
 		}
-		return evalAvm;
 	}
 
 	protected AwkTuples createTuples() {

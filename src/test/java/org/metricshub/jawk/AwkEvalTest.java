@@ -237,6 +237,17 @@ public class AwkEvalTest {
 	}
 
 	@Test
+	public void testPrepareEvalClosesSourceWhenPreparationThrows() {
+		Awk awk = new Awk();
+		ThrowingCloseTrackingInputSource source = new ThrowingCloseTrackingInputSource();
+
+		IOException thrown = assertThrows(IOException.class, () -> awk.prepareEval(source));
+
+		assertEquals("boom", thrown.getMessage());
+		assertTrue(source.isClosed());
+	}
+
+	@Test
 	public void testPreparedAvmCanCloseBoundInputSource() throws Exception {
 		Awk awk = new Awk();
 		AwkTuples secondField = awk.compileForEval("$2");
@@ -247,7 +258,7 @@ public class AwkEvalTest {
 			assertEquals("right", prepared.eval(secondField));
 		}
 
-		assertTrue(source.closed);
+		assertTrue(source.isClosed());
 	}
 
 	@Test
@@ -496,7 +507,7 @@ public class AwkEvalTest {
 		}
 	}
 
-	private static final class CloseTrackingInputSource implements InputSource, Closeable {
+	private static class CloseTrackingInputSource implements InputSource, Closeable {
 
 		private final TableInputSource delegate;
 		private boolean closed;
@@ -528,6 +539,22 @@ public class AwkEvalTest {
 		@Override
 		public void close() {
 			closed = true;
+		}
+
+		boolean isClosed() {
+			return closed;
+		}
+	}
+
+	private static final class ThrowingCloseTrackingInputSource extends CloseTrackingInputSource {
+
+		private ThrowingCloseTrackingInputSource() {
+			super(Collections.<List<String>>emptyList());
+		}
+
+		@Override
+		public boolean nextRecord() throws IOException {
+			throw new IOException("boom");
 		}
 	}
 }

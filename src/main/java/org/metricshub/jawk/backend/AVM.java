@@ -394,13 +394,8 @@ public class AVM implements VariableManager, Closeable {
 			Map<String, Object> variableOverrides)
 			throws IOException {
 		InputSource resolvedSource = Objects.requireNonNull(inputSource, "inputSource");
-		InputSource previousResolvedSource = resolvedInputSource;
 		resetRuntimeState(runtimeArguments, variableOverrides);
-
-		if (previousResolvedSource != null && previousResolvedSource != resolvedSource) {
-			closeInputSource(previousResolvedSource);
-		}
-		resolvedInputSource = resolvedSource;
+		rebindResolvedInputSource(resolvedSource);
 
 		jrt.jrtCloseAll();
 		jrt.prepareForExecution(initialFsValue, settings.getDefaultRS(), settings.getDefaultORS());
@@ -484,7 +479,7 @@ public class AVM implements VariableManager, Closeable {
 		if (!executionSpecialVariables.isEmpty()) {
 			jrt.applySpecialVariables(executionSpecialVariables);
 		}
-		resolvedInputSource = resolvedSource;
+		rebindResolvedInputSource(resolvedSource);
 		executeTuples(tuples.top());
 	}
 
@@ -499,7 +494,6 @@ public class AVM implements VariableManager, Closeable {
 		exitCode = 0;
 		throwExitException = false;
 		inputSourceFilelistAssignmentsApplied = false;
-		resolvedInputSource = null;
 		globalVariableOffsets = null;
 		globalVariableArrays = null;
 		functionNames = null;
@@ -537,6 +531,14 @@ public class AVM implements VariableManager, Closeable {
 		globalVariableArrays = compiledTuples.getGlobalVariableAarrayMap();
 		functionNames = compiledTuples.getFunctionNameSet();
 		installedEvalTuples = compiledTuples;
+	}
+
+	private void rebindResolvedInputSource(InputSource resolvedSource) {
+		InputSource previousResolvedSource = resolvedInputSource;
+		if (previousResolvedSource != null && previousResolvedSource != resolvedSource) {
+			closeInputSource(previousResolvedSource);
+		}
+		resolvedInputSource = resolvedSource;
 	}
 
 	private boolean hasCompatibleEvalGlobalLayout(long numGlobals) {

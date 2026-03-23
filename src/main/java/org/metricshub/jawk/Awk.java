@@ -815,10 +815,7 @@ public class Awk {
 	public AVM prepareEval(String input) throws IOException {
 		String resolvedInput = Objects.requireNonNull(input, "input");
 		AVM evalAvm = createEvalAvm();
-		if (!evalAvm.prepareForEval(resolvedInput)) {
-			evalAvm.close();
-			throw new IOException("No record available from input.");
-		}
+		evalAvm.prepareForEval(resolvedInput);
 		return evalAvm;
 	}
 

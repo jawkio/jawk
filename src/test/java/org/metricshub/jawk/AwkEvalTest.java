@@ -251,6 +251,22 @@ public class AwkEvalTest {
 	}
 
 	@Test
+	public void testPrepareForEvalClosesPreviousCloseableInputSourceWhenRebinding() throws Exception {
+		CloseTrackingInputSource first = new CloseTrackingInputSource(Collections.singletonList(Arrays.asList("a", "b")));
+		CloseTrackingInputSource second = new CloseTrackingInputSource(Collections.singletonList(Arrays.asList("x", "y")));
+
+		try (AVM avm = new AVM(new AwkSettings(), Collections.emptyMap())) {
+			assertTrue(avm.prepareForEval(first));
+			assertFalse(first.closed);
+			assertTrue(avm.prepareForEval(second));
+			assertTrue(first.closed);
+			assertFalse(second.closed);
+		}
+
+		assertTrue(second.closed);
+	}
+
+	@Test
 	public void testOptimizeRemainsIdempotentForEvalTuples() throws Exception {
 		AwkTuples tuples = new Awk().compileForEval("$2 + $3");
 		String before = dumpTuples(tuples);

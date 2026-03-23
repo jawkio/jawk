@@ -1646,19 +1646,20 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
-	 * Performs tuple queue optimizations such as reachability pruning and NOP
-	 * collapsing.
+	 * Performs tuple queue optimizations such as reachability pruning, redundant
+	 * eval-global setup removal, and NOP collapsing.
 	 * <p>
 	 * This method is idempotent. Repeated invocations after a successful
 	 * optimization run will have no additional effect.
-	 */
-	/**
+	 * </p>
+	 * <p>
 	 * Peephole optimization happens at the tuple layer instead of during AST
 	 * construction. Folding after parsing guarantees that any tuple-level
 	 * transformations (for example, address resolution and extension hooks) have
-	 * already run, and it keeps a single optimization toggle (optimize()) for
-	 * callers. Performing the work at the tuple layer also lets us recurse until
-	 * no more changes occur without complicating the parser.
+	 * already run, and it keeps a single optimization toggle ({@code optimize()})
+	 * for callers. Performing the work at the tuple layer also lets us recurse
+	 * until no more changes occur without complicating the parser.
+	 * </p>
 	 */
 	public void optimize() {
 		if (optimized) {

@@ -390,7 +390,12 @@ public class AVM implements VariableManager, Closeable {
 			Map<String, Object> variableOverrides)
 			throws IOException {
 		InputSource resolvedSource = Objects.requireNonNull(inputSource, "inputSource");
+		InputSource previousResolvedSource = resolvedInputSource;
 		resetRuntimeState(runtimeArguments, variableOverrides);
+
+		if (previousResolvedSource != null && previousResolvedSource != resolvedSource) {
+			closeInputSource(previousResolvedSource);
+		}
 		resolvedInputSource = resolvedSource;
 
 		jrt.jrtCloseAll();

@@ -62,17 +62,20 @@ for (String line : Arrays.asList("alpha,beta", "left,right", "one,two")) {
 evaluation is isolated from the previous one.
 
 When you already have one record and need to evaluate several expressions
-against it, prepare that record once and reuse the returned session:
+against it, prepare that record once and reuse the returned `AVM`:
 
 ```java
 AwkSettings settings = new AwkSettings();
 settings.setFieldSeparator(":");
 
 Awk awk = new Awk(settings);
-Awk.PreparedEval prepared = awk.prepareEval("alice:admin:eu");
+AwkTuples roleExpr = awk.compileForEval("$2");
+AwkTuples summaryExpr = awk.compileForEval("NF \":\" $NF");
 
-Object role = prepared.eval("$2");
-Object summary = prepared.eval("NF \":\" $NF");
+try (AVM prepared = awk.prepareEval("alice:admin:eu")) {
+    Object role = prepared.eval(roleExpr);
+    Object summary = prepared.eval(summaryExpr);
+}
 ```
 
 For the hottest path, combine prepared input with precompiled tuples:
@@ -82,16 +85,17 @@ AwkSettings settings = new AwkSettings();
 settings.setFieldSeparator(",");
 
 Awk awk = new Awk(settings);
-Awk.PreparedEval prepared = awk.prepareEval("alpha,beta,gamma");
 AwkTuples secondField = awk.compileForEval("$2");
 AwkTuples summary = awk.compileForEval("NF \":\" $NF");
 
-Object second = prepared.eval(secondField);
-Object info = prepared.eval(summary);
+try (AVM prepared = awk.prepareEval("alpha,beta,gamma")) {
+    Object second = prepared.eval(secondField);
+    Object info = prepared.eval(summary);
+}
 ```
 
-`Awk.prepareEval(...)` is the recommended high-level API for that shape. It
-owns the underlying `AVM` for you and exposes a simpler `PreparedEval` facade.
+`Awk.prepareEval(...)` is the recommended convenience API for that shape. It
+creates and prepares the reusable `AVM` for you.
 
 ### Quick execution with `Awk.run()`
 
@@ -312,7 +316,7 @@ This is the recommended API when you have:
 * a tight loop where compile cost must be paid only once
 
 When the shape is inverted and you have one record with many expressions,
-prefer `Awk.prepareEval(...)` and reuse the returned `PreparedEval`.
+prefer `Awk.prepareEval(...)` and reuse the returned `AVM`.
 That API is intentionally stateful: later expressions can observe mutations
 performed by earlier ones.
 
@@ -325,8 +329,9 @@ Most embedders should stay on `Awk`:
 * Use `Awk.prepareEval(...)` for one record against many expressions.
 
 `AVM.prepareForEval(...)` is the low-level equivalent of `Awk.prepareEval(...)`.
-Prefer `Awk.prepareEval(...)` unless you specifically need to hold the `AVM`
-instance yourself or call the lower-level preparation overload directly.
+Prefer `Awk.prepareEval(...)` unless you specifically need to own the `AVM`
+instance lifecycle yourself or call the lower-level preparation overload
+directly.
 
 If you intentionally want to reuse the same interpreter instance, you can work
 with `AVM` directly:
@@ -354,7 +359,8 @@ The relationship between the two APIs is:
 raw `AVM.eval(AwkTuples)` reuses the AVM exactly as it stands, which means
 globals, stacks, and AWK specials all carry over. Calling
 `prepareForEval(...)` again binds the next record from the source and creates a
-fresh eval baseline.
+fresh eval baseline. Call `AVM.close()` when you are done with a prepared AVM
+to release bound input and runtime I/O resources.
 
 Use this API only when you explicitly want to control the runtime lifecycle and
 accept the footgun. The reused `AVM` API is sequential, not concurrent: do not

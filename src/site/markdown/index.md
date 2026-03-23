@@ -49,24 +49,27 @@ AwkSettings settings = new AwkSettings();
 settings.setFieldSeparator(",");
 
 Awk awk = new Awk(settings);
-Awk.PreparedEval prepared = awk.prepareEval("alpha,beta,gamma");
+AwkTuples secondField = awk.compileForEval("$2");
+AwkTuples summary = awk.compileForEval("NF \":\" $NF");
 
-Object second = prepared.eval("$2");
-Object summary = prepared.eval("NF \":\" $NF");
+try (AVM prepared = awk.prepareEval("alpha,beta,gamma")) {
+    Object second = prepared.eval(secondField);
+    Object info = prepared.eval(summary);
+}
 ```
 
 For the fastest variant of that flow, precompile the expressions once and pass
-the resulting tuples to `PreparedEval.eval(AwkTuples)`.
+the resulting tuples to `AVM.eval(AwkTuples)`.
 
-Prepared sessions are intentionally stateful. They reuse the same mutable AVM
+Prepared AVMs are intentionally stateful. They reuse the same mutable AVM
 instance across calls, so globals and AWK specials such as `RSTART` and
 `RLENGTH` can leak from one expression to the next. Use `Awk.eval(...)` when
 you need per-call isolation.
 
 `Awk.eval(...)` always creates and prepares a fresh runtime, so each evaluation
-is isolated from the previous one. `Awk.prepareEval(...)` is the recommended
-high-level reuse API; direct `AVM.prepareForEval(...)` is the low-level expert
-equivalent.
+is isolated from the previous one. `Awk.prepareEval(...)` is the convenience
+API that creates and prepares a reusable `AVM`; direct
+`AVM.prepareForEval(...)` is the low-level expert equivalent.
 
 ### Run a script directly
 

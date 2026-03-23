@@ -27,6 +27,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import java.io.Closeable;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -147,52 +148,51 @@ public class AwkEvalTest {
 	@Test
 	public void testPrepareEvalReusesOneStringRecordAcrossSeveralExpressions() throws Exception {
 		Awk awk = new Awk();
-		Awk.PreparedEval prepared = awk.prepareEval("alpha beta gamma");
+		AwkTuples secondField = awk.compileForEval("$2");
+		AwkTuples sizeAndLastField = awk.compileForEval("NF \":\" $NF");
 
-		assertEquals("beta", prepared.eval("$2"));
-		assertEquals("3:gamma", prepared.eval("NF \":\" $NF"));
+		try (AVM prepared = awk.prepareEval("alpha beta gamma")) {
+			assertEquals("beta", prepared.eval(secondField));
+			assertEquals("3:gamma", prepared.eval(sizeAndLastField));
+		}
 	}
 
 	@Test
 	public void testPrepareEvalReusesOneStructuredRecordAcrossSeveralExpressions() throws Exception {
 		Awk awk = new Awk();
-		Awk.PreparedEval prepared = awk
-				.prepareEval(
-						new TableInputSource(Collections.singletonList(Arrays.asList("left", "right", "tail"))));
 		AwkTuples secondField = awk.compileForEval("$2");
 		AwkTuples sizeAndLastField = awk.compileForEval("NF \":\" $NF");
 
-		assertEquals("right", prepared.eval(secondField));
-		assertEquals("3:tail", prepared.eval(sizeAndLastField));
+		try (
+				AVM prepared = awk
+						.prepareEval(
+								new TableInputSource(Collections.singletonList(Arrays.asList("left", "right", "tail"))))) {
+			assertEquals("right", prepared.eval(secondField));
+			assertEquals("3:tail", prepared.eval(sizeAndLastField));
+		}
 	}
 
 	@Test
 	public void testPrepareEvalIntentionallyCarriesJrtStateAcrossExpressions() throws Exception {
 		Awk awk = new Awk();
-		Awk.PreparedEval prepared = awk.prepareEval("alpha beta");
+		AwkTuples matcher = awk.compileForEval("match($0, /alpha/)");
+		AwkTuples startAndLength = awk.compileForEval("RSTART \":\" RLENGTH");
 
-		assertEquals(1, prepared.eval("match($0, /alpha/)"));
-		assertEquals("1:5", prepared.eval("RSTART \":\" RLENGTH"));
+		try (AVM prepared = awk.prepareEval("alpha beta")) {
+			assertEquals(1, prepared.eval(matcher));
+			assertEquals("1:5", prepared.eval(startAndLength));
+		}
 	}
 
 	@Test
 	public void testPrepareEvalIntentionallyCarriesStateAcrossRepeatedTupleRuns() throws Exception {
 		Awk awk = new Awk();
-		Awk.PreparedEval prepared = awk.prepareEval("alpha beta");
 		AwkTuples increment = awk.compileForEval("a++");
 
-		assertEquals(0.0, JRT.toDouble(prepared.eval(increment)), 0.0);
-		assertEquals(1.0, JRT.toDouble(prepared.eval(increment)), 0.0);
-	}
-
-	@Test
-	public void testPrepareEvalCachesRepeatedExpressionCompilation() throws Exception {
-		CountingAwk awk = new CountingAwk();
-		Awk.PreparedEval prepared = awk.prepareEval("a b c");
-
-		assertEquals("b", prepared.eval("$2"));
-		assertEquals("b", prepared.eval("$2"));
-		assertEquals(1, awk.getCompileForEvalCount());
+		try (AVM prepared = awk.prepareEval("alpha beta")) {
+			assertEquals(0.0, JRT.toDouble(prepared.eval(increment)), 0.0);
+			assertEquals(1.0, JRT.toDouble(prepared.eval(increment)), 0.0);
+		}
 	}
 
 	@Test
@@ -213,16 +213,41 @@ public class AwkEvalTest {
 	@Test
 	public void testPrepareEvalRejectsDifferentStatefulTupleLayoutsWithoutReprepare() throws Exception {
 		Awk awk = new Awk();
-		Awk.PreparedEval prepared = awk.prepareEval("alpha beta");
-		AwkTuples matcher = awk.compileForEval("match($0, /alpha/)");
-		AwkTuples increment = awk.compileForEval("a++");
+		AwkTuples firstIncrement = awk.compileForEval("a++");
+		AwkTuples secondIncrement = awk.compileForEval("b++");
 
-		assertEquals(1, prepared.eval(matcher));
-		AwkRuntimeException thrown = assertThrows(AwkRuntimeException.class, () -> prepared.eval(increment));
-		assertTrue(thrown.getCause() instanceof IllegalStateException);
-		assertEquals(
-				"AVM globals are already initialized for a different eval layout. Call prepareForEval(...) first.",
-				thrown.getCause().getMessage());
+		try (AVM prepared = awk.prepareEval("alpha beta")) {
+			assertEquals(0.0, JRT.toDouble(prepared.eval(firstIncrement)), 0.0);
+			AwkRuntimeException thrown = assertThrows(AwkRuntimeException.class, () -> prepared.eval(secondIncrement));
+			assertTrue(thrown.getCause() instanceof IllegalStateException);
+			assertEquals(
+					"AVM globals are already initialized for a different eval layout. Call prepareForEval(...) first.",
+					thrown.getCause().getMessage());
+		}
+	}
+
+	@Test
+	public void testPrepareEvalRejectsExhaustedSource() {
+		Awk awk = new Awk();
+		TableInputSource emptySource = new TableInputSource(Collections.<List<String>>emptyList());
+
+		IOException thrown = assertThrows(IOException.class, () -> awk.prepareEval(emptySource));
+
+		assertEquals("No record available from source.", thrown.getMessage());
+	}
+
+	@Test
+	public void testPreparedAvmCanCloseBoundInputSource() throws Exception {
+		Awk awk = new Awk();
+		AwkTuples secondField = awk.compileForEval("$2");
+		CloseTrackingInputSource source = new CloseTrackingInputSource(
+				Collections.singletonList(Arrays.asList("left", "right")));
+
+		try (AVM prepared = awk.prepareEval(source)) {
+			assertEquals("right", prepared.eval(secondField));
+		}
+
+		assertTrue(source.closed);
 	}
 
 	@Test
@@ -365,16 +390,9 @@ public class AwkEvalTest {
 	private static final class CountingAwk extends Awk {
 
 		private final AtomicInteger createAvmCount = new AtomicInteger();
-		private final AtomicInteger compileForEvalCount = new AtomicInteger();
 
 		private CountingAwk() {
 			super(new AwkSettings());
-		}
-
-		@Override
-		public AwkTuples compileForEval(String expression) throws IOException {
-			compileForEvalCount.incrementAndGet();
-			return super.compileForEval(expression);
 		}
 
 		@Override
@@ -385,10 +403,6 @@ public class AwkEvalTest {
 
 		private int getCreateAvmCount() {
 			return createAvmCount.get();
-		}
-
-		private int getCompileForEvalCount() {
-			return compileForEvalCount.get();
 		}
 	}
 
@@ -463,6 +477,41 @@ public class AwkEvalTest {
 
 		private int getCloseAllCount() {
 			return closeAllCount;
+		}
+	}
+
+	private static final class CloseTrackingInputSource implements InputSource, Closeable {
+
+		private final TableInputSource delegate;
+		private boolean closed;
+
+		private CloseTrackingInputSource(List<List<String>> rows) {
+			delegate = new TableInputSource(rows);
+		}
+
+		@Override
+		public boolean nextRecord() throws IOException {
+			return delegate.nextRecord();
+		}
+
+		@Override
+		public String getRecordText() {
+			return delegate.getRecordText();
+		}
+
+		@Override
+		public List<String> getFields() {
+			return delegate.getFields();
+		}
+
+		@Override
+		public boolean isFromFilenameList() {
+			return delegate.isFromFilenameList();
+		}
+
+		@Override
+		public void close() {
+			closed = true;
 		}
 	}
 }

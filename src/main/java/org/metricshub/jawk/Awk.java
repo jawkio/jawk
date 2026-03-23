@@ -797,47 +797,57 @@ public class Awk {
 	}
 
 	/**
-	 * Prepares one text record for repeated expression evaluation.
+	 * Prepares one text record for repeated expression evaluation and returns the
+	 * mutable {@link AVM} that will execute those expressions.
 	 * <p>
-	 * The returned session snapshots the current eval runtime configuration and
-	 * binds the provided record once. Later calls to
-	 * {@link PreparedEval#eval(String)} or {@link PreparedEval#eval(AwkTuples)}
-	 * reuse the same AVM state without resetting it between expressions, so
-	 * mutations intentionally leak across evaluations. This is the high-level
-	 * convenience wrapper around direct {@link AVM#prepareForEval(String)} and
-	 * {@link AVM#eval(AwkTuples)} usage.
+	 * The returned {@link AVM} snapshots the current eval runtime configuration
+	 * and binds the provided record once. Later calls to
+	 * {@link AVM#eval(AwkTuples)} reuse the same AVM state without resetting it
+	 * between expressions, so mutations intentionally leak across evaluations.
+	 * This is the high-level convenience wrapper around direct
+	 * {@link AVM#prepareForEval(String)} and {@link AVM#eval(AwkTuples)} usage.
 	 * </p>
 	 *
-	 * @param input text record to expose as {@code $0}
-	 * @return reusable prepared-eval session
+	 * @param input non-null text record to expose as {@code $0}
+	 * @return prepared AVM ready for repeated {@link AVM#eval(AwkTuples)} calls
 	 * @throws IOException if binding the record fails
 	 */
-	public PreparedEval prepareEval(String input) throws IOException {
+	public AVM prepareEval(String input) throws IOException {
+		String resolvedInput = Objects.requireNonNull(input, "input");
 		AVM evalAvm = createEvalAvm();
-		evalAvm.prepareForEval(input);
-		return new PreparedEval(evalAvm);
+		if (!evalAvm.prepareForEval(resolvedInput)) {
+			evalAvm.close();
+			throw new IOException("No record available from input.");
+		}
+		return evalAvm;
 	}
 
 	/**
-	 * Prepares at most one record from a structured {@link InputSource} for
-	 * repeated expression evaluation.
+	 * Prepares the first available record from a structured {@link InputSource}
+	 * for repeated expression evaluation and returns the mutable {@link AVM}
+	 * that will execute those expressions.
 	 * <p>
-	 * Only the first available record is captured. Later evaluations reuse the
-	 * same AVM state without resetting it between expressions, so mutations
-	 * intentionally leak across evaluations. This is the high-level convenience
-	 * wrapper around direct {@link AVM#prepareForEval(InputSource)} and
-	 * {@link AVM#eval(AwkTuples)} usage.
+	 * The returned AVM remains attached to the provided source, so later
+	 * {@code getline} operations and repeated {@link AVM#prepareForEval(InputSource)}
+	 * calls continue from that source's current position. Later
+	 * {@link AVM#eval(AwkTuples)} calls reuse the same AVM state without
+	 * resetting it between expressions, so mutations intentionally leak across
+	 * evaluations. Close the returned AVM when you are done with it to release
+	 * any bound input or runtime I/O resources.
 	 * </p>
 	 *
 	 * @param source structured source providing the record to bind
-	 * @return reusable prepared-eval session
-	 * @throws IOException if reading the record fails
+	 * @return prepared AVM ready for repeated {@link AVM#eval(AwkTuples)} calls
+	 * @throws IOException if reading the record fails or the source is exhausted
 	 */
-	public PreparedEval prepareEval(InputSource source) throws IOException {
+	public AVM prepareEval(InputSource source) throws IOException {
 		InputSource resolvedSource = Objects.requireNonNull(source, "source");
 		AVM evalAvm = createEvalAvm();
-		evalAvm.prepareForEval(resolvedSource);
-		return new PreparedEval(evalAvm);
+		if (!evalAvm.prepareForEval(resolvedSource)) {
+			evalAvm.close();
+			throw new IOException("No record available from source.");
+		}
+		return evalAvm;
 	}
 
 	protected AwkTuples createTuples() {
@@ -937,62 +947,6 @@ public class Awk {
 			} catch (IOException e) {
 				throw new IllegalStateException("UTF-8 must always be available", e);
 			}
-		}
-	}
-
-	/**
-	 * Reusable session for evaluating several expressions against the same bound
-	 * record.
-	 * <p>
-	 * Instances are sequential, not concurrent. They intentionally reuse the
-	 * same mutable AVM state across calls, so use one prepared session per
-	 * thread and call {@link Awk#eval(String, InputSource)} instead when you
-	 * need isolated evaluations.
-	 * </p>
-	 */
-	public final class PreparedEval {
-
-		private final AVM avm;
-		private final Map<String, AwkTuples> expressionCache = new LinkedHashMap<String, AwkTuples>();
-
-		private PreparedEval(AVM avm) {
-			this.avm = avm;
-		}
-
-		/**
-		 * Evaluates the supplied AWK expression against the prepared record.
-		 * Repeated calls with the same expression string reuse the previously
-		 * compiled tuples and the same underlying AVM state.
-		 *
-		 * @param expression expression to evaluate
-		 * @return the resulting value of the expression
-		 * @throws IOException if compilation or evaluation fails
-		 */
-		public Object eval(String expression) throws IOException {
-			String expressionKey = Objects.requireNonNull(expression, "expression");
-			AwkTuples tuples = expressionCache.get(expressionKey);
-			if (tuples == null) {
-				tuples = compileForEval(expressionKey);
-				expressionCache.put(expressionKey, tuples);
-			}
-			return eval(tuples);
-		}
-
-		/**
-		 * Evaluates pre-compiled expression tuples against the prepared record
-		 * without resetting the AVM state first.
-		 * <p>
-		 * Mixing different stateful tuple layouts on the same prepared session is
-		 * unsupported. If the tuple streams require incompatible global-variable
-		 * layouts, this method can fail fast with an {@link IllegalStateException}.
-		 * </p>
-		 *
-		 * @param tuples tuples returned by {@link Awk#compileForEval(String)}
-		 * @return the resulting value of the expression
-		 * @throws IOException if evaluation fails
-		 */
-		public Object eval(AwkTuples tuples) throws IOException {
-			return avm.eval(Objects.requireNonNull(tuples, "tuples"));
 		}
 	}
 

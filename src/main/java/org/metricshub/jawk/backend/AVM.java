@@ -24,6 +24,8 @@ package org.metricshub.jawk.backend;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,9 +36,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.LinkedHashSet;
 import java.util.StringTokenizer;
-import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -96,7 +96,7 @@ import org.metricshub.printf4j.Printf4J;
  *
  * @author Danny Daglas
  */
-public class AVM implements VariableManager {
+public class AVM implements VariableManager, Closeable {
 
 	private static final boolean IS_WINDOWS = System.getProperty("os.name").indexOf("Windows") >= 0;
 
@@ -254,6 +254,8 @@ public class AVM implements VariableManager {
 	 */
 	private Map<String, Boolean> globalVariableArrays;
 	private Set<String> functionNames;
+	private Map<String, Integer> initializedEvalGlobalVariableOffsets;
+	private Map<String, Boolean> initializedEvalGlobalVariableArrays;
 
 	/**
 	 * Evaluate the provided tuples as an AWK expression.
@@ -336,8 +338,9 @@ public class AVM implements VariableManager {
 	 * the current input.
 	 *
 	 * @param input text record to expose as {@code $0}
-	 * @param runtimeArguments name=value or filename entries visible to the eval
-	 *        runtime
+	 * @param runtimeArguments CLI-style runtime arguments visible through
+	 *        {@code ARGC}/{@code ARGV}; use {@code variableOverrides} for Java
+	 *        SDK variable assignments
 	 * @param variableOverrides additional variable assignments applied on top of
 	 *        the settings-level variables (may be {@code null})
 	 * @return {@code true} when a record was prepared, {@code false} when the
@@ -372,8 +375,9 @@ public class AVM implements VariableManager {
 	 * again on the same source advances to the next available record.
 	 *
 	 * @param inputSource source providing the record to bind
-	 * @param runtimeArguments name=value or filename entries visible to the eval
-	 *        runtime
+	 * @param runtimeArguments CLI-style runtime arguments visible through
+	 *        {@code ARGC}/{@code ARGV}; use {@code variableOverrides} for Java
+	 *        SDK variable assignments
 	 * @param variableOverrides additional variable assignments applied on top of
 	 *        the settings-level variables (may be {@code null})
 	 * @return {@code true} when a record was prepared, {@code false} when the
@@ -475,6 +479,8 @@ public class AVM implements VariableManager {
 		globalVariableOffsets = null;
 		globalVariableArrays = null;
 		functionNames = null;
+		initializedEvalGlobalVariableOffsets = null;
+		initializedEvalGlobalVariableArrays = null;
 		installedEvalTuples = null;
 		runtimeStack.reset();
 		randomNumberGenerator.setSeed(1);
@@ -507,6 +513,14 @@ public class AVM implements VariableManager {
 		globalVariableArrays = compiledTuples.getGlobalVariableAarrayMap();
 		functionNames = compiledTuples.getFunctionNameSet();
 		installedEvalTuples = compiledTuples;
+	}
+
+	private boolean hasCompatibleEvalGlobalLayout(long numGlobals) {
+		Object[] globals = runtimeStack.getNumGlobals();
+		return globals != null
+				&& globals.length == numGlobals
+				&& Objects.equals(initializedEvalGlobalVariableOffsets, globalVariableOffsets)
+				&& Objects.equals(initializedEvalGlobalVariableArrays, globalVariableArrays);
 	}
 
 	/**
@@ -1757,6 +1771,8 @@ public class AVM implements VariableManager {
 					Object[] globals = runtimeStack.getNumGlobals();
 					if (globals == null) {
 						runtimeStack.setNumGlobals(position.intArg(0));
+						initializedEvalGlobalVariableOffsets = globalVariableOffsets;
+						initializedEvalGlobalVariableArrays = globalVariableArrays;
 
 						// now that we have the global variable size,
 						// we can allocate the initial variables
@@ -1779,7 +1795,7 @@ public class AVM implements VariableManager {
 								}
 							}
 						}
-					} else if (globals.length != position.intArg(0)) {
+					} else if (!hasCompatibleEvalGlobalLayout(position.intArg(0))) {
 						throw new IllegalStateException(
 								"AVM globals are already initialized for a different eval layout. Call prepareForEval(...) first.");
 					}
@@ -2200,6 +2216,22 @@ public class AVM implements VariableManager {
 		}
 		resolvedInputSource = null;
 		inputSourceFilelistAssignmentsApplied = false;
+	}
+
+	/**
+	 * Releases any prepared input source and runtime I/O resources owned by this
+	 * AVM.
+	 * <p>
+	 * Call this when you are done with an AVM returned by
+	 * {@link org.metricshub.jawk.Awk#prepareEval(String)} or
+	 * {@link org.metricshub.jawk.Awk#prepareEval(org.metricshub.jawk.jrt.InputSource)}.
+	 * The AVM may be prepared again afterwards, but callers should treat a closed
+	 * instance as end-of-use unless they intentionally reinitialize it.
+	 * </p>
+	 */
+	@Override
+	public void close() throws IOException {
+		finishPreparedEval(true);
 	}
 
 	/**

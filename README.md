@@ -60,31 +60,35 @@ Object second = awk.eval(expression, "left,right");
 ```
 
 When you need to evaluate several expressions against the same record, prepare
-that record once and reuse the prepared session:
+that record once and reuse the prepared `AVM`:
 
 ```java
 AwkSettings settings = new AwkSettings();
 settings.setFieldSeparator(",");
 
 Awk awk = new Awk(settings);
-Awk.PreparedEval prepared = awk.prepareEval("alpha,beta,gamma");
+AwkTuples secondField = awk.compileForEval("$2");
+AwkTuples summary = awk.compileForEval("NF \":\" $NF");
 
-Object second = prepared.eval("$2");
-Object summary = prepared.eval("NF \":\" $NF");
+try (AVM prepared = awk.prepareEval("alpha,beta,gamma")) {
+    Object second = prepared.eval(secondField);
+    Object info = prepared.eval(summary);
+}
 ```
 
 For the hottest path, combine both techniques: prepare the record once and pass
-precompiled tuples to `PreparedEval.eval(AwkTuples)`.
+precompiled tuples directly to `AVM.eval(AwkTuples)`.
 
-Prepared sessions intentionally reuse the same mutable AVM state across calls.
+Prepared AVMs intentionally reuse the same mutable runtime state across calls.
 That means globals, `RSTART`, `RLENGTH`, and any other AWK-visible state can
 leak from one expression to the next. Use `Awk.eval(...)` when you need an
 isolated evaluation instead.
 
 `Awk.eval(...)` always creates and prepares a fresh runtime for isolated
 evaluation. Use direct `AVM` access only when you explicitly want to manage
-runtime reuse yourself. `Awk.prepareEval(...)` is the high-level convenience
-API; `AVM.prepareForEval(...)` is the low-level expert equivalent.
+runtime reuse yourself. `Awk.prepareEval(...)` is the convenience API that
+creates and prepares a reusable `AVM`; direct `AVM.prepareForEval(...)` is the
+low-level expert equivalent.
 
 When your application already has structured rows, implement
 `org.metricshub.jawk.jrt.InputSource` and feed fields directly to

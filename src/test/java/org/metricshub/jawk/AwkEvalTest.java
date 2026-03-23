@@ -189,6 +189,19 @@ public class AwkEvalTest {
 	}
 
 	@Test
+	public void testEvalRejectsExitOpcodeWithoutPoisoningPreparedAvm() throws Exception {
+		Awk awk = new Awk();
+		AwkTuples invalidEvalTuples = awk.compile("BEGIN { exit 7 }");
+		AwkTuples safeExpression = awk.compileForEval("1 + 1");
+
+		try (AVM prepared = awk.prepareEval("alpha beta")) {
+			IllegalStateException thrown = assertThrows(IllegalStateException.class, () -> prepared.eval(invalidEvalTuples));
+			assertEquals("eval(AwkTuples) cannot execute EXIT opcodes.", thrown.getMessage());
+			assertEquals(2.0, JRT.toDouble(prepared.eval(safeExpression)), 0.0);
+		}
+	}
+
+	@Test
 	public void testPrepareForEvalCanAdvanceAcrossRecordsOnSameSource() throws Exception {
 		Awk awk = new Awk();
 		AVM avm = new AVM(new AwkSettings(), Collections.emptyMap());

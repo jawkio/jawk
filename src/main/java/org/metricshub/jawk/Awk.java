@@ -754,8 +754,9 @@ public class Awk {
 	 * Prepares one text record for repeated expression evaluation and returns the
 	 * mutable {@link AVM} that will execute those expressions.
 	 * <p>
-	 * The returned {@link AVM} snapshots the current eval runtime configuration
-	 * and binds the provided record once. Later calls to
+	 * The returned {@link AVM} is created using the current runtime
+	 * configuration of this {@link Awk} instance and binds the provided record
+	 * once. Later calls to
 	 * {@link AVM#eval(AwkTuples)} reuse the same AVM state without resetting it
 	 * between expressions, so mutations intentionally leak across evaluations.
 	 * This is the high-level convenience wrapper around direct

@@ -293,7 +293,11 @@ public class AVM implements VariableManager, Closeable {
 		try {
 			executeTuples(compiledTuples.top());
 		} catch (ExitException e) {
-			return e.getCode();
+			// Expression tuples must never contain EXIT opcodes. If callers pass a
+			// script tuple stream by mistake, fail fast without poisoning later evals.
+			throwExitException = false;
+			exitCode = 0;
+			throw new IllegalStateException("eval(AwkTuples) cannot execute EXIT opcodes.", e);
 		}
 		return operandStack.isEmpty() ? null : pop();
 	}

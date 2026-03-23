@@ -58,9 +58,40 @@ for (String line : Arrays.asList("alpha,beta", "left,right", "one,two")) {
 }
 ```
 
-`Awk.eval(...)` automatically chooses the lightweight read-only execution path
-when the compiled tuples do not mutate AWK-visible state. No extra API call is
-required for this optimization.
+`Awk.eval(...)` creates and prepares a fresh runtime for each call, so each
+evaluation is isolated from the previous one.
+
+When you already have one record and need to evaluate several expressions
+against it, prepare that record once and reuse the returned session:
+
+```java
+AwkSettings settings = new AwkSettings();
+settings.setFieldSeparator(":");
+
+Awk awk = new Awk(settings);
+Awk.PreparedEval prepared = awk.prepareEval("alice:admin:eu");
+
+Object role = prepared.eval("$2");
+Object summary = prepared.eval("NF \":\" $NF");
+```
+
+For the hottest path, combine prepared input with precompiled tuples:
+
+```java
+AwkSettings settings = new AwkSettings();
+settings.setFieldSeparator(",");
+
+Awk awk = new Awk(settings);
+Awk.PreparedEval prepared = awk.prepareEval("alpha,beta,gamma");
+AwkTuples secondField = awk.compileForEval("$2");
+AwkTuples summary = awk.compileForEval("NF \":\" $NF");
+
+Object second = prepared.eval(secondField);
+Object info = prepared.eval(summary);
+```
+
+`Awk.prepareEval(...)` is the recommended high-level API for that shape. It
+owns the underlying `AVM` for you and exposes a simpler `PreparedEval` facade.
 
 ### Quick execution with `Awk.run()`
 
@@ -280,11 +311,22 @@ This is the recommended API when you have:
 * many records
 * a tight loop where compile cost must be paid only once
 
+When the shape is inverted and you have one record with many expressions,
+prefer `Awk.prepareEval(...)` and reuse the returned `PreparedEval`.
+That API is intentionally stateful: later expressions can observe mutations
+performed by earlier ones.
+
 ### Advanced runtime control with `AVM`
 
-Most embedders should stay on `Awk`, which compiles tuples, creates a fresh
-runtime per invocation, and automatically selects the read-only eval path when
-possible.
+Most embedders should stay on `Awk`:
+
+* Use `Awk.eval(...)` for isolated evaluations.
+* Use `Awk.compileForEval(...)` plus `Awk.eval(...)` for one expression against many records.
+* Use `Awk.prepareEval(...)` for one record against many expressions.
+
+`AVM.prepareForEval(...)` is the low-level equivalent of `Awk.prepareEval(...)`.
+Prefer `Awk.prepareEval(...)` unless you specifically need to hold the `AVM`
+instance yourself or call the lower-level preparation overload directly.
 
 If you intentionally want to reuse the same interpreter instance, you can work
 with `AVM` directly:
@@ -297,22 +339,29 @@ Awk compiler = new Awk(settings);
 AwkTuples expr = compiler.compileForEval("NF \":\" $2");
 
 AVM avm = new AVM(settings, Collections.emptyMap());
+avm.prepareForEval("a,b,c");
 
-for (List<String> row : Arrays.asList(
-        Arrays.asList("a", "b", "c"),
-        Arrays.asList("left", "right"))) {
-    InputSource source = new TableInputSource(Collections.singletonList(row));
-    Object value = avm.eval(expr, source);
-    System.out.println(value);
-}
+Object value = avm.eval(expr);
 ```
 
-Use this API only when you explicitly want to control the runtime lifecycle.
-The reused `AVM` API is sequential, not concurrent: do not call the same AVM
-instance from multiple threads at the same time.
+The relationship between the two APIs is:
 
-`AVM.eval(...)` uses the same tuple metadata as `Awk.eval(...)` and will
-automatically choose the read-only eval path when the expression is eligible.
+* `Awk.prepareEval(...)` is the recommended convenience API.
+* `AVM.prepareForEval(...)` is the expert API for direct runtime control.
+* Raw `AVM.eval(AwkTuples)` does not reset anything at all.
+
+`AVM.prepareForEval(...)` performs the reset and binds one record. After that,
+raw `AVM.eval(AwkTuples)` reuses the AVM exactly as it stands, which means
+globals, stacks, and AWK specials all carry over. Calling
+`prepareForEval(...)` again binds the next record from the source and creates a
+fresh eval baseline.
+
+Use this API only when you explicitly want to control the runtime lifecycle and
+accept the footgun. The reused `AVM` API is sequential, not concurrent: do not
+call the same AVM instance from multiple threads at the same time.
+
+`Awk.eval(...)` stays on the safe side by creating and preparing a fresh AVM
+for each isolated evaluation.
 
 ### Advanced examples
 

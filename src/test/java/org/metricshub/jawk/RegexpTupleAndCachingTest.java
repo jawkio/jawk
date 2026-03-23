@@ -102,20 +102,15 @@ public class RegexpTupleAndCachingTest {
 	}
 
 	@Test
-	public void serializedEvalTuplesPreserveExecutionProfile() throws Exception {
+	public void serializedEvalTuplesPreserveSetNumGlobalsOptimization() throws Exception {
 		AwkTuples tuples = new Awk().compileForEval("NF \":\" $2");
-		AwkTuples.ExecutionProfile compiledProfile = tuples.getExecutionProfile();
-
-		assertTrue("Compiled tuples should eagerly carry an execution profile", compiledProfile != null);
-		assertTrue("Execution profile should retain read-only eligibility", compiledProfile.isReadOnlyEvalEligible());
+		assertFalse("Field-only eval tuples should omit SET_NUM_GLOBALS", dumpTuples(tuples).contains("SET_NUM_GLOBALS"));
 
 		AwkTuples deserialized = roundTrip(tuples);
-		AwkTuples.ExecutionProfile deserializedProfile = deserialized.getExecutionProfile();
 
-		assertTrue("Deserialized tuples should already carry an execution profile", deserializedProfile != null);
-		assertTrue(
-				"Serialized execution profile should remain read-only-eligible",
-				deserializedProfile.isReadOnlyEvalEligible());
+		assertFalse(
+				"Serialized eval tuples should keep the SET_NUM_GLOBALS optimization",
+				dumpTuples(deserialized).contains("SET_NUM_GLOBALS"));
 		assertEquals("2:right", new Awk().eval(deserialized, "left right"));
 	}
 

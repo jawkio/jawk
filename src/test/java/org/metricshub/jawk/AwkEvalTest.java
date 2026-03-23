@@ -24,7 +24,7 @@ package org.metricshub.jawk;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 import org.metricshub.jawk.backend.AVM;
 import org.metricshub.jawk.intermediate.AwkTuples;
+import org.metricshub.jawk.jrt.AwkRuntimeException;
 import org.metricshub.jawk.jrt.InputSource;
 import org.metricshub.jawk.jrt.JRT;
 import org.metricshub.jawk.util.AwkSettings;
@@ -71,22 +72,11 @@ public class AwkEvalTest {
 	}
 
 	@Test
-	public void testReadOnlyEvalEligibilityClassification() throws Exception {
-		Awk awk = new Awk();
-
-		assertTrue(awk.compileForEval("$2").isReadOnlyEvalEligible());
-		assertFalse(awk.compileForEval("match($0, /a/)").isReadOnlyEvalEligible());
-		assertFalse(awk.compileForEval("rand()").isReadOnlyEvalEligible());
-	}
-
-	@Test
 	public void testCompileForEvalOmitsSetNumGlobalsForFieldOnlyExpression() throws Exception {
 		Awk awk = new Awk();
 		AwkTuples tuples = awk.compileForEval("NF \":\" $2");
 
 		assertFalse(dumpTuples(tuples).contains("SET_NUM_GLOBALS"));
-		assertFalse(tuples.getExecutionProfile().usesRuntimeStack());
-		assertFalse(tuples.getExecutionProfile().needsGlobalVariableMetadata());
 		assertEquals("3:b", awk.eval(tuples, "a b c"));
 	}
 
@@ -96,13 +86,11 @@ public class AwkEvalTest {
 		AwkTuples tuples = awk.compileForEval("match($0, /a/)");
 
 		assertTrue(dumpTuples(tuples).contains("SET_NUM_GLOBALS"));
-		assertTrue(tuples.getExecutionProfile().usesRuntimeStack());
-		assertTrue(tuples.getExecutionProfile().needsGlobalVariableMetadata());
 		assertEquals(1, awk.eval(tuples, "a"));
 	}
 
 	@Test
-	public void testReadOnlyEvalUsesFreshAvmPerInvocation() throws Exception {
+	public void testFieldOnlyEvalUsesFreshAvmPerInvocation() throws Exception {
 		CountingAwk awk = new CountingAwk();
 		AwkTuples tuples = awk.compileForEval("NF \":\" $2");
 
@@ -157,14 +145,96 @@ public class AwkEvalTest {
 	}
 
 	@Test
-	public void testOptimizeRemainsIdempotentForExecutionProfile() throws Exception {
+	public void testPrepareEvalReusesOneStringRecordAcrossSeveralExpressions() throws Exception {
+		Awk awk = new Awk();
+		Awk.PreparedEval prepared = awk.prepareEval("alpha beta gamma");
+
+		assertEquals("beta", prepared.eval("$2"));
+		assertEquals("3:gamma", prepared.eval("NF \":\" $NF"));
+	}
+
+	@Test
+	public void testPrepareEvalReusesOneStructuredRecordAcrossSeveralExpressions() throws Exception {
+		Awk awk = new Awk();
+		Awk.PreparedEval prepared = awk
+				.prepareEval(
+						new TableInputSource(Collections.singletonList(Arrays.asList("left", "right", "tail"))));
+		AwkTuples secondField = awk.compileForEval("$2");
+		AwkTuples sizeAndLastField = awk.compileForEval("NF \":\" $NF");
+
+		assertEquals("right", prepared.eval(secondField));
+		assertEquals("3:tail", prepared.eval(sizeAndLastField));
+	}
+
+	@Test
+	public void testPrepareEvalIntentionallyCarriesJrtStateAcrossExpressions() throws Exception {
+		Awk awk = new Awk();
+		Awk.PreparedEval prepared = awk.prepareEval("alpha beta");
+
+		assertEquals(1, prepared.eval("match($0, /alpha/)"));
+		assertEquals("1:5", prepared.eval("RSTART \":\" RLENGTH"));
+	}
+
+	@Test
+	public void testPrepareEvalIntentionallyCarriesStateAcrossRepeatedTupleRuns() throws Exception {
+		Awk awk = new Awk();
+		Awk.PreparedEval prepared = awk.prepareEval("alpha beta");
+		AwkTuples increment = awk.compileForEval("a++");
+
+		assertEquals(0.0, JRT.toDouble(prepared.eval(increment)), 0.0);
+		assertEquals(1.0, JRT.toDouble(prepared.eval(increment)), 0.0);
+	}
+
+	@Test
+	public void testPrepareEvalCachesRepeatedExpressionCompilation() throws Exception {
+		CountingAwk awk = new CountingAwk();
+		Awk.PreparedEval prepared = awk.prepareEval("a b c");
+
+		assertEquals("b", prepared.eval("$2"));
+		assertEquals("b", prepared.eval("$2"));
+		assertEquals(1, awk.getCompileForEvalCount());
+	}
+
+	@Test
+	public void testPrepareForEvalCanAdvanceAcrossRecordsOnSameSource() throws Exception {
+		Awk awk = new Awk();
+		AVM avm = new AVM(new AwkSettings(), Collections.emptyMap());
+		AwkTuples tuples = awk.compileForEval("NF \":\" $2");
+		TableInputSource source = new TableInputSource(
+				Arrays.asList(Arrays.asList("a", "b", "c"), Arrays.asList("left", "right")));
+
+		assertTrue(avm.prepareForEval(source));
+		assertEquals("3:b", avm.eval(tuples));
+		assertTrue(avm.prepareForEval(source));
+		assertEquals("2:right", avm.eval(tuples));
+		assertFalse(avm.prepareForEval(source));
+	}
+
+	@Test
+	public void testPrepareEvalRejectsDifferentStatefulTupleLayoutsWithoutReprepare() throws Exception {
+		Awk awk = new Awk();
+		Awk.PreparedEval prepared = awk.prepareEval("alpha beta");
+		AwkTuples matcher = awk.compileForEval("match($0, /alpha/)");
+		AwkTuples increment = awk.compileForEval("a++");
+
+		assertEquals(1, prepared.eval(matcher));
+		AwkRuntimeException thrown = assertThrows(AwkRuntimeException.class, () -> prepared.eval(increment));
+		assertTrue(thrown.getCause() instanceof IllegalStateException);
+		assertEquals(
+				"AVM globals are already initialized for a different eval layout. Call prepareForEval(...) first.",
+				thrown.getCause().getMessage());
+	}
+
+	@Test
+	public void testOptimizeRemainsIdempotentForEvalTuples() throws Exception {
 		AwkTuples tuples = new Awk().compileForEval("$2 + $3");
-		AwkTuples.ExecutionProfile initialProfile = tuples.getExecutionProfile();
+		String before = dumpTuples(tuples);
 
 		tuples.optimize();
+		String after = dumpTuples(tuples);
 
-		assertSame(initialProfile, tuples.getExecutionProfile());
-		assertTrue(tuples.isReadOnlyEvalEligible());
+		assertEquals(before, after);
+		assertEquals(5.0, JRT.toDouble(new Awk().eval(tuples, "x 2 3")), 0.0);
 	}
 
 	@Test
@@ -177,10 +247,11 @@ public class AwkEvalTest {
 		assertEquals(1, avm.eval(tuples, new SingleRecordInputSource("a")));
 		assertEquals(2, avm.getPrepareForExecutionCount());
 		assertEquals(0, avm.getLegacyInitializationCount());
+		assertEquals(4, avm.getCloseAllCount());
 	}
 
 	@Test
-	public void testReusedAvmEvalAutomaticallyUsesReadOnlyPreparation() throws Exception {
+	public void testReusedAvmEvalUsesPreparedRuntimeSetup() throws Exception {
 		Awk awk = new Awk();
 		AwkTuples tuples = awk.compileForEval("NF \":\" $2");
 		TrackingAVM avm = new TrackingAVM(new AwkSettings());
@@ -189,7 +260,7 @@ public class AwkEvalTest {
 		assertEquals("2:right", avm.eval(tuples, new SingleRecordInputSource("left right")));
 		assertEquals(2, avm.getPrepareForExecutionCount());
 		assertEquals(0, avm.getLegacyInitializationCount());
-		assertEquals(0, avm.getCloseAllCount());
+		assertEquals(4, avm.getCloseAllCount());
 	}
 
 	@Test
@@ -294,9 +365,16 @@ public class AwkEvalTest {
 	private static final class CountingAwk extends Awk {
 
 		private final AtomicInteger createAvmCount = new AtomicInteger();
+		private final AtomicInteger compileForEvalCount = new AtomicInteger();
 
 		private CountingAwk() {
 			super(new AwkSettings());
+		}
+
+		@Override
+		public AwkTuples compileForEval(String expression) throws IOException {
+			compileForEvalCount.incrementAndGet();
+			return super.compileForEval(expression);
 		}
 
 		@Override
@@ -307,6 +385,10 @@ public class AwkEvalTest {
 
 		private int getCreateAvmCount() {
 			return createAvmCount.get();
+		}
+
+		private int getCompileForEvalCount() {
+			return compileForEvalCount.get();
 		}
 	}
 

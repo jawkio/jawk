@@ -1305,15 +1305,7 @@ public enum Opcode {
 	 * Stack before: ...<br/>
 	 * Stack after: x ... or 0 if uninitialized
 	 */
-	POSTDEC,
-
-	/**
-	 * Read stdin for simple AWK expression evaluation.
-	 * <p>
-	 * Stack before: ...<br/>
-	 * Stack after: ...
-	 */
-	SET_INPUT_FOR_EVAL;
+	POSTDEC;
 
 	private static final Opcode[] VALUES = values();
 

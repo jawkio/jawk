@@ -42,8 +42,31 @@ Object first = awk.eval(expression, "alpha,beta");
 Object second = awk.eval(expression, "left,right");
 ```
 
-Jawk automatically uses its read-only eval fast path when the compiled
-expression does not mutate AWK-visible state.
+When you have one record and several expressions, prepare the record once:
+
+```java
+AwkSettings settings = new AwkSettings();
+settings.setFieldSeparator(",");
+
+Awk awk = new Awk(settings);
+Awk.PreparedEval prepared = awk.prepareEval("alpha,beta,gamma");
+
+Object second = prepared.eval("$2");
+Object summary = prepared.eval("NF \":\" $NF");
+```
+
+For the fastest variant of that flow, precompile the expressions once and pass
+the resulting tuples to `PreparedEval.eval(AwkTuples)`.
+
+Prepared sessions are intentionally stateful. They reuse the same mutable AVM
+instance across calls, so globals and AWK specials such as `RSTART` and
+`RLENGTH` can leak from one expression to the next. Use `Awk.eval(...)` when
+you need per-call isolation.
+
+`Awk.eval(...)` always creates and prepares a fresh runtime, so each evaluation
+is isolated from the previous one. `Awk.prepareEval(...)` is the recommended
+high-level reuse API; direct `AVM.prepareForEval(...)` is the low-level expert
+equivalent.
 
 ### Run a script directly
 

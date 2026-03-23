@@ -93,6 +93,8 @@ import org.metricshub.printf4j.Printf4J;
  * <p>
  * AVM instances are reusable, but they are not thread-safe. Reuse the same
  * interpreter only sequentially, or create one AVM per concurrent execution.
+ * When AVM is used directly, callers own its lifecycle and must
+ * {@link #close()} it when done.
  *
  * @author Danny Daglas
  */
@@ -289,7 +291,7 @@ public class AVM implements VariableManager, Closeable {
 		installEvalTupleMetadata(compiledTuples);
 
 		try {
-			executeTuples(compiledTuples.top(), false);
+			executeTuples(compiledTuples.top());
 		} catch (ExitException e) {
 			return e.getCode();
 		}
@@ -299,6 +301,12 @@ public class AVM implements VariableManager, Closeable {
 	/**
 	 * Evaluate the provided tuples as an AWK expression with per-call variable
 	 * overrides.
+	 * <p>
+	 * This method prepares the AVM for the supplied input and then executes the
+	 * tuples on the same mutable runtime. It does not automatically release any
+	 * bound input or runtime I/O resources afterwards; callers using AVM directly
+	 * are responsible for eventually calling {@link #close()}.
+	 * </p>
 	 *
 	 * @param tuples Tuples representing the expression
 	 * @param inputSource the input source providing records for the evaluation
@@ -313,11 +321,7 @@ public class AVM implements VariableManager, Closeable {
 			Map<String, Object> variableOverrides)
 			throws IOException {
 		prepareForEval(inputSource, Collections.<String>emptyList(), variableOverrides);
-		try {
-			return eval(tuples);
-		} finally {
-			finishPreparedEval(true);
-		}
+		return eval(tuples);
 	}
 
 	/**
@@ -409,6 +413,11 @@ public class AVM implements VariableManager, Closeable {
 	/**
 	 * Traverse the tuples, executing their associated opcodes to provide
 	 * an execution platform for Jawk scripts.
+	 * <p>
+	 * When AVM is used directly, the caller is responsible for eventually
+	 * calling {@link #close()} to release any bound input and runtime I/O
+	 * resources.
+	 * </p>
 	 *
 	 * @param tuples the compiled tuple instructions to execute
 	 * @param inputSource the input source providing records
@@ -421,6 +430,11 @@ public class AVM implements VariableManager, Closeable {
 	/**
 	 * Traverse the tuples, executing their associated opcodes to provide
 	 * an execution platform for Jawk scripts.
+	 * <p>
+	 * When AVM is used directly, the caller is responsible for eventually
+	 * calling {@link #close()} to release any bound input and runtime I/O
+	 * resources.
+	 * </p>
 	 *
 	 * @param tuples the compiled tuple instructions to execute
 	 * @param inputSource the input source providing records
@@ -439,6 +453,11 @@ public class AVM implements VariableManager, Closeable {
 	/**
 	 * Traverse the tuples, executing their associated opcodes to provide
 	 * an execution platform for Jawk scripts.
+	 * <p>
+	 * When AVM is used directly, the caller is responsible for eventually
+	 * calling {@link #close()} to release any bound input and runtime I/O
+	 * resources.
+	 * </p>
 	 *
 	 * @param tuples the compiled tuple instructions to execute
 	 * @param inputSource the input source providing records
@@ -466,7 +485,7 @@ public class AVM implements VariableManager, Closeable {
 			jrt.applySpecialVariables(executionSpecialVariables);
 		}
 		resolvedInputSource = resolvedSource;
-		executeTuples(tuples.top(), true);
+		executeTuples(tuples.top());
 	}
 
 	private void resetRuntimeState(List<String> runtimeArguments, Map<String, Object> variableOverrides) {
@@ -535,7 +554,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @throws ExitException when the AWK program executes {@code exit}
 	 * @throws IOException when runtime input operations fail
 	 */
-	private void executeTuples(PositionTracker position, boolean cleanupAfterExecution)
+	private void executeTuples(PositionTracker position)
 			throws ExitException,
 			IOException {
 		Map<Integer, ConditionPair> conditionPairs = null;
@@ -2202,10 +2221,6 @@ public class AVM implements VariableManager, Closeable {
 			// clear operand stack
 			operandStack.clear();
 			throw ae;
-		} finally {
-			if (cleanupAfterExecution) {
-				finishPreparedEval(true);
-			}
 		}
 
 		// If <code>exit</code> was called, throw an ExitException
@@ -2214,42 +2229,32 @@ public class AVM implements VariableManager, Closeable {
 		}
 	}
 
-	private void finishPreparedEval(boolean closeInputSource) {
-		jrt.jrtCloseAll();
-		if (closeInputSource) {
-			closeResolvedInputSource();
-		}
-		resolvedInputSource = null;
-		inputSourceFilelistAssignmentsApplied = false;
-	}
-
 	/**
 	 * Releases any prepared input source and runtime I/O resources owned by this
 	 * AVM.
 	 * <p>
 	 * Call this when you are done with an AVM returned by
 	 * {@link org.metricshub.jawk.Awk#prepareEval(String)} or
-	 * {@link org.metricshub.jawk.Awk#prepareEval(org.metricshub.jawk.jrt.InputSource)}.
+	 * {@link org.metricshub.jawk.Awk#prepareEval(org.metricshub.jawk.jrt.InputSource)},
+	 * or after direct {@link #eval(AwkTuples, InputSource)} /
+	 * {@link #interpret(AwkTuples, InputSource)} usage.
 	 * The AVM may be prepared again afterwards, but callers should treat a closed
 	 * instance as end-of-use unless they intentionally reinitialize it.
 	 * </p>
 	 */
 	@Override
 	public void close() throws IOException {
-		finishPreparedEval(true);
-	}
-
-	/**
-	 * Close all streams in the runtime
-	 */
-	public void waitForIO() {
 		jrt.jrtCloseAll();
+		closeResolvedInputSource();
+		resolvedInputSource = null;
+		inputSourceFilelistAssignmentsApplied = false;
 	}
 
 	/**
 	 * Close the resolved {@link InputSource} if it implements {@link Closeable}.
-	 * Called from all interpreter exit paths to prevent file-descriptor leaks
-	 * (e.g. when the script exits early via {@code exit}).
+	 * This is used by {@link #close()} and by explicit rebind operations such as
+	 * {@link #prepareForEval(InputSource)} when the AVM switches to a different
+	 * source instance.
 	 */
 	private void closeResolvedInputSource() {
 		closeInputSource(resolvedInputSource);

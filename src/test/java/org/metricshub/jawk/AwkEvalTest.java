@@ -111,7 +111,7 @@ public class AwkEvalTest {
 	}
 
 	@Test
-	public void testEvalRebuildsPrototypeWhenSettingsChange() throws Exception {
+	public void testEvalHonorsSettingsChangesBetweenCalls() throws Exception {
 		AwkSettings settings = new AwkSettings();
 		Awk awk = new Awk(settings);
 		AwkTuples tuples = awk.compileForEval("$2");
@@ -133,16 +133,9 @@ public class AwkEvalTest {
 	@Test
 	public void testEvalSourceAliasesStructuredInputEvaluation() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples tuples = awk.compileForEval("NF \":\" $2");
 		InputSource source = new TableInputSource(Collections.singletonList(Arrays.asList("left", "right")));
 
-		assertEquals("2:right", awk.evalSource("NF \":\" $2", source));
-		assertEquals(
-				"2:right",
-				awk
-						.evalSource(
-								tuples,
-								new TableInputSource(Collections.singletonList(Arrays.asList("left", "right")))));
+		assertEquals("2:right", awk.eval("NF \":\" $2", source));
 	}
 
 	@Test
@@ -262,19 +255,45 @@ public class AwkEvalTest {
 	}
 
 	@Test
+	public void testDirectAvmEvalLeavesBoundInputSourceOpenUntilClose() throws Exception {
+		Awk awk = new Awk();
+		AwkTuples secondField = awk.compileForEval("$2");
+		CloseTrackingInputSource source = new CloseTrackingInputSource(
+				Collections.singletonList(Arrays.asList("left", "right")));
+
+		try (AVM avm = new AVM(new AwkSettings(), Collections.emptyMap())) {
+			assertEquals("right", avm.eval(secondField, source));
+			assertFalse(source.isClosed());
+		}
+
+		assertTrue(source.isClosed());
+	}
+
+	@Test
+	public void testAwkEvalClosesStructuredInputSourceAfterOneShotEval() throws Exception {
+		Awk awk = new Awk();
+		AwkTuples secondField = awk.compileForEval("$2");
+		CloseTrackingInputSource source = new CloseTrackingInputSource(
+				Collections.singletonList(Arrays.asList("left", "right")));
+
+		assertEquals("right", awk.eval(secondField, source));
+		assertTrue(source.isClosed());
+	}
+
+	@Test
 	public void testPrepareForEvalClosesPreviousCloseableInputSourceWhenRebinding() throws Exception {
 		CloseTrackingInputSource first = new CloseTrackingInputSource(Collections.singletonList(Arrays.asList("a", "b")));
 		CloseTrackingInputSource second = new CloseTrackingInputSource(Collections.singletonList(Arrays.asList("x", "y")));
 
 		try (AVM avm = new AVM(new AwkSettings(), Collections.emptyMap())) {
 			assertTrue(avm.prepareForEval(first));
-			assertFalse(first.closed);
+			assertFalse(first.isClosed());
 			assertTrue(avm.prepareForEval(second));
-			assertTrue(first.closed);
-			assertFalse(second.closed);
+			assertTrue(first.isClosed());
+			assertFalse(second.isClosed());
 		}
 
-		assertTrue(second.closed);
+		assertTrue(second.isClosed());
 	}
 
 	@Test
@@ -295,11 +314,13 @@ public class AwkEvalTest {
 		AwkTuples tuples = awk.compileForEval("match($0, /a/)");
 		TrackingAVM avm = new TrackingAVM(new AwkSettings());
 
-		assertEquals(1, avm.eval(tuples, new SingleRecordInputSource("a")));
-		assertEquals(1, avm.eval(tuples, new SingleRecordInputSource("a")));
-		assertEquals(2, avm.getPrepareForExecutionCount());
-		assertEquals(0, avm.getLegacyInitializationCount());
-		assertEquals(4, avm.getCloseAllCount());
+		try (TrackingAVM ignored = avm) {
+			assertEquals(1, avm.eval(tuples, new SingleRecordInputSource("a")));
+			assertEquals(1, avm.eval(tuples, new SingleRecordInputSource("a")));
+			assertEquals(2, avm.getPrepareForExecutionCount());
+			assertEquals(0, avm.getLegacyInitializationCount());
+		}
+		assertEquals(3, avm.getCloseAllCount());
 	}
 
 	@Test
@@ -308,11 +329,13 @@ public class AwkEvalTest {
 		AwkTuples tuples = awk.compileForEval("NF \":\" $2");
 		TrackingAVM avm = new TrackingAVM(new AwkSettings());
 
-		assertEquals("3:b", avm.eval(tuples, new SingleRecordInputSource("a b c")));
-		assertEquals("2:right", avm.eval(tuples, new SingleRecordInputSource("left right")));
-		assertEquals(2, avm.getPrepareForExecutionCount());
-		assertEquals(0, avm.getLegacyInitializationCount());
-		assertEquals(4, avm.getCloseAllCount());
+		try (TrackingAVM ignored = avm) {
+			assertEquals("3:b", avm.eval(tuples, new SingleRecordInputSource("a b c")));
+			assertEquals("2:right", avm.eval(tuples, new SingleRecordInputSource("left right")));
+			assertEquals(2, avm.getPrepareForExecutionCount());
+			assertEquals(0, avm.getLegacyInitializationCount());
+		}
+		assertEquals(3, avm.getCloseAllCount());
 	}
 
 	@Test

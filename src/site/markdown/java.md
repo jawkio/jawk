@@ -58,8 +58,8 @@ for (String line : Arrays.asList("alpha,beta", "left,right", "one,two")) {
 }
 ```
 
-`Awk.eval(...)` creates and prepares a fresh runtime for each call, so each
-evaluation is isolated from the previous one.
+`Awk.eval(...)` creates, uses, and closes a fresh runtime for each call, so
+each evaluation is isolated from the previous one.
 
 When you already have one record and need to evaluate several expressions
 against it, prepare that record once and reuse the returned `AVM`:
@@ -95,7 +95,8 @@ try (AVM prepared = awk.prepareEval("alpha,beta,gamma")) {
 ```
 
 `Awk.prepareEval(...)` is the recommended convenience API for that shape. It
-creates and prepares the reusable `AVM` for you.
+creates and prepares the reusable `AVM` for you. Close the returned `AVM` when
+you are done with it.
 
 ### Quick execution with `Awk.run()`
 
@@ -331,7 +332,8 @@ Most embedders should stay on `Awk`:
 `AVM.prepareForEval(...)` is the low-level equivalent of `Awk.prepareEval(...)`.
 Prefer `Awk.prepareEval(...)` unless you specifically need to own the `AVM`
 instance lifecycle yourself or call the lower-level preparation overload
-directly.
+directly. When you use `AVM` directly, you are responsible for calling
+`AVM.close()`.
 
 If you intentionally want to reuse the same interpreter instance, you can work
 with `AVM` directly:
@@ -343,7 +345,6 @@ settings.setFieldSeparator(",");
 Awk compiler = new Awk(settings);
 AwkTuples expr = compiler.compileForEval("NF \":\" $2");
 
-AVM avm = new AVM(settings, Collections.emptyMap());
 try (AVM avm = new AVM(settings, Collections.emptyMap())) {
     avm.prepareForEval("a,b,c");
     Object value = avm.eval(expr);
@@ -354,21 +355,22 @@ The relationship between the two APIs is:
 
 * `Awk.prepareEval(...)` is the recommended convenience API.
 * `AVM.prepareForEval(...)` is the expert API for direct runtime control.
-* Raw `AVM.eval(AwkTuples)` does not reset anything at all.
+* Raw `AVM.eval(AwkTuples)` does not reset or clean up anything at all.
 
 `AVM.prepareForEval(...)` performs the reset and binds one record. After that,
 raw `AVM.eval(AwkTuples)` reuses the AVM exactly as it stands, which means
 globals, stacks, and AWK specials all carry over. Calling
 `prepareForEval(...)` again binds the next record from the source and creates a
-fresh eval baseline. Call `AVM.close()` when you are done with a prepared AVM
-to release bound input and runtime I/O resources.
+fresh eval baseline. `AVM.eval(AwkTuples, InputSource)` and
+`AVM.interpret(...)` also leave cleanup to the caller. Call `AVM.close()` when
+you are done with an AVM to release bound input and runtime I/O resources.
 
 Use this API only when you explicitly want to control the runtime lifecycle and
 accept the footgun. The reused `AVM` API is sequential, not concurrent: do not
 call the same AVM instance from multiple threads at the same time.
 
-`Awk.eval(...)` stays on the safe side by creating and preparing a fresh AVM
-for each isolated evaluation.
+`Awk.eval(...)` and `Awk.invoke(...)` stay on the safe side by creating,
+using, and closing a fresh AVM for each isolated execution.
 
 ### Advanced examples
 

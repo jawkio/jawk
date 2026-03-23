@@ -66,10 +66,12 @@ instance across calls, so globals and AWK specials such as `RSTART` and
 `RLENGTH` can leak from one expression to the next. Use `Awk.eval(...)` when
 you need per-call isolation.
 
-`Awk.eval(...)` always creates and prepares a fresh runtime, so each evaluation
-is isolated from the previous one. `Awk.prepareEval(...)` is the convenience
-API that creates and prepares a reusable `AVM`; direct
-`AVM.prepareForEval(...)` is the low-level expert equivalent.
+`Awk.eval(...)` and `Awk.invoke(...)` always create, use, and close a fresh
+runtime, so each execution is isolated from the previous one.
+`Awk.prepareEval(...)` is the convenience API that creates and prepares a
+reusable `AVM`; direct `AVM.prepareForEval(...)` is the low-level expert
+equivalent. When you use `AVM` directly, you own its lifecycle and must call
+`close()` yourself.
 
 ### Run a script directly
 

@@ -84,11 +84,12 @@ That means globals, `RSTART`, `RLENGTH`, and any other AWK-visible state can
 leak from one expression to the next. Use `Awk.eval(...)` when you need an
 isolated evaluation instead.
 
-`Awk.eval(...)` always creates and prepares a fresh runtime for isolated
-evaluation. Use direct `AVM` access only when you explicitly want to manage
-runtime reuse yourself. `Awk.prepareEval(...)` is the convenience API that
-creates and prepares a reusable `AVM`; direct `AVM.prepareForEval(...)` is the
-low-level expert equivalent.
+`Awk.eval(...)` and `Awk.invoke(...)` always create, use, and close a fresh
+runtime for isolated execution. Use direct `AVM` access only when you
+explicitly want to own the runtime lifecycle yourself. In that low-level API,
+callers must close the `AVM` explicitly. `Awk.prepareEval(...)` is the
+convenience API that creates and prepares a reusable `AVM`; direct
+`AVM.prepareForEval(...)` is the low-level expert equivalent.
 
 When your application already has structured rows, implement
 `org.metricshub.jawk.jrt.InputSource` and feed fields directly to

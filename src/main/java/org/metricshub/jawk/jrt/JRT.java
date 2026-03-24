@@ -381,7 +381,6 @@ public class JRT {
 	 *        names and their values.
 	 */
 	public final void assignInitialVariables(Map<String, Object> initialVarMap) {
-		assert initialVarMap != null;
 		for (Map.Entry<String, Object> var : initialVarMap.entrySet()) {
 			String name = var.getKey();
 			Object value = var.getValue();
@@ -493,7 +492,6 @@ public class JRT {
 	 *        the associative array is empty prior to population.
 	 */
 	public static void assignEnvironmentVariables(AssocArray aa) {
-		assert aa.keySet().isEmpty();
 		Map<String, String> env = System.getenv();
 		for (Map.Entry<String, String> var : env.entrySet()) {
 			aa.put(var.getKey(), var.getValue());
@@ -786,7 +784,6 @@ public class JRT {
 	 *         Otherwise, a Double object is returned.
 	 */
 	public static Object inc(Object o) {
-		assert o != null;
 		double ans;
 		if (o instanceof Number) {
 			ans = ((Number) o).doubleValue() + 1;
@@ -1450,8 +1447,6 @@ public class JRT {
 	}
 
 	public String jrtSetInputField(Object valueObj, long fieldNum, PositionTracker position) {
-		assert fieldNum >= 1;
-		assert valueObj != null;
 		if (fieldNum > Integer.MAX_VALUE) {
 			String message = "Field $(" + Long.valueOf(fieldNum) + ") is incorrect.";
 			if (position == null) {
@@ -1870,7 +1865,6 @@ public class JRT {
 				throw new AwkRuntimeException("Cannot open " + fileNameParam + " for writing: " + ioe);
 			}
 		}
-		assert ps != null;
 		return ps;
 	}
 
@@ -2087,7 +2081,6 @@ public class JRT {
 		}
 		Thread stdoutPump = state.outputStdoutPumps.get(cmd);
 		Thread stderrPump = state.outputStderrPumps.get(cmd);
-		assert p != null;
 		state.outputProcesses.remove(cmd);
 		state.outputStreams.remove(cmd);
 		ps.close();
@@ -2141,7 +2134,6 @@ public class JRT {
 			return false;
 		}
 		Thread errorPump = state.commandErrorPumps.get(cmd);
-		assert p != null;
 		state.commandReaders.remove(cmd);
 		state.commandProcesses.remove(cmd);
 		try {

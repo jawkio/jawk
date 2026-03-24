@@ -88,7 +88,6 @@ public class AssocArray implements Comparator<Object>, Map<Object, Object> {
 	 *        or MT_TREE.
 	 */
 	public void useMapType(int mapType) {
-		assert map.isEmpty();
 		switch (mapType) {
 		case MT_HASH:
 			map = new HashMap<Object, Object>();

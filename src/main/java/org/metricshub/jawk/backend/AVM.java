@@ -833,13 +833,10 @@ public class AVM implements VariableManager, Closeable {
 					if (o1 == null || o1 instanceof UninitializedObject) {
 						o1 = new AssocArray(sortedArrayKeys);
 						runtimeStack.setVariable(offset, o1, isGlobal);
-					} else {
-						assert o1 instanceof AssocArray;
 					}
 
 					AssocArray array = (AssocArray) o1;
 					Object o = array.get(arrIdx);
-					assert o != null;
 					double origVal = JRT.toDouble(o);
 
 					double newVal;
@@ -1040,7 +1037,6 @@ public class AVM implements VariableManager, Closeable {
 					AssocArray aa = (AssocArray) o1;
 					Object key = pop();
 					Object o = aa.get(key);
-					assert o != null;
 					double ans = JRT.toDouble(o) + 1;
 					if (JRT.isActuallyLong(ans)) {
 						aa.put(key, (long) Math.rint(ans));
@@ -1063,7 +1059,6 @@ public class AVM implements VariableManager, Closeable {
 					AssocArray aa = (AssocArray) o1;
 					Object key = pop();
 					Object o = aa.get(key);
-					assert o != null;
 					double ans = JRT.toDouble(o) - 1;
 					if (JRT.isActuallyLong(ans)) {
 						aa.put(key, (long) Math.rint(ans));
@@ -1137,7 +1132,6 @@ public class AVM implements VariableManager, Closeable {
 						throw new AwkRuntimeException("Attempting to index a non-associative-array.");
 					}
 					Object o = ((AssocArray) array).get(idx);
-					assert o != null;
 					push(o);
 					position.next();
 					break;
@@ -1605,7 +1599,6 @@ public class AVM implements VariableManager, Closeable {
 				case KEYLIST: {
 					// stack[0] = AssocArray
 					Object o = pop();
-					assert o != null;
 					if (!(o instanceof AssocArray)) {
 						throw new AwkRuntimeException(
 								position.lineNumber(),
@@ -1643,7 +1636,6 @@ public class AVM implements VariableManager, Closeable {
 					}
 					// pop off and return the head of the key set
 					Deque<?> keylist = (Deque<?>) o;
-					assert !keylist.isEmpty();
 					push(keylist.removeFirst());
 					position.next();
 					break;
@@ -1696,7 +1688,6 @@ public class AVM implements VariableManager, Closeable {
 					// stack[0] = offset
 					//// assignArray(offset, arrIdx, newstring, isGlobal);
 					environOffset = position.intArg(0);
-					assert environOffset != NULL_OFFSET;
 					// set the initial variables
 					Map<String, String> env = System.getenv();
 					for (Map.Entry<String, String> var : env.entrySet()) {
@@ -1709,7 +1700,6 @@ public class AVM implements VariableManager, Closeable {
 				case ARGC_OFFSET: {
 					// stack[0] = offset
 					argcOffset = position.intArg(0);
-					assert argcOffset != NULL_OFFSET;
 					// assign(argcOffset, arguments.size(), true, position); // true = global
 					// +1 to include the "jawk" program name (ARGV[0])
 					assign(argcOffset, arguments.size() + 1, true, position); // true = global
@@ -1720,7 +1710,6 @@ public class AVM implements VariableManager, Closeable {
 				case ARGV_OFFSET: {
 					// stack[0] = offset
 					argvOffset = position.intArg(0);
-					assert argvOffset != NULL_OFFSET;
 					// consume argv (looping from 1 to argc)
 					int argc = (int) JRT.toDouble(runtimeStack.getVariable(argcOffset, true)); // true = global
 					assignArray(argvOffset, 0, "jawk", true);
@@ -1765,7 +1754,6 @@ public class AVM implements VariableManager, Closeable {
 					// String func_name = position.arg(1).toString();
 					long numFormalParams = position.intArg(2);
 					long numActualParams = position.intArg(3);
-					assert numFormalParams >= numActualParams;
 					runtimeStack.pushFrame(numFormalParams, position.current());
 					// Arguments are stacked, so first in the stack is the last for the function
 					for (long i = numActualParams - 1; i >= 0; i--) {
@@ -1797,7 +1785,6 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case SET_NUM_GLOBALS: {
 					// arg[0] = # of globals
-					assert position.intArg(0) == globalVariableOffsets.size();
 					Object[] globals = runtimeStack.getNumGlobals();
 					if (globals == null) {
 						runtimeStack.setNumGlobals(position.intArg(0));
@@ -1816,7 +1803,6 @@ public class AVM implements VariableManager, Closeable {
 							Integer offsetObj = globalVariableOffsets.get(key);
 							Boolean arrayObj = globalVariableArrays.get(key);
 							if (offsetObj != null) {
-								assert arrayObj != null;
 								if (arrayObj.booleanValue()) {
 									throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + key + ").");
 								} else {
@@ -1846,7 +1832,6 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = second element
 					// etc.
 					long count = position.intArg(0);
-					assert count >= 1;
 					// String s;
 					if (count == 1) {
 						push(jrt.toAwkString(pop()));
@@ -2389,7 +2374,6 @@ public class AVM implements VariableManager, Closeable {
 			o1 = new AssocArray(sortedArrayKeys);
 			runtimeStack.setVariable(offset, o1, isGlobal);
 		}
-		assert o1 != null;
 		// The only (conceivable) way to contradict
 		// the assertion (below) is by passing in
 		// a scalar to an unindexed associative array
@@ -2398,7 +2382,6 @@ public class AVM implements VariableManager, Closeable {
 		// Therefore, guard against this elsewhere, not here.
 		// if (! (o1 instanceof AssocArray))
 		// throw new AwkRuntimeException("Attempting to treat a scalar as an array.");
-		assert o1 instanceof AssocArray;
 		AssocArray array = (AssocArray) o1;
 
 		// Convert arrIdx to a true integer if it is one
@@ -2470,7 +2453,6 @@ public class AVM implements VariableManager, Closeable {
 	private void setFilelistVariable(String nameValue) {
 		int eqIdx = nameValue.indexOf('=');
 		// variable name should be non-blank
-		assert eqIdx >= 0;
 		if (eqIdx == 0) {
 			throw new IllegalArgumentException(
 					"Must have a non-blank variable name in a name=value variable assignment argument.");
@@ -2497,7 +2479,6 @@ public class AVM implements VariableManager, Closeable {
 		Boolean arrayObj = globalVariableArrays.get(name);
 
 		if (offsetObj != null) {
-			assert arrayObj != null;
 			if (arrayObj.booleanValue()) {
 				throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + name + ").");
 			} else {
@@ -2529,7 +2510,6 @@ public class AVM implements VariableManager, Closeable {
 		Boolean arrayObj = globalVariableArrays.get(name);
 
 		if (offsetObj != null) {
-			assert arrayObj != null;
 			if (arrayObj.booleanValue()) {
 				throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + name + ").");
 			} else {

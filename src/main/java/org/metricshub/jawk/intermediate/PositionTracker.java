@@ -48,10 +48,8 @@ public class PositionTracker {
 	}
 
 	public void next() {
-		assert tuple != null;
 		++idx;
 		tuple = tuple.getNext();
-		assert queue.size() == idx || queue.get(idx) == tuple;
 	}
 
 	public void jump(Address address) {
@@ -99,11 +97,9 @@ public class PositionTracker {
 			return tuple.getPatterns()[argIdx];
 		}
 		if (c == Address.class) {
-			assert argIdx == 0;
 			return tuple.getAddress();
 		}
 		if (c == ExtensionFunction.class) {
-			assert argIdx == 0;
 			return tuple.getExtensionFunction();
 		}
 		throw new Error("Invalid arg type: " + c + ", arg_idx = " + argIdx + ", tuple = " + tuple);
@@ -124,8 +120,6 @@ public class PositionTracker {
 	}
 
 	public Address addressArg() {
-		assert tuple.getAddress() != null || tuple.getAddressSupplier() != null : "tuple.address = "
-				+ tuple.getAddress() + ", tuple.address_supplier = " + tuple.getAddressSupplier();
 		if (tuple.getAddress() == null) {
 			tuple.setAddress(tuple.getAddressSupplier().get());
 		}
@@ -133,12 +127,10 @@ public class PositionTracker {
 	}
 
 	public Class<?> classArg() {
-		assert tuple.getCls() != null;
 		return tuple.getCls();
 	}
 
 	public int lineNumber() {
-		assert tuple.getLineno() != -1 : "The line number should have been set by queue.add(), but was not.";
 		return tuple.getLineno();
 	}
 

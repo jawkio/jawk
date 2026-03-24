@@ -121,7 +121,7 @@ public class AwkTuples implements Serializable {
 			queue.add(new Tuple(Opcode.PUSH, (Long) o));
 		} else if (o instanceof Double) {
 			queue.add(new Tuple(Opcode.PUSH, (Double) o));
-		} else {}
+		}
 	}
 
 	/**

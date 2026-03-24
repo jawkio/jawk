@@ -3079,7 +3079,7 @@ public class AwkParser {
 			int exprCount = getAst1().populateTuples(tuples);
 			if (exprCount == 1) {
 				tuples.pop();
-			} else if (exprCount != 0) {}
+			}
 			popSourceLineNumber(tuples);
 			return 0;
 		}
@@ -3456,7 +3456,7 @@ public class AwkParser {
 				tuples.ifTrue(end);
 			} else if (op == Token.AND) {
 				tuples.ifFalse(end);
-			} else {}
+			}
 			tuples.pop();
 			int ast2Result = getAst2().populateTuples(tuples);
 

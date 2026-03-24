@@ -833,7 +833,7 @@ public class AVM implements VariableManager, Closeable {
 					if (o1 == null || o1 instanceof UninitializedObject) {
 						o1 = new AssocArray(sortedArrayKeys);
 						runtimeStack.setVariable(offset, o1, isGlobal);
-					} else {}
+					}
 
 					AssocArray array = (AssocArray) o1;
 					Object o = array.get(arrIdx);

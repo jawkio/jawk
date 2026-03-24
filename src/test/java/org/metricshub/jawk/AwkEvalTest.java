@@ -204,16 +204,17 @@ public class AwkEvalTest {
 	@Test
 	public void testPrepareForEvalCanAdvanceAcrossRecordsOnSameSource() throws Exception {
 		Awk awk = new Awk();
-		AVM avm = new AVM(new AwkSettings(), Collections.emptyMap());
 		AwkTuples tuples = awk.compileForEval("NF \":\" $2");
 		TableInputSource source = new TableInputSource(
 				Arrays.asList(Arrays.asList("a", "b", "c"), Arrays.asList("left", "right")));
 
-		assertTrue(avm.prepareForEval(source));
-		assertEquals("3:b", avm.eval(tuples));
-		assertTrue(avm.prepareForEval(source));
-		assertEquals("2:right", avm.eval(tuples));
-		assertFalse(avm.prepareForEval(source));
+		try (AVM avm = new AVM(new AwkSettings(), Collections.emptyMap())) {
+			assertTrue(avm.prepareForEval(source));
+			assertEquals("3:b", avm.eval(tuples));
+			assertTrue(avm.prepareForEval(source));
+			assertEquals("2:right", avm.eval(tuples));
+			assertFalse(avm.prepareForEval(source));
+		}
 	}
 
 	@Test

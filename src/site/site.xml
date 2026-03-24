@@ -1,5 +1,6 @@
-<?xml version="1.0" encoding="ISO-8859-1"?>
-<project name="${project.name}">
+<?xml version="1.0" encoding="UTF-8"?>
+<site name="${project.name}" xmlns="http://maven.apache.org/SITE/2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/SITE/2.0.0 https://maven.apache.org/xsd/site-2.0.0.xsd">
 
 	<skin>
 		<groupId>org.sentrysoftware.maven</groupId>
@@ -12,9 +13,8 @@
 		<keywords>awk</keywords>
 	</custom>
 
-	<bannerLeft>
-		<src>images/metricshub-logo.png</src>
-		<href>https://metricshub.org</href>
+	<bannerLeft href="https://metricshub.org">
+		<image src="images/metricshub-logo.png" alt="MetricsHub" />
 	</bannerLeft>
 
 	<body>
@@ -35,4 +35,4 @@
 		<menu ref="reports" />
 	</body>
 
-</project>
+</site>

@@ -30,12 +30,29 @@ public enum Opcode {
 	 */
 	POP,
 	/**
-	 * Pushes an item onto the operand stack.
+	 * Pushes a long constant onto the operand stack.
 	 * <p>
+	 * Argument: the long value<br/>
 	 * Stack before: ...<br/>
 	 * Stack after: x ...
 	 */
-	PUSH,
+	PUSH_LONG,
+	/**
+	 * Pushes a double constant onto the operand stack.
+	 * <p>
+	 * Argument: the double value<br/>
+	 * Stack before: ...<br/>
+	 * Stack after: x ...
+	 */
+	PUSH_DOUBLE,
+	/**
+	 * Pushes a string constant onto the operand stack.
+	 * <p>
+	 * Argument: the string value<br/>
+	 * Stack before: ...<br/>
+	 * Stack after: x ...
+	 */
+	PUSH_STRING,
 	/**
 	 * Pops and evaluates the top-of-stack; if
 	 * false, it jumps to a specified address.

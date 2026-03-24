@@ -66,20 +66,44 @@ public class PositionTracker {
 		return tuple.getOpcode();
 	}
 
+	/**
+	 * Returns the long argument at the specified index without type dispatch.
+	 *
+	 * @param argIdx argument index
+	 * @return the long value
+	 */
 	public long intArg(int argIdx) {
-		Class<?> c = tuple.getTypes()[argIdx];
-		if (c == Long.class) {
-			return tuple.getInts()[argIdx];
-		}
-		throw new Error("Invalid arg type: " + c + ", arg_idx = " + argIdx + ", tuple = " + tuple);
+		return tuple.getInts()[argIdx];
 	}
 
+	/**
+	 * Returns the boolean argument at the specified index without type dispatch.
+	 *
+	 * @param argIdx argument index
+	 * @return the boolean value
+	 */
 	public boolean boolArg(int argIdx) {
-		Class<?> c = tuple.getTypes()[argIdx];
-		if (c == Boolean.class) {
-			return tuple.getBools()[argIdx];
-		}
-		throw new Error("Invalid arg type: " + c + ", arg_idx = " + argIdx + ", tuple = " + tuple);
+		return tuple.getBools()[argIdx];
+	}
+
+	/**
+	 * Returns the string argument at the specified index without type dispatch.
+	 *
+	 * @param argIdx argument index
+	 * @return the string value
+	 */
+	public String stringArg(int argIdx) {
+		return tuple.getStrings()[argIdx];
+	}
+
+	/**
+	 * Returns the double argument at the specified index without type dispatch.
+	 *
+	 * @param argIdx argument index
+	 * @return the double value
+	 */
+	public double doubleArg(int argIdx) {
+		return tuple.getDoubles()[argIdx];
 	}
 
 	public Object arg(int argIdx) {

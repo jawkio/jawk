@@ -4296,7 +4296,8 @@ public class AwkParser {
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 			// get the array var
-			getAst1().populateTuples(tuples); // get the index
+			getAst1().populateTuples(tuples);
+			// get the index
 			getAst2().populateTuples(tuples);
 			tuples.dereferenceArray();
 			popSourceLineNumber(tuples);

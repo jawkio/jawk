@@ -24,6 +24,8 @@ package org.metricshub.jawk.backend;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,9 +36,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.LinkedHashSet;
 import java.util.StringTokenizer;
-import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -93,10 +93,12 @@ import org.metricshub.printf4j.Printf4J;
  * <p>
  * AVM instances are reusable, but they are not thread-safe. Reuse the same
  * interpreter only sequentially, or create one AVM per concurrent execution.
+ * When AVM is used directly, callers own its lifecycle and must
+ * {@link #close()} it when done.
  *
  * @author Danny Daglas
  */
-public class AVM implements VariableManager {
+public class AVM implements VariableManager, Closeable {
 
 	private static final boolean IS_WINDOWS = System.getProperty("os.name").indexOf("Windows") >= 0;
 
@@ -133,6 +135,7 @@ public class AVM implements VariableManager {
 	private final AwkSettings settings;
 	private boolean inputSourceFilelistAssignmentsApplied;
 	private InputSource resolvedInputSource;
+	private AwkTuples installedEvalTuples;
 
 	/**
 	 * Construct the interpreter.
@@ -253,6 +256,8 @@ public class AVM implements VariableManager {
 	 */
 	private Map<String, Boolean> globalVariableArrays;
 	private Set<String> functionNames;
+	private Map<String, Integer> initializedEvalGlobalVariableOffsets;
+	private Map<String, Boolean> initializedEvalGlobalVariableArrays;
 
 	/**
 	 * Evaluate the provided tuples as an AWK expression.
@@ -267,8 +272,45 @@ public class AVM implements VariableManager {
 	}
 
 	/**
+	 * Evaluate the provided tuples against the AVM state exactly as it currently
+	 * stands. This method does not reset variables, stacks, random state, special
+	 * variables, or input fields.
+	 * <p>
+	 * Use {@link #prepareForEval(InputSource)} before calling this method when you
+	 * want a fresh eval state for a new record. Repeated calls to this method
+	 * intentionally reuse the same mutable runtime state and therefore form an
+	 * expert-only "footgun" API.
+	 * </p>
+	 *
+	 * @param tuples Tuples representing the expression
+	 * @return The resulting value of the expression
+	 * @throws IOException if an IO error occurs during evaluation
+	 */
+	public Object eval(AwkTuples tuples) throws IOException {
+		AwkTuples compiledTuples = Objects.requireNonNull(tuples, "tuples");
+		installEvalTupleMetadata(compiledTuples);
+
+		try {
+			executeTuples(compiledTuples.top());
+		} catch (ExitException e) {
+			// Expression tuples must never contain EXIT opcodes. If callers pass a
+			// script tuple stream by mistake, fail fast without poisoning later evals.
+			throwExitException = false;
+			exitCode = 0;
+			throw new IllegalStateException("eval(AwkTuples) cannot execute EXIT opcodes.", e);
+		}
+		return operandStack.isEmpty() ? null : pop();
+	}
+
+	/**
 	 * Evaluate the provided tuples as an AWK expression with per-call variable
 	 * overrides.
+	 * <p>
+	 * This method prepares the AVM for the supplied input and then executes the
+	 * tuples on the same mutable runtime. It does not automatically release any
+	 * bound input or runtime I/O resources afterwards; callers using AVM directly
+	 * are responsible for eventually calling {@link #close()}.
+	 * </p>
 	 *
 	 * @param tuples Tuples representing the expression
 	 * @param inputSource the input source providing records for the evaluation
@@ -282,23 +324,99 @@ public class AVM implements VariableManager {
 			InputSource inputSource,
 			Map<String, Object> variableOverrides)
 			throws IOException {
-		AwkTuples.ExecutionProfile executionProfile = prepareExecution(
-				tuples,
-				inputSource,
-				Collections.<String>emptyList(),
-				variableOverrides);
+		prepareForEval(inputSource, Collections.<String>emptyList(), variableOverrides);
+		return eval(tuples);
+	}
 
-		try {
-			executePreparedTuples(tuples.top(), executionProfile);
-		} catch (ExitException e) {
-			return e.getCode();
+	/**
+	 * Resets the interpreter to a fresh eval state and binds one text record as
+	 * the current input.
+	 *
+	 * @param input text record to expose as {@code $0}
+	 * @return {@code true} when a record was prepared, {@code false} when the
+	 *         provided text represents no input
+	 * @throws IOException if binding the input fails
+	 */
+	public boolean prepareForEval(String input) throws IOException {
+		return prepareForEval(input, Collections.<String>emptyList(), null);
+	}
+
+	/**
+	 * Resets the interpreter to a fresh eval state and binds one text record as
+	 * the current input.
+	 *
+	 * @param input text record to expose as {@code $0}
+	 * @param runtimeArguments CLI-style runtime arguments visible through
+	 *        {@code ARGC}/{@code ARGV}; use {@code variableOverrides} for Java
+	 *        SDK variable assignments
+	 * @param variableOverrides additional variable assignments applied on top of
+	 *        the settings-level variables (may be {@code null})
+	 * @return {@code true} when a record was prepared, {@code false} when the
+	 *         provided text represents no input
+	 * @throws IOException if binding the input fails
+	 */
+	public boolean prepareForEval(
+			String input,
+			List<String> runtimeArguments,
+			Map<String, Object> variableOverrides)
+			throws IOException {
+		return prepareForEval(new SingleRecordInputSource(input), runtimeArguments, variableOverrides);
+	}
+
+	/**
+	 * Resets the interpreter to a fresh eval state and binds at most one record
+	 * from the provided input source as the current input. Calling this method
+	 * again on the same source advances to the next available record.
+	 *
+	 * @param inputSource source providing the record to bind
+	 * @return {@code true} when a record was prepared, {@code false} when the
+	 *         source is exhausted
+	 * @throws IOException if reading the input fails
+	 */
+	public boolean prepareForEval(InputSource inputSource) throws IOException {
+		return prepareForEval(inputSource, Collections.<String>emptyList(), null);
+	}
+
+	/**
+	 * Resets the interpreter to a fresh eval state and binds at most one record
+	 * from the provided input source as the current input. Calling this method
+	 * again on the same source advances to the next available record.
+	 *
+	 * @param inputSource source providing the record to bind
+	 * @param runtimeArguments CLI-style runtime arguments visible through
+	 *        {@code ARGC}/{@code ARGV}; use {@code variableOverrides} for Java
+	 *        SDK variable assignments
+	 * @param variableOverrides additional variable assignments applied on top of
+	 *        the settings-level variables (may be {@code null})
+	 * @return {@code true} when a record was prepared, {@code false} when the
+	 *         source is exhausted
+	 * @throws IOException if reading the input fails
+	 */
+	public boolean prepareForEval(
+			InputSource inputSource,
+			List<String> runtimeArguments,
+			Map<String, Object> variableOverrides)
+			throws IOException {
+		InputSource resolvedSource = Objects.requireNonNull(inputSource, "inputSource");
+		resetRuntimeState(runtimeArguments, variableOverrides);
+		rebindResolvedInputSource(resolvedSource);
+
+		jrt.jrtCloseAll();
+		jrt.prepareForExecution(initialFsValue, settings.getDefaultRS(), settings.getDefaultORS());
+		if (!executionSpecialVariables.isEmpty()) {
+			jrt.applySpecialVariables(executionSpecialVariables);
 		}
-		return operandStack.isEmpty() ? null : pop();
+		return jrt.consumeInputForEval(resolvedInputSource);
 	}
 
 	/**
 	 * Traverse the tuples, executing their associated opcodes to provide
 	 * an execution platform for Jawk scripts.
+	 * <p>
+	 * When AVM is used directly, the caller is responsible for eventually
+	 * calling {@link #close()} to release any bound input and runtime I/O
+	 * resources.
+	 * </p>
 	 *
 	 * @param tuples the compiled tuple instructions to execute
 	 * @param inputSource the input source providing records
@@ -311,6 +429,11 @@ public class AVM implements VariableManager {
 	/**
 	 * Traverse the tuples, executing their associated opcodes to provide
 	 * an execution platform for Jawk scripts.
+	 * <p>
+	 * When AVM is used directly, the caller is responsible for eventually
+	 * calling {@link #close()} to release any bound input and runtime I/O
+	 * resources.
+	 * </p>
 	 *
 	 * @param tuples the compiled tuple instructions to execute
 	 * @param inputSource the input source providing records
@@ -329,6 +452,11 @@ public class AVM implements VariableManager {
 	/**
 	 * Traverse the tuples, executing their associated opcodes to provide
 	 * an execution platform for Jawk scripts.
+	 * <p>
+	 * When AVM is used directly, the caller is responsible for eventually
+	 * calling {@link #close()} to release any bound input and runtime I/O
+	 * resources.
+	 * </p>
 	 *
 	 * @param tuples the compiled tuple instructions to execute
 	 * @param inputSource the input source providing records
@@ -344,33 +472,22 @@ public class AVM implements VariableManager {
 			Map<String, Object> variableOverrides)
 			throws ExitException,
 			IOException {
-		AwkTuples.ExecutionProfile executionProfile = prepareExecution(
-				tuples,
-				inputSource,
-				runtimeArguments,
-				variableOverrides);
-		executePreparedTuples(tuples.top(), executionProfile);
-	}
-
-	/**
-	 * Prepares the AVM and JRT for one execution of compiled tuples.
-	 *
-	 * @param tuples tuples to execute
-	 * @param inputSource the input source providing records
-	 * @param runtimeArguments name=value or filename entries from the command line
-	 * @param variableOverrides additional variable assignments applied on top of
-	 *        the settings-level variables (may be {@code null})
-	 * @return execution requirements derived from the tuple stream
-	 */
-	private AwkTuples.ExecutionProfile prepareExecution(
-			AwkTuples tuples,
-			InputSource inputSource,
-			List<String> runtimeArguments,
-			Map<String, Object> variableOverrides) {
 		AwkTuples compiledTuples = Objects.requireNonNull(tuples, "tuples");
 		InputSource resolvedSource = Objects.requireNonNull(inputSource, "inputSource");
-		AwkTuples.ExecutionProfile executionProfile = compiledTuples.getExecutionProfile();
+		resetRuntimeState(runtimeArguments, variableOverrides);
+		globalVariableOffsets = compiledTuples.getGlobalVariableOffsetMap();
+		globalVariableArrays = compiledTuples.getGlobalVariableAarrayMap();
+		functionNames = compiledTuples.getFunctionNameSet();
 
+		jrt.prepareForExecution(initialFsValue, settings.getDefaultRS(), settings.getDefaultORS());
+		if (!executionSpecialVariables.isEmpty()) {
+			jrt.applySpecialVariables(executionSpecialVariables);
+		}
+		rebindResolvedInputSource(resolvedSource);
+		executeTuples(tuples.top());
+	}
+
+	private void resetRuntimeState(List<String> runtimeArguments, Map<String, Object> variableOverrides) {
 		// Reset the AVM-owned state that must not leak across executions.
 		operandStack.clear();
 		environOffset = NULL_OFFSET;
@@ -381,23 +498,18 @@ public class AVM implements VariableManager {
 		exitCode = 0;
 		throwExitException = false;
 		inputSourceFilelistAssignmentsApplied = false;
-		resolvedInputSource = null;
 		globalVariableOffsets = null;
 		globalVariableArrays = null;
 		functionNames = null;
-		executionInitialVariables = baseInitialVariables;
-		executionSpecialVariables = baseSpecialVariables;
-		if (executionProfile.usesRuntimeStack()) {
-			runtimeStack.reset();
-		}
-		if (executionProfile.needsRandomState()) {
-			randomNumberGenerator.setSeed(1);
-			oldseed = 1;
-		}
+		initializedEvalGlobalVariableOffsets = null;
+		initializedEvalGlobalVariableArrays = null;
+		installedEvalTuples = null;
+		runtimeStack.reset();
+		randomNumberGenerator.setSeed(1);
+		oldseed = 1;
 
 		this.arguments = runtimeArguments != null ? new ArrayList<>(runtimeArguments) : Collections.<String>emptyList();
 
-		// Install the variable snapshot visible to this execution.
 		if (variableOverrides == null || variableOverrides.isEmpty()) {
 			executionInitialVariables = baseInitialVariables;
 			executionSpecialVariables = baseSpecialVariables;
@@ -413,33 +525,42 @@ public class AVM implements VariableManager {
 				executionSpecialVariables.putAll(specialOverrides);
 			}
 		}
+	}
 
-		// Install tuple metadata only when this execution can observe it.
-		if (executionProfile.needsGlobalVariableMetadata()
-				|| (!arguments.isEmpty() && executionProfile.mayApplyInputAssignments())) {
-			globalVariableOffsets = compiledTuples.getGlobalVariableOffsetMap();
-			globalVariableArrays = compiledTuples.getGlobalVariableAarrayMap();
-			functionNames = compiledTuples.getFunctionNameSet();
+	private void installEvalTupleMetadata(AwkTuples compiledTuples) {
+		if (installedEvalTuples == compiledTuples) {
+			return;
 		}
+		globalVariableOffsets = compiledTuples.getGlobalVariableOffsetMap();
+		globalVariableArrays = compiledTuples.getGlobalVariableAarrayMap();
+		functionNames = compiledTuples.getFunctionNameSet();
+		installedEvalTuples = compiledTuples;
+	}
 
-		jrt.prepareForExecution(initialFsValue, settings.getDefaultRS(), settings.getDefaultORS());
-		if (!executionSpecialVariables.isEmpty()) {
-			jrt.applySpecialVariables(executionSpecialVariables);
+	private void rebindResolvedInputSource(InputSource resolvedSource) {
+		InputSource previousResolvedSource = resolvedInputSource;
+		if (previousResolvedSource != null && previousResolvedSource != resolvedSource) {
+			closeInputSource(previousResolvedSource);
 		}
 		resolvedInputSource = resolvedSource;
+	}
 
-		return executionProfile;
+	private boolean hasCompatibleEvalGlobalLayout(long numGlobals) {
+		Object[] globals = runtimeStack.getNumGlobals();
+		return globals != null
+				&& globals.length == numGlobals
+				&& Objects.equals(initializedEvalGlobalVariableOffsets, globalVariableOffsets)
+				&& Objects.equals(initializedEvalGlobalVariableArrays, globalVariableArrays);
 	}
 
 	/**
 	 * Executes the tuple stream after the runtime has been fully prepared.
 	 *
 	 * @param position current position in the tuple stream
-	 * @param executionProfile execution requirements derived from the tuple stream
 	 * @throws ExitException when the AWK program executes {@code exit}
 	 * @throws IOException when runtime input operations fail
 	 */
-	private void executePreparedTuples(PositionTracker position, AwkTuples.ExecutionProfile executionProfile)
+	private void executeTuples(PositionTracker position)
 			throws ExitException,
 			IOException {
 		Map<Integer, ConditionPair> conditionPairs = null;
@@ -1552,13 +1673,6 @@ public class AVM implements VariableManager {
 					break;
 				}
 
-				case SET_INPUT_FOR_EVAL: {
-					applyInputSourceFilelistAssignmentsIfNeeded();
-					jrt.consumeInputForEval(resolvedInputSource);
-					position.next();
-					break;
-				}
-
 				case GETLINE_INPUT: {
 					avmConsumeInputForGetline();
 					position.next();
@@ -1684,28 +1798,36 @@ public class AVM implements VariableManager {
 				case SET_NUM_GLOBALS: {
 					// arg[0] = # of globals
 					assert position.intArg(0) == globalVariableOffsets.size();
-					runtimeStack.setNumGlobals(position.intArg(0));
+					Object[] globals = runtimeStack.getNumGlobals();
+					if (globals == null) {
+						runtimeStack.setNumGlobals(position.intArg(0));
+						initializedEvalGlobalVariableOffsets = globalVariableOffsets;
+						initializedEvalGlobalVariableArrays = globalVariableArrays;
 
-					// now that we have the global variable size,
-					// we can allocate the initial variables
+						// now that we have the global variable size,
+						// we can allocate the initial variables
 
-					// assign -v variables and per-call overrides prepared for this execution
-					for (Map.Entry<String, Object> entry : executionInitialVariables.entrySet()) {
-						String key = entry.getKey();
-						if (functionNames.contains(key)) {
-							throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + key + ").");
-						}
-						Integer offsetObj = globalVariableOffsets.get(key);
-						Boolean arrayObj = globalVariableArrays.get(key);
-						if (offsetObj != null) {
-							assert arrayObj != null;
-							if (arrayObj.booleanValue()) {
-								throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + key + ").");
-							} else {
-								Object obj = entry.getValue();
-								runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
+						// assign -v variables and per-call overrides prepared for this execution
+						for (Map.Entry<String, Object> entry : executionInitialVariables.entrySet()) {
+							String key = entry.getKey();
+							if (functionNames.contains(key)) {
+								throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + key + ").");
+							}
+							Integer offsetObj = globalVariableOffsets.get(key);
+							Boolean arrayObj = globalVariableArrays.get(key);
+							if (offsetObj != null) {
+								assert arrayObj != null;
+								if (arrayObj.booleanValue()) {
+									throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + key + ").");
+								} else {
+									Object obj = entry.getValue();
+									runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
+								}
 							}
 						}
+					} else if (!hasCompatibleEvalGlobalLayout(position.intArg(0))) {
+						throw new IllegalStateException(
+								"AVM globals are already initialized for a different eval layout. Call prepareForEval(...) first.");
 					}
 
 					position.next();
@@ -2105,40 +2227,53 @@ public class AVM implements VariableManager {
 			// clear operand stack
 			operandStack.clear();
 			throw ae;
-		} finally {
-			if (executionProfile.mayCreateJrtIoState()) {
-				jrt.jrtCloseAll();
-			}
-			closeResolvedInputSource();
-			resolvedInputSource = null;
-			inputSourceFilelistAssignmentsApplied = false;
 		}
 
 		// If <code>exit</code> was called, throw an ExitException
-		if (executionProfile.needsExitState() && throwExitException) {
+		if (throwExitException) {
 			throw new ExitException(exitCode, "The AWK script requested an exit");
 		}
 	}
 
 	/**
-	 * Close all streams in the runtime
+	 * Releases any prepared input source and runtime I/O resources owned by this
+	 * AVM.
+	 * <p>
+	 * Call this when you are done with an AVM returned by
+	 * {@link org.metricshub.jawk.Awk#prepareEval(String)} or
+	 * {@link org.metricshub.jawk.Awk#prepareEval(org.metricshub.jawk.jrt.InputSource)},
+	 * or after direct {@link #eval(AwkTuples, InputSource)} /
+	 * {@link #interpret(AwkTuples, InputSource)} usage.
+	 * The AVM may be prepared again afterwards, but callers should treat a closed
+	 * instance as end-of-use unless they intentionally reinitialize it.
+	 * </p>
 	 */
-	public void waitForIO() {
+	@Override
+	public void close() throws IOException {
 		jrt.jrtCloseAll();
+		closeResolvedInputSource();
+		resolvedInputSource = null;
+		inputSourceFilelistAssignmentsApplied = false;
 	}
 
 	/**
 	 * Close the resolved {@link InputSource} if it implements {@link Closeable}.
-	 * Called from all interpreter exit paths to prevent file-descriptor leaks
-	 * (e.g. when the script exits early via {@code exit}).
+	 * This is used by {@link #close()} and by explicit rebind operations such as
+	 * {@link #prepareForEval(InputSource)} when the AVM switches to a different
+	 * source instance.
 	 */
 	private void closeResolvedInputSource() {
-		if (resolvedInputSource instanceof Closeable) {
-			try {
-				((Closeable) resolvedInputSource).close();
-			} catch (IOException ignored) {
-				// Best-effort close.
-			}
+		closeInputSource(resolvedInputSource);
+	}
+
+	private void closeInputSource(InputSource inputSource) {
+		if (!(inputSource instanceof Closeable)) {
+			return;
+		}
+		try {
+			((Closeable) inputSource).close();
+		} catch (IOException ignored) {
+			// Best-effort close.
 		}
 	}
 
@@ -2561,6 +2696,40 @@ public class AVM implements VariableManager {
 	}
 
 	private static final UninitializedObject BLANK = new UninitializedObject();
+
+	private static final class SingleRecordInputSource implements InputSource {
+
+		private final String record;
+		private boolean consumed;
+
+		private SingleRecordInputSource(String record) {
+			this.record = record;
+		}
+
+		@Override
+		public boolean nextRecord() {
+			if (consumed || record == null) {
+				return false;
+			}
+			consumed = true;
+			return true;
+		}
+
+		@Override
+		public String getRecordText() {
+			return consumed ? record : null;
+		}
+
+		@Override
+		public List<String> getFields() {
+			return null;
+		}
+
+		@Override
+		public boolean isFromFilenameList() {
+			return false;
+		}
+	}
 
 	/**
 	 * The value of an address which is not yet assigned a tuple index.

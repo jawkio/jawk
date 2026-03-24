@@ -59,9 +59,37 @@ Object first = awk.eval(expression, "alpha,beta");
 Object second = awk.eval(expression, "left,right");
 ```
 
-Both `Awk.eval(...)` and advanced direct `AVM.eval(...)` reuse the compiled
-tuple metadata to choose the read-only eval fast path automatically when the
-expression is side-effect free.
+When you need to evaluate several expressions against the same record, prepare
+that record once and reuse the prepared `AVM`:
+
+```java
+AwkSettings settings = new AwkSettings();
+settings.setFieldSeparator(",");
+
+Awk awk = new Awk(settings);
+AwkTuples secondField = awk.compileForEval("$2");
+AwkTuples summary = awk.compileForEval("NF \":\" $NF");
+
+try (AVM prepared = awk.prepareEval("alpha,beta,gamma")) {
+    Object second = prepared.eval(secondField);
+    Object info = prepared.eval(summary);
+}
+```
+
+For the hottest path, combine both techniques: prepare the record once and pass
+precompiled tuples directly to `AVM.eval(AwkTuples)`.
+
+Prepared AVMs intentionally reuse the same mutable runtime state across calls.
+That means globals, `RSTART`, `RLENGTH`, and any other AWK-visible state can
+leak from one expression to the next. Use `Awk.eval(...)` when you need an
+isolated evaluation instead.
+
+`Awk.eval(...)` and `Awk.invoke(...)` always create, use, and close a fresh
+runtime for isolated execution. Use direct `AVM` access only when you
+explicitly want to own the runtime lifecycle yourself. In that low-level API,
+callers must close the `AVM` explicitly. `Awk.prepareEval(...)` is the
+convenience API that creates and prepares a reusable `AVM`; direct
+`AVM.prepareForEval(...)` is the low-level expert equivalent.
 
 When your application already has structured rows, implement
 `org.metricshub.jawk.jrt.InputSource` and feed fields directly to

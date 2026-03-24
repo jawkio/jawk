@@ -2676,13 +2676,12 @@ public class AwkParser {
 			// MUST BE DONE AFTER FUNCTIONS ARE COMPILED,
 			// and after special variables are made known to the symbol table
 			// (see above)!
+			tuples.markEvalTupleStream();
 			tuples.setNumGlobals(symbolTable.numGlobals());
 
 			if (environAst.isReferenced()) {
 				tuples.environOffset(environAst.offset);
 			}
-
-			tuples.setInputForEval();
 
 			if (getAst1() != null) {
 				getAst1().populateTuples(tuples);

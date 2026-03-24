@@ -25,9 +25,7 @@ package org.metricshub.jawk.backend;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Deque;
-
 import org.metricshub.jawk.intermediate.UninitializedObject;
-import org.metricshub.jawk.jrt.AssocArray;
 
 /**
  * Runtime stack used by the AVM interpreter.

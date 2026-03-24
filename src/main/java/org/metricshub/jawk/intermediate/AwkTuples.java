@@ -2299,7 +2299,7 @@ public class AwkTuples implements Serializable {
 	 * @param lineno a int
 	 */
 	public void popSourceLineNumber(int lineno) {
-		int tos = linenoStack.pop();
+		linenoStack.pop();
 	}
 
 }

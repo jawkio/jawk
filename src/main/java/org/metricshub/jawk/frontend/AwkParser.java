@@ -27,7 +27,6 @@ import java.io.LineNumberReader;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -2509,7 +2508,7 @@ public class AwkParser {
 			ptr = this;
 			while (ptr != null) {
 				if (ptr.getAst1() != null && ptr.getAst1().isFunction()) {
-					int ast1Count = ptr.getAst1().populateTuples(tuples);
+					ptr.getAst1().populateTuples(tuples);
 				}
 
 				ptr = ptr.getAst2();
@@ -2705,7 +2704,7 @@ public class AwkParser {
 				// just indicate to execute the rule
 				tuples.push(1); // 1 == true
 			} else {
-				int result = getAst1().populateTuples(tuples);
+				getAst1().populateTuples(tuples);
 			}
 			// result of whether to execute or not is on the stack
 			Address bypassRule = tuples.createAddress("bypassRule");
@@ -2720,7 +2719,7 @@ public class AwkParser {
 				// (i.e., blank BEGIN/END rule)
 			} else {
 				// execute it, and leave nothing on the stack
-				int ast2Count = getAst2().populateTuples(tuples);
+				getAst2().populateTuples(tuples);
 			}
 			tuples.address(bypassRule).nop();
 			popSourceLineNumber(tuples);
@@ -2751,10 +2750,10 @@ public class AwkParser {
 
 			Address elseblock = tuples.createAddress("elseblock");
 
-			int ast1Result = getAst1().populateTuples(tuples);
+			getAst1().populateTuples(tuples);
 			tuples.ifFalse(elseblock);
 			if (getAst2() != null) {
-				int ast2Result = getAst2().populateTuples(tuples);
+				getAst2().populateTuples(tuples);
 			}
 			if (getAst3() == null) {
 				tuples.address(elseblock);
@@ -2762,7 +2761,7 @@ public class AwkParser {
 				Address end = tuples.createAddress("end");
 				tuples.gotoAddress(end);
 				tuples.address(elseblock);
-				int ast3Result = getAst3().populateTuples(tuples);
+				getAst3().populateTuples(tuples);
 				tuples.address(end);
 			}
 			popSourceLineNumber(tuples);
@@ -2783,14 +2782,13 @@ public class AwkParser {
 			Address elseexpr = tuples.createAddress("elseexpr");
 			Address endTertiary = tuples.createAddress("endTertiary");
 
-			int ast1Result = getAst1().populateTuples(tuples);
+			getAst1().populateTuples(tuples);
 			tuples.ifFalse(elseexpr);
-			int ast2Result = getAst2().populateTuples(tuples);
+			getAst2().populateTuples(tuples);
 			tuples.gotoAddress(endTertiary);
 
 			tuples.address(elseexpr);
-			int ast3Result = getAst3().populateTuples(tuples);
-
+			getAst3().populateTuples(tuples);
 			tuples.address(endTertiary);
 
 			popSourceLineNumber(tuples);
@@ -2833,11 +2831,11 @@ public class AwkParser {
 			continueAddress = loop;
 
 			// condition
-			int ast1Result = getAst1().populateTuples(tuples);
+			getAst1().populateTuples(tuples);
 			tuples.ifFalse(breakAddress);
 
 			if (getAst2() != null) {
-				int ast2Result = getAst2().populateTuples(tuples);
+				getAst2().populateTuples(tuples);
 			}
 
 			tuples.gotoAddress(loop);
@@ -2882,14 +2880,14 @@ public class AwkParser {
 			tuples.address(loop);
 
 			if (getAst1() != null) {
-				int ast1Result = getAst1().populateTuples(tuples);
+				getAst1().populateTuples(tuples);
 			}
 
 			// for do-while statements, the continue jump address is the loop condition
 			tuples.address(continueAddress);
 
 			// condition
-			int ast2Result = getAst2().populateTuples(tuples);
+			getAst2().populateTuples(tuples);
 			tuples.ifTrue(loop);
 
 			// tuples.gotoAddress(loop);
@@ -2943,13 +2941,13 @@ public class AwkParser {
 			if (getAst2() != null) {
 				// condition
 				// assert(getAst2() != null);
-				int ast2Result = getAst2().populateTuples(tuples);
+				getAst2().populateTuples(tuples);
 				tuples.ifFalse(breakAddress);
 			}
 
 			if (getAst4() != null) {
 				// post loop action
-				int ast4Result = getAst4().populateTuples(tuples);
+				getAst4().populateTuples(tuples);
 			}
 
 			// for for-loops, the continue jump address is the post-loop-action
@@ -3032,7 +3030,7 @@ public class AwkParser {
 
 			if (getAst3() != null) {
 				// execute the block
-				int ast3Result = getAst3().populateTuples(tuples);
+				getAst3().populateTuples(tuples);
 			}
 			// otherwise, there is no block to execute
 
@@ -3105,8 +3103,7 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			int ast2Count = getAst2().populateTuples(tuples);
-			// here, stack contains one value
+			getAst2().populateTuples(tuples); // here, stack contains one value
 			if (getAst1() instanceof IDAst) {
 				IDAst idAst = (IDAst) getAst1();
 				if (idAst.isArray()) {
@@ -3185,8 +3182,7 @@ public class AwkParser {
 			} else if (getAst1() instanceof ArrayReferenceAst) {
 				ArrayReferenceAst arr = (ArrayReferenceAst) getAst1();
 				// push the index
-				int arrAst2Result = arr.getAst2().populateTuples(tuples);
-				// push the array ref itself
+				arr.getAst2().populateTuples(tuples); // push the array ref itself
 				IDAst idAst = (IDAst) arr.getAst1();
 				if (idAst.isScalar()) {
 					throw new SemanticException("Cannot use " + idAst + " as an array. It is a scalar.");
@@ -3211,8 +3207,7 @@ public class AwkParser {
 				}
 			} else if (getAst1() instanceof DollarExpressionAst) {
 				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
-				int ast1Result = dollarExpr.getAst1().populateTuples(tuples);
-				// stack contains eval of dollar arg
+				dollarExpr.getAst1().populateTuples(tuples); // stack contains eval of dollar arg
 
 				if (op == Token.EQUALS) {
 					tuples.assignAsInputField();
@@ -3356,10 +3351,8 @@ public class AwkParser {
 			}
 			arrAst.setArray(true);
 
-			int ast1Result = getAst1().populateTuples(tuples);
-
-			int ast2Result = arrAst.populateTuples(tuples);
-
+			getAst1().populateTuples(tuples);
+			arrAst.populateTuples(tuples);
 			tuples.isIn();
 
 			popSourceLineNumber(tuples);
@@ -3390,10 +3383,8 @@ public class AwkParser {
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 
-			int ast1Result = getAst1().populateTuples(tuples);
-
-			int ast2Result = getAst2().populateTuples(tuples);
-
+			getAst1().populateTuples(tuples);
+			getAst2().populateTuples(tuples);
 			// 2 values on the stack
 
 			if (op == Token.EQ) {
@@ -3449,7 +3440,7 @@ public class AwkParser {
 			pushSourceLineNumber(tuples);
 			// exhibit short-circuit behavior
 			Address end = tuples.createAddress("end");
-			int ast1Result = getAst1().populateTuples(tuples);
+			getAst1().populateTuples(tuples);
 			tuples.dup();
 			if (op == Token.OR) {
 				// shortCircuit when op is Token.OR and 1st arg is true
@@ -3458,8 +3449,7 @@ public class AwkParser {
 				tuples.ifFalse(end);
 			}
 			tuples.pop();
-			int ast2Result = getAst2().populateTuples(tuples);
-
+			getAst2().populateTuples(tuples);
 			tuples.address(end);
 
 			// turn the result into boolean one or zero
@@ -3491,8 +3481,8 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			int ast1Result = getAst1().populateTuples(tuples);
-			int ast2Result = getAst2().populateTuples(tuples);
+			getAst1().populateTuples(tuples);
+			getAst2().populateTuples(tuples);
 			if (op == Token.PLUS) {
 				tuples.add();
 			} else if (op == Token.MINUS) {
@@ -3522,8 +3512,8 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			int lhsCount = getAst1().populateTuples(tuples);
-			int rhsCount = getAst2().populateTuples(tuples);
+			getAst1().populateTuples(tuples);
+			getAst2().populateTuples(tuples);
 			tuples.concat();
 			popSourceLineNumber(tuples);
 			return 1;
@@ -3539,7 +3529,7 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			int ast1Result = getAst1().populateTuples(tuples);
+			getAst1().populateTuples(tuples);
 			tuples.negate();
 			popSourceLineNumber(tuples);
 			return 1;
@@ -3555,7 +3545,7 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			int ast1Result = getAst1().populateTuples(tuples);
+			getAst1().populateTuples(tuples);
 			tuples.unaryPlus();
 			popSourceLineNumber(tuples);
 			return 1;
@@ -3571,7 +3561,7 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			int ast1Result = getAst1().populateTuples(tuples);
+			getAst1().populateTuples(tuples);
 			tuples.not();
 			popSourceLineNumber(tuples);
 			return 1;
@@ -3587,7 +3577,7 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			int ast1Result = getAst1().populateTuples(tuples);
+			getAst1().populateTuples(tuples);
 			tuples.getInputField();
 			popSourceLineNumber(tuples);
 			return 1;
@@ -3606,7 +3596,7 @@ public class AwkParser {
 			AST ptr = this;
 			int cnt = 0;
 			while (ptr != null) {
-				int ptrAst1Result = ptr.getAst1().populateTuples(tuples);
+				ptr.getAst1().populateTuples(tuples);
 				++cnt;
 				ptr = ptr.getAst2();
 			}
@@ -3638,9 +3628,9 @@ public class AwkParser {
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 			// typical recursive processing of a list
-			int ast1Count = getAst1().populateTuples(tuples);
+			getAst1().populateTuples(tuples);
 			if (getAst2() != null) {
-				int ast2Count = getAst2().populateTuples(tuples);
+				getAst2().populateTuples(tuples);
 			}
 			popSourceLineNumber(tuples);
 			return 0;
@@ -3699,7 +3689,7 @@ public class AwkParser {
 			// execute the body
 			// (function body could be empty [no statements])
 			if (getAst2() != null) {
-				int ast2Result = getAst2().populateTuples(tuples);
+				getAst2().populateTuples(tuples);
 			}
 
 			tuples.address(returnAddress);
@@ -4022,7 +4012,7 @@ public class AwkParser {
 					} else if (ptr instanceof ArrayReferenceAst) {
 						ArrayReferenceAst arrAst = (ArrayReferenceAst) ptr;
 						// push the index
-						int ast2Result = arrAst.getAst2().populateTuples(tuples);
+						arrAst.getAst2().populateTuples(tuples);
 						IDAst idAst = (IDAst) arrAst.getAst1();
 						if (idAst.isScalar()) {
 							throw new SemanticException("Cannot use " + idAst + " as an array.");
@@ -4031,7 +4021,7 @@ public class AwkParser {
 					} else if (ptr instanceof DollarExpressionAst) {
 						// push the field ref
 						DollarExpressionAst dollarExpr = (DollarExpressionAst) ptr;
-						int ast1Result = dollarExpr.getAst1().populateTuples(tuples);
+						dollarExpr.getAst1().populateTuples(tuples);
 						tuples.subForDollarReference(isGsub);
 					} else {
 						throw new SemanticException(
@@ -4306,9 +4296,8 @@ public class AwkParser {
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 			// get the array var
-			int ast1Result = getAst1().populateTuples(tuples);
-			// get the index
-			int ast2Result = getAst2().populateTuples(tuples);
+			getAst1().populateTuples(tuples); // get the index
+			getAst2().populateTuples(tuples);
 			tuples.dereferenceArray();
 			popSourceLineNumber(tuples);
 			return 1;
@@ -4428,8 +4417,8 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			int ast1Result = getAst1().populateTuples(tuples);
-			int ast2Result = getAst2().populateTuples(tuples);
+			getAst1().populateTuples(tuples);
+			getAst2().populateTuples(tuples);
 			tuples.conditionPair();
 			popSourceLineNumber(tuples);
 			return 1;
@@ -4483,12 +4472,11 @@ public class AwkParser {
 			} else if (getAst1() instanceof ArrayReferenceAst) {
 				ArrayReferenceAst arrAst = (ArrayReferenceAst) getAst1();
 				IDAst idAst = (IDAst) arrAst.getAst1();
-				int arrAst2Result = arrAst.getAst2().populateTuples(tuples);
+				arrAst.getAst2().populateTuples(tuples);
 				tuples.incArrayRef(idAst.offset, idAst.isGlobal);
 			} else if (getAst1() instanceof DollarExpressionAst) {
 				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
-				int ast1Result = dollarExpr.getAst1().populateTuples(tuples);
-				// OPTIMIATION: duplicate the x in $x here
+				dollarExpr.getAst1().populateTuples(tuples); // OPTIMIATION: duplicate the x in $x here
 				// so that it is not evaluated again
 				tuples.dup();
 				// stack contains eval of dollar arg
@@ -4505,7 +4493,7 @@ public class AwkParser {
 			}
 			// else
 			// assert false : "cannot refer for preInc to "+getAst1();
-			int ast1Result = getAst1().populateTuples(tuples);
+			getAst1().populateTuples(tuples);
 			popSourceLineNumber(tuples);
 			return 1;
 		}
@@ -4526,12 +4514,11 @@ public class AwkParser {
 			} else if (getAst1() instanceof ArrayReferenceAst) {
 				ArrayReferenceAst arrAst = (ArrayReferenceAst) getAst1();
 				IDAst idAst = (IDAst) arrAst.getAst1();
-				int arrAst2Result = arrAst.getAst2().populateTuples(tuples);
+				arrAst.getAst2().populateTuples(tuples);
 				tuples.decArrayRef(idAst.offset, idAst.isGlobal);
 			} else if (getAst1() instanceof DollarExpressionAst) {
 				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
-				int ast1Result = dollarExpr.getAst1().populateTuples(tuples);
-				// OPTIMIATION: duplicate the x in $x here
+				dollarExpr.getAst1().populateTuples(tuples); // OPTIMIATION: duplicate the x in $x here
 				// so that it is not evaluated again
 				tuples.dup();
 				// stack contains eval of dollar arg
@@ -4546,7 +4533,7 @@ public class AwkParser {
 			} else {
 				throw new NotImplementedError("unhandled predec for " + getAst1());
 			}
-			int ast1Result = getAst1().populateTuples(tuples);
+			getAst1().populateTuples(tuples);
 			popSourceLineNumber(tuples);
 			return 1;
 		}
@@ -4563,17 +4550,17 @@ public class AwkParser {
 			pushSourceLineNumber(tuples);
 			if (getAst1() instanceof DollarExpressionAst) {
 				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
-				int dollarAst1Result = dollarExpr.getAst1().populateTuples(tuples);
+				dollarExpr.getAst1().populateTuples(tuples);
 				tuples.incDollarRef();
 			} else {
-				int ast1Result = getAst1().populateTuples(tuples);
+				getAst1().populateTuples(tuples);
 				if (getAst1() instanceof IDAst) {
 					IDAst idAst = (IDAst) getAst1();
 					tuples.postInc(idAst.offset, idAst.isGlobal);
 				} else if (getAst1() instanceof ArrayReferenceAst) {
 					ArrayReferenceAst arrAst = (ArrayReferenceAst) getAst1();
 					IDAst idAst = (IDAst) arrAst.getAst1();
-					int arrAst2Result = arrAst.getAst2().populateTuples(tuples);
+					arrAst.getAst2().populateTuples(tuples);
 					tuples.incArrayRef(idAst.offset, idAst.isGlobal);
 				} else {
 					throw new NotImplementedError("unhandled postinc for " + getAst1());
@@ -4593,18 +4580,18 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			int ast1Result = getAst1().populateTuples(tuples);
+			getAst1().populateTuples(tuples);
 			if (getAst1() instanceof IDAst) {
 				IDAst idAst = (IDAst) getAst1();
 				tuples.postDec(idAst.offset, idAst.isGlobal);
 			} else if (getAst1() instanceof ArrayReferenceAst) {
 				ArrayReferenceAst arrAst = (ArrayReferenceAst) getAst1();
 				IDAst idAst = (IDAst) arrAst.getAst1();
-				int arrAst2Result = arrAst.getAst2().populateTuples(tuples);
+				arrAst.getAst2().populateTuples(tuples);
 				tuples.decArrayRef(idAst.offset, idAst.isGlobal);
 			} else if (getAst1() instanceof DollarExpressionAst) {
 				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
-				int dollarAst1Result = dollarExpr.getAst1().populateTuples(tuples);
+				dollarExpr.getAst1().populateTuples(tuples);
 				tuples.decDollarRef();
 			} else {
 				throw new NotImplementedError("unhandled postinc for " + getAst1());
@@ -4638,7 +4625,7 @@ public class AwkParser {
 			}
 
 			if (getAst2() != null) {
-				int ast2Result = getAst2().populateTuples(tuples);
+				getAst2().populateTuples(tuples);
 			}
 
 			if (outputToken == Token.GT) {
@@ -4772,7 +4759,7 @@ public class AwkParser {
 			}
 
 			if (getAst2() != null) {
-				int ast2Result = getAst2().populateTuples(tuples);
+				getAst2().populateTuples(tuples);
 			}
 
 			if (outputToken == Token.GT) {
@@ -4800,13 +4787,11 @@ public class AwkParser {
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 			if (getAst1() != null) {
-				int ast1Result = getAst1().populateTuples(tuples);
-// stack has getAst1() (i.e., "command")
+				getAst1().populateTuples(tuples);// stack has getAst1() (i.e., "command")
 				tuples.useAsCommandInput();
 			} else if (getAst3() != null) {
 // getline ... < getAst3()
-				int ast3Result = getAst3().populateTuples(tuples);
-				// stack has getAst3() (i.e., "filename")
+				getAst3().populateTuples(tuples); // stack has getAst3() (i.e., "filename")
 				tuples.useAsFileInput();
 			} else {
 				tuples.getlineInput();
@@ -4827,14 +4812,13 @@ public class AwkParser {
 			} else if (getAst2() instanceof ArrayReferenceAst) {
 				ArrayReferenceAst arr = (ArrayReferenceAst) getAst2();
 				// push the index
-				int arrAst2Result = arr.getAst2().populateTuples(tuples);
-				// push the array ref itself
+				arr.getAst2().populateTuples(tuples); // push the array ref itself
 				IDAst idAst = (IDAst) arr.getAst1();
 				tuples.assignArray(idAst.offset, idAst.isGlobal);
 			} else if (getAst2() instanceof DollarExpressionAst) {
 				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst2();
 				if (dollarExpr.getAst2() != null) {
-					int ast2Result = dollarExpr.getAst2().populateTuples(tuples);
+					dollarExpr.getAst2().populateTuples(tuples);
 				}
 				// stack contains eval of dollar arg
 				tuples.assignAsInputField();
@@ -4863,7 +4847,7 @@ public class AwkParser {
 				throw new SemanticException("Cannot use return here.");
 			}
 			if (getAst1() != null) {
-				int ast1Result = getAst1().populateTuples(tuples);
+				getAst1().populateTuples(tuples);
 				tuples.setReturnResult();
 			}
 			tuples.gotoAddress(returnable.returnAddress());
@@ -4882,7 +4866,7 @@ public class AwkParser {
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 			if (getAst1() != null) {
-				int ast1Result = getAst1().populateTuples(tuples);
+				getAst1().populateTuples(tuples);
 				tuples.exitWithCode();
 			} else {
 				tuples.exitWithoutCode();
@@ -4908,8 +4892,7 @@ public class AwkParser {
 					throw new SemanticException("delete: Cannot use a scalar as an array.");
 				}
 				idAst.setArray(true);
-				int idxResult = getAst1().getAst2().populateTuples(tuples);
-				// idx on the stack
+				getAst1().getAst2().populateTuples(tuples); // idx on the stack
 				tuples.deleteArrayElement(idAst.offset, idAst.isGlobal);
 			} else if (getAst1() instanceof IDAst) {
 				IDAst idAst = (IDAst) getAst1();

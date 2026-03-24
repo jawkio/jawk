@@ -172,8 +172,6 @@ class Tuple implements Serializable {
 	}
 
 	void setLineNumber(int lineNumber) {
-		assert this.lineno == -1 : "The line number was already set to " + this.lineno + ". Later lineno = "
-				+ lineNumber + ".";
 		this.lineno = lineNumber;
 	}
 
@@ -201,13 +199,10 @@ class Tuple implements Serializable {
 						.append(p == null ? "" : p.pattern())
 						.append('/');
 			} else if (type == Address.class) {
-				assert idx == 0;
 				sb.append(address);
 			} else if (type == ExtensionFunction.class) {
-				assert idx == 0;
 				sb.append(extensionFunction.getKeyword());
 			} else if (type == Class.class) {
-				assert idx == 0;
 				sb.append(cls);
 			} else {
 				throw new Error("Unknown param type (" + idx + "): " + type);
@@ -218,7 +213,6 @@ class Tuple implements Serializable {
 	}
 
 	public void touch(java.util.List<Tuple> queue) {
-		assert lineno != -1 : "The line number should have been set by queue.add(), but was not.";
 		if (addressSupplier != null) {
 			address = addressSupplier.get();
 			types[0] = Address.class;

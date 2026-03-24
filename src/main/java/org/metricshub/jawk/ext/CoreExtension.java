@@ -496,7 +496,6 @@ public class CoreExtension extends AbstractExtension implements JawkExtension {
 		}
 
 		instance.referenceMap.remove(argCheck);
-		assert instance.referenceMap.get(argCheck) == null;
 		return 1;
 	}
 

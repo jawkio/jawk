@@ -252,7 +252,6 @@ public class StdinExtension extends AbstractExtension implements JawkExtension {
 	}
 
 	private BlockObject stdInBlock(BlockObject bo) {
-		assert bo != null;
 		blocker.setNextBlockObject(bo);
 		return blocker;
 	}

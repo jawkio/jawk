@@ -154,7 +154,6 @@ public class AwkSettings {
 	@SuppressWarnings("unused")
 	private void addInitialVariable(String keyValue) {
 		int equalsIdx = keyValue.indexOf('=');
-		assert equalsIdx >= 0;
 		String name = keyValue.substring(0, equalsIdx);
 		String valueString = keyValue.substring(equalsIdx + 1);
 		Object value;

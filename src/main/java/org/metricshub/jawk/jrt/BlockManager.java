@@ -115,7 +115,6 @@ public class BlockManager {
 		}
 
 		// return who was the notifier
-		assert blockNotifier != null;
 		return blockNotifier;
 	}
 

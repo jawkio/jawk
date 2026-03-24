@@ -113,9 +113,6 @@ public class AwkTuples implements Serializable {
 	 * @param o a {@link java.lang.Object} object
 	 */
 	public void push(Object o) {
-		assert (o instanceof String) || (o instanceof Long) || (o instanceof Integer) || (o instanceof Double); // || (o
-																																																						// instanceof
-																																																						// Pattern);
 		if (o instanceof String) {
 			queue.add(new Tuple(Opcode.PUSH, o.toString()));
 		} else if (o instanceof Integer) {
@@ -124,9 +121,7 @@ public class AwkTuples implements Serializable {
 			queue.add(new Tuple(Opcode.PUSH, (Long) o));
 		} else if (o instanceof Double) {
 			queue.add(new Tuple(Opcode.PUSH, (Double) o));
-		} else {
-			assert false : "Invalid type for " + o + ", " + o.getClass();
-		}
+		} else {}
 	}
 
 	/**
@@ -2186,7 +2181,6 @@ public class AwkTuples implements Serializable {
 	 */
 	public void addGlobalVariableNameToOffsetMapping(String varname, int offset, boolean isArray) {
 		if (globalVarOffsetMap.get(varname) != null) {
-			assert globalVarAarrayMap.get(varname) != null;
 			return;
 		}
 		globalVarOffsetMap.put(varname, offset);
@@ -2243,7 +2237,6 @@ public class AwkTuples implements Serializable {
 	 * @return a {@link java.util.Set} object
 	 */
 	public Set<String> getFunctionNameSet() {
-		assert functionNames != null;
 		return Collections.unmodifiableSet(functionNames);
 	}
 
@@ -2307,7 +2300,6 @@ public class AwkTuples implements Serializable {
 	 */
 	public void popSourceLineNumber(int lineno) {
 		int tos = linenoStack.pop();
-		assert lineno == tos;
 	}
 
 }

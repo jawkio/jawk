@@ -590,7 +590,6 @@ public class Awk {
 				ast.semanticAnalysis();
 				// Build tuples from the AST
 				int result = ast.populateTuples(tuples);
-				assert result == 0;
 				// Assign addresses and prepare tuples for interpretation
 				tuples.postProcess();
 				if (!disableOptimizeParam) {

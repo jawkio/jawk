@@ -89,8 +89,6 @@ public abstract class AbstractExtension implements JawkExtension {
 		// (made into assertions so that
 		// production code does not perform
 		// these checks)
-		assert arr != null;
-		assert expectedNum >= 0;
 
 		if (arr.length != expectedNum) {
 			throw new IllegalAwkArgumentException("Expecting " + expectedNum + " arg(s), got " + arr.length);

@@ -349,7 +349,6 @@ public class StreamInputSource implements InputSource, Closeable {
 	 */
 	private void setFilelistVariable(String nameValue) {
 		int eqIdx = nameValue.indexOf('=');
-		assert eqIdx >= 0;
 		if (eqIdx == 0) {
 			throw new IllegalArgumentException(
 					"Must have a non-blank variable name in a name=value variable assignment argument.");

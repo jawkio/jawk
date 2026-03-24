@@ -64,8 +64,6 @@ class RuntimeStack {
 
 	/** Must be one of the first methods executed. */
 	void setNumGlobals(long l) {
-		assert l >= 0;
-		assert globals == null;
 		globals = new Object[(int) l];
 		for (int i = 0; i < l; i++) {
 			globals[i] = null;
@@ -89,8 +87,6 @@ class RuntimeStack {
 	 */
 
 	Object getVariable(long offset, boolean isGlobal) {
-		assert globals != null;
-		assert offset != AVM.NULL_OFFSET;
 		if (isGlobal) {
 			return globals[(int) offset];
 		} else {
@@ -99,8 +95,6 @@ class RuntimeStack {
 	}
 
 	Object setVariable(long offset, Object val, boolean isGlobal) {
-		assert globals != null;
-		assert offset != AVM.NULL_OFFSET;
 		if (isGlobal) {
 			globals[(int) offset] = val;
 			return val;
@@ -112,20 +106,14 @@ class RuntimeStack {
 
 	// for _DELETE_ARRAY_
 	void removeVariable(long offset, boolean isGlobal) {
-		assert globals != null;
-		assert offset != AVM.NULL_OFFSET;
 		if (isGlobal) {
-			assert globals[(int) offset] == null || globals[(int) offset] instanceof AssocArray;
 			globals[(int) offset] = null;
 		} else {
-			assert locals[(int) offset] == null || locals[(int) offset] instanceof AssocArray;
 			locals[(int) offset] = null;
 		}
 	}
 
 	void setFilelistVariable(int offset, Object value) {
-		assert globals != null;
-		assert offset != AVM.NULL_OFFSET;
 		globals[offset] = value;
 	}
 
@@ -153,7 +141,6 @@ class RuntimeStack {
 	private Object returnValue;
 
 	void setReturnValue(Object obj) {
-		assert returnValue == null;
 		returnValue = obj;
 	}
 

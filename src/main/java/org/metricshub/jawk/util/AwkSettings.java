@@ -54,7 +54,10 @@ public class AwkSettings {
 	 * Contains variable assignments which are applied prior to
 	 * executing the script (-v assignments).
 	 * The values may be of type <code>Integer</code>,
-	 * <code>Double</code> or <code>String</code>.
+	 * <code>Double</code>, <code>String</code>,
+	 * {@link org.metricshub.jawk.jrt.AssocArray} (for array variables),
+	 * or any {@link java.util.Map} whose entries are copied into a new
+	 * associative array.
 	 */
 	private final Map<String, Object> variables = new HashMap<String, Object>();
 
@@ -175,7 +178,10 @@ public class AwkSettings {
 	 * Contains variable assignments which are applied prior to
 	 * executing the script (-v assignments).
 	 * The values may be of type <code>Integer</code>,
-	 * <code>Double</code> or <code>String</code>.
+	 * <code>Double</code>, <code>String</code>,
+	 * {@link org.metricshub.jawk.jrt.AssocArray} (for array variables),
+	 * or any {@link java.util.Map} whose entries are copied into a new
+	 * associative array.
 	 *
 	 * @return the variables
 	 */
@@ -204,7 +210,10 @@ public class AwkSettings {
 	 * Contains variable assignments which are applied prior to
 	 * executing the script (-v assignments).
 	 * The values may be of type <code>Integer</code>,
-	 * <code>Double</code> or <code>String</code>.
+	 * <code>Double</code>, <code>String</code>,
+	 * {@link org.metricshub.jawk.jrt.AssocArray} (for array variables),
+	 * or any {@link java.util.Map} whose entries are copied into a new
+	 * associative array.
 	 *
 	 * @param variables the variables to set
 	 */

@@ -2,6 +2,8 @@ package org.metricshub.jawk;
 
 import static org.junit.Assert.*;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.junit.Test;
 import org.metricshub.jawk.intermediate.UninitializedObject;
 import org.metricshub.jawk.jrt.AssocArray;
@@ -70,5 +72,58 @@ public class AssocArrayTest {
 
 		assertEquals("empty", array.get(idx));
 		assertEquals("zero", array.get(0L));
+	}
+
+	@Test
+	public void testInjectAssocArrayVariable() throws Exception {
+		AssocArray data = AssocArray.createHash();
+		data.put("key1", "hello");
+		data.put("key2", "world");
+
+		AwkTestSupport
+				.awkTest("inject AssocArray into array variable")
+				.script("BEGIN{ print arr[\"key1\"], arr[\"key2\"] }")
+				.preassign("arr", data)
+				.expectLines("hello world")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testInjectMapVariable() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+		data.put("a", "alpha");
+		data.put("b", "beta");
+
+		AwkTestSupport
+				.awkTest("inject Map into array variable")
+				.script("BEGIN{ print arr[\"a\"], arr[\"b\"] }")
+				.preassign("arr", data)
+				.expectLines("alpha beta")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testInjectAssocArrayIterateForIn() throws Exception {
+		AssocArray data = AssocArray.createSorted();
+		data.put("x", "1");
+		data.put("y", "2");
+		data.put("z", "3");
+
+		AwkTestSupport
+				.awkTest("inject AssocArray and iterate with for-in")
+				.script("BEGIN{ for (k in arr) print k, arr[k] }")
+				.preassign("arr", data)
+				.expectLines("x 1", "y 2", "z 3")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testInjectScalarIntoArrayVariableThrows() throws Exception {
+		AwkTestSupport
+				.awkTest("inject scalar into array variable should throw")
+				.script("BEGIN{ for (k in arr) print k }")
+				.preassign("arr", "notAnArray")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
 	}
 }

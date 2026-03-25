@@ -367,13 +367,16 @@ public class AwkTupleOptimizationTest {
 				dump.contains("GET_INPUT_FIELD_CONST, " + fieldIndex));
 		assertFalse(
 				"Literal field index should not be pushed separately",
-				dump.contains("PUSH, " + fieldIndex));
+				dump.contains("PUSH_LONG, " + fieldIndex));
 	}
 
 	private static boolean hasLiteralPush(AwkTuples tuples, Object expected) {
 		PositionTracker tracker = tuples.top();
 		while (!tracker.isEOF()) {
-			if (tracker.opcode() == Opcode.PUSH) {
+			Opcode opcode = tracker.opcode();
+			if (opcode == Opcode.PUSH_LONG
+					|| opcode == Opcode.PUSH_DOUBLE
+					|| opcode == Opcode.PUSH_STRING) {
 				Object value = tracker.arg(0);
 				if (expected instanceof Number && value instanceof Number) {
 					double actual = ((Number) value).doubleValue();

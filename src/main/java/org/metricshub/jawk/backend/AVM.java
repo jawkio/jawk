@@ -668,9 +668,21 @@ public class AVM implements VariableManager, Closeable {
 					position.next();
 					break;
 				}
-				case PUSH: {
-					// arg[0] = constant to push onto the stack
-					push(position.arg(0));
+				case PUSH_LONG: {
+					// arg[0] = long constant to push onto the stack
+					push(position.intArg(0));
+					position.next();
+					break;
+				}
+				case PUSH_DOUBLE: {
+					// arg[0] = double constant to push onto the stack
+					push(position.doubleArg(0));
+					position.next();
+					break;
+				}
+				case PUSH_STRING: {
+					// arg[0] = string constant to push onto the stack
+					push(position.stringArg(0));
 					position.next();
 					break;
 				}

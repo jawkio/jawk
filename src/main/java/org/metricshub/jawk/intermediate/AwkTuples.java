@@ -114,13 +114,13 @@ public class AwkTuples implements Serializable {
 	 */
 	public void push(Object o) {
 		if (o instanceof String) {
-			queue.add(new Tuple(Opcode.PUSH, o.toString()));
+			queue.add(new Tuple(Opcode.PUSH_STRING, o.toString()));
 		} else if (o instanceof Integer) {
-			queue.add(new Tuple(Opcode.PUSH, (Integer) o));
+			queue.add(new Tuple(Opcode.PUSH_LONG, (long) (Integer) o));
 		} else if (o instanceof Long) {
-			queue.add(new Tuple(Opcode.PUSH, (Long) o));
+			queue.add(new Tuple(Opcode.PUSH_LONG, (long) (Long) o));
 		} else if (o instanceof Double) {
-			queue.add(new Tuple(Opcode.PUSH, (Double) o));
+			queue.add(new Tuple(Opcode.PUSH_DOUBLE, (Double) o));
 		}
 	}
 
@@ -1828,23 +1828,16 @@ public class AwkTuples implements Serializable {
 	}
 
 	private Object literalValue(Tuple tuple) {
-		if (tuple.getOpcode() != Opcode.PUSH) {
-			return null;
-		}
-		Class<?>[] types = tuple.getTypes();
-		if (types.length == 0 || types[0] == null) {
-			return null;
-		}
-		if (types[0] == Long.class) {
+		switch (tuple.getOpcode()) {
+		case PUSH_LONG:
 			return Long.valueOf(tuple.getInts()[0]);
-		}
-		if (types[0] == Double.class) {
+		case PUSH_DOUBLE:
 			return Double.valueOf(tuple.getDoubles()[0]);
-		}
-		if (types[0] == String.class) {
+		case PUSH_STRING:
 			return tuple.getStrings()[0];
+		default:
+			return null;
 		}
-		return null;
 	}
 
 	private Object foldBinary(Object left, Object right, Tuple operation) {
@@ -1952,20 +1945,20 @@ public class AwkTuples implements Serializable {
 	private Tuple createLiteralPush(Object value, int lineNumber) {
 		Tuple tuple;
 		if (value instanceof Long) {
-			tuple = new Tuple(Opcode.PUSH, ((Long) value).longValue());
+			tuple = new Tuple(Opcode.PUSH_LONG, ((Long) value).longValue());
 		} else if (value instanceof Integer) {
-			tuple = new Tuple(Opcode.PUSH, ((Integer) value).longValue());
+			tuple = new Tuple(Opcode.PUSH_LONG, ((Integer) value).longValue());
 		} else if (value instanceof Double) {
-			tuple = new Tuple(Opcode.PUSH, ((Double) value).doubleValue());
+			tuple = new Tuple(Opcode.PUSH_DOUBLE, ((Double) value).doubleValue());
 		} else if (value instanceof Number) {
 			double d = ((Number) value).doubleValue();
 			if (JRT.isActuallyLong(d)) {
-				tuple = new Tuple(Opcode.PUSH, (long) Math.rint(d));
+				tuple = new Tuple(Opcode.PUSH_LONG, (long) Math.rint(d));
 			} else {
-				tuple = new Tuple(Opcode.PUSH, d);
+				tuple = new Tuple(Opcode.PUSH_DOUBLE, d);
 			}
 		} else if (value instanceof String) {
-			tuple = new Tuple(Opcode.PUSH, (String) value);
+			tuple = new Tuple(Opcode.PUSH_STRING, (String) value);
 		} else {
 			throw new IllegalArgumentException("Unsupported literal value: " + value);
 		}

@@ -843,7 +843,7 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = array index
 					Object o1 = runtimeStack.getVariable(offset, isGlobal); // map
 					if (o1 == null || o1 instanceof UninitializedObject) {
-						o1 = new AssocArray(sortedArrayKeys);
+						o1 = AssocArray.create(sortedArrayKeys);
 						runtimeStack.setVariable(offset, o1, isGlobal);
 					}
 
@@ -1043,7 +1043,7 @@ public class AVM implements VariableManager, Closeable {
 					boolean isGlobal = position.boolArg(1);
 					Object o1 = runtimeStack.getVariable(position.intArg(0), isGlobal);
 					if (o1 == null || o1 instanceof UninitializedObject) {
-						o1 = new AssocArray(sortedArrayKeys);
+						o1 = AssocArray.create(sortedArrayKeys);
 						runtimeStack.setVariable(position.intArg(0), o1, isGlobal);
 					}
 					AssocArray aa = (AssocArray) o1;
@@ -1065,7 +1065,7 @@ public class AVM implements VariableManager, Closeable {
 					boolean isGlobal = position.boolArg(1);
 					Object o1 = runtimeStack.getVariable(position.intArg(0), isGlobal);
 					if (o1 == null || o1 instanceof UninitializedObject) {
-						o1 = new AssocArray(sortedArrayKeys);
+						o1 = AssocArray.create(sortedArrayKeys);
 						runtimeStack.setVariable(position.intArg(0), o1, isGlobal);
 					}
 					AssocArray aa = (AssocArray) o1;
@@ -1125,7 +1125,7 @@ public class AVM implements VariableManager, Closeable {
 					if (o == null) {
 						if (position.boolArg(1)) {
 							// is_array
-							push(runtimeStack.setVariable(position.intArg(0), new AssocArray(sortedArrayKeys), isGlobal));
+							push(runtimeStack.setVariable(position.intArg(0), AssocArray.create(sortedArrayKeys), isGlobal));
 						} else {
 							push(runtimeStack.setVariable(position.intArg(0), BLANK, isGlobal));
 						}
@@ -2383,7 +2383,7 @@ public class AVM implements VariableManager, Closeable {
 	private void assignArray(long offset, Object arrIdx, Object rhs, boolean isGlobal) {
 		Object o1 = runtimeStack.getVariable(offset, isGlobal);
 		if (o1 == null || o1.equals(BLANK)) {
-			o1 = new AssocArray(sortedArrayKeys);
+			o1 = AssocArray.create(sortedArrayKeys);
 			runtimeStack.setVariable(offset, o1, isGlobal);
 		}
 		// The only (conceivable) way to contradict
@@ -2664,7 +2664,7 @@ public class AVM implements VariableManager, Closeable {
 	public Object getARGV() {
 		if (argvOffset == NULL_OFFSET) {
 			// Build a synthetic ARGV AssocArray from command-line arguments
-			AssocArray argv = new AssocArray(sortedArrayKeys);
+			AssocArray argv = AssocArray.create(sortedArrayKeys);
 			argv.put(0, "jawk");
 			for (int i = 0; i < arguments.size(); i++) {
 				argv.put(i + 1, arguments.get(i));

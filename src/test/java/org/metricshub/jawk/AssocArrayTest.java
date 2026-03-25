@@ -10,7 +10,7 @@ public class AssocArrayTest {
 
 	@Test
 	public void testInOperatorWithNumericAndStringKeys() {
-		AssocArray array = new AssocArray(false);
+		AssocArray array = AssocArray.createHash();
 		array.put(1L, "one");
 		array.put("bar", "barValue");
 
@@ -23,7 +23,7 @@ public class AssocArrayTest {
 
 	@Test
 	public void testInOperatorWithNullKey() {
-		AssocArray array = new AssocArray(false);
+		AssocArray array = AssocArray.createHash();
 		array.put(0L, "zero");
 
 		assertFalse(array.isIn(null));
@@ -33,7 +33,7 @@ public class AssocArrayTest {
 
 	@Test
 	public void testRemoveNumericStringKey() {
-		AssocArray array = new AssocArray(false);
+		AssocArray array = AssocArray.createHash();
 		array.put(1L, "one");
 
 		assertEquals("one", array.remove("1"));
@@ -42,7 +42,7 @@ public class AssocArrayTest {
 
 	@Test
 	public void testRemoveNumericKeyFromString() {
-		AssocArray array = new AssocArray(false);
+		AssocArray array = AssocArray.createHash();
 		array.put("2", "two");
 
 		assertEquals("two", array.remove(2L));
@@ -51,7 +51,7 @@ public class AssocArrayTest {
 
 	@Test
 	public void testRemoveMissingKey() {
-		AssocArray array = new AssocArray(false);
+		AssocArray array = AssocArray.createHash();
 		array.put(1, "one");
 
 		assertNull(array.remove(3L));
@@ -60,11 +60,11 @@ public class AssocArrayTest {
 
 	@Test
 	public void testUninitializedIndexUsesEmptyString() {
-		AssocArray idxArray = new AssocArray(false);
+		AssocArray idxArray = AssocArray.createHash();
 		Object idx = idxArray.get(0L);
 		assertTrue(idx instanceof UninitializedObject);
 
-		AssocArray array = new AssocArray(false);
+		AssocArray array = AssocArray.createHash();
 		array.put("", "empty");
 		array.put(0L, "zero");
 

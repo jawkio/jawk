@@ -30,6 +30,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.metricshub.jawk.jrt.AssocArray;
 import org.metricshub.jawk.jrt.AwkRuntimeException;
 import org.metricshub.jawk.jrt.BlockObject;
@@ -247,27 +248,27 @@ public class CoreExtension extends AbstractExtension implements JawkExtension {
 
 	@JawkFunction("Map")
 	public Object mapFunction(Object... args) {
-		return map("Map", args, AssocArray.MT_HASH);
+		return map("Map", args, AssocArray::createHash);
 	}
 
 	@JawkFunction("HashMap")
 	public Object hashMapFunction(Object... args) {
-		return map("HashMap", args, AssocArray.MT_HASH);
+		return map("HashMap", args, AssocArray::createHash);
 	}
 
 	@JawkFunction("LinkedMap")
 	public Object linkedMapFunction(Object... args) {
-		return map("LinkedMap", args, AssocArray.MT_LINKED);
+		return map("LinkedMap", args, AssocArray::createLinked);
 	}
 
 	@JawkFunction("TreeMap")
 	public Object treeMapFunction(Object... args) {
-		return map("TreeMap", args, AssocArray.MT_TREE);
+		return map("TreeMap", args, AssocArray::createSorted);
 	}
 
 	@JawkFunction("MapUnion")
 	public Object mapUnionFunction(Object... args) {
-		return mapUnion("MapUnion", args, AssocArray.MT_LINKED);
+		return mapUnion("MapUnion", args);
 	}
 
 	@JawkFunction("MapCopy")
@@ -609,18 +610,18 @@ public class CoreExtension extends AbstractExtension implements JawkExtension {
 		return aa.get(0);
 	}
 
-	private Object map(String keyword, Object[] args, int mapType) {
+	private Object map(String keyword, Object[] args, Supplier<AssocArray> factory) {
 		if (args.length % 2 == 0) {
-			return subMap(args, mapType);
+			return subMap(args, factory);
 		}
-		return topLevelMap(keyword, args, mapType, false); // false = map assignment
+		return topLevelMap(keyword, args, false); // false = map assignment
 	}
 
-	private Object mapUnion(String keyword, Object[] args, int mapType) {
-		return topLevelMap(keyword, args, mapType, true); // true = map union
+	private Object mapUnion(String keyword, Object[] args) {
+		return topLevelMap(keyword, args, true); // true = map union
 	}
 
-	private int topLevelMap(String keyword, Object[] args, int mapType, boolean mapUnion) {
+	private int topLevelMap(String keyword, Object[] args, boolean mapUnion) {
 		if (args.length == 0) {
 			throw new IllegalAwkArgumentException(keyword + " requires at least one argument.");
 		}
@@ -631,7 +632,6 @@ public class CoreExtension extends AbstractExtension implements JawkExtension {
 		AssocArray aa = (AssocArray) args[0];
 		if (!mapUnion) {
 			aa.clear();
-			aa.useMapType(mapType);
 		}
 		int cnt = 0;
 		for (int i = 1; i < args.length; i += 2) {
@@ -649,9 +649,8 @@ public class CoreExtension extends AbstractExtension implements JawkExtension {
 		return cnt;
 	}
 
-	private AssocArray subMap(Object[] args, int mapType) {
-		AssocArray aa = new AssocArray(false);
-		aa.useMapType(mapType);
+	private AssocArray subMap(Object[] args, Supplier<AssocArray> factory) {
+		AssocArray aa = factory.get();
 		for (int i = 0; i < args.length; i += 2) {
 			if (args[i] instanceof AssocArray) {
 				args[i] = newReference(args[i]);
@@ -672,7 +671,6 @@ public class CoreExtension extends AbstractExtension implements JawkExtension {
 		}
 		AssocArray aa = (AssocArray) args[0];
 		aa.clear();
-		aa.useMapType(AssocArray.MT_TREE);
 		String subsep = toAwkString(vm.getSUBSEP());
 		int cnt = 0;
 		for (int i = 1; i < args.length; ++i) {

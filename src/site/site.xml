@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<site name="${project.name}" xmlns="http://maven.apache.org/SITE/2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<site name="Jawk Documentation" xmlns="http://maven.apache.org/SITE/2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/SITE/2.0.0 https://maven.apache.org/xsd/site-2.0.0.xsd">
 
 	<skin>
@@ -11,19 +11,74 @@
 	<custom>
 		<noDefaultLinks>true</noDefaultLinks>
 		<keywords>awk</keywords>
+		<social>
+			<linkedin>metricshub</linkedin>
+			<custom>
+				<title>Join us on Slack!</title>
+				<href>https://metricshub.slack.com</href>
+				<icon>fa-brands fa-slack</icon>
+			</custom>
+			<custom>
+				<title>Jawk on GitHub</title>
+				<href>https://github.com/metricshub/jawk</href>
+				<icon>fa-brands fa-github</icon>
+			</custom>
+		</social>
+		<additionalLinks>
+			<link>
+				<name>Terms of Service</name>
+				<href>https://metricshub.com/legal/general.html</href>
+			</link>
+			<link>
+				<name>Licenses</name>
+				<href>licenses.html</href>
+			</link>
+			<link>
+				<name>Privacy Policy</name>
+				<href>https://metricshub.com/legal/privacy.html</href>
+			</link>
+			<link>
+				<name>Cookie Policy</name>
+				<href>https://metricshub.com/legal/cookies.html</href>
+			</link>
+			<link>
+				<name>Disclaimer</name>
+				<href>https://metricshub.com/legal/disclaimer.html</href>
+			</link>
+			<link>
+				<name>Trademarks</name>
+				<href>https://metricshub.com/legal/trademarks.html</href>
+			</link>
+			<link>
+				<name>Code of Ethics</name>
+				<href>https://metricshub.com/legal/ethics.html</href>
+			</link>
+			<link>
+				<name>Code of Conduct</name>
+				<href>https://metricshub.org/code-of-conduct.html</href>
+			</link>
+			<link>
+				<name>How to Contribute</name>
+				<href>https://metricshub.org/contributing.html</href>
+			</link>
+		</additionalLinks>
 	</custom>
 
-	<bannerLeft href="https://metricshub.org">
-		<image src="images/metricshub-logo.png" alt="MetricsHub" />
+	<bannerLeft href="https://metricshub.org/jawk">
+		<image src="images/jawk-logo-color-dark-351x80.png" alt="Jawk Logo" />
 	</bannerLeft>
 
 	<body>
 
 		<links>
-			<item name="Jawk on GitHub" href="${project.scm.url}" />
 			<item name="The GNU Awk User's Guide" href="https://www.gnu.org/software/gawk/manual/gawk.html" />
-			<item name="MetricsHub&reg;" href="https://metricshub.com" />
+			<item name="Powers MetricsHub&reg;" href="https://metricshub.com" />
 		</links>
+
+		<breadcrumbs>
+			<item name="Open MetricsHub" href="https://metricshub.org" />
+			<item name="Jawk" href="https://metricshub.org/jawk" />
+		</breadcrumbs>
 
 		<menu name="User Documentation">
 			<item name="Getting Started" href="index.html" />

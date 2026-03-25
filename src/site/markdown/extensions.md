@@ -1,5 +1,7 @@
 # Jawk - _Extension Facility_
 
+<!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
+
 AWK, while an excellent text processing language, is limited as a general purpose language. For example, it would be impossible to create a socket or display a simple GUI without external assistance either from the shell or via extensions to AWK itself (i.e., gawk). To overcome this limitation, an extension facility is added to **Jawk** .
 
 The Jawk extension facility allows for arbitrary Java code to be called as AWK functions in a Jawk script. These extensions can come from the user (developer) or 3rd party providers (i.e., the Jawk project team). Extensions are opt-in and must be explicitly loaded either through the Java API by passing the extension instances to the `Awk` constructor or on the command line via the `-l`/`--load` option. The `--list-ext` option lists the extensions available on the class path, showing the registered name and the implementing class.

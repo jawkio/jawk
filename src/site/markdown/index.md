@@ -1,6 +1,6 @@
 # Jawk - AWK for Java
 
-<!-- MACRO{toc|fromDepth=1|toDepth=2|id=toc} -->
+<!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
 
 ## Introduction
 

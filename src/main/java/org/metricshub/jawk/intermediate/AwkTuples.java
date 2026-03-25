@@ -1760,7 +1760,7 @@ public class AwkTuples implements Serializable {
 							&& !hasResolvedAddress(oldIndex + 1)) {
 						PositionTracker position = new PositionTracker(original);
 						position.jump(oldIndex + 1);
-						long fieldIndex = JRT.parseFieldNumber(literal, position);
+						long fieldIndex = JRT.parseFieldNumber(literal);
 						Tuple replacement = createGetInputFieldConst(
 								fieldIndex,
 								tuple.getLineno());

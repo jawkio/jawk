@@ -897,14 +897,14 @@ public class AVM implements VariableManager, Closeable {
 					// stack[0] = field number
 					// stack[1] = value
 					Object fieldNumObj = pop();
-					long fieldNum = JRT.parseFieldNumber(fieldNumObj, position);
+					long fieldNum = JRT.parseFieldNumber(fieldNumObj);
 					String value = pop().toString();
 					push(value); // leave the result on the stack
 					if (fieldNum == 0) {
 						jrt.setInputLine(value);
 						jrt.jrtParseFields();
 					} else {
-						jrt.jrtSetInputField(value, fieldNum, position);
+						jrt.jrtSetInputField(value, fieldNum);
 					}
 					position.next();
 					break;
@@ -970,11 +970,11 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = inc value
 
 					// same code as GET_INPUT_FIELD:
-					long fieldnum = JRT.parseFieldNumber(pop(), position);
+					long fieldnum = JRT.parseFieldNumber(pop());
 					double incval = JRT.toDouble(pop());
 
 					// except here, get the number, and add the incvalue
-					Object numObj = jrt.jrtGetInputField(fieldnum, position);
+					Object numObj = jrt.jrtGetInputField(fieldnum);
 					double num;
 					switch (opcode) {
 					case PLUS_EQ_INPUT_FIELD:
@@ -998,7 +998,7 @@ public class AVM implements VariableManager, Closeable {
 					default:
 						throw new Error("Invalid opcode here: " + opcode);
 					}
-					setNumOnJRT(fieldnum, num, position);
+					setNumOnJRT(fieldnum, num);
 
 					// put the result value on the stack
 					push(num);
@@ -1082,12 +1082,12 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case INC_DOLLAR_REF: {
 					// stack[0] = dollar index (field number)
-					long fieldnum = JRT.parseFieldNumber(pop(), position);
+					long fieldnum = JRT.parseFieldNumber(pop());
 
-					Object numObj = jrt.jrtGetInputField(fieldnum, position);
+					Object numObj = jrt.jrtGetInputField(fieldnum);
 					double original = JRT.toDouble(numObj);
 					double num = original + 1;
-					setNumOnJRT(fieldnum, num, position);
+					setNumOnJRT(fieldnum, num);
 
 					if (JRT.isActuallyLong(original)) {
 						push((long) Math.rint(original));
@@ -1101,12 +1101,12 @@ public class AVM implements VariableManager, Closeable {
 				case DEC_DOLLAR_REF: {
 					// stack[0] = dollar index (field number)
 					// same code as GET_INPUT_FIELD:
-					long fieldnum = JRT.parseFieldNumber(pop(), position);
+					long fieldnum = JRT.parseFieldNumber(pop());
 
-					Object numObj = jrt.jrtGetInputField(fieldnum, position);
+					Object numObj = jrt.jrtGetInputField(fieldnum);
 					double original = JRT.toDouble(numObj);
 					double num = original - 1;
-					setNumOnJRT(fieldnum, num, position);
+					setNumOnJRT(fieldnum, num);
 
 					if (JRT.isActuallyLong(original)) {
 						push((long) Math.rint(original));
@@ -1299,7 +1299,7 @@ public class AVM implements VariableManager, Closeable {
 					// stack[2] = replacement string
 					// stack[3] = ere
 					boolean isGsub = position.boolArg(0);
-					long fieldNum = JRT.parseFieldNumber(pop(), position);
+					long fieldNum = JRT.parseFieldNumber(pop());
 					String orig = jrt.toAwkString(pop());
 					String repl = jrt.toAwkString(pop());
 					String ere = jrt.toAwkString(pop());
@@ -1314,7 +1314,7 @@ public class AVM implements VariableManager, Closeable {
 						jrt.setInputLine(newstring);
 						jrt.jrtParseFields();
 					} else {
-						jrt.jrtSetInputField(newstring, fieldNum, position);
+						jrt.jrtSetInputField(newstring, fieldNum);
 					}
 					position.next();
 					break;
@@ -1737,13 +1737,13 @@ public class AVM implements VariableManager, Closeable {
 				case GET_INPUT_FIELD: {
 					// stack[0] = field number
 					Object fieldNumber = pop();
-					push(jrt.jrtGetInputField(fieldNumber, position));
+					push(jrt.jrtGetInputField(fieldNumber));
 					position.next();
 					break;
 				}
 				case GET_INPUT_FIELD_CONST: {
 					long fieldnum = position.intArg(0);
-					push(jrt.jrtGetInputField(fieldnum, position));
+					push(jrt.jrtGetInputField(fieldnum));
 					position.next();
 					break;
 				}
@@ -2307,7 +2307,7 @@ public class AVM implements VariableManager, Closeable {
 		}
 	}
 
-	private void setNumOnJRT(long fieldNum, double num, PositionTracker position) {
+	private void setNumOnJRT(long fieldNum, double num) {
 		String numString;
 		if (JRT.isActuallyLong(num)) {
 			numString = Long.toString((long) Math.rint(num));
@@ -2320,7 +2320,7 @@ public class AVM implements VariableManager, Closeable {
 			jrt.setInputLine(numString.toString());
 			jrt.jrtParseFields();
 		} else {
-			jrt.jrtSetInputField(numString, fieldNum, position);
+			jrt.jrtSetInputField(numString, fieldNum);
 		}
 	}
 

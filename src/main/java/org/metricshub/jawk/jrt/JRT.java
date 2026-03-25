@@ -50,7 +50,6 @@ import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.math.BigDecimal;
-import org.metricshub.jawk.intermediate.PositionTracker;
 import org.metricshub.jawk.intermediate.UninitializedObject;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
@@ -683,15 +682,12 @@ public class JRT {
 	 *
 	 * @param obj the object identifying the field (for example, the result of a
 	 *        numeric expression)
-	 * @param position the position tracker pointing at the tuple being
-	 *        evaluated, used for error reporting
 	 * @return the parsed field number as a long
 	 */
-	public static long parseFieldNumber(Object obj, PositionTracker position) {
+	public static long parseFieldNumber(Object obj) {
 		long num = toLong(obj);
 		if (num < 0) {
 			throw new AwkRuntimeException(
-					position.lineNumber(),
 					"Field $(" + obj.toString()
 							+ ") is incorrect.");
 		}
@@ -1400,11 +1396,10 @@ public class JRT {
 	 * Retrieve the contents of a particular input field.
 	 *
 	 * @param fieldnumObj Object referring to the field number.
-	 * @param position the current tuple position, used for error reporting
 	 * @return Contents of the field.
 	 */
-	public Object jrtGetInputField(Object fieldnumObj, PositionTracker position) {
-		return jrtGetInputField(parseFieldNumber(fieldnumObj, position), position);
+	public Object jrtGetInputField(Object fieldnumObj) {
+		return jrtGetInputField(parseFieldNumber(fieldnumObj));
 	}
 
 	/**
@@ -1413,26 +1408,16 @@ public class JRT {
 	 * </p>
 	 *
 	 * @param fieldnum a long
-	 * @param position the current tuple position, used for error reporting
 	 * @return a {@link java.lang.Object} object
 	 */
-	public Object jrtGetInputField(long fieldnum, PositionTracker position) {
+	public Object jrtGetInputField(long fieldnum) {
 		if (fieldnum < 0 || fieldnum > Integer.MAX_VALUE) {
-			Object descriptor = Long.valueOf(fieldnum);
-			String message = "Field $(" + descriptor.toString() + ") is incorrect.";
-			if (position == null) {
-				throw new RuntimeException(message);
-			}
-			throw new AwkRuntimeException(position.lineNumber(), message);
+			throw new AwkRuntimeException("Field $(" + Long.valueOf(fieldnum) + ") is incorrect.");
 		}
 		if (recordState == null) {
 			return BLANK;
 		}
 		return recordState.getField((int) fieldnum);
-	}
-
-	public Object jrtGetInputField(long fieldnum) {
-		return jrtGetInputField(fieldnum, null);
 	}
 
 	/**
@@ -1443,16 +1428,8 @@ public class JRT {
 	 * @return A string representation of valueObj.
 	 */
 	public String jrtSetInputField(Object valueObj, long fieldNum) {
-		return jrtSetInputField(valueObj, fieldNum, null);
-	}
-
-	public String jrtSetInputField(Object valueObj, long fieldNum, PositionTracker position) {
 		if (fieldNum > Integer.MAX_VALUE) {
-			String message = "Field $(" + Long.valueOf(fieldNum) + ") is incorrect.";
-			if (position == null) {
-				throw new RuntimeException(message);
-			}
-			throw new AwkRuntimeException(position.lineNumber(), message);
+			throw new AwkRuntimeException("Field $(" + Long.valueOf(fieldNum) + ") is incorrect.");
 		}
 		String value = valueObj.toString();
 		int fieldIndex = (int) fieldNum;

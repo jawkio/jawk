@@ -47,12 +47,12 @@ public class HashAssocArray extends HashMap<Object, Object> implements AssocArra
 	 */
 	@Override
 	public Object get(Object key) {
-		key = AssocArrayHelper.normalizeKey(key);
+		key = AssocArray.normalizeKey(key);
 		Object result = super.get(key);
 		if (result != null) {
 			return result;
 		}
-		Long lKey = AssocArrayHelper.toLongKey(key);
+		Long lKey = AssocArray.toLongKey(key);
 		if (lKey != null) {
 			result = super.get(lKey);
 			if (result != null) {
@@ -60,7 +60,7 @@ public class HashAssocArray extends HashMap<Object, Object> implements AssocArra
 			}
 			key = lKey;
 		}
-		result = AssocArrayHelper.BLANK;
+		result = BLANK;
 		super.put(key, result);
 		return result;
 	}
@@ -75,8 +75,8 @@ public class HashAssocArray extends HashMap<Object, Object> implements AssocArra
 	 */
 	@Override
 	public Object put(Object key, Object value) {
-		key = AssocArrayHelper.normalizeKey(key);
-		Long lKey = AssocArrayHelper.toLongKey(key);
+		key = AssocArray.normalizeKey(key);
+		Long lKey = AssocArray.toLongKey(key);
 		return super.put(lKey != null ? lKey : key, value);
 	}
 
@@ -89,12 +89,12 @@ public class HashAssocArray extends HashMap<Object, Object> implements AssocArra
 	 */
 	@Override
 	public Object remove(Object key) {
-		key = AssocArrayHelper.normalizeKey(key);
+		key = AssocArray.normalizeKey(key);
 		Object result = super.remove(key);
 		if (result != null) {
 			return result;
 		}
-		Long lKey = AssocArrayHelper.toLongKey(key);
+		Long lKey = AssocArray.toLongKey(key);
 		return lKey != null ? super.remove(lKey) : null;
 	}
 

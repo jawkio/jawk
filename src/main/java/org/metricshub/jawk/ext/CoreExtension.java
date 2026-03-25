@@ -52,7 +52,7 @@ import org.metricshub.jawk.ext.annotations.JawkFunction;
  * are ordered non-negative integers, and the values
  * are the arguments themselves. The first argument is
  * the associative array itself.
- * <li><strong>Map/HashMap/TreeMap/LinkedMap</strong> - <code>Map(map,k1,v1,k2,v2,...,kN,vN)</code>,
+ * <li><strong>Map/HashMap/TreeMap</strong> - <code>Map(map,k1,v1,k2,v2,...,kN,vN)</code>,
  * or <code>Map(k1,v1,k2,v2,...,kN,vN)</code>.<br>
  * Build an associative array with its keys/values as
  * parameters. The odd parameter count version takes
@@ -60,10 +60,8 @@ import org.metricshub.jawk.ext.annotations.JawkFunction;
  * parameter count version returns an anonymous associative
  * array for the purposes of providing a map by function
  * call parameter.<br>
- * Map/HashMap configures the associative array as a
- * hash map, TreeMap as an ordered map, and LinkedMap
- * as a map which traverses the key set in order of
- * insertion.
+ * Map/HashMap configures the associative array as a hash map,
+ * and TreeMap as an ordered map.
  * <li><strong>MapUnion</strong> - <code>MapUnion(map,k1,v1,k2,v2,...,kN,vN)</code><br>
  * Similar to Map, except that map is not cleared prior
  * to populating it with key/value pairs from the
@@ -254,11 +252,6 @@ public class CoreExtension extends AbstractExtension implements JawkExtension {
 	@JawkFunction("HashMap")
 	public Object hashMapFunction(Object... args) {
 		return map("HashMap", args, AssocArray::createHash);
-	}
-
-	@JawkFunction("LinkedMap")
-	public Object linkedMapFunction(Object... args) {
-		return map("LinkedMap", args, AssocArray::createLinked);
 	}
 
 	@JawkFunction("TreeMap")

@@ -39,7 +39,6 @@ import org.metricshub.jawk.intermediate.UninitializedObject;
  * </p>
  * <ul>
  * <li>{@link HashAssocArray} &mdash; backed by {@link java.util.HashMap}</li>
- * <li>{@link LinkedAssocArray} &mdash; backed by {@link java.util.LinkedHashMap}</li>
  * <li>{@link SortedAssocArray} &mdash; backed by {@link java.util.TreeMap} with
  * AWK key ordering</li>
  * </ul>
@@ -49,7 +48,6 @@ import org.metricshub.jawk.intermediate.UninitializedObject;
  *
  * <pre>
  * AssocArray hash = AssocArray.createHash();
- * AssocArray linked = AssocArray.createLinked();
  * AssocArray sorted = AssocArray.createSorted();
  * AssocArray aa = AssocArray.create(sortedArrayKeys);
  * </pre>
@@ -57,6 +55,43 @@ import org.metricshub.jawk.intermediate.UninitializedObject;
  * @author Danny Daglas
  */
 public interface AssocArray extends Map<Object, Object> {
+
+	/** A blank (uninitialized) value shared across all AWK array accesses. */
+	UninitializedObject BLANK = new UninitializedObject();
+
+// -------------------------------------------------------------------------
+// Key-normalization helpers (used by concrete implementations)
+// -------------------------------------------------------------------------
+
+	/**
+	 * Converts a key to the canonical form expected by AWK: {@code null} and
+	 * {@link UninitializedObject} map to the empty string.
+	 *
+	 * @param key the raw key
+	 * @return the normalized key, never {@code null}
+	 */
+	static Object normalizeKey(Object key) {
+		return (key == null || key instanceof UninitializedObject) ? "" : key;
+	}
+
+	/**
+	 * Attempts to parse the key as a {@code Long}.
+	 *
+	 * @param key the key to parse (must not be {@code null})
+	 * @return the {@code Long} value, or {@code null} if the key cannot be parsed
+	 *         as a long integer
+	 */
+	static Long toLongKey(Object key) {
+		try {
+			return Long.parseLong(key.toString());
+		} catch (Exception e) { // NOPMD - EmptyCatchBlock: intentionally ignored
+			return null;
+		}
+	}
+
+// -------------------------------------------------------------------------
+// AWK-specific default methods
+// -------------------------------------------------------------------------
 
 	/**
 	 * Returns whether a particular key is contained within the associative array.
@@ -71,8 +106,8 @@ public interface AssocArray extends Map<Object, Object> {
 	 */
 	default boolean isIn(Object key) {
 		if (key == null || key instanceof UninitializedObject) {
-			// According to AWK semantics, an uninitialized index
-			// evaluates to the empty string, not numeric zero
+// According to AWK semantics, an uninitialized index
+// evaluates to the empty string, not numeric zero
 			key = "";
 		}
 		if (containsKey(key)) {
@@ -93,8 +128,8 @@ public interface AssocArray extends Map<Object, Object> {
 	 * @return a human-readable map string of the form {@code {key=value, ...}}
 	 */
 	default String mapString() {
-		// Since extensions allow assoc arrays to become keys as well,
-		// we render nested arrays recursively rather than using toString().
+// Since extensions allow assoc arrays to become keys as well,
+// we render nested arrays recursively rather than using toString().
 		StringBuilder sb = new StringBuilder().append('{');
 		int cnt = 0;
 		for (Map.Entry<Object, Object> entry : entrySet()) {
@@ -156,16 +191,6 @@ public interface AssocArray extends Map<Object, Object> {
 	 */
 	static AssocArray createHash() {
 		return new HashAssocArray();
-	}
-
-	/**
-	 * Creates a new insertion-order associative array (backed by
-	 * {@link java.util.LinkedHashMap}).
-	 *
-	 * @return a new {@link LinkedAssocArray}
-	 */
-	static AssocArray createLinked() {
-		return new LinkedAssocArray();
 	}
 
 	/**

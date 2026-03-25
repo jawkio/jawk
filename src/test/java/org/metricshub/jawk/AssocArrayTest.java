@@ -2,9 +2,12 @@ package org.metricshub.jawk;
 
 import static org.junit.Assert.*;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.junit.Test;
 import org.metricshub.jawk.intermediate.UninitializedObject;
 import org.metricshub.jawk.jrt.AssocArray;
+import org.metricshub.jawk.jrt.SortedAssocArray;
 
 public class AssocArrayTest {
 
@@ -70,5 +73,113 @@ public class AssocArrayTest {
 
 		assertEquals("empty", array.get(idx));
 		assertEquals("zero", array.get(0L));
+	}
+
+	@Test
+	public void testFromMapCopiesEntries() {
+		Map<Object, Object> source = new LinkedHashMap<>();
+		source.put("alpha", "a");
+		source.put("beta", "b");
+
+		AssocArray result = AssocArray.from(source, false);
+
+		assertEquals("a", result.get("alpha"));
+		assertEquals("b", result.get("beta"));
+		assertEquals(2, result.keySet().size());
+	}
+
+	@Test
+	public void testFromMapNormalizesNumericKeys() {
+		Map<Object, Object> source = new LinkedHashMap<>();
+		source.put("1", "one");
+		source.put("2", "two");
+
+		AssocArray result = AssocArray.from(source, false);
+
+		// String "1" should be normalized to Long 1 so isIn("1") and isIn(1L) both work
+		assertTrue(result.isIn(1L));
+		assertTrue(result.isIn("1"));
+		assertEquals("one", result.get(1L));
+		assertEquals("two", result.get(2L));
+	}
+
+	@Test
+	public void testFromMapSortedProducesSortedAssocArray() {
+		Map<Object, Object> source = new LinkedHashMap<>();
+		source.put("z", "last");
+		source.put("a", "first");
+
+		AssocArray result = AssocArray.from(source, true);
+
+		assertTrue(result instanceof SortedAssocArray);
+		assertEquals("first", result.get("a"));
+		assertEquals("last", result.get("z"));
+	}
+
+	@Test
+	public void testInjectAssocArrayVariable() throws Exception {
+		AssocArray data = AssocArray.createHash();
+		data.put("key1", "hello");
+		data.put("key2", "world");
+
+		AwkTestSupport
+				.awkTest("inject AssocArray into array variable")
+				.script("BEGIN{ print arr[\"key1\"], arr[\"key2\"] }")
+				.preassign("arr", data)
+				.expectLines("hello world")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testInjectMapVariable() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+		data.put("a", "alpha");
+		data.put("b", "beta");
+
+		AwkTestSupport
+				.awkTest("inject Map into array variable")
+				.script("BEGIN{ print arr[\"a\"], arr[\"b\"] }")
+				.preassign("arr", data)
+				.expectLines("alpha beta")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testInjectMapWithNumericKeysVariable() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+		data.put("1", "one");
+		data.put("2", "two");
+
+		AwkTestSupport
+				.awkTest("inject Map with numeric string keys - key normalization")
+				.script("BEGIN{ print arr[1], arr[2] }")
+				.preassign("arr", data)
+				.expectLines("one two")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testInjectAssocArrayIterateForIn() throws Exception {
+		AssocArray data = AssocArray.createSorted();
+		data.put("x", "1");
+		data.put("y", "2");
+		data.put("z", "3");
+
+		AwkTestSupport
+				.awkTest("inject AssocArray and iterate with for-in")
+				.script("BEGIN{ for (k in arr) print k, arr[k] }")
+				.preassign("arr", data)
+				.expectLines("x 1", "y 2", "z 3")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testInjectScalarIntoArrayVariableThrows() throws Exception {
+		AwkTestSupport
+				.awkTest("inject scalar into array variable should throw")
+				.script("BEGIN{ for (k in arr) print k }")
+				.preassign("arr", "notAnArray")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
 	}
 }

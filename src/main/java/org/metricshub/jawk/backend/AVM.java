@@ -1815,10 +1815,18 @@ public class AVM implements VariableManager, Closeable {
 							Integer offsetObj = globalVariableOffsets.get(key);
 							Boolean arrayObj = globalVariableArrays.get(key);
 							if (offsetObj != null) {
+								Object obj = entry.getValue();
 								if (arrayObj.booleanValue()) {
-									throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + key + ").");
+									if (obj instanceof AssocArray) {
+										runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
+									} else if (obj instanceof Map) {
+										runtimeStack
+												.setFilelistVariable(offsetObj.intValue(), AssocArray.from((Map<?, ?>) obj, sortedArrayKeys));
+									} else {
+										throw new IllegalArgumentException(
+												"Cannot assign a scalar to a non-scalar variable (" + key + ").");
+									}
 								} else {
-									Object obj = entry.getValue();
 									runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
 								}
 							}

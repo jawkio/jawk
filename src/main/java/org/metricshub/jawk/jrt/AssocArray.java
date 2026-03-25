@@ -213,4 +213,28 @@ public interface AssocArray extends Map<Object, Object> {
 	static AssocArray create(boolean sortedArrayKeys) {
 		return sortedArrayKeys ? createSorted() : createHash();
 	}
+
+	/**
+	 * Creates a new associative array whose entries are copied from the given
+	 * {@link Map}. Each key is processed through AWK key normalization (via
+	 * {@link #put(Object, Object)}) so that string-integer equivalence and
+	 * null-to-empty-string coercion are applied consistently.
+	 * <p>
+	 * Note: {@link java.util.HashMap#putAll} bypasses the overridden
+	 * {@link #put} method and therefore cannot be used for this purpose.
+	 * </p>
+	 *
+	 * @param source the source map whose entries to copy; must not be
+	 *        {@code null}
+	 * @param sortedArrayKeys {@code true} to create a sorted (tree-backed) array,
+	 *        {@code false} for a hash-backed array
+	 * @return a new {@link AssocArray} containing the entries of {@code source}
+	 */
+	static AssocArray from(Map<?, ?> source, boolean sortedArrayKeys) {
+		AssocArray result = create(sortedArrayKeys);
+		for (Map.Entry<?, ?> entry : source.entrySet()) {
+			result.put(entry.getKey(), entry.getValue());
+		}
+		return result;
+	}
 }

@@ -30,6 +30,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.metricshub.jawk.jrt.AssocArray;
 import org.metricshub.jawk.jrt.AwkRuntimeException;
 import org.metricshub.jawk.jrt.BlockObject;
@@ -51,7 +52,7 @@ import org.metricshub.jawk.ext.annotations.JawkFunction;
  * are ordered non-negative integers, and the values
  * are the arguments themselves. The first argument is
  * the associative array itself.
- * <li><strong>Map/HashMap/TreeMap/LinkedMap</strong> - <code>Map(map,k1,v1,k2,v2,...,kN,vN)</code>,
+ * <li><strong>Map/HashMap/TreeMap</strong> - <code>Map(map,k1,v1,k2,v2,...,kN,vN)</code>,
  * or <code>Map(k1,v1,k2,v2,...,kN,vN)</code>.<br>
  * Build an associative array with its keys/values as
  * parameters. The odd parameter count version takes
@@ -59,10 +60,8 @@ import org.metricshub.jawk.ext.annotations.JawkFunction;
  * parameter count version returns an anonymous associative
  * array for the purposes of providing a map by function
  * call parameter.<br>
- * Map/HashMap configures the associative array as a
- * hash map, TreeMap as an ordered map, and LinkedMap
- * as a map which traverses the key set in order of
- * insertion.
+ * Map/HashMap configures the associative array as a hash map,
+ * and TreeMap as an ordered map.
  * <li><strong>MapUnion</strong> - <code>MapUnion(map,k1,v1,k2,v2,...,kN,vN)</code><br>
  * Similar to Map, except that map is not cleared prior
  * to populating it with key/value pairs from the
@@ -247,27 +246,22 @@ public class CoreExtension extends AbstractExtension implements JawkExtension {
 
 	@JawkFunction("Map")
 	public Object mapFunction(Object... args) {
-		return map("Map", args, AssocArray.MT_HASH);
+		return map("Map", args, AssocArray::createHash);
 	}
 
 	@JawkFunction("HashMap")
 	public Object hashMapFunction(Object... args) {
-		return map("HashMap", args, AssocArray.MT_HASH);
-	}
-
-	@JawkFunction("LinkedMap")
-	public Object linkedMapFunction(Object... args) {
-		return map("LinkedMap", args, AssocArray.MT_LINKED);
+		return map("HashMap", args, AssocArray::createHash);
 	}
 
 	@JawkFunction("TreeMap")
 	public Object treeMapFunction(Object... args) {
-		return map("TreeMap", args, AssocArray.MT_TREE);
+		return map("TreeMap", args, AssocArray::createSorted);
 	}
 
 	@JawkFunction("MapUnion")
 	public Object mapUnionFunction(Object... args) {
-		return mapUnion("MapUnion", args, AssocArray.MT_LINKED);
+		return mapUnion("MapUnion", args);
 	}
 
 	@JawkFunction("MapCopy")
@@ -609,18 +603,18 @@ public class CoreExtension extends AbstractExtension implements JawkExtension {
 		return aa.get(0);
 	}
 
-	private Object map(String keyword, Object[] args, int mapType) {
+	private Object map(String keyword, Object[] args, Supplier<AssocArray> factory) {
 		if (args.length % 2 == 0) {
-			return subMap(args, mapType);
+			return subMap(args, factory);
 		}
-		return topLevelMap(keyword, args, mapType, false); // false = map assignment
+		return topLevelMap(keyword, args, false); // false = map assignment
 	}
 
-	private Object mapUnion(String keyword, Object[] args, int mapType) {
-		return topLevelMap(keyword, args, mapType, true); // true = map union
+	private Object mapUnion(String keyword, Object[] args) {
+		return topLevelMap(keyword, args, true); // true = map union
 	}
 
-	private int topLevelMap(String keyword, Object[] args, int mapType, boolean mapUnion) {
+	private int topLevelMap(String keyword, Object[] args, boolean mapUnion) {
 		if (args.length == 0) {
 			throw new IllegalAwkArgumentException(keyword + " requires at least one argument.");
 		}
@@ -631,7 +625,6 @@ public class CoreExtension extends AbstractExtension implements JawkExtension {
 		AssocArray aa = (AssocArray) args[0];
 		if (!mapUnion) {
 			aa.clear();
-			aa.useMapType(mapType);
 		}
 		int cnt = 0;
 		for (int i = 1; i < args.length; i += 2) {
@@ -649,9 +642,8 @@ public class CoreExtension extends AbstractExtension implements JawkExtension {
 		return cnt;
 	}
 
-	private AssocArray subMap(Object[] args, int mapType) {
-		AssocArray aa = new AssocArray(false);
-		aa.useMapType(mapType);
+	private AssocArray subMap(Object[] args, Supplier<AssocArray> factory) {
+		AssocArray aa = factory.get();
 		for (int i = 0; i < args.length; i += 2) {
 			if (args[i] instanceof AssocArray) {
 				args[i] = newReference(args[i]);
@@ -672,7 +664,6 @@ public class CoreExtension extends AbstractExtension implements JawkExtension {
 		}
 		AssocArray aa = (AssocArray) args[0];
 		aa.clear();
-		aa.useMapType(AssocArray.MT_TREE);
 		String subsep = toAwkString(vm.getSUBSEP());
 		int cnt = 0;
 		for (int i = 1; i < args.length; ++i) {

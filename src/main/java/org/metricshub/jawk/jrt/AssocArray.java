@@ -1,7 +1,5 @@
 package org.metricshub.jawk.jrt;
 
-import java.util.Collection;
-
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
@@ -24,98 +22,117 @@ import java.util.Collection;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
 import org.metricshub.jawk.intermediate.UninitializedObject;
 
 /**
  * An AWK associative array.
  * <p>
- * The implementation requires the ability to choose,
- * at runtime, whether the keys are to be maintained in
- * sorted order or not. Therefore, the implementation
- * contains a reference to a Map (either TreeMap or
- * HashMap, depending on whether to maintain keys in
- * sorted order or not) and delegates calls to it
- * accordingly.
+ * This interface extends {@link Map} and provides AWK-specific behaviour:
+ * automatic key normalization (null and uninitialized values map to {@code ""}),
+ * numeric key coercion ({@code "1"} and {@code 1L} address the same slot), and
+ * auto-creation of blank entries on first access.
+ * </p>
+ * <p>
+ * Concrete implementations directly extend a JDK {@link Map} class to avoid
+ * delegation overhead:
+ * </p>
+ * <ul>
+ * <li>{@link HashAssocArray} &mdash; backed by {@link java.util.HashMap}</li>
+ * <li>{@link SortedAssocArray} &mdash; backed by {@link java.util.TreeMap} with
+ * AWK key ordering</li>
+ * </ul>
+ * <p>
+ * Use the factory methods to create instances:
+ * </p>
+ *
+ * <pre>
+ * AssocArray hash = AssocArray.createHash();
+ * AssocArray sorted = AssocArray.createSorted();
+ * AssocArray aa = AssocArray.create(sortedArrayKeys);
+ * </pre>
  *
  * @author Danny Daglas
  */
-public class AssocArray implements Comparator<Object>, Map<Object, Object> {
+public interface AssocArray extends Map<Object, Object> {
 
-	private Map<Object, Object> map;
+	/** A blank (uninitialized) value shared across all AWK array accesses. */
+	UninitializedObject BLANK = new UninitializedObject();
+
+// -------------------------------------------------------------------------
+// Key-normalization helpers (used by concrete implementations)
+// -------------------------------------------------------------------------
 
 	/**
+	 * Converts a key to the canonical form expected by AWK: {@code null} and
+	 * {@link UninitializedObject} map to the empty string.
+	 *
+	 * @param key the raw key
+	 * @return the normalized key, never {@code null}
+	 */
+	static Object normalizeKey(Object key) {
+		return (key == null || key instanceof UninitializedObject) ? "" : key;
+	}
+
+	/**
+	 * Attempts to parse the key as a {@code Long}.
+	 *
+	 * @param key the key to parse (must not be {@code null})
+	 * @return the {@code Long} value, or {@code null} if the key cannot be parsed
+	 *         as a long integer
+	 */
+	static Long toLongKey(Object key) {
+		try {
+			return Long.parseLong(key.toString());
+		} catch (Exception e) { // NOPMD - EmptyCatchBlock: intentionally ignored
+			return null;
+		}
+	}
+
+// -------------------------------------------------------------------------
+// AWK-specific default methods
+// -------------------------------------------------------------------------
+
+	/**
+	 * Returns whether a particular key is contained within the associative array.
 	 * <p>
-	 * Constructor for AssocArray.
+	 * Unlike {@link #get(Object)}, which auto-creates a blank entry when the key
+	 * is absent, this method does not modify the array. It exists to support the
+	 * AWK {@code IN} keyword.
 	 * </p>
 	 *
-	 * @param sortedArrayKeys Whether keys must be kept sorted
+	 * @param key Key to be checked
+	 * @return {@code true} if the key (or its numeric equivalent) is present
 	 */
-	public AssocArray(boolean sortedArrayKeys) {
-		if (sortedArrayKeys) {
-			map = new TreeMap<Object, Object>((Comparator<Object>) this);
-		} else {
-			map = new HashMap<Object, Object>();
+	default boolean isIn(Object key) {
+		if (key == null || key instanceof UninitializedObject) {
+// According to AWK semantics, an uninitialized index
+// evaluates to the empty string, not numeric zero
+			key = "";
 		}
+		if (containsKey(key)) {
+			return true;
+		}
+		try {
+			long iKey = Long.parseLong(key.toString());
+			return containsKey(iKey);
+		} catch (Exception e) { // NOPMD - EmptyCatchBlock: intentionally ignored
+		}
+		return false;
 	}
 
 	/**
-	 * The parameter to useMapType to convert
-	 * this associative array to a HashMap.
-	 */
-	public static final int MT_HASH = 2;
-	/**
-	 * The parameter to useMapType to convert
-	 * this associative array to a LinkedHashMap.
-	 */
-	public static final int MT_LINKED = 2 << 1;
-	/**
-	 * The parameter to useMapType to convert
-	 * this associative array to a TreeMap.
-	 */
-	public static final int MT_TREE = 2 << 2;
-
-	/**
-	 * Convert the map which backs this associative array
-	 * into one of HashMap, LinkedHashMap, or TreeMap.
+	 * Provides a string representation of this associative array, recursively
+	 * rendering nested arrays.
 	 *
-	 * @param mapType Can be one of MT_HASH, MT_LINKED,
-	 *        or MT_TREE.
+	 * @return a human-readable map string of the form {@code {key=value, ...}}
 	 */
-	public void useMapType(int mapType) {
-		switch (mapType) {
-		case MT_HASH:
-			map = new HashMap<Object, Object>();
-			break;
-		case MT_LINKED:
-			map = new LinkedHashMap<Object, Object>();
-			break;
-		case MT_TREE:
-			map = new TreeMap<Object, Object>((Comparator<Object>) this);
-			break;
-		default:
-			throw new Error("Invalid map type : " + mapType);
-		}
-	}
-
-	/**
-	 * Provide a string representation of the delegated
-	 * map object.
-	 *
-	 * @return string representing the map/array
-	 */
-	public String mapString() {
-		// was:
-		// return map.toString();
-		// but since the extensions, assoc arrays can become keys as well
+	default String mapString() {
+// Since extensions allow assoc arrays to become keys as well,
+// we render nested arrays recursively rather than using toString().
 		StringBuilder sb = new StringBuilder().append('{');
 		int cnt = 0;
-		for (Map.Entry<Object, Object> entry : map.entrySet()) {
+		for (Map.Entry<Object, Object> entry : entrySet()) {
 			if (cnt > 0) {
 				sb.append(", ");
 			}
@@ -137,246 +154,63 @@ public class AssocArray implements Comparator<Object>, Map<Object, Object> {
 		return sb.append('}').toString();
 	}
 
-	/** a "null" value in Awk */
-	private static final UninitializedObject BLANK = new UninitializedObject();
-
 	/**
+	 * Stores a value using a primitive {@code long} key, bypassing string parsing.
 	 * <p>
-	 * isIn.
+	 * This is a convenience overload for callers that already hold a {@code long}
+	 * key. The default implementation boxes the key and delegates to
+	 * {@link #put(Object, Object)}.
 	 * </p>
 	 *
-	 * @param key Key to be checked
-	 * @return whether a particular key is
-	 *         contained within the associative array.
-	 *         Unlike get(), which adds a blank (null)
-	 *         reference to the associative array if the
-	 *         element is not found, isIn will not.
-	 *         It exists to support the IN keyword.
+	 * @param key the long key
+	 * @param value the value to associate with the key
+	 * @return the previous value associated with the key, or {@code null}
 	 */
-	public boolean isIn(Object key) {
-		if (key == null || key instanceof UninitializedObject) {
-			// According to AWK semantics, an uninitialized index
-			// evaluates to the empty string, not numeric zero
-			key = "";
-		}
-
-		if (map.containsKey(key)) {
-			return true;
-		}
-
-		try {
-			long iKey = Long.parseLong(key.toString());
-			if (map.containsKey(iKey)) {
-				return true;
-			}
-		} catch (Exception e) {// NOPMD - EmptyCatchBlock: intentionally ignored
-		}
-
-		return false;
+	default Object put(long key, Object value) {
+		return put(Long.valueOf(key), value);
 	}
 
 	/**
-	 * <p>
-	 * get.
-	 * </p>
+	 * Returns the specification version of the underlying JDK {@link Map} class
+	 * that backs this implementation.
 	 *
-	 * @param key Key to retrieve in the array
-	 * @return the value of an associative array
-	 *         element given a particular key.
-	 *         If the key does not exist, a null value
-	 *         (blank string) is inserted into the array
-	 *         with this key, and the null value is returned.
+	 * @return the specification version string, or {@code null} if unavailable
 	 */
-	public Object get(Object key) {
-		if (key == null || key instanceof UninitializedObject) {
-			// AWK evaluates an uninitialized subscript to the empty string
-			key = "";
-		}
-		Object result = map.get(key);
-		if (result != null) {
-			return result;
-		}
-
-		// Did not find it?
-		try {
-			// try a integer version key
-			key = Long.parseLong(key.toString());
-			result = map.get(key);
-			if (result != null) {
-				return result;
-			}
-		} catch (Exception e) {// NOPMD - EmptyCatchBlock: intentionally ignored
-		}
-
-		// based on the AWK specification:
-		// Any reference (except for IN expressions) to a non-existent
-		// array element will automatically create it.
-		result = BLANK;
-		map.put(key, result);
-
-		return result;
+	default String getMapVersion() {
+		return getClass().getSuperclass().getPackage().getSpecificationVersion();
 	}
 
+// -------------------------------------------------------------------------
+// Factory methods
+// -------------------------------------------------------------------------
+
 	/**
-	 * Added to support insertion of primitive key types.
+	 * Creates a new hash-based associative array (backed by {@link java.util.HashMap}).
 	 *
-	 * @param key Key of the entry to put in the array
-	 * @param value Value of the key
-	 * @return the previous value of the specified key, or null if key didn't exist
+	 * @return a new {@link HashAssocArray}
 	 */
-	public Object put(Object key, Object value) {
-		if (key == null || key instanceof UninitializedObject) {
-			key = "";
-		}
-		try {
-			// Save a primitive version
-			long iKey = Long.parseLong(key.toString());
-			return map.put(iKey, value);
-		} catch (Exception e) {// NOPMD - EmptyCatchBlock: intentionally ignored
-		}
-
-		return map.put(key, value);
+	static AssocArray createHash() {
+		return new HashAssocArray();
 	}
 
 	/**
-	 * Added to support insertion of primitive key types.
+	 * Creates a new sorted associative array (backed by {@link java.util.TreeMap}
+	 * with AWK key ordering).
 	 *
-	 * @param key Index of the entry to put in the array
-	 * @param value Value of the key
-	 * @return the previous value of the specified key, or null if key didn't exist
+	 * @return a new {@link SortedAssocArray}
 	 */
-	public Object put(long key, Object value) {
-		return map.put(key, value);
+	static AssocArray createSorted() {
+		return new SortedAssocArray();
 	}
 
 	/**
-	 * <p>
-	 * keySet.
-	 * </p>
+	 * Creates a new associative array of the appropriate type.
 	 *
-	 * @return the set of keys
+	 * @param sortedArrayKeys {@code true} to create a sorted (tree-backed) array,
+	 *        {@code false} for a hash-backed array
+	 * @return a new {@link AssocArray} instance
 	 */
-	public Set<Object> keySet() {
-		return map.keySet();
-	}
-
-	/**
-	 * Clear the array
-	 */
-	public void clear() {
-		map.clear();
-	}
-
-	/**
-	 * Delete the specified entry
-	 *
-	 * @param key Key of the entry to remove from the array
-	 * @return the value of the entry before it was removed
-	 */
-	public Object remove(Object key) {
-		if (key == null || key instanceof UninitializedObject) {
-			key = "";
-		}
-		Object result = map.remove(key);
-		if (result != null) {
-			return result;
-		}
-
-		try {
-			long iKey = Long.parseLong(key.toString());
-			return map.remove(iKey);
-		} catch (Exception e) {// NOPMD - EmptyCatchBlock: intentionally ignored
-		}
-
-		return null;
-	}
-
-	/**
-	 * {@inheritDoc}
-	 * Do nothing. Should not be called in this state.
-	 */
-	@Override
-	public String toString() {
-		throw new AwkRuntimeException("Cannot evaluate an unindexed array.");
-	}
-
-	/**
-	 * {@inheritDoc}
-	 * Comparator implementation used by the TreeMap
-	 * when keys are to be maintained in sorted order.
-	 */
-	@Override
-	public int compare(Object o1, Object o2) {
-		if (o1 instanceof String
-				|| o2 instanceof String
-				|| !(o1 instanceof Number && o2 instanceof Number)) {
-			// Fall back to string comparison if any of the keys is a
-			// String or not a Number
-			String s1 = o1.toString();
-			String s2 = o2.toString();
-			return s1.compareTo(s2);
-		}
-
-		// Both keys are numbers
-		if (o1 instanceof Double
-				|| o2 instanceof Double
-				|| o1 instanceof Float
-				|| o2 instanceof Float) {
-			double d1 = ((Number) o1).doubleValue();
-			double d2 = ((Number) o2).doubleValue();
-			return Double.compare(d1, d2);
-		}
-
-		long l1 = ((Number) o1).longValue();
-		long l2 = ((Number) o2).longValue();
-		return Long.compare(l1, l2);
-	}
-
-	/**
-	 * <p>
-	 * getMapVersion.
-	 * </p>
-	 *
-	 * @return the specification version of this class
-	 */
-	public String getMapVersion() {
-		return map.getClass().getPackage().getSpecificationVersion();
-	}
-
-	@Override
-	public int size() {
-		return map.size();
-	}
-
-	@Override
-	public boolean isEmpty() {
-		return map.isEmpty();
-	}
-
-	@Override
-	public boolean containsKey(Object key) {
-		return map.containsKey(key);
-	}
-
-	@Override
-	public boolean containsValue(Object value) {
-		return map.containsValue(value);
-	}
-
-	@Override
-	public void putAll(Map<? extends Object, ? extends Object> m) {
-		for (Map.Entry<? extends Object, ? extends Object> entry : m.entrySet()) {
-			map.put(entry.getKey(), entry.getValue());
-		}
-	}
-
-	@Override
-	public Collection<Object> values() {
-		return map.values();
-	}
-
-	@Override
-	public Set<Entry<Object, Object>> entrySet() {
-		return map.entrySet();
+	static AssocArray create(boolean sortedArrayKeys) {
+		return sortedArrayKeys ? createSorted() : createHash();
 	}
 }

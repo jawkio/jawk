@@ -152,6 +152,20 @@ public class AssocArrayTest {
 	}
 
 	@Test
+	public void testMissingInjectedMapElementDoesNotReturnRawNull() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+
+		AwkTestSupport
+				.awkTest("missing injected Map element behaves like blank without null leakage")
+				.script("BEGIN{ print \"[\" arr[1] \"]\", (arr[1] ? 1 : 0) }")
+				.preassign("arr", data)
+				.expectLines("[] 0")
+				.runAndAssert();
+
+		assertTrue(data.isEmpty());
+	}
+
+	@Test
 	public void testInjectAssocArrayIterateForIn() throws Exception {
 		AssocArray data = AssocArray.createSorted();
 		data.put("x", "1");

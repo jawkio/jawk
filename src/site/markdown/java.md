@@ -294,7 +294,9 @@ Awk.listAvailableExtensions().forEach((name, extension) ->
 
 When variables are supplied programmatically through `AwkSettings` or per-call
 `variableOverrides`, plain Java `Map` instances are exposed to the script as-is.
-Arrays created by the AWK runtime itself still use `AssocArray`.
+The script and AWK runtime may mutate these maps directly, and numeric array
+indexes are represented as `Long` keys when observed from Java. Arrays created
+by the AWK runtime itself still use `AssocArray`.
 
 ### Precompile expressions
 

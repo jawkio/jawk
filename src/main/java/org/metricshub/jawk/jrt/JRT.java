@@ -525,6 +525,25 @@ public class JRT {
 	}
 
 	/**
+	 * Reads a map element using AWK semantics when the supplied map is backed by
+	 * an {@link AssocArray}. For plain {@link Map} instances, missing or
+	 * {@code null}-valued entries are exposed as the AWK blank value so later
+	 * expression evaluation never receives a raw {@code null}.
+	 *
+	 * @param map map to inspect
+	 * @param key key to look up
+	 * @return the stored value, or the AWK blank value when no concrete value is
+	 *         present
+	 */
+	public static Object getAwkValue(Map<Object, Object> map, Object key) {
+		if (map instanceof AssocArray) {
+			return map.get(key);
+		}
+		Object value = map.get(key);
+		return value != null ? value : BLANK;
+	}
+
+	/**
 	 * Convert Strings, Integers, and Doubles to Strings
 	 * based on the CONVFMT variable contents and the stored Locale.
 	 *

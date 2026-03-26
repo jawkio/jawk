@@ -25,6 +25,7 @@ package org.metricshub.jawk;
 import static org.metricshub.jawk.AwkTestSupport.awkTest;
 
 import java.io.FileNotFoundException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -69,7 +70,7 @@ public class StreamInputSourceTest {
 	@Test
 	public void testFileInputThroughInjectedLongKeyArgvMap() throws Exception {
 		Path file = Files.createTempFile(AwkTestSupport.sharedTempDirectory(), "argv-long-", ".txt");
-		Files.write(file, "mapped".getBytes("UTF-8"));
+		Files.write(file, "mapped".getBytes(StandardCharsets.UTF_8));
 		Map<Object, Object> argv = new LinkedHashMap<>();
 		argv.put(0L, "jawk");
 		argv.put(1L, file.toString());

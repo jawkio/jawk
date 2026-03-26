@@ -1124,7 +1124,7 @@ public class AVM implements VariableManager, Closeable {
 					}
 					@SuppressWarnings("unchecked")
 					Map<Object, Object> map = (Map<Object, Object>) array;
-					Object o = map.get(idx);
+					Object o = JRT.getAwkValue(map, idx);
 					push(o);
 					position.next();
 					break;

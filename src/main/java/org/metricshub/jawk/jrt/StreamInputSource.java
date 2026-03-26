@@ -202,11 +202,11 @@ public class StreamInputSource implements InputSource, Closeable {
 		int traversalArgCount = getTraversalArgCount();
 		boolean found = false;
 		for (int i = 1; i < traversalArgCount && !found; i++) {
-			Long awkIndex = Long.valueOf(i);
-			if (!JRT.containsAwkKey(arglistMap, awkIndex)) {
+			Object argValue = getArgvValue(i);
+			if (argValue == MISSING_ARGV_VALUE) {
 				continue;
 			}
-			String arg = jrt.toAwkString(arglistMap.get(awkIndex));
+			String arg = jrt.toAwkString(argValue);
 			if (arg.isEmpty() || arg.indexOf('=') > 0) {
 				continue;
 			}
@@ -257,16 +257,43 @@ public class StreamInputSource implements InputSource, Closeable {
 		int traversalArgCount = getTraversalArgCount();
 		while (arglistIdx < traversalArgCount) {
 			int idx = arglistIdx++;
-			Long awkIndex = Long.valueOf(idx);
-			if (!JRT.containsAwkKey(arglistMap, awkIndex)) {
+			Object argValue = getArgvValue(idx);
+			if (argValue == MISSING_ARGV_VALUE) {
 				continue;
 			}
-			String arg = jrt.toAwkString(arglistMap.get(awkIndex));
+			String arg = jrt.toAwkString(argValue);
 			if (!arg.isEmpty()) {
 				return arg;
 			}
 		}
 		return null;
+	}
+
+	private static final Object MISSING_ARGV_VALUE = new Object();
+
+	private Object getArgvValue(int index) {
+		Long longIndex = Long.valueOf(index);
+		if (arglistMap instanceof AssocArray) {
+			return JRT.containsAwkKey(arglistMap, longIndex) ? JRT.getAwkValue(arglistMap, longIndex) : MISSING_ARGV_VALUE;
+		}
+		if (arglistMap.containsKey(longIndex)) {
+			return arglistMap.get(longIndex);
+		}
+		Integer intIndex = Integer.valueOf(index);
+		if (arglistMap.containsKey(intIndex)) {
+			return arglistMap.get(intIndex);
+		}
+		for (Map.Entry<Object, Object> entry : arglistMap.entrySet()) {
+			Object key = entry.getKey();
+			if (!(key instanceof Number)) {
+				continue;
+			}
+			double numericKey = ((Number) key).doubleValue();
+			if (JRT.isActuallyLong(numericKey) && ((long) Math.rint(numericKey)) == index) {
+				return entry.getValue();
+			}
+		}
+		return MISSING_ARGV_VALUE;
 	}
 
 	/**

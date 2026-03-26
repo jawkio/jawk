@@ -97,8 +97,11 @@ When your application already has structured rows, implement
 
 When you bind variables programmatically through `AwkSettings` or per-call
 `variableOverrides`, Jawk now passes plain Java `Map` instances straight
-through to the script instead of copying them into `AssocArray`. Arrays created
-by the AWK runtime itself still use `AssocArray`.
+through to the script instead of copying them into `AssocArray`. The AWK
+runtime may mutate these `Map` instances during execution, so do not pass
+immutable maps. Numeric AWK array indexes are represented as `Long` keys in
+these maps when observed from Java. Arrays created by the AWK runtime itself
+still use `AssocArray`.
 
 See [AWK in Java documentation](https://metricshub.org/Jawk/java.html) for more details and advanced usage.
 

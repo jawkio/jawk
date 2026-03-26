@@ -1368,7 +1368,7 @@ public class AVM implements VariableManager, Closeable {
 					@SuppressWarnings("unchecked")
 					Map<Object, Object> assocArray = (Map<Object, Object>) o;
 					assocArray.clear();
-					int cnt = 0;
+					long cnt = 0;
 					while (tokenizer.hasMoreElements()) {
 						assocArray.put(++cnt, tokenizer.nextElement());
 					}
@@ -2642,9 +2642,9 @@ public class AVM implements VariableManager, Closeable {
 	public Object getARGV() {
 		if (argvOffset == NULL_OFFSET) {
 			Map<Object, Object> argv = newAwkArray();
-			argv.put(0, "jawk");
+			argv.put(0L, "jawk");
 			for (int i = 0; i < arguments.size(); i++) {
-				argv.put(i + 1, arguments.get(i));
+				argv.put(Long.valueOf(i + 1L), arguments.get(i));
 			}
 			return argv;
 		}

@@ -952,9 +952,9 @@ public class JRT {
 		int cnt = 0;
 		array.clear();
 		while (e.hasMoreElements()) {
-			array.put(++cnt, e.nextElement());
+			array.put(Long.valueOf(++cnt), e.nextElement());
 		}
-		array.put(0L, Integer.valueOf(cnt));
+		array.put(0L, Long.valueOf(cnt));
 		return cnt;
 	}
 

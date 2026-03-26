@@ -202,10 +202,11 @@ public class StreamInputSource implements InputSource, Closeable {
 		int traversalArgCount = getTraversalArgCount();
 		boolean found = false;
 		for (int i = 1; i < traversalArgCount && !found; i++) {
-			if (!JRT.containsAwkKey(arglistMap, i)) {
+			Long awkIndex = Long.valueOf(i);
+			if (!JRT.containsAwkKey(arglistMap, awkIndex)) {
 				continue;
 			}
-			String arg = jrt.toAwkString(arglistMap.get(i));
+			String arg = jrt.toAwkString(arglistMap.get(awkIndex));
 			if (arg.isEmpty() || arg.indexOf('=') > 0) {
 				continue;
 			}
@@ -256,10 +257,11 @@ public class StreamInputSource implements InputSource, Closeable {
 		int traversalArgCount = getTraversalArgCount();
 		while (arglistIdx < traversalArgCount) {
 			int idx = arglistIdx++;
-			if (!JRT.containsAwkKey(arglistMap, idx)) {
+			Long awkIndex = Long.valueOf(idx);
+			if (!JRT.containsAwkKey(arglistMap, awkIndex)) {
 				continue;
 			}
-			String arg = jrt.toAwkString(arglistMap.get(idx));
+			String arg = jrt.toAwkString(arglistMap.get(awkIndex));
 			if (!arg.isEmpty()) {
 				return arg;
 			}

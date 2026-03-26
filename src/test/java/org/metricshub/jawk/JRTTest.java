@@ -2,7 +2,9 @@ package org.metricshub.jawk;
 
 import static org.junit.Assert.*;
 
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import org.junit.Assume;
 import org.junit.Test;
 import org.metricshub.jawk.intermediate.UninitializedObject;
@@ -146,7 +148,20 @@ public class JRTTest {
 		jrt.setCONVFMT("%.6g");
 		int n = jrt.split(aa, "a b");
 		assertEquals(2, n);
-		assertEquals(2, aa.get(0));
+		assertEquals(2L, aa.get(0L));
+	}
+
+	@Test
+	public void testSplitUsesLongIndexesForPlainMap() {
+		Map<Object, Object> map = new LinkedHashMap<>();
+		JRT jrt = new JRT(null, Locale.US);
+		jrt.setCONVFMT("%.6g");
+		int n = jrt.split(map, "a b");
+		assertEquals(2, n);
+		assertEquals(2L, map.get(0L));
+		assertEquals("a", map.get(1L));
+		assertEquals("b", map.get(2L));
+		assertFalse(map.containsKey(1));
 	}
 
 	@Test

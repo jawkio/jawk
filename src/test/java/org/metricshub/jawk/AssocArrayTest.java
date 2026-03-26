@@ -139,14 +139,16 @@ public class AssocArrayTest {
 
 		AwkTestSupport
 				.awkTest("split rewrites injected Map directly")
-				.script("BEGIN{ print split(\"alpha beta\", arr) }")
+				.script("BEGIN{ print split(\"alpha beta\", arr), arr[1], arr[2] }")
 				.preassign("arr", data)
-				.expectLines("2")
+				.expectLines("2 alpha beta")
 				.runAndAssert();
 
 		assertFalse(data.containsKey("old"));
-		assertEquals("alpha", data.get(1));
-		assertEquals("beta", data.get(2));
+		assertFalse(data.containsKey(1));
+		assertFalse(data.containsKey(2));
+		assertEquals("alpha", data.get(1L));
+		assertEquals("beta", data.get(2L));
 	}
 
 	@Test

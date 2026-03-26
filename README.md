@@ -95,6 +95,11 @@ When your application already has structured rows, implement
 `org.metricshub.jawk.jrt.InputSource` and feed fields directly to
 `Awk.eval(...)` or `Awk.invoke(...)` without serializing them back to text.
 
+When you bind variables programmatically through `AwkSettings` or per-call
+`variableOverrides`, Jawk now passes plain Java `Map` instances straight
+through to the script instead of copying them into `AssocArray`. Arrays created
+by the AWK runtime itself still use `AssocArray`.
+
 See [AWK in Java documentation](https://metricshub.org/Jawk/java.html) for more details and advanced usage.
 
 ## Writing tests with `AwkTestSupport`

@@ -50,7 +50,6 @@ import org.metricshub.jawk.intermediate.AwkTuples;
 import org.metricshub.jawk.intermediate.Opcode;
 import org.metricshub.jawk.intermediate.PositionTracker;
 import org.metricshub.jawk.intermediate.UninitializedObject;
-import org.metricshub.jawk.jrt.AssocArray;
 import org.metricshub.jawk.jrt.AwkRuntimeException;
 import org.metricshub.jawk.jrt.BlockManager;
 import org.metricshub.jawk.jrt.BlockObject;
@@ -838,16 +837,7 @@ public class AVM implements VariableManager, Closeable {
 
 					double val = JRT.toDouble(rhs);
 
-					// from DEREF_ARRAY
-					// stack[0] = AssocArray
-					// stack[1] = array index
-					Object o1 = runtimeStack.getVariable(offset, isGlobal); // map
-					if (o1 == null || o1 instanceof UninitializedObject) {
-						o1 = AssocArray.create(sortedArrayKeys);
-						runtimeStack.setVariable(offset, o1, isGlobal);
-					}
-
-					AssocArray array = (AssocArray) o1;
+					Map<Object, Object> array = ensureMapVariable(offset, isGlobal);
 					Object o = array.get(arrIdx);
 					double origVal = JRT.toDouble(o);
 
@@ -1041,12 +1031,7 @@ public class AVM implements VariableManager, Closeable {
 					// arg[1] = isGlobal
 					// stack[0] = array index
 					boolean isGlobal = position.boolArg(1);
-					Object o1 = runtimeStack.getVariable(position.intArg(0), isGlobal);
-					if (o1 == null || o1 instanceof UninitializedObject) {
-						o1 = AssocArray.create(sortedArrayKeys);
-						runtimeStack.setVariable(position.intArg(0), o1, isGlobal);
-					}
-					AssocArray aa = (AssocArray) o1;
+					Map<Object, Object> aa = ensureMapVariable(position.intArg(0), isGlobal);
 					Object key = pop();
 					Object o = aa.get(key);
 					double ans = JRT.toDouble(o) + 1;
@@ -1063,12 +1048,7 @@ public class AVM implements VariableManager, Closeable {
 					// arg[1] = isGlobal
 					// stack[0] = array index
 					boolean isGlobal = position.boolArg(1);
-					Object o1 = runtimeStack.getVariable(position.intArg(0), isGlobal);
-					if (o1 == null || o1 instanceof UninitializedObject) {
-						o1 = AssocArray.create(sortedArrayKeys);
-						runtimeStack.setVariable(position.intArg(0), o1, isGlobal);
-					}
-					AssocArray aa = (AssocArray) o1;
+					Map<Object, Object> aa = ensureMapVariable(position.intArg(0), isGlobal);
 					Object key = pop();
 					Object o = aa.get(key);
 					double ans = JRT.toDouble(o) - 1;
@@ -1125,7 +1105,7 @@ public class AVM implements VariableManager, Closeable {
 					if (o == null) {
 						if (position.boolArg(1)) {
 							// is_array
-							push(runtimeStack.setVariable(position.intArg(0), AssocArray.create(sortedArrayKeys), isGlobal));
+							push(runtimeStack.setVariable(position.intArg(0), newAwkArray(), isGlobal));
 						} else {
 							push(runtimeStack.setVariable(position.intArg(0), BLANK, isGlobal));
 						}
@@ -1137,13 +1117,14 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case DEREF_ARRAY: {
 					// stack[0] = array index
-					// stack[1] = AssocArray
 					Object idx = pop(); // idx
 					Object array = pop(); // map
-					if (!(array instanceof AssocArray)) {
+					if (!(array instanceof Map)) {
 						throw new AwkRuntimeException("Attempting to index a non-associative-array.");
 					}
-					Object o = ((AssocArray) array).get(idx);
+					@SuppressWarnings("unchecked")
+					Map<Object, Object> map = (Map<Object, Object>) array;
+					Object o = map.get(idx);
 					push(o);
 					position.next();
 					break;
@@ -1369,7 +1350,7 @@ public class AVM implements VariableManager, Closeable {
 						throw new Error("Invalid # of args. split() requires 2 or 3. Got: " + numArgs);
 					}
 					Object o = pop();
-					if (!(o instanceof AssocArray)) {
+					if (!(o instanceof Map)) {
 						throw new AwkRuntimeException(position.lineNumber(), o + " is not an array.");
 					}
 					String s = jrt.toAwkString(pop());
@@ -1384,7 +1365,8 @@ public class AVM implements VariableManager, Closeable {
 						tokenizer = new RegexTokenizer(s, fsString);
 					}
 
-					AssocArray assocArray = (AssocArray) o;
+					@SuppressWarnings("unchecked")
+					Map<Object, Object> assocArray = (Map<Object, Object>) o;
 					assocArray.clear();
 					int cnt = 0;
 					while (tokenizer.hasMoreElements()) {
@@ -1609,15 +1591,15 @@ public class AVM implements VariableManager, Closeable {
 					break;
 				}
 				case KEYLIST: {
-					// stack[0] = AssocArray
 					Object o = pop();
-					if (!(o instanceof AssocArray)) {
+					if (!(o instanceof Map)) {
 						throw new AwkRuntimeException(
 								position.lineNumber(),
 								"Cannot get a key list (via 'in') of a non associative array. arg = " + o.getClass() + ", " + o);
 					}
-					AssocArray aa = (AssocArray) o;
-					push(new ArrayDeque<>(aa.keySet()));
+					@SuppressWarnings("unchecked")
+					Map<Object, Object> map = (Map<Object, Object>) o;
+					push(new ArrayDeque<>(map.keySet()));
 					position.next();
 					break;
 				}
@@ -1817,11 +1799,8 @@ public class AVM implements VariableManager, Closeable {
 							if (offsetObj != null) {
 								Object obj = entry.getValue();
 								if (arrayObj.booleanValue()) {
-									if (obj instanceof AssocArray) {
+									if (obj instanceof Map) {
 										runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
-									} else if (obj instanceof Map) {
-										runtimeStack
-												.setFilelistVariable(offsetObj.intValue(), AssocArray.from((Map<?, ?>) obj, sortedArrayKeys));
 									} else {
 										throw new IllegalArgumentException(
 												"Cannot assign a scalar to a non-scalar variable (" + key + ").");
@@ -1874,7 +1853,7 @@ public class AVM implements VariableManager, Closeable {
 					// stack[0] = array index
 					long offset = position.intArg(0);
 					boolean isGlobal = position.boolArg(1);
-					AssocArray aa = (AssocArray) runtimeStack.getVariable(offset, isGlobal);
+					Map<Object, Object> aa = getMapVariable(offset, isGlobal);
 					Object key = pop();
 					if (aa != null) {
 						aa.remove(key);
@@ -1888,6 +1867,10 @@ public class AVM implements VariableManager, Closeable {
 					// (nothing on the stack)
 					long offset = position.intArg(0);
 					boolean isGlobal = position.boolArg(1);
+					Map<Object, Object> array = getMapVariable(offset, isGlobal);
+					if (array != null) {
+						array.clear();
+					}
 					runtimeStack.removeVariable(offset, isGlobal);
 					position.next();
 					break;
@@ -1953,12 +1936,15 @@ public class AVM implements VariableManager, Closeable {
 					break;
 				}
 				case IS_IN: {
-					// stack[0] = AssocArray
 					// stack[1] = key to check
 					Object arr = pop();
 					Object arg = pop();
-					AssocArray aa = (AssocArray) arr;
-					boolean result = aa.isIn(arg);
+					if (!(arr instanceof Map)) {
+						throw new AwkRuntimeException("Attempting to test membership on a non-associative-array.");
+					}
+					@SuppressWarnings("unchecked")
+					Map<Object, Object> aa = (Map<Object, Object>) arr;
+					boolean result = JRT.containsAwkKey(aa, arg);
 					push(result ? ONE : ZERO);
 					position.next();
 					break;
@@ -2025,7 +2011,7 @@ public class AVM implements VariableManager, Closeable {
 								||
 								retval instanceof String
 								||
-								retval instanceof AssocArray
+								retval instanceof Map
 								||
 								retval instanceof BlockObject)) {
 									// all other extension results are converted
@@ -2377,7 +2363,7 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	private void assign(long l, Object value, boolean isGlobal, PositionTracker position) {
 		// check if curr value already refers to an array
-		if (runtimeStack.getVariable(l, isGlobal) instanceof AssocArray) {
+		if (runtimeStack.getVariable(l, isGlobal) instanceof Map) {
 			throw new AwkRuntimeException(position.lineNumber(), "cannot assign anything to an unindexed associative array");
 		}
 		push(value);
@@ -2389,23 +2375,7 @@ public class AVM implements VariableManager, Closeable {
 	 * Awk array element assignment functionality.
 	 */
 	private void assignArray(long offset, Object arrIdx, Object rhs, boolean isGlobal) {
-		Object o1 = runtimeStack.getVariable(offset, isGlobal);
-		if (o1 == null || o1.equals(BLANK)) {
-			o1 = AssocArray.create(sortedArrayKeys);
-			runtimeStack.setVariable(offset, o1, isGlobal);
-		}
-		// The only (conceivable) way to contradict
-		// the assertion (below) is by passing in
-		// a scalar to an unindexed associative array
-		// via a -v argument without safeguards to
-		// prohibit this.
-		// Therefore, guard against this elsewhere, not here.
-		// if (! (o1 instanceof AssocArray))
-		// throw new AwkRuntimeException("Attempting to treat a scalar as an array.");
-		AssocArray array = (AssocArray) o1;
-
-		// Convert arrIdx to a true integer if it is one
-		// String indexString = JRT.toAwkStringForOutput(arrIdx, getCONVFMT().toString());
+		Map<Object, Object> array = ensureMapVariable(offset, isGlobal);
 		array.put(arrIdx, rhs);
 		push(rhs);
 	}
@@ -2671,8 +2641,7 @@ public class AVM implements VariableManager, Closeable {
 	@Override
 	public Object getARGV() {
 		if (argvOffset == NULL_OFFSET) {
-			// Build a synthetic ARGV AssocArray from command-line arguments
-			AssocArray argv = AssocArray.create(sortedArrayKeys);
+			Map<Object, Object> argv = newAwkArray();
 			argv.put(0, "jawk");
 			for (int i = 0; i < arguments.size(); i++) {
 				argv.put(i + 1, arguments.get(i));
@@ -2693,6 +2662,37 @@ public class AVM implements VariableManager, Closeable {
 
 	private String getOFMT() {
 		return jrt.getOFMTString();
+	}
+
+	private Map<Object, Object> newAwkArray() {
+		return JRT.createAwkMap(sortedArrayKeys);
+	}
+
+	private Map<Object, Object> ensureMapVariable(long offset, boolean isGlobal) {
+		Object value = runtimeStack.getVariable(offset, isGlobal);
+		if (value == null || value.equals(BLANK) || value instanceof UninitializedObject) {
+			Map<Object, Object> map = newAwkArray();
+			runtimeStack.setVariable(offset, map, isGlobal);
+			return map;
+		}
+		return toMap(value);
+	}
+
+	private Map<Object, Object> getMapVariable(long offset, boolean isGlobal) {
+		Object value = runtimeStack.getVariable(offset, isGlobal);
+		if (value == null || value.equals(BLANK) || value instanceof UninitializedObject) {
+			return null;
+		}
+		return toMap(value);
+	}
+
+	private Map<Object, Object> toMap(Object value) {
+		if (!(value instanceof Map)) {
+			throw new AwkRuntimeException("Attempting to treat a scalar as an array.");
+		}
+		@SuppressWarnings("unchecked")
+		Map<Object, Object> map = (Map<Object, Object>) value;
+		return map;
 	}
 
 	private static final UninitializedObject BLANK = new UninitializedObject();

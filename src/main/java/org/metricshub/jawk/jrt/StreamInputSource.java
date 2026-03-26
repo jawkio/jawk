@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -59,7 +60,7 @@ public class StreamInputSource implements InputSource, Closeable {
 	private final JRT jrt;
 
 	// ARGV traversal state
-	private AssocArray arglistAa;
+	private Map<Object, Object> arglistMap;
 	private int arglistIdx;
 	private int arglistMaxKey;
 	private boolean hasFilenames;
@@ -157,23 +158,32 @@ public class StreamInputSource implements InputSource, Closeable {
 	 * Initialize internal state for traversing {@code ARGV}.
 	 */
 	private void initializeArgList() {
-		if (arglistAa != null) {
+		if (arglistMap != null) {
 			return;
 		}
-		arglistAa = (AssocArray) vm.getARGV();
+		arglistMap = toArgvMap(vm.getARGV());
 		arglistMaxKey = computeMaxArgvKey();
 		arglistIdx = 1;
 		hasFilenames = detectFilenames();
 	}
 
+	private Map<Object, Object> toArgvMap(Object argv) {
+		if (!(argv instanceof Map)) {
+			throw new IllegalArgumentException("ARGV must be a Map.");
+		}
+		@SuppressWarnings("unchecked")
+		Map<Object, Object> argvMap = (Map<Object, Object>) argv;
+		return argvMap;
+	}
+
 	/**
-	 * Compute the highest numeric key present in the current {@code arglistAa}.
+	 * Compute the highest numeric key present in the current {@code arglistMap}.
 	 *
 	 * @return the maximum integer key, or {@code 0} when the array is empty
 	 */
 	private int computeMaxArgvKey() {
 		int max = 0;
-		for (Object key : arglistAa.keySet()) {
+		for (Object key : arglistMap.keySet()) {
 			int idx = (int) JRT.toLong(key);
 			if (idx > max) {
 				max = idx;
@@ -190,16 +200,18 @@ public class StreamInputSource implements InputSource, Closeable {
 	 */
 	private boolean detectFilenames() {
 		int traversalArgCount = getTraversalArgCount();
-		for (int i = 1; i < traversalArgCount; i++) {
-			if (arglistAa.isIn(i)) {
-				String arg = jrt.toAwkString(arglistAa.get(i));
-				if (arg.isEmpty() || arg.indexOf('=') > 0) {
-					continue;
-				}
-				return true;
+		boolean found = false;
+		for (int i = 1; i < traversalArgCount && !found; i++) {
+			if (!JRT.containsAwkKey(arglistMap, i)) {
+				continue;
 			}
+			String arg = jrt.toAwkString(arglistMap.get(i));
+			if (arg.isEmpty() || arg.indexOf('=') > 0) {
+				continue;
+			}
+			found = true;
 		}
-		return false;
+		return found;
 	}
 
 	/**
@@ -244,10 +256,10 @@ public class StreamInputSource implements InputSource, Closeable {
 		int traversalArgCount = getTraversalArgCount();
 		while (arglistIdx < traversalArgCount) {
 			int idx = arglistIdx++;
-			if (!arglistAa.isIn(idx)) {
+			if (!JRT.containsAwkKey(arglistMap, idx)) {
 				continue;
 			}
-			String arg = jrt.toAwkString(arglistAa.get(idx));
+			String arg = jrt.toAwkString(arglistMap.get(idx));
 			if (!arg.isEmpty()) {
 				return arg;
 			}

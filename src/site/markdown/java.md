@@ -278,10 +278,10 @@ for (List<String> row : rows) {
 
 To supply custom extensions, create the `Awk` instance with the extension
 instances. Built-in extensions expose convenient singletons such as
-`CoreExtension.INSTANCE` and `StdinExtension.INSTANCE`:
+`StdinExtension.INSTANCE`:
 
 ```java
-Awk awk = new Awk(CoreExtension.INSTANCE, new MyExtension());
+Awk awk = new Awk(StdinExtension.INSTANCE, new MyExtension());
 ```
 
 Use `Awk.listAvailableExtensions()` to inspect the extensions discoverable on
@@ -291,6 +291,10 @@ the current class path:
 Awk.listAvailableExtensions().forEach((name, extension) ->
         System.out.println(name + " - " + extension.getClass().getName()));
 ```
+
+When variables are supplied programmatically through `AwkSettings` or per-call
+`variableOverrides`, plain Java `Map` instances are exposed to the script as-is.
+Arrays created by the AWK runtime itself still use `AssocArray`.
 
 ### Precompile expressions
 
@@ -489,7 +493,7 @@ available.  The most notable differences are:
 * `printf`/`sprintf` formatting relies on `java.util.Formatter`.  Unexpected
   argument types will raise an exception; Jawk does not provide helper
   keywords for typecasting.
-* Extensions must be explicitly enabled.  Only the core extensions bundled with
-  Jawk are available by default.
+* Extensions must be explicitly enabled.  Only built-in extensions registered
+  on the class path, such as `StdinExtension`, are available by default.
 
 For a more complete list see the [project overview](index.html#features).

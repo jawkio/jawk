@@ -23,11 +23,9 @@ package org.metricshub.jawk;
  */
 
 import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
 
 import java.util.Map;
 import org.junit.Test;
-import org.metricshub.jawk.ext.CoreExtension;
 import org.metricshub.jawk.ext.ExtensionFunction;
 import org.metricshub.jawk.ext.JawkExtension;
 import org.metricshub.jawk.ext.StdinExtension;
@@ -40,18 +38,14 @@ public class AvailableExtensionsTest {
 	@Test
 	public void testListAvailableExtensions() {
 		Map<String, JawkExtension> ext = Awk.listAvailableExtensions();
-		assertSame(CoreExtension.INSTANCE, ext.get("core"));
 		assertSame(StdinExtension.INSTANCE, ext.get("stdin"));
 	}
 
 	@Test
 	public void testExtensionNames() {
 		Map<String, JawkExtension> ext = Awk.listAvailableExtensions();
-		assertSame(CoreExtension.INSTANCE, ext.get(CoreExtension.class.getSimpleName()));
-		assertSame(CoreExtension.INSTANCE, ext.get(CoreExtension.class.getName()));
 		assertSame(StdinExtension.INSTANCE, ext.get(StdinExtension.class.getSimpleName()));
 		assertSame(StdinExtension.INSTANCE, ext.get(StdinExtension.class.getName()));
-		assertSame(CoreExtension.INSTANCE, ext.get("Core Extension"));
 		assertSame(StdinExtension.INSTANCE, ext.get("Stdin Support"));
 	}
 
@@ -59,19 +53,16 @@ public class AvailableExtensionsTest {
 	public void testExtensionKeywords() {
 		Map<String, ExtensionFunction> keywordMap = Awk
 				.createExtensionFunctionMap(
-						CoreExtension.INSTANCE,
 						StdinExtension.INSTANCE);
-		assertSame(CoreExtension.class, keywordMap.get("Array").getDeclaringType());
-		assertSame(CoreExtension.class, keywordMap.get("Map").getDeclaringType());
 		assertSame(StdinExtension.class, keywordMap.get("StdinHasInput").getDeclaringType());
 
-		JawkExtension customCore = new CoreExtension();
-		Map<String, JawkExtension> instanceMap = Awk.createExtensionInstanceMap(customCore);
-		assertSame(customCore, instanceMap.get(CoreExtension.class.getName()));
+		JawkExtension customStdin = new StdinExtension();
+		Map<String, JawkExtension> instanceMap = Awk.createExtensionInstanceMap(customStdin);
+		assertSame(customStdin, instanceMap.get(StdinExtension.class.getName()));
 	}
 
 	@Test(expected = IllegalArgumentException.class)
 	public void testDuplicateExtensionInstancesAreRejected() {
-		Awk.createExtensionInstanceMap(new CoreExtension(), new CoreExtension());
+		Awk.createExtensionInstanceMap(new StdinExtension(), new StdinExtension());
 	}
 }

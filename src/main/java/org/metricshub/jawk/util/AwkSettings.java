@@ -56,8 +56,7 @@ public class AwkSettings {
 	 * The values may be of type <code>Integer</code>,
 	 * <code>Double</code>, <code>String</code>,
 	 * {@link org.metricshub.jawk.jrt.AssocArray} (for array variables),
-	 * or any {@link java.util.Map} whose entries are copied into a new
-	 * associative array.
+	 * or any {@link java.util.Map} that Jawk exposes directly to the script.
 	 */
 	private final Map<String, Object> variables = new HashMap<String, Object>();
 
@@ -180,8 +179,7 @@ public class AwkSettings {
 	 * The values may be of type <code>Integer</code>,
 	 * <code>Double</code>, <code>String</code>,
 	 * {@link org.metricshub.jawk.jrt.AssocArray} (for array variables),
-	 * or any {@link java.util.Map} whose entries are copied into a new
-	 * associative array.
+	 * or any {@link java.util.Map} that Jawk exposes directly to the script.
 	 *
 	 * @return the variables
 	 */
@@ -212,8 +210,7 @@ public class AwkSettings {
 	 * The values may be of type <code>Integer</code>,
 	 * <code>Double</code>, <code>String</code>,
 	 * {@link org.metricshub.jawk.jrt.AssocArray} (for array variables),
-	 * or any {@link java.util.Map} whose entries are copied into a new
-	 * associative array.
+	 * or any {@link java.util.Map} that Jawk exposes directly to the script.
 	 *
 	 * @param variables the variables to set
 	 */

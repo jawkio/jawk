@@ -45,14 +45,29 @@ public final class ExtensionFunction implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 
+	/** AWK-visible keyword that dispatches to the underlying Java method. */
 	private final String keyword;
+
+	/** Extension type declaring the Java implementation method. */
 	private final Class<? extends AbstractExtension> declaringType;
+
+	/** Name of the Java method used when rehydrating serialized metadata. */
 	private final String methodName;
+
+	/** Java parameter types of the extension method. */
 	private final Class<?>[] parameterTypes;
 	private transient Method method;
+
+	/** Flags describing which parameters must receive associative arrays. */
 	private final boolean[] assocArrayParameters;
+
+	/** Whether the underlying Java method accepts varargs. */
 	private final boolean varArgs;
+
+	/** Number of non-vararg parameters that must always be present. */
 	private final int mandatoryParameterCount;
+
+	/** Whether the vararg component type must be an associative array. */
 	private final boolean varArgAssocArray;
 
 	ExtensionFunction(String keywordParam, Method methodParam) {
@@ -121,6 +136,13 @@ public final class ExtensionFunction implements Serializable {
 		return assoc;
 	}
 
+	/**
+	 * Restores the reflective {@link Method} handle after Java deserialization.
+	 *
+	 * @param in Object stream containing the serialized metadata
+	 * @throws IOException If the stream cannot be read
+	 * @throws ClassNotFoundException If a serialized dependency cannot be resolved
+	 */
 	private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
 		in.defaultReadObject();
 		try {

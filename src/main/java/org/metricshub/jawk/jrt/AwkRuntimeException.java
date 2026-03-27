@@ -33,6 +33,7 @@ public class AwkRuntimeException extends RuntimeException {
 
 	private static final long serialVersionUID = 1L;
 
+	/** Source line associated with the failure, or {@code -1} when unknown. */
 	private final int lineNumber;
 
 	/**
@@ -47,6 +48,13 @@ public class AwkRuntimeException extends RuntimeException {
 		this.lineNumber = -1;
 	}
 
+	/**
+	 * Creates a runtime exception with a message and root cause but without a
+	 * specific source line.
+	 *
+	 * @param msg Failure message
+	 * @param cause Root cause
+	 */
 	public AwkRuntimeException(String msg, Throwable cause) {
 		super(msg, cause);
 		this.lineNumber = -1;
@@ -65,6 +73,13 @@ public class AwkRuntimeException extends RuntimeException {
 		this.lineNumber = lineno;
 	}
 
+	/**
+	 * Creates a runtime exception tied to a source line and a root cause.
+	 *
+	 * @param lineno AWK source line associated with the failure
+	 * @param msg Failure message
+	 * @param cause Root cause
+	 */
 	public AwkRuntimeException(int lineno, String msg, Throwable cause) {
 		super(msg, cause);
 		this.lineNumber = lineno;

@@ -34,7 +34,11 @@ public class BSDRandom {
 	private int fptr;
 	private int rptr;
 
-	/** Create a new generator with the specified seed. */
+	/**
+	 * Creates a new generator with the specified seed.
+	 *
+	 * @param seed Initial pseudo-random seed
+	 */
 	public BSDRandom(int seed) {
 		setSeed(seed);
 	}
@@ -42,6 +46,8 @@ public class BSDRandom {
 	/**
 	 * Seed the generator. A seed of {@code 0} is transformed to {@code 1}
 	 * as in the original implementation.
+	 *
+	 * @param seed New pseudo-random seed
 	 */
 	public final void setSeed(int seed) {
 		if (seed == 0) {
@@ -73,6 +79,8 @@ public class BSDRandom {
 
 	/**
 	 * Return the next pseudo-random number in the range {@code [0.0,1.0)}.
+	 *
+	 * @return Next pseudo-random floating-point value
 	 */
 	public double nextDouble() {
 		return ((double) nextInt()) / 2147483647.0;

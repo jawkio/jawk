@@ -142,37 +142,24 @@ public class AwkTupleOptimizationTest {
 	}
 
 	@Test
-	public void retainsNopsTargetedByAddresses() throws Exception {
+	public void removesUnconditionalRuleWrapperAndLeadingGoto() throws Exception {
 		String script = "{ print $0 }\n";
 		AwkTestSupport
-				.awkTest("targeted nop retained")
+				.awkTest("unconditional rule wrapper removed")
 				.script(script)
 				.stdin("value")
 				.expectLines("value")
 				.runAndAssert();
 
 		AwkTuples tuples = new Awk().compile(script);
-		List<Integer> nopIndices = new ArrayList<>();
-		Set<Integer> referencedIndices = new HashSet<>();
+		List<Opcode> opcodes = collectOpcodes(tuples);
 
-		PositionTracker tracker = tuples.top();
-		while (!tracker.isEOF()) {
-			int current = tracker.current();
-			Opcode opcode = tracker.opcode();
-			if (opcode == Opcode.NOP) {
-				nopIndices.add(Integer.valueOf(current));
-			}
-			if (usesAddress(opcode)) {
-				Address address = tracker.addressArg();
-				referencedIndices.add(Integer.valueOf(address.index()));
-			}
-			tracker.next();
-		}
-
-		assertFalse("Expected at least one NOP in compiled script", nopIndices.isEmpty());
-		for (Integer index : nopIndices) {
-			assertTrue("NOP at index " + index + " should remain referenced", referencedIndices.contains(index));
-		}
+		assertFalse("Tuple list should not be empty", opcodes.isEmpty());
+		assertNotEquals("Leading GOTO should be removed when main starts immediately", Opcode.GOTO, opcodes.get(0));
+		assertFalse(
+				"Unconditional rule should not compile a synthetic conditional branch",
+				opcodes.contains(Opcode.IFFALSE));
+		assertFalse("No placeholder NOP should remain in the optimized script", opcodes.contains(Opcode.NOP));
 	}
 
 	@Test
@@ -251,6 +238,53 @@ public class AwkTupleOptimizationTest {
 	public void compilesExpressionBasedFieldWithConstOpcode() throws Exception {
 		String script = "{ print $(1 + 1) }\n";
 		assertLiteralFieldUsesConstOpcode(script, "alpha beta", new String[] { "beta" }, 2);
+	}
+
+	@Test
+	public void retargetsBranchesAwayFromPlaceholderTuples() throws Exception {
+		String script = "$1 { print $2 }\n";
+		AwkTestSupport
+				.awkTest("conditional rule bypass retargeted")
+				.script(script)
+				.stdin("alpha beta")
+				.expectLines("beta")
+				.runAndAssert();
+
+		AwkTuples tuples = new Awk().compile(script);
+		Set<Integer> branchTargets = new HashSet<>();
+
+		PositionTracker tracker = tuples.top();
+		while (!tracker.isEOF()) {
+			if (usesAddress(tracker.opcode())) {
+				branchTargets.add(Integer.valueOf(tracker.addressArg().index()));
+			}
+			tracker.next();
+		}
+
+		assertFalse("Expected at least one branch target in the optimized script", branchTargets.isEmpty());
+		for (Integer target : branchTargets) {
+			Opcode targetOpcode = opcodeAt(tuples, target.intValue());
+			assertNotEquals("Branch target should not remain on a NOP placeholder", Opcode.NOP, targetOpcode);
+			assertNotEquals("Branch target should bypass pure GOTO trampolines", Opcode.GOTO, targetOpcode);
+		}
+	}
+
+	@Test
+	public void removesGotoImmediatelyBeforeFunctionReturn() throws Exception {
+		String script = "function inc(x){ return x + 1 }\nBEGIN { print inc(41) }\n";
+		AwkTestSupport
+				.awkTest("function return goto removed")
+				.script(script)
+				.expect("42\n")
+				.runAndAssert();
+
+		AwkTuples tuples = new Awk().compile(script);
+		List<Opcode> opcodes = collectOpcodes(tuples);
+		for (int i = 0; i < opcodes.size() - 1; i++) {
+			assertFalse(
+					"GOTO should not remain immediately before RETURN_FROM_FUNCTION",
+					opcodes.get(i) == Opcode.GOTO && opcodes.get(i + 1) == Opcode.RETURN_FROM_FUNCTION);
+		}
 	}
 
 	@Test
@@ -407,5 +441,16 @@ public class AwkTupleOptimizationTest {
 		default:
 			return false;
 		}
+	}
+
+	private static Opcode opcodeAt(AwkTuples tuples, int index) {
+		PositionTracker tracker = tuples.top();
+		while (!tracker.isEOF()) {
+			if (tracker.current() == index) {
+				return tracker.opcode();
+			}
+			tracker.next();
+		}
+		throw new AssertionError("No tuple at index " + index);
 	}
 }

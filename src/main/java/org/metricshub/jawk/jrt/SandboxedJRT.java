@@ -32,6 +32,11 @@ import org.metricshub.jawk.AwkSandboxException;
  */
 public class SandboxedJRT extends JRT {
 
+	/**
+	 * Creates a sandboxed runtime facade bound to the supplied variable manager.
+	 *
+	 * @param vm Variable manager used by the sandboxed runtime
+	 */
 	public SandboxedJRT(VariableManager vm) {
 		super(vm);
 	}

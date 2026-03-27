@@ -37,21 +37,39 @@ public class PositionTracker {
 	private final java.util.List<Tuple> queue;
 	private Tuple tuple;
 
+	/**
+	 * Creates a tracker positioned at the first tuple in the queue.
+	 *
+	 * @param queue Tuple stream to traverse
+	 */
 	@SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "PositionTracker must iterate over the shared tuple list")
 	public PositionTracker(java.util.List<Tuple> queue) {
 		this.queue = queue;
 		this.tuple = queue.isEmpty() ? null : queue.get(idx);
 	}
 
+	/**
+	 * Indicates whether the tracker has moved past the last tuple.
+	 *
+	 * @return {@code true} when no current tuple remains
+	 */
 	public boolean isEOF() {
 		return idx >= queue.size();
 	}
 
+	/**
+	 * Advances to the next tuple in sequence.
+	 */
 	public void next() {
 		++idx;
 		tuple = tuple.getNext();
 	}
 
+	/**
+	 * Jumps directly to the tuple identified by the supplied address.
+	 *
+	 * @param address Address to jump to
+	 */
 	public void jump(Address address) {
 		idx = address.index();
 		tuple = queue.get(idx);
@@ -62,6 +80,11 @@ public class PositionTracker {
 		return "[" + idx + "]-->" + tuple.toString();
 	}
 
+	/**
+	 * Returns the opcode of the current tuple.
+	 *
+	 * @return Current opcode
+	 */
 	public Opcode opcode() {
 		return tuple.getOpcode();
 	}
@@ -106,6 +129,12 @@ public class PositionTracker {
 		return tuple.getDoubles()[argIdx];
 	}
 
+	/**
+	 * Returns the current tuple argument with runtime type dispatch.
+	 *
+	 * @param argIdx Argument index
+	 * @return Argument value as its boxed Java type
+	 */
 	public Object arg(int argIdx) {
 		Class<?> c = tuple.getTypes()[argIdx];
 		if (c == Long.class) {
@@ -129,6 +158,12 @@ public class PositionTracker {
 		throw new Error("Invalid arg type: " + c + ", arg_idx = " + argIdx + ", tuple = " + tuple);
 	}
 
+	/**
+	 * Returns the regular-expression argument at the supplied index.
+	 *
+	 * @param argIdx Argument index
+	 * @return Pattern argument
+	 */
 	public Pattern patternArg(int argIdx) {
 		if (tuple.getTypes()[argIdx] != Pattern.class) {
 			throw new Error("Tuple does not contain a Pattern at index " + argIdx + ": " + tuple);
@@ -136,6 +171,11 @@ public class PositionTracker {
 		return tuple.getPatterns()[argIdx];
 	}
 
+	/**
+	 * Returns the extension-function argument stored on the current tuple.
+	 *
+	 * @return Extension function metadata
+	 */
 	public ExtensionFunction extensionFunctionArg() {
 		if (tuple.getTypes()[0] != ExtensionFunction.class) {
 			throw new Error("Tuple does not contain an extension function: " + tuple);
@@ -143,6 +183,11 @@ public class PositionTracker {
 		return tuple.getExtensionFunction();
 	}
 
+	/**
+	 * Returns the tuple address argument, resolving lazy suppliers when needed.
+	 *
+	 * @return Current tuple address argument
+	 */
 	public Address addressArg() {
 		if (tuple.getAddress() == null) {
 			tuple.setAddress(tuple.getAddressSupplier().get());
@@ -150,18 +195,38 @@ public class PositionTracker {
 		return tuple.getAddress();
 	}
 
+	/**
+	 * Returns the class argument stored on the current tuple.
+	 *
+	 * @return Class argument
+	 */
 	public Class<?> classArg() {
 		return tuple.getCls();
 	}
 
+	/**
+	 * Returns the source line number associated with the current tuple.
+	 *
+	 * @return Tuple source line number
+	 */
 	public int lineNumber() {
 		return tuple.getLineno();
 	}
 
+	/**
+	 * Returns the current tuple index.
+	 *
+	 * @return Current queue index
+	 */
 	public int current() {
 		return idx;
 	}
 
+	/**
+	 * Jumps directly to the tuple at the supplied queue index.
+	 *
+	 * @param index Tuple index to jump to
+	 */
 	public void jump(int index) {
 		this.idx = index;
 		tuple = queue.get(this.idx);

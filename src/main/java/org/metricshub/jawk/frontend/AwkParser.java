@@ -2700,15 +2700,24 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (getAst1() == null) {
-				// just indicate to execute the rule
-				tuples.push(1); // 1 == true
-			} else {
+			boolean unconditionalRule = getAst1() == null
+					|| getAst1().isBegin()
+					|| getAst1().isEnd();
+			if (!unconditionalRule) {
 				getAst1().populateTuples(tuples);
+				// result of whether to execute or not is on the stack
+				Address bypassRule = tuples.createAddress("bypassRule");
+				tuples.ifFalse(bypassRule);
+				populateRuleBody(tuples);
+				tuples.address(bypassRule).nop();
+			} else {
+				populateRuleBody(tuples);
 			}
-			// result of whether to execute or not is on the stack
-			Address bypassRule = tuples.createAddress("bypassRule");
-			tuples.ifFalse(bypassRule);
+			popSourceLineNumber(tuples);
+			return 0;
+		}
+
+		private void populateRuleBody(AwkTuples tuples) {
 			// execute the optRule here!
 			if (getAst2() == null) {
 				if (getAst1() == null || (!getAst1().isBegin() && !getAst1().isEnd())) {
@@ -2721,9 +2730,6 @@ public class AwkParser {
 				// execute it, and leave nothing on the stack
 				getAst2().populateTuples(tuples);
 			}
-			tuples.address(bypassRule).nop();
-			popSourceLineNumber(tuples);
-			return 0;
 		}
 
 		@Override

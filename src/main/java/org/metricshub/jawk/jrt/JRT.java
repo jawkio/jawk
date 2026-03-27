@@ -1075,6 +1075,11 @@ public class JRT {
 		return fs;
 	}
 
+	/**
+	 * Returns the current FS value as a string.
+	 *
+	 * @return current field separator
+	 */
 	public String getFSString() {
 		return fs;
 	}
@@ -1097,6 +1102,11 @@ public class JRT {
 		return rs;
 	}
 
+	/**
+	 * Returns the current RS value as a string.
+	 *
+	 * @return current record separator
+	 */
 	public String getRSString() {
 		return rs;
 	}
@@ -1120,6 +1130,11 @@ public class JRT {
 		return ofs;
 	}
 
+	/**
+	 * Returns the current OFS value as a string.
+	 *
+	 * @return current output field separator
+	 */
 	public String getOFSString() {
 		return ofs;
 	}
@@ -1142,6 +1157,11 @@ public class JRT {
 		return ors;
 	}
 
+	/**
+	 * Returns the current ORS value as a string.
+	 *
+	 * @return current output record separator
+	 */
 	public String getORSString() {
 		return ors;
 	}
@@ -1218,6 +1238,11 @@ public class JRT {
 		return subsep;
 	}
 
+	/**
+	 * Returns the current SUBSEP value as a string.
+	 *
+	 * @return current multidimensional-array subscript separator
+	 */
 	public String getSUBSEPString() {
 		return subsep;
 	}
@@ -1240,6 +1265,11 @@ public class JRT {
 		return convfmt;
 	}
 
+	/**
+	 * Returns the current CONVFMT value as a string.
+	 *
+	 * @return current numeric conversion format
+	 */
 	public String getCONVFMTString() {
 		return convfmt;
 	}

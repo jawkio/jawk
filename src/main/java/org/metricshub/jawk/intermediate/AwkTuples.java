@@ -79,10 +79,13 @@ public class AwkTuples implements Serializable {
 		}
 	};
 
+	/** Whether tuple post-processing has already been applied. */
 	private boolean postProcessed;
 
+	/** Whether optimization passes have already been applied. */
 	private boolean optimized;
 
+	/** Whether this tuple stream was produced by {@code compileForEval()}. */
 	private boolean evalTupleStream;
 
 	/**
@@ -1271,114 +1274,142 @@ public class AwkTuples implements Serializable {
 	}
 
 	// JRT-managed special variable helpers
+	/** Pushes the current value of {@code NF} onto the operand stack. */
 	public void pushNF() {
 		queue.add(new Tuple(Opcode.PUSH_NF));
 	}
 
+	/** Assigns the top-of-stack value to {@code NF}. */
 	public void assignNF() {
 		queue.add(new Tuple(Opcode.ASSIGN_NF));
 	}
 
+	/** Pushes the current value of {@code NR} onto the operand stack. */
 	public void pushNR() {
 		queue.add(new Tuple(Opcode.PUSH_NR));
 	}
 
+	/** Assigns the top-of-stack value to {@code NR}. */
 	public void assignNR() {
 		queue.add(new Tuple(Opcode.ASSIGN_NR));
 	}
 
+	/** Pushes the current value of {@code FNR} onto the operand stack. */
 	public void pushFNR() {
 		queue.add(new Tuple(Opcode.PUSH_FNR));
 	}
 
+	/** Assigns the top-of-stack value to {@code FNR}. */
 	public void assignFNR() {
 		queue.add(new Tuple(Opcode.ASSIGN_FNR));
 	}
 
+	/** Pushes the current value of {@code FS} onto the operand stack. */
 	public void pushFS() {
 		queue.add(new Tuple(Opcode.PUSH_FS));
 	}
 
+	/** Assigns the top-of-stack value to {@code FS}. */
 	public void assignFS() {
 		queue.add(new Tuple(Opcode.ASSIGN_FS));
 	}
 
+	/** Pushes the current value of {@code RS} onto the operand stack. */
 	public void pushRS() {
 		queue.add(new Tuple(Opcode.PUSH_RS));
 	}
 
+	/** Assigns the top-of-stack value to {@code RS}. */
 	public void assignRS() {
 		queue.add(new Tuple(Opcode.ASSIGN_RS));
 	}
 
+	/** Pushes the current value of {@code OFS} onto the operand stack. */
 	public void pushOFS() {
 		queue.add(new Tuple(Opcode.PUSH_OFS));
 	}
 
+	/** Assigns the top-of-stack value to {@code OFS}. */
 	public void assignOFS() {
 		queue.add(new Tuple(Opcode.ASSIGN_OFS));
 	}
 
+	/** Pushes the current value of {@code ORS} onto the operand stack. */
 	public void pushORS() {
 		queue.add(new Tuple(Opcode.PUSH_ORS));
 	}
 
+	/** Assigns the top-of-stack value to {@code ORS}. */
 	public void assignORS() {
 		queue.add(new Tuple(Opcode.ASSIGN_ORS));
 	}
 
+	/** Pushes the current value of {@code RSTART} onto the operand stack. */
 	public void pushRSTART() {
 		queue.add(new Tuple(Opcode.PUSH_RSTART));
 	}
 
+	/** Assigns the top-of-stack value to {@code RSTART}. */
 	public void assignRSTART() {
 		queue.add(new Tuple(Opcode.ASSIGN_RSTART));
 	}
 
+	/** Pushes the current value of {@code RLENGTH} onto the operand stack. */
 	public void pushRLENGTH() {
 		queue.add(new Tuple(Opcode.PUSH_RLENGTH));
 	}
 
+	/** Assigns the top-of-stack value to {@code RLENGTH}. */
 	public void assignRLENGTH() {
 		queue.add(new Tuple(Opcode.ASSIGN_RLENGTH));
 	}
 
+	/** Pushes the current value of {@code FILENAME} onto the operand stack. */
 	public void pushFILENAME() {
 		queue.add(new Tuple(Opcode.PUSH_FILENAME));
 	}
 
+	/** Assigns the top-of-stack value to {@code FILENAME}. */
 	public void assignFILENAME() {
 		queue.add(new Tuple(Opcode.ASSIGN_FILENAME));
 	}
 
+	/** Pushes the current value of {@code SUBSEP} onto the operand stack. */
 	public void pushSUBSEP() {
 		queue.add(new Tuple(Opcode.PUSH_SUBSEP));
 	}
 
+	/** Assigns the top-of-stack value to {@code SUBSEP}. */
 	public void assignSUBSEP() {
 		queue.add(new Tuple(Opcode.ASSIGN_SUBSEP));
 	}
 
+	/** Pushes the current value of {@code CONVFMT} onto the operand stack. */
 	public void pushCONVFMT() {
 		queue.add(new Tuple(Opcode.PUSH_CONVFMT));
 	}
 
+	/** Assigns the top-of-stack value to {@code CONVFMT}. */
 	public void assignCONVFMT() {
 		queue.add(new Tuple(Opcode.ASSIGN_CONVFMT));
 	}
 
+	/** Pushes the current value of {@code OFMT} onto the operand stack. */
 	public void pushOFMT() {
 		queue.add(new Tuple(Opcode.PUSH_OFMT));
 	}
 
+	/** Assigns the top-of-stack value to {@code OFMT}. */
 	public void assignOFMT() {
 		queue.add(new Tuple(Opcode.ASSIGN_OFMT));
 	}
 
+	/** Pushes the current value of {@code ARGC} onto the operand stack. */
 	public void pushARGC() {
 		queue.add(new Tuple(Opcode.PUSH_ARGC));
 	}
 
+	/** Assigns the top-of-stack value to {@code ARGC}. */
 	public void assignARGC() {
 		queue.add(new Tuple(Opcode.ASSIGN_ARGC));
 	}
@@ -1664,14 +1695,12 @@ public class AwkTuples implements Serializable {
 		if (!postProcessed) {
 			postProcess();
 		}
-		boolean modified = removeRedundantEvalSetNumGlobals();
-		modified |= peepholeOptimize();
-		if (modified) {
-			assignSequentialNextPointers();
-			for (Tuple tuple : queue) {
-				tuple.touch(queue);
-			}
+		boolean queueModified = removeRedundantEvalSetNumGlobals();
+		queueModified |= peepholeOptimize();
+		if (queueModified) {
+			reprocessQueue();
 		}
+		simplifyControlFlow();
 		optimizeQueue();
 		optimized = true;
 	}
@@ -2001,11 +2030,169 @@ public class AwkTuples implements Serializable {
 		addressManager.remapIndexes(indexMapping);
 	}
 
+	private void reprocessQueue() {
+		assignSequentialNextPointers();
+		for (Tuple tuple : queue) {
+			tuple.touch(queue);
+		}
+	}
+
+	private boolean simplifyControlFlow() {
+		boolean modified = false;
+		boolean passModified;
+		do {
+			passModified = simplifyControlFlowPass();
+			if (passModified) {
+				reprocessQueue();
+			}
+			modified |= passModified;
+		} while (passModified);
+		return modified;
+	}
+
+	private boolean simplifyControlFlowPass() {
+		int size = queue.size();
+		if (size < 2) {
+			return false;
+		}
+
+		boolean modified = false;
+		boolean[] remove = new boolean[size];
+		int[] redirectTargets = new int[size];
+		int[] visitStamps = new int[size];
+		int nextVisitStamp = 1;
+		Arrays.fill(redirectTargets, -1);
+
+		for (int i = 0; i < size; i++) {
+			Tuple tuple = queue.get(i);
+			Address address = tuple.getAddress();
+			if (address != null) {
+				int resolvedTarget = resolveJumpEquivalentIndex(
+						address.index(),
+						size,
+						visitStamps,
+						nextVisitStamp++);
+				if (resolvedTarget >= 0 && resolvedTarget != address.index()) {
+					addressManager.reassignAddress(address, resolvedTarget);
+					modified = true;
+				}
+			}
+
+			switch (tuple.getOpcode()) {
+			case NOP: {
+				int redirectTarget = resolveJumpEquivalentIndex(
+						i + 1,
+						size,
+						visitStamps,
+						nextVisitStamp++);
+				if (redirectTarget >= 0) {
+					remove[i] = true;
+					redirectTargets[i] = redirectTarget;
+					modified = true;
+				}
+				break;
+			}
+			case GOTO: {
+				int target = resolveJumpEquivalentIndex(
+						tuple.getAddress().index(),
+						size,
+						visitStamps,
+						nextVisitStamp++);
+				int fallthroughTarget = resolveJumpEquivalentIndex(
+						i + 1,
+						size,
+						visitStamps,
+						nextVisitStamp++);
+				if (target >= 0 && target == fallthroughTarget) {
+					remove[i] = true;
+					redirectTargets[i] = fallthroughTarget;
+					modified = true;
+				}
+				break;
+			}
+			default:
+				break;
+			}
+		}
+
+		if (!modified) {
+			return false;
+		}
+
+		boolean anyRemoved = false;
+		for (boolean removeTuple : remove) {
+			if (removeTuple) {
+				anyRemoved = true;
+				break;
+			}
+		}
+		if (!anyRemoved) {
+			return true;
+		}
+
+		int[] indexMapping = new int[size];
+		Arrays.fill(indexMapping, -1);
+		int nextIndex = 0;
+		for (int i = 0; i < size; i++) {
+			if (!remove[i]) {
+				indexMapping[i] = nextIndex++;
+			}
+		}
+		for (int i = 0; i < size; i++) {
+			if (remove[i] && redirectTargets[i] >= 0) {
+				indexMapping[i] = indexMapping[redirectTargets[i]];
+			}
+		}
+
+		compactQueue(remove);
+
+		remapAddresses(indexMapping);
+		return true;
+	}
+
+	private int resolveJumpEquivalentIndex(int index, int size, int[] visitStamps, int stamp) {
+		if (index < 0 || index >= size) {
+			return -1;
+		}
+		int current = index;
+		while (current >= 0 && current < size && visitStamps[current] != stamp) {
+			visitStamps[current] = stamp;
+			Tuple tuple = queue.get(current);
+			switch (tuple.getOpcode()) {
+			case NOP:
+				current++;
+				break;
+			case GOTO: {
+				Address address = tuple.getAddress();
+				if (address == null) {
+					return current;
+				}
+				current = address.index();
+				break;
+			}
+			default:
+				return current;
+			}
+		}
+		return -1;
+	}
+
 	private void assignSequentialNextPointers() {
 		for (int i = 0; i < queue.size(); i++) {
 			Tuple nextTuple = (i + 1) < queue.size() ? queue.get(i + 1) : null;
 			queue.get(i).setNext(nextTuple);
 		}
+	}
+
+	private void compactQueue(boolean[] remove) {
+		ArrayList<Tuple> compactedQueue = new ArrayList<Tuple>(queue.size());
+		for (int i = 0; i < remove.length; i++) {
+			if (!remove[i]) {
+				compactedQueue.add(queue.get(i));
+			}
+		}
+		queue.clear();
+		queue.addAll(compactedQueue);
 	}
 
 	private void optimizeQueue() {
@@ -2117,32 +2304,13 @@ public class AwkTuples implements Serializable {
 			}
 		}
 
-		for (int i = size - 1; i >= 0; i--) {
-			if (remove[i]) {
-				queue.remove(i);
-			}
-		}
+		compactQueue(remove);
 
 		if (!queue.isEmpty()) {
 			assignSequentialNextPointers();
 		}
 
-		Set<Address> processedAddresses = Collections.newSetFromMap(new IdentityHashMap<Address, Boolean>());
-		for (Tuple tuple : queue) {
-			Address address = tuple.getAddress();
-			if (address != null && processedAddresses.add(address)) {
-				int oldIndex = address.index();
-				if (oldIndex >= 0 && oldIndex < indexMapping.length) {
-					int mappedIndex = indexMapping[oldIndex];
-					if (mappedIndex < 0) {
-						throw new Error("Address " + address + " references removed tuple " + oldIndex);
-					}
-					address.assignIndex(mappedIndex);
-				}
-			}
-		}
-
-		addressManager.remapIndexes(indexMapping);
+		remapAddresses(indexMapping);
 	}
 
 	private boolean fallsThrough(Opcode opcode) {

@@ -36,6 +36,9 @@ import org.metricshub.jawk.util.AwkSettings;
  */
 public final class SandboxedAwk extends Awk {
 
+	/**
+	 * Creates a sandboxed AWK instance with default settings and no extensions.
+	 */
 	public SandboxedAwk() {
 		super();
 	}
@@ -49,6 +52,11 @@ public final class SandboxedAwk extends Awk {
 		super(settings);
 	}
 
+	/**
+	 * Creates a sandboxed AWK instance with the supplied extensions.
+	 *
+	 * @param extensions Extension instances to register
+	 */
 	public SandboxedAwk(Collection<? extends JawkExtension> extensions) {
 		super(extensions);
 	}
@@ -63,6 +71,11 @@ public final class SandboxedAwk extends Awk {
 		super(extensions, settings);
 	}
 
+	/**
+	 * Creates a sandboxed AWK instance with the supplied extensions.
+	 *
+	 * @param extensions Extension instances to register
+	 */
 	@SafeVarargs
 	public SandboxedAwk(JawkExtension... extensions) {
 		super(extensions);

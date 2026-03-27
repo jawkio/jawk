@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.metricshub.jawk.ext.ExtensionFunction;
 import org.metricshub.jawk.jrt.JRT;
 
@@ -2392,6 +2393,7 @@ public class AwkTuples implements Serializable {
 	 *
 	 * @return a {@link java.util.Map} object
 	 */
+	@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "freezeMetadata() replaces this field with an unmodifiable snapshot before compiled tuples are exposed")
 	public Map<String, Integer> getGlobalVariableOffsetMap() {
 		return globalVarOffsetMap;
 	}
@@ -2403,6 +2405,7 @@ public class AwkTuples implements Serializable {
 	 *
 	 * @return a {@link java.util.Map} object
 	 */
+	@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "freezeMetadata() replaces this field with an unmodifiable snapshot before compiled tuples are exposed")
 	public Map<String, Boolean> getGlobalVariableAarrayMap() {
 		return globalVarAarrayMap;
 	}
@@ -2414,6 +2417,7 @@ public class AwkTuples implements Serializable {
 	 *
 	 * @return a {@link java.util.Set} object
 	 */
+	@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "freezeMetadata() replaces this field with an unmodifiable snapshot before compiled tuples are exposed")
 	public Set<String> getFunctionNameSet() {
 		return functionNames;
 	}

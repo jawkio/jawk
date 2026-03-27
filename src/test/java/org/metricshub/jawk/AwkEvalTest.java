@@ -453,12 +453,32 @@ public class AwkEvalTest {
 	}
 
 	private static boolean startsWithGoto(String dump) {
-		String firstLine = dump;
-		int newline = dump.indexOf('\n');
-		if (newline >= 0) {
-			firstLine = dump.substring(0, newline);
+		if (dump == null || dump.isEmpty()) {
+			return false;
 		}
-		return firstLine.contains("GOTO");
+
+		int length = dump.length();
+		int start = 0;
+		while (start < length) {
+			int end = dump.indexOf('\n', start);
+			if (end < 0) {
+				end = length;
+			}
+
+			String line = dump.substring(start, end).trim();
+			if (!line.isEmpty()) {
+				int idx = 0;
+				while (idx < line.length() && Character.isDigit(line.charAt(idx))) {
+					idx++;
+				}
+				if (idx > 0 && idx + 3 <= line.length() && line.startsWith(" : ", idx)) {
+					return line.contains("GOTO");
+				}
+			}
+
+			start = end + 1;
+		}
+		return false;
 	}
 
 	private static final class SingleRecordInputSource implements InputSource {

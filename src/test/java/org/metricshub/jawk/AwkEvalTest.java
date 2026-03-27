@@ -76,8 +76,10 @@ public class AwkEvalTest {
 	public void testCompileForEvalOmitsSetNumGlobalsForFieldOnlyExpression() throws Exception {
 		Awk awk = new Awk();
 		AwkTuples tuples = awk.compileForEval("NF \":\" $2");
+		String dump = dumpTuples(tuples);
 
-		assertFalse(dumpTuples(tuples).contains("SET_NUM_GLOBALS"));
+		assertFalse(startsWithGoto(dump));
+		assertFalse(dump.contains("SET_NUM_GLOBALS"));
 		assertEquals("3:b", awk.eval(tuples, "a b c"));
 	}
 
@@ -85,9 +87,44 @@ public class AwkEvalTest {
 	public void testCompileForEvalKeepsSetNumGlobalsWhenGlobalMetadataIsNeeded() throws Exception {
 		Awk awk = new Awk();
 		AwkTuples tuples = awk.compileForEval("match($0, /a/)");
+		String dump = dumpTuples(tuples);
 
-		assertTrue(dumpTuples(tuples).contains("SET_NUM_GLOBALS"));
+		assertFalse(startsWithGoto(dump));
+		assertTrue(dump.contains("SET_NUM_GLOBALS"));
 		assertEquals(1, awk.eval(tuples, "a"));
+	}
+
+	@Test
+	public void testCompileForEvalStatefulGlobalExpressionStartsWithoutGoto() throws Exception {
+		Awk awk = new Awk();
+		AwkTuples tuples = awk.compileForEval("a++");
+		String dump = dumpTuples(tuples);
+
+		assertFalse(startsWithGoto(dump));
+		assertTrue(dump.contains("SET_NUM_GLOBALS"));
+		assertEquals(0.0, JRT.toDouble(awk.eval(tuples, "alpha")), 0.0);
+	}
+
+	@Test
+	public void testCompileForEvalTernaryExpressionStartsWithoutGoto() throws Exception {
+		Awk awk = new Awk();
+		AwkTuples tuples = awk.compileForEval("($1 + 0) ? $2 : $3");
+		String dump = dumpTuples(tuples);
+
+		assertFalse(startsWithGoto(dump));
+		assertEquals("b", awk.eval(tuples, "1 b c"));
+		assertEquals("c", awk.eval(tuples, "0 b c"));
+	}
+
+	@Test
+	public void testCompileForEvalUnoptimizedTernaryExpressionResolvesBranchTargets() throws Exception {
+		Awk awk = new Awk();
+		AwkTuples tuples = awk.compileForEval("($1 + 0) ? $2 : $3", true);
+		String dump = dumpTuples(tuples);
+
+		assertFalse(startsWithGoto(dump));
+		assertEquals("b", awk.eval(tuples, "1 b c"));
+		assertEquals("c", awk.eval(tuples, "0 b c"));
 	}
 
 	@Test
@@ -435,6 +472,35 @@ public class AwkEvalTest {
 			tuples.dump(ps);
 		}
 		return out.toString(StandardCharsets.UTF_8.name());
+	}
+
+	private static boolean startsWithGoto(String dump) {
+		if (dump == null || dump.isEmpty()) {
+			return false;
+		}
+
+		int length = dump.length();
+		int start = 0;
+		while (start < length) {
+			int end = dump.indexOf('\n', start);
+			if (end < 0) {
+				end = length;
+			}
+
+			String line = dump.substring(start, end).trim();
+			if (!line.isEmpty()) {
+				int idx = 0;
+				while (idx < line.length() && Character.isDigit(line.charAt(idx))) {
+					idx++;
+				}
+				if (idx > 0 && idx + 3 <= line.length() && line.startsWith(" : ", idx)) {
+					return line.contains("GOTO");
+				}
+			}
+
+			start = end + 1;
+		}
+		return false;
 	}
 
 	private static final class SingleRecordInputSource implements InputSource {

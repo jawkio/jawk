@@ -2650,14 +2650,6 @@ public class AwkParser {
 		public int populateTuples(AwkTuples tuples) {
 
 			pushSourceLineNumber(tuples);
-			nextAddress = tuples.createAddress("nextAddress");
-
-			// goto start address
-			Address startAddress = tuples.createAddress("start address");
-			tuples.gotoAddress(startAddress);
-
-			// START OF MAIN BLOCK
-			tuples.address(startAddress);
 
 			// initialize runtime-managed special variables via JRT defaults in AVM
 			symbolTable.getID("NR");
@@ -2682,6 +2674,8 @@ public class AwkParser {
 			if (getAst1() != null) {
 				getAst1().populateTuples(tuples);
 			}
+			// Some expression forms (for example ternaries) still need a concrete
+			// terminal tuple to resolve branch targets during post-processing.
 			tuples.nop();
 
 			popSourceLineNumber(tuples);

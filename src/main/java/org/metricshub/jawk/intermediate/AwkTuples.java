@@ -37,7 +37,6 @@ import java.util.Set;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import org.metricshub.jawk.ext.ExtensionFunction;
-import org.metricshub.jawk.jrt.AwkRuntimeException;
 import org.metricshub.jawk.jrt.JRT;
 
 /**
@@ -1783,22 +1782,16 @@ public class AwkTuples implements Serializable {
 		while (oldIndex < originalSize) {
 			Tuple tuple = original.get(oldIndex);
 			Object literal = literalValue(tuple);
-			if (literal != null && !hasResolvedAddress(oldIndex)) {
+			if (literal != null) {
 				if ((oldIndex + 1) < originalSize) {
 					Tuple nextTuple = original.get(oldIndex + 1);
-					if (nextTuple.getOpcode() == Opcode.GET_INPUT_FIELD
-							&& !hasResolvedAddress(oldIndex + 1)) {
-						long fieldIndex;
-						try {
-							fieldIndex = JRT.parseFieldNumber(literal);
-						} catch (AwkRuntimeException e) {
-							throw new AwkRuntimeException(tuple.getLineno(), e.getMessage(), e);
-						}
+					if (nextTuple.getOpcode() == Opcode.GET_INPUT_FIELD) {
+						long fieldIndex = JRT.toLong(literal);
 						Tuple replacement = createGetInputFieldConst(
 								fieldIndex,
 								tuple.getLineno());
 						optimizedQueue.add(replacement);
-						indexMapping[oldIndex] = newIndex;
+						mapFoldedRange(indexMapping, oldIndex, 2, newIndex);
 						oldIndex += 2;
 						newIndex++;
 						modified = true;
@@ -1809,14 +1802,12 @@ public class AwkTuples implements Serializable {
 					Tuple nextTuple = original.get(oldIndex + 1);
 					Tuple opTuple = original.get(oldIndex + 2);
 					Object secondLiteral = literalValue(nextTuple);
-					if (secondLiteral != null
-							&& !hasResolvedAddress(oldIndex + 1)
-							&& !hasResolvedAddress(oldIndex + 2)) {
+					if (secondLiteral != null) {
 						Object folded = foldBinary(literal, secondLiteral, opTuple);
 						if (folded != null) {
 							Tuple replacement = createLiteralPush(folded, tuple.getLineno());
 							optimizedQueue.add(replacement);
-							indexMapping[oldIndex] = newIndex;
+							mapFoldedRange(indexMapping, oldIndex, 3, newIndex);
 							oldIndex += 3;
 							newIndex++;
 							modified = true;
@@ -1824,13 +1815,13 @@ public class AwkTuples implements Serializable {
 						}
 					}
 				}
-				if ((oldIndex + 1) < originalSize && !hasResolvedAddress(oldIndex + 1)) {
+				if ((oldIndex + 1) < originalSize) {
 					Tuple opTuple = original.get(oldIndex + 1);
 					Object folded = foldUnary(literal, opTuple);
 					if (folded != null) {
 						Tuple replacement = createLiteralPush(folded, tuple.getLineno());
 						optimizedQueue.add(replacement);
-						indexMapping[oldIndex] = newIndex;
+						mapFoldedRange(indexMapping, oldIndex, 2, newIndex);
 						oldIndex += 2;
 						newIndex++;
 						modified = true;
@@ -1858,6 +1849,12 @@ public class AwkTuples implements Serializable {
 
 		remapAddresses(indexMapping);
 		return true;
+	}
+
+	private void mapFoldedRange(int[] indexMapping, int startIndex, int length, int newIndex) {
+		for (int idx = 0; idx < length; idx++) {
+			indexMapping[startIndex + idx] = newIndex;
+		}
 	}
 
 	private Object literalValue(Tuple tuple) {
@@ -2003,10 +2000,6 @@ public class AwkTuples implements Serializable {
 		Tuple tuple = new Tuple(Opcode.GET_INPUT_FIELD_CONST, fieldIndex);
 		tuple.setLineNumber(lineNumber);
 		return tuple;
-	}
-
-	private boolean hasResolvedAddress(int index) {
-		return addressManager.getAddress(index) != null;
 	}
 
 	private void remapAddresses(int[] indexMapping) {

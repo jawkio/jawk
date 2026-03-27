@@ -241,6 +241,46 @@ public class AwkTupleOptimizationTest {
 	}
 
 	@Test
+	public void foldsLabeledTernaryFieldAccessesInFullScript() throws Exception {
+		String script = "{ print ($1 == \"x\" ? $2 : $3) }\n";
+		AwkTestSupport
+				.awkTest("labeled ternary field accesses in full script")
+				.script(script)
+				.stdin("x b c\ny b c")
+				.expectLines("b", "c")
+				.runAndAssert();
+
+		AwkTuples tuples = new Awk().compile(script);
+		String dump = dumpTuples(tuples);
+		assertTrue("Expected folded field access for $1", dump.contains("GET_INPUT_FIELD_CONST, 1"));
+		assertTrue("Expected folded field access for $2", dump.contains("GET_INPUT_FIELD_CONST, 2"));
+		assertTrue("Expected folded field access for $3", dump.contains("GET_INPUT_FIELD_CONST, 3"));
+		assertFalse("Condition field index should not be pushed separately", dump.contains("PUSH_LONG, 1"));
+		assertFalse("Then-branch field index should not be pushed separately", dump.contains("PUSH_LONG, 2"));
+		assertFalse("Else-branch field index should not be pushed separately", dump.contains("PUSH_LONG, 3"));
+	}
+
+	@Test
+	public void foldsLabeledTernaryLiteralBranchesInFullScript() throws Exception {
+		String script = "{ print ($1 == \"x\" ? (1 + 2) : (4 + 5)) }\n";
+		AwkTestSupport
+				.awkTest("labeled ternary literal branches in full script")
+				.script(script)
+				.stdin("x b c\ny b c")
+				.expectLines("3", "9")
+				.runAndAssert();
+
+		AwkTuples tuples = new Awk().compile(script);
+		String dump = dumpTuples(tuples);
+		assertTrue("Expected folded then-branch literal", dump.contains("PUSH_LONG, 3"));
+		assertTrue("Expected folded else-branch literal", dump.contains("PUSH_LONG, 9"));
+		assertFalse("Then-branch operands should be folded away", dump.contains("PUSH_LONG, 1"));
+		assertFalse("Then-branch operands should be folded away", dump.contains("PUSH_LONG, 2"));
+		assertFalse("Else-branch operands should be folded away", dump.contains("PUSH_LONG, 4"));
+		assertFalse("Else-branch operands should be folded away", dump.contains("PUSH_LONG, 5"));
+	}
+
+	@Test
 	public void retargetsBranchesAwayFromPlaceholderTuples() throws Exception {
 		String script = "$1 { print $2 }\n";
 		AwkTestSupport
@@ -292,6 +332,29 @@ public class AwkTupleOptimizationTest {
 		AwkTestSupport
 				.awkTest("negative field literal is invalid")
 				.script("BEGIN { print $-1 }\n")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
+	}
+
+	@Test
+	public void preservesRuntimeFailureForFoldedNegativeFieldInScriptBranch() throws Exception {
+		String script = "{ print ($1 == \"x\" ? $2 : $-1) }\n";
+		AwkTuples tuples = new Awk().compile(script);
+		String dump = dumpTuples(tuples);
+
+		assertTrue("Expected folded negative field access in tuple dump", dump.contains("GET_INPUT_FIELD_CONST, -1"));
+
+		AwkTestSupport
+				.awkTest("negative field branch remains runtime failure")
+				.script(script)
+				.stdin("x b c")
+				.expectLines("b")
+				.runAndAssert();
+
+		AwkTestSupport
+				.awkTest("negative field branch fails when executed")
+				.script(script)
+				.stdin("y b c")
 				.expectThrow(RuntimeException.class)
 				.runAndAssert();
 	}

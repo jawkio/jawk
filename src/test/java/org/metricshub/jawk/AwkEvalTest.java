@@ -84,6 +84,31 @@ public class AwkEvalTest {
 	}
 
 	@Test
+	public void testCompileForEvalSimpleFieldExpressionFoldsToConstFieldAccess() throws Exception {
+		Awk awk = new Awk();
+		AwkTuples tuples = awk.compileForEval("$2");
+		String dump = dumpTuples(tuples);
+
+		assertFalse(startsWithGoto(dump));
+		assertTrue(dump.contains("GET_INPUT_FIELD_CONST, 2"));
+		assertFalse(dump.contains("PUSH_LONG, 2"));
+		assertEquals("beta", awk.eval(tuples, "alpha beta"));
+	}
+
+	@Test
+	public void testCompileForEvalNegativeFieldBranchStillFailsOnlyAtRuntime() throws Exception {
+		Awk awk = new Awk();
+		AwkTuples tuples = awk.compileForEval("$1 == \"x\" ? $2 : $-1");
+		String dump = dumpTuples(tuples);
+
+		assertTrue(dump.contains("GET_INPUT_FIELD_CONST, -1"));
+		assertEquals("b", awk.eval(tuples, "x b c"));
+
+		AwkRuntimeException thrown = assertThrows(AwkRuntimeException.class, () -> awk.eval(tuples, "y b c"));
+		assertEquals("Field $(-1) is incorrect.", thrown.getMessage());
+	}
+
+	@Test
 	public void testCompileForEvalKeepsSetNumGlobalsWhenGlobalMetadataIsNeeded() throws Exception {
 		Awk awk = new Awk();
 		AwkTuples tuples = awk.compileForEval("match($0, /a/)");
@@ -103,6 +128,40 @@ public class AwkEvalTest {
 		assertFalse(startsWithGoto(dump));
 		assertTrue(dump.contains("SET_NUM_GLOBALS"));
 		assertEquals(0.0, JRT.toDouble(awk.eval(tuples, "alpha")), 0.0);
+	}
+
+	@Test
+	public void testCompileForEvalTernaryFoldsAllLiteralFieldAccessesIncludingLabeledEntries() throws Exception {
+		Awk awk = new Awk();
+		AwkTuples tuples = awk.compileForEval("$1 == \"x\" ? $2 : $3");
+		String dump = dumpTuples(tuples);
+
+		assertFalse(startsWithGoto(dump));
+		assertTrue(dump.contains("GET_INPUT_FIELD_CONST, 1"));
+		assertTrue(dump.contains("GET_INPUT_FIELD_CONST, 2"));
+		assertTrue(dump.contains("GET_INPUT_FIELD_CONST, 3"));
+		assertFalse(dump.contains("PUSH_LONG, 1"));
+		assertFalse(dump.contains("PUSH_LONG, 2"));
+		assertFalse(dump.contains("PUSH_LONG, 3"));
+		assertEquals("b", awk.eval(tuples, "x b c"));
+		assertEquals("c", awk.eval(tuples, "y b c"));
+	}
+
+	@Test
+	public void testCompileForEvalTernaryFoldsLabeledBinaryLiteralBranch() throws Exception {
+		Awk awk = new Awk();
+		AwkTuples tuples = awk.compileForEval("$1 == \"x\" ? (1 + 2) : (4 + 5)");
+		String dump = dumpTuples(tuples);
+
+		assertFalse(startsWithGoto(dump));
+		assertTrue(dump.contains("PUSH_LONG, 3"));
+		assertTrue(dump.contains("PUSH_LONG, 9"));
+		assertFalse(dump.contains("PUSH_LONG, 1"));
+		assertFalse(dump.contains("PUSH_LONG, 2"));
+		assertFalse(dump.contains("PUSH_LONG, 4"));
+		assertFalse(dump.contains("PUSH_LONG, 5"));
+		assertEquals(3.0, JRT.toDouble(awk.eval(tuples, "x b c")), 0.0);
+		assertEquals(9.0, JRT.toDouble(awk.eval(tuples, "y b c")), 0.0);
 	}
 
 	@Test

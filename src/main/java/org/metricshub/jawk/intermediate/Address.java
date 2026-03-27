@@ -44,9 +44,17 @@ public class Address implements java.io.Serializable {
 
 	private static final long serialVersionUID = 109610985341478678L;
 
+	/** Human-readable label used when rendering or debugging this address. */
 	private final String lbl;
+
+	/** Tuple index currently bound to this address, or {@code -1} when unresolved. */
 	private int idx = -1;
 
+	/**
+	 * Creates an unresolved address with the supplied label.
+	 *
+	 * @param lbl Label to associate with this jump target
+	 */
 	public Address(String lbl) {
 		this.lbl = lbl;
 	}

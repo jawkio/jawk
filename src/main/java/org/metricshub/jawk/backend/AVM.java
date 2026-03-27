@@ -419,6 +419,7 @@ public class AVM implements VariableManager, Closeable {
 	 *
 	 * @param tuples the compiled tuple instructions to execute
 	 * @param inputSource the input source providing records
+	 * @throws ExitException when the AWK program terminates via {@code exit}
 	 * @throws IOException in case of I/O problems (with getline typically)
 	 */
 	public void interpret(AwkTuples tuples, InputSource inputSource) throws ExitException, IOException {
@@ -437,6 +438,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @param tuples the compiled tuple instructions to execute
 	 * @param inputSource the input source providing records
 	 * @param runtimeArguments name=value or filename entries from the command line
+	 * @throws ExitException when the AWK program terminates via {@code exit}
 	 * @throws IOException in case of I/O problems (with getline typically)
 	 */
 	public void interpret(
@@ -462,6 +464,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @param runtimeArguments name=value or filename entries from the command line
 	 * @param variableOverrides additional variable assignments applied on top of
 	 *        the settings-level variables (may be {@code null})
+	 * @throws ExitException when the AWK program terminates via {@code exit}
 	 * @throws IOException in case of I/O problems (with getline typically)
 	 */
 	public void interpret(

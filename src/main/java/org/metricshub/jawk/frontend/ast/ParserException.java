@@ -22,10 +22,21 @@ package org.metricshub.jawk.frontend.ast;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+/**
+ * Signals a syntax or grammar violation while parsing AWK source text.
+ */
 public class ParserException extends RuntimeException {
 
 	private static final long serialVersionUID = 1L;
 
+	/**
+	 * Creates a parser exception annotated with source location information.
+	 *
+	 * @param msg Failure message
+	 * @param sourceDescription Human-readable source description
+	 * @param lineNumber 0-based or parser-reported line number where the error
+	 *        occurred
+	 */
 	public ParserException(String msg, String sourceDescription, int lineNumber) {
 		super(msg + " (" + sourceDescription + ":" + lineNumber + ")");
 	}

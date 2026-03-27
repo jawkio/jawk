@@ -33,6 +33,12 @@ import org.metricshub.jawk.util.AwkSettings;
  */
 public class SandboxedAVM extends AVM {
 
+	/**
+	 * Creates a sandboxed AVM with the provided settings and extension instances.
+	 *
+	 * @param parameters Runtime settings to honor
+	 * @param extensionInstances Available extension implementations
+	 */
 	public SandboxedAVM(AwkSettings parameters,
 			Map<String, JawkExtension> extensionInstances) {
 		super(parameters, extensionInstances);

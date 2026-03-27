@@ -24,10 +24,21 @@ package org.metricshub.jawk.frontend.ast;
 
 import java.io.IOException;
 
+/**
+ * Signals a lexical analysis failure while parsing AWK source text.
+ */
 public class LexerException extends IOException {
 
 	private static final long serialVersionUID = 1L;
 
+	/**
+	 * Creates a lexer exception annotated with source location information.
+	 *
+	 * @param msg Failure message
+	 * @param sourceDescription Human-readable source description
+	 * @param lineNumber 0-based or parser-reported line number where the error
+	 *        occurred
+	 */
 	public LexerException(String msg, String sourceDescription, int lineNumber) {
 		super(msg + " (" + sourceDescription + ":" + lineNumber + ")");
 	}

@@ -79,10 +79,13 @@ public class AwkTuples implements Serializable {
 		}
 	};
 
+	/** Whether tuple post-processing has already been applied. */
 	private boolean postProcessed;
 
+	/** Whether optimization passes have already been applied. */
 	private boolean optimized;
 
+	/** Whether this tuple stream was produced by {@code compileForEval()}. */
 	private boolean evalTupleStream;
 
 	/**
@@ -1271,114 +1274,142 @@ public class AwkTuples implements Serializable {
 	}
 
 	// JRT-managed special variable helpers
+	/** Pushes the current value of {@code NF} onto the operand stack. */
 	public void pushNF() {
 		queue.add(new Tuple(Opcode.PUSH_NF));
 	}
 
+	/** Assigns the top-of-stack value to {@code NF}. */
 	public void assignNF() {
 		queue.add(new Tuple(Opcode.ASSIGN_NF));
 	}
 
+	/** Pushes the current value of {@code NR} onto the operand stack. */
 	public void pushNR() {
 		queue.add(new Tuple(Opcode.PUSH_NR));
 	}
 
+	/** Assigns the top-of-stack value to {@code NR}. */
 	public void assignNR() {
 		queue.add(new Tuple(Opcode.ASSIGN_NR));
 	}
 
+	/** Pushes the current value of {@code FNR} onto the operand stack. */
 	public void pushFNR() {
 		queue.add(new Tuple(Opcode.PUSH_FNR));
 	}
 
+	/** Assigns the top-of-stack value to {@code FNR}. */
 	public void assignFNR() {
 		queue.add(new Tuple(Opcode.ASSIGN_FNR));
 	}
 
+	/** Pushes the current value of {@code FS} onto the operand stack. */
 	public void pushFS() {
 		queue.add(new Tuple(Opcode.PUSH_FS));
 	}
 
+	/** Assigns the top-of-stack value to {@code FS}. */
 	public void assignFS() {
 		queue.add(new Tuple(Opcode.ASSIGN_FS));
 	}
 
+	/** Pushes the current value of {@code RS} onto the operand stack. */
 	public void pushRS() {
 		queue.add(new Tuple(Opcode.PUSH_RS));
 	}
 
+	/** Assigns the top-of-stack value to {@code RS}. */
 	public void assignRS() {
 		queue.add(new Tuple(Opcode.ASSIGN_RS));
 	}
 
+	/** Pushes the current value of {@code OFS} onto the operand stack. */
 	public void pushOFS() {
 		queue.add(new Tuple(Opcode.PUSH_OFS));
 	}
 
+	/** Assigns the top-of-stack value to {@code OFS}. */
 	public void assignOFS() {
 		queue.add(new Tuple(Opcode.ASSIGN_OFS));
 	}
 
+	/** Pushes the current value of {@code ORS} onto the operand stack. */
 	public void pushORS() {
 		queue.add(new Tuple(Opcode.PUSH_ORS));
 	}
 
+	/** Assigns the top-of-stack value to {@code ORS}. */
 	public void assignORS() {
 		queue.add(new Tuple(Opcode.ASSIGN_ORS));
 	}
 
+	/** Pushes the current value of {@code RSTART} onto the operand stack. */
 	public void pushRSTART() {
 		queue.add(new Tuple(Opcode.PUSH_RSTART));
 	}
 
+	/** Assigns the top-of-stack value to {@code RSTART}. */
 	public void assignRSTART() {
 		queue.add(new Tuple(Opcode.ASSIGN_RSTART));
 	}
 
+	/** Pushes the current value of {@code RLENGTH} onto the operand stack. */
 	public void pushRLENGTH() {
 		queue.add(new Tuple(Opcode.PUSH_RLENGTH));
 	}
 
+	/** Assigns the top-of-stack value to {@code RLENGTH}. */
 	public void assignRLENGTH() {
 		queue.add(new Tuple(Opcode.ASSIGN_RLENGTH));
 	}
 
+	/** Pushes the current value of {@code FILENAME} onto the operand stack. */
 	public void pushFILENAME() {
 		queue.add(new Tuple(Opcode.PUSH_FILENAME));
 	}
 
+	/** Assigns the top-of-stack value to {@code FILENAME}. */
 	public void assignFILENAME() {
 		queue.add(new Tuple(Opcode.ASSIGN_FILENAME));
 	}
 
+	/** Pushes the current value of {@code SUBSEP} onto the operand stack. */
 	public void pushSUBSEP() {
 		queue.add(new Tuple(Opcode.PUSH_SUBSEP));
 	}
 
+	/** Assigns the top-of-stack value to {@code SUBSEP}. */
 	public void assignSUBSEP() {
 		queue.add(new Tuple(Opcode.ASSIGN_SUBSEP));
 	}
 
+	/** Pushes the current value of {@code CONVFMT} onto the operand stack. */
 	public void pushCONVFMT() {
 		queue.add(new Tuple(Opcode.PUSH_CONVFMT));
 	}
 
+	/** Assigns the top-of-stack value to {@code CONVFMT}. */
 	public void assignCONVFMT() {
 		queue.add(new Tuple(Opcode.ASSIGN_CONVFMT));
 	}
 
+	/** Pushes the current value of {@code OFMT} onto the operand stack. */
 	public void pushOFMT() {
 		queue.add(new Tuple(Opcode.PUSH_OFMT));
 	}
 
+	/** Assigns the top-of-stack value to {@code OFMT}. */
 	public void assignOFMT() {
 		queue.add(new Tuple(Opcode.ASSIGN_OFMT));
 	}
 
+	/** Pushes the current value of {@code ARGC} onto the operand stack. */
 	public void pushARGC() {
 		queue.add(new Tuple(Opcode.PUSH_ARGC));
 	}
 
+	/** Assigns the top-of-stack value to {@code ARGC}. */
 	public void assignARGC() {
 		queue.add(new Tuple(Opcode.ASSIGN_ARGC));
 	}

@@ -117,10 +117,20 @@ public final class Cli {
 		return settings;
 	}
 
+	/**
+	 * Indicates whether sandbox mode was requested on the command line.
+	 *
+	 * @return {@code true} when sandbox mode is enabled
+	 */
 	public boolean isSandbox() {
 		return sandbox;
 	}
 
+	/**
+	 * Indicates whether tuple optimization was explicitly disabled.
+	 *
+	 * @return {@code true} when optimization should be skipped
+	 */
 	public boolean isDisableOptimize() {
 		return disableOptimize;
 	}

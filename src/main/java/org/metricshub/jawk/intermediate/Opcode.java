@@ -20,6 +20,10 @@ package org.metricshub.jawk.intermediate;
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/lgpl-3.0.html>.
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
+ *
+ * <p>
+ * Each enum constant describes one tuple opcode understood by the AVM.
+ * </p>
  */
 public enum Opcode {
 	/**
@@ -1326,6 +1330,14 @@ public enum Opcode {
 
 	private static final Opcode[] VALUES = values();
 
+	/**
+	 * Resolves an opcode enum constant from its serialized numeric identifier.
+	 *
+	 * @param id Numeric opcode identifier
+	 * @return Matching {@link Opcode}
+	 * @throws IllegalArgumentException If the identifier is outside the valid
+	 *         opcode range
+	 */
 	public static Opcode fromId(int id) {
 		if (id < 0 || id >= VALUES.length) {
 			throw new IllegalArgumentException("Unknown opcode: " + id);

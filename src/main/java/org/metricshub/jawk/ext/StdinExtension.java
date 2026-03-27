@@ -98,6 +98,7 @@ import org.metricshub.jawk.ext.annotations.JawkFunction;
  */
 public class StdinExtension extends AbstractExtension implements JawkExtension {
 
+	/** Singleton extension instance backed by {@link System#in}. */
 	public static final StdinExtension INSTANCE = new StdinExtension();
 	private static final Object DONE = new Object();
 
@@ -181,16 +182,35 @@ public class StdinExtension extends AbstractExtension implements JawkExtension {
 		return "stdin";
 	}
 
+	/**
+	 * Reports whether stdin data is available without blocking.
+	 *
+	 * @return {@code 1} when a read can proceed or EOF was reached, otherwise
+	 *         {@code 0}
+	 */
 	@JawkFunction("StdinHasInput")
 	public int stdinHasInputFunction() {
 		return stdInHasInput();
 	}
 
+	/**
+	 * Reads the next line from stdin, or the AWK empty string at EOF.
+	 *
+	 * @return Next line of input or an EOF marker compatible with the extension's
+	 *         contract
+	 */
 	@JawkFunction("StdinGetline")
 	public Object stdinGetlineFunction() {
 		return stdInGetLine();
 	}
 
+	/**
+	 * Returns a block object that waits for stdin readiness and optionally chains
+	 * to another block.
+	 *
+	 * @param args Optional chaining block object
+	 * @return Block object suitable for Jawk's block manager
+	 */
 	@JawkFunction("StdinBlock")
 	public BlockObject stdinBlockFunction(Object... args) {
 		if (args.length == 0) {

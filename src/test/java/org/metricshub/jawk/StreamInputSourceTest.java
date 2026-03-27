@@ -25,6 +25,11 @@ package org.metricshub.jawk;
 import static org.metricshub.jawk.AwkTestSupport.awkTest;
 
 import java.io.FileNotFoundException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.junit.Test;
 
 /**
@@ -59,6 +64,23 @@ public class StreamInputSourceTest {
 				.file("data.txt", "line1\nline2\n")
 				.operand("{{data.txt}}")
 				.expectLines("line1", "line2")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testFileInputThroughInjectedLongKeyArgvMap() throws Exception {
+		Path file = Files.createTempFile(AwkTestSupport.sharedTempDirectory(), "argv-long-", ".txt");
+		Files.write(file, "mapped".getBytes(StandardCharsets.UTF_8));
+		Map<Object, Object> argv = new LinkedHashMap<>();
+		argv.put(0L, "jawk");
+		argv.put(1L, file.toString());
+
+		awkTest("StreamInputSource reads injected ARGV map with Long keys")
+				.script("BEGIN { _ = ARGV[0] } { print $0 }")
+				.preassign("ARGV", argv)
+				.file("operand.txt", "operand\n")
+				.operand("{{operand.txt}}")
+				.expectLines("mapped")
 				.runAndAssert();
 	}
 

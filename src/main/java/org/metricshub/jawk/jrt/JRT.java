@@ -498,6 +498,52 @@ public class JRT {
 	}
 
 	/**
+	 * Creates an AWK-managed associative array and exposes it as a plain
+	 * {@link Map} for callers that do not need the concrete runtime type.
+	 *
+	 * @param sortedArrayKeys {@code true} to keep keys sorted
+	 * @return a new AWK associative array
+	 */
+	public static Map<Object, Object> createAwkMap(boolean sortedArrayKeys) {
+		return AssocArray.create(sortedArrayKeys);
+	}
+
+	/**
+	 * Checks key existence using AWK semantics when the supplied map is backed by
+	 * an {@link AssocArray}, otherwise falling back to regular {@link Map}
+	 * semantics.
+	 *
+	 * @param map map to inspect
+	 * @param key key to look up
+	 * @return {@code true} when the key exists
+	 */
+	public static boolean containsAwkKey(Map<Object, Object> map, Object key) {
+		if (map instanceof AssocArray) {
+			return ((AssocArray) map).isIn(key);
+		}
+		return map.containsKey(key);
+	}
+
+	/**
+	 * Reads a map element using AWK semantics when the supplied map is backed by
+	 * an {@link AssocArray}. For plain {@link Map} instances, missing or
+	 * {@code null}-valued entries are exposed as the AWK blank value so later
+	 * expression evaluation never receives a raw {@code null}.
+	 *
+	 * @param map map to inspect
+	 * @param key key to look up
+	 * @return the stored value, or the AWK blank value when no concrete value is
+	 *         present
+	 */
+	public static Object getAwkValue(Map<Object, Object> map, Object key) {
+		if (map instanceof AssocArray) {
+			return map.get(key);
+		}
+		Object value = map.get(key);
+		return value != null ? value : BLANK;
+	}
+
+	/**
 	 * Convert Strings, Integers, and Doubles to Strings
 	 * based on the CONVFMT variable contents and the stored Locale.
 	 *
@@ -882,7 +928,7 @@ public class JRT {
 	 * @return The number of parts resulting from this split operation.
 	 */
 	public int split(Object array, Object string) {
-		return splitWorker(new StringTokenizer(toAwkString(string)), (AssocArray) array);
+		return splitWorker(new StringTokenizer(toAwkString(string)), toArrayMap(array));
 	}
 
 	/**
@@ -900,25 +946,34 @@ public class JRT {
 	public int split(Object fieldSeparator, Object array, Object string) {
 		String fsString = toAwkString(fieldSeparator);
 		if (fsString.equals(" ")) {
-			return splitWorker(new StringTokenizer(toAwkString(string)), (AssocArray) array);
+			return splitWorker(new StringTokenizer(toAwkString(string)), toArrayMap(array));
 		} else if (fsString.equals("")) {
-			return splitWorker(new CharacterTokenizer(toAwkString(string)), (AssocArray) array);
+			return splitWorker(new CharacterTokenizer(toAwkString(string)), toArrayMap(array));
 		} else if (fsString.length() == 1) {
 			return splitWorker(
 					new SingleCharacterTokenizer(toAwkString(string), fsString.charAt(0)),
-					(AssocArray) array);
+					toArrayMap(array));
 		} else {
-			return splitWorker(new RegexTokenizer(toAwkString(string), fsString), (AssocArray) array);
+			return splitWorker(new RegexTokenizer(toAwkString(string), fsString), toArrayMap(array));
 		}
 	}
 
-	private static int splitWorker(Enumeration<Object> e, AssocArray aa) {
-		int cnt = 0;
-		aa.clear();
-		while (e.hasMoreElements()) {
-			aa.put(++cnt, e.nextElement());
+	private static Map<Object, Object> toArrayMap(Object array) {
+		if (!(array instanceof Map)) {
+			throw new IllegalArgumentException("split target must be a Map.");
 		}
-		aa.put(0L, Integer.valueOf(cnt));
+		@SuppressWarnings("unchecked")
+		Map<Object, Object> arrayMap = (Map<Object, Object>) array;
+		return arrayMap;
+	}
+
+	private static int splitWorker(Enumeration<Object> e, Map<Object, Object> array) {
+		int cnt = 0;
+		array.clear();
+		while (e.hasMoreElements()) {
+			array.put(Long.valueOf(++cnt), e.nextElement());
+		}
+		array.put(0L, Long.valueOf(cnt));
 		return cnt;
 	}
 

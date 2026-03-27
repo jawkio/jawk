@@ -43,11 +43,6 @@ public final class ExtensionRegistry {
 
 	static {
 		registerBuiltin(
-				CoreExtension.INSTANCE,
-				CoreExtension.class.getName(),
-				CoreExtension.class.getSimpleName(),
-				"Core Extension");
-		registerBuiltin(
 				StdinExtension.INSTANCE,
 				StdinExtension.class.getName(),
 				StdinExtension.class.getSimpleName(),

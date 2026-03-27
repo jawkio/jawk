@@ -7,7 +7,6 @@ import java.util.Map;
 import org.junit.Test;
 import org.metricshub.jawk.intermediate.UninitializedObject;
 import org.metricshub.jawk.jrt.AssocArray;
-import org.metricshub.jawk.jrt.SortedAssocArray;
 
 public class AssocArrayTest {
 
@@ -76,47 +75,6 @@ public class AssocArrayTest {
 	}
 
 	@Test
-	public void testFromMapCopiesEntries() {
-		Map<Object, Object> source = new LinkedHashMap<>();
-		source.put("alpha", "a");
-		source.put("beta", "b");
-
-		AssocArray result = AssocArray.from(source, false);
-
-		assertEquals("a", result.get("alpha"));
-		assertEquals("b", result.get("beta"));
-		assertEquals(2, result.keySet().size());
-	}
-
-	@Test
-	public void testFromMapNormalizesNumericKeys() {
-		Map<Object, Object> source = new LinkedHashMap<>();
-		source.put("1", "one");
-		source.put("2", "two");
-
-		AssocArray result = AssocArray.from(source, false);
-
-		// String "1" should be normalized to Long 1 so isIn("1") and isIn(1L) both work
-		assertTrue(result.isIn(1L));
-		assertTrue(result.isIn("1"));
-		assertEquals("one", result.get(1L));
-		assertEquals("two", result.get(2L));
-	}
-
-	@Test
-	public void testFromMapSortedProducesSortedAssocArray() {
-		Map<Object, Object> source = new LinkedHashMap<>();
-		source.put("z", "last");
-		source.put("a", "first");
-
-		AssocArray result = AssocArray.from(source, true);
-
-		assertTrue(result instanceof SortedAssocArray);
-		assertEquals("first", result.get("a"));
-		assertEquals("last", result.get("z"));
-	}
-
-	@Test
 	public void testInjectAssocArrayVariable() throws Exception {
 		AssocArray data = AssocArray.createHash();
 		data.put("key1", "hello");
@@ -145,17 +103,66 @@ public class AssocArrayTest {
 	}
 
 	@Test
-	public void testInjectMapWithNumericKeysVariable() throws Exception {
+	public void testInjectMapVariableMutatesOriginalMap() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+		data.put("a", "alpha");
+
+		AwkTestSupport
+				.awkTest("inject Map into array variable without copying")
+				.script("BEGIN{ arr[\"b\"] = \"beta\"; delete arr[\"a\"]; print arr[\"b\"], (\"a\" in arr) }")
+				.preassign("arr", data)
+				.expectLines("beta 0")
+				.runAndAssert();
+
+		assertFalse(data.containsKey("a"));
+		assertEquals("beta", data.get("b"));
+	}
+
+	@Test
+	public void testInjectMapVariableDoesNotNormalizeKeys() throws Exception {
 		Map<Object, Object> data = new LinkedHashMap<>();
 		data.put("1", "one");
 		data.put("2", "two");
 
 		AwkTestSupport
-				.awkTest("inject Map with numeric string keys - key normalization")
-				.script("BEGIN{ print arr[1], arr[2] }")
+				.awkTest("inject Map with numeric string keys without key normalization")
+				.script("BEGIN{ print (1 in arr) \" \" (\"1\" in arr) }")
 				.preassign("arr", data)
-				.expectLines("one two")
+				.expectLines("0 1")
 				.runAndAssert();
+	}
+
+	@Test
+	public void testSplitMutatesInjectedMapDirectly() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+		data.put("old", "value");
+
+		AwkTestSupport
+				.awkTest("split rewrites injected Map directly")
+				.script("BEGIN{ print split(\"alpha beta\", arr), arr[1], arr[2] }")
+				.preassign("arr", data)
+				.expectLines("2 alpha beta")
+				.runAndAssert();
+
+		assertFalse(data.containsKey("old"));
+		assertFalse(data.containsKey(1));
+		assertFalse(data.containsKey(2));
+		assertEquals("alpha", data.get(1L));
+		assertEquals("beta", data.get(2L));
+	}
+
+	@Test
+	public void testMissingInjectedMapElementDoesNotReturnRawNull() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+
+		AwkTestSupport
+				.awkTest("missing injected Map element behaves like blank without null leakage")
+				.script("BEGIN{ print \"[\" arr[1] \"]\", (arr[1] ? 1 : 0) }")
+				.preassign("arr", data)
+				.expectLines("[] 0")
+				.runAndAssert();
+
+		assertTrue(data.isEmpty());
 	}
 
 	@Test
@@ -181,5 +188,37 @@ public class AssocArrayTest {
 				.preassign("arr", "notAnArray")
 				.expectThrow(RuntimeException.class)
 				.runAndAssert();
+	}
+
+	@Test
+	public void testDeleteArrayClearsInjectedMap() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+		data.put("a", "alpha");
+		data.put("b", "beta");
+
+		AwkTestSupport
+				.awkTest("delete array clears injected Map")
+				.script("BEGIN{ delete arr }")
+				.preassign("arr", data)
+				.expect("")
+				.runAndAssert();
+
+		assertTrue(data.isEmpty());
+	}
+
+	@Test
+	public void testDeleteArrayKeepsInjectedMapBoundForLaterWrites() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+		data.put("a", "alpha");
+
+		AwkTestSupport
+				.awkTest("delete array keeps injected Map bound")
+				.script("BEGIN{ delete arr; arr[1] = \"after\"; print arr[1] }")
+				.preassign("arr", data)
+				.expectLines("after")
+				.runAndAssert();
+
+		assertFalse(data.containsKey("a"));
+		assertEquals("after", data.get(1L));
 	}
 }

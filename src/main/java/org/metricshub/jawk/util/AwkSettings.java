@@ -56,8 +56,14 @@ public class AwkSettings {
 	 * The values may be of type <code>Integer</code>,
 	 * <code>Double</code>, <code>String</code>,
 	 * {@link org.metricshub.jawk.jrt.AssocArray} (for array variables),
-	 * or any {@link java.util.Map} whose entries are copied into a new
-	 * associative array.
+	 * or any {@link java.util.Map} that Jawk exposes directly to the script.
+	 * <p>
+	 * When a {@link java.util.Map} is provided, the Jawk runtime may mutate it
+	 * during execution. Callers must therefore supply a mutable map
+	 * implementation. Numeric indices written by the runtime into such maps use
+	 * {@link java.lang.Long} keys (for example, <code>0L</code>,
+	 * <code>1L</code>, ...).
+	 * </p>
 	 */
 	private final Map<String, Object> variables = new HashMap<String, Object>();
 
@@ -180,8 +186,7 @@ public class AwkSettings {
 	 * The values may be of type <code>Integer</code>,
 	 * <code>Double</code>, <code>String</code>,
 	 * {@link org.metricshub.jawk.jrt.AssocArray} (for array variables),
-	 * or any {@link java.util.Map} whose entries are copied into a new
-	 * associative array.
+	 * or any {@link java.util.Map} that Jawk exposes directly to the script.
 	 *
 	 * @return the variables
 	 */
@@ -212,8 +217,7 @@ public class AwkSettings {
 	 * The values may be of type <code>Integer</code>,
 	 * <code>Double</code>, <code>String</code>,
 	 * {@link org.metricshub.jawk.jrt.AssocArray} (for array variables),
-	 * or any {@link java.util.Map} whose entries are copied into a new
-	 * associative array.
+	 * or any {@link java.util.Map} that Jawk exposes directly to the script.
 	 *
 	 * @param variables the variables to set
 	 */

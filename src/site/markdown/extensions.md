@@ -20,7 +20,6 @@ We will first go over an example of using the extensions bundled with Jawk . The
 
 Jawk comes bundled with the following extensions:
 
-* **CoreExtension** - A set of extensions which make integrating other extensions into Jawk easier, and development of Jawk scripts easier.
 * **StdinExtension** - Extension to look for and read input from stdin, since it is expected extensions run extensions with the -ni option.
 
 Please refer to their individual JavaDocs for a description of their APIs.
@@ -32,7 +31,7 @@ Here, we build `FileExtension.java`. The extension module consists of the follow
 * FileCreationBlock - Block until any of the files are created.
 * FileInfo - Return information about a file. For now, it just returns the last modified time of the file as a String.
 
-The extension's FileCreationBlock will poll to check for the existence of a file via a separate thread, but will appear to simply block from the Jawk script perspective. And, a FileExists function would naturally fit into this extension. However, it is already implemented in the CoreExtension module.
+The extension's FileCreationBlock will poll to check for the existence of a file via a separate thread, but will appear to simply block from the Jawk script perspective. A `FileExists` helper would also fit naturally in this extension, but the example stays focused on `FileCreationBlock` and `FileInfo`.
 
 The code for `FileExtension.java` is as follows:
 

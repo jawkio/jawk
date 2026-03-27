@@ -599,6 +599,7 @@ public class Awk {
 				parser.populateGlobalVariableNameToOffsetMappings(tuples);
 			}
 		}
+		tuples.freezeMetadata();
 
 		return tuples;
 	}
@@ -654,6 +655,7 @@ public class Awk {
 			// so that the interpreter can assign variables
 			parser.populateGlobalVariableNameToOffsetMappings(tuples);
 		}
+		tuples.freezeMetadata();
 
 		return tuples;
 	}

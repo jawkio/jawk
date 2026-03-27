@@ -2327,7 +2327,10 @@ public class AwkTuples implements Serializable {
 	private Map<String, Boolean> globalVarAarrayMap = new HashMap<String, Boolean>();
 
 	/** List of user function names */
-	private Set<String> functionNames = null;
+	private Set<String> functionNames = new HashSet<String>();
+
+	/** Whether metadata collections are frozen for execution. */
+	private boolean metadataFrozen;
 
 	/**
 	 * Accept a {variable_name -&gt; offset} mapping such that global variables can be
@@ -2338,6 +2341,7 @@ public class AwkTuples implements Serializable {
 	 * @param isArray Whether the variable is actually an array
 	 */
 	public void addGlobalVariableNameToOffsetMapping(String varname, int offset, boolean isArray) {
+		ensureMetadataMutable();
 		if (globalVarOffsetMap.get(varname) != null) {
 			return;
 		}
@@ -2354,6 +2358,7 @@ public class AwkTuples implements Serializable {
 	 * @param names A set of function name strings.
 	 */
 	public void setFunctionNameSet(Set<String> names) {
+		ensureMetadataMutable();
 		// setFunctionNameSet is called with a keySet from
 		// a HashMap as a parameter, which is Opcode.NOT
 		// Serializable. Creating a new HashSet around
@@ -2366,6 +2371,21 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
+	 * Freezes the tuple metadata after compilation so execution can reuse the
+	 * published maps and sets without creating fresh unmodifiable wrappers.
+	 * Repeated calls are ignored.
+	 */
+	public void freezeMetadata() {
+		if (metadataFrozen) {
+			return;
+		}
+		globalVarOffsetMap = freezeMap(globalVarOffsetMap);
+		globalVarAarrayMap = freezeMap(globalVarAarrayMap);
+		functionNames = freezeSet(functionNames);
+		metadataFrozen = true;
+	}
+
+	/**
 	 * <p>
 	 * getGlobalVariableOffsetMap.
 	 * </p>
@@ -2373,7 +2393,7 @@ public class AwkTuples implements Serializable {
 	 * @return a {@link java.util.Map} object
 	 */
 	public Map<String, Integer> getGlobalVariableOffsetMap() {
-		return Collections.unmodifiableMap(globalVarOffsetMap);
+		return globalVarOffsetMap;
 	}
 
 	/**
@@ -2384,7 +2404,7 @@ public class AwkTuples implements Serializable {
 	 * @return a {@link java.util.Map} object
 	 */
 	public Map<String, Boolean> getGlobalVariableAarrayMap() {
-		return Collections.unmodifiableMap(globalVarAarrayMap);
+		return globalVarAarrayMap;
 	}
 
 	/**
@@ -2395,7 +2415,27 @@ public class AwkTuples implements Serializable {
 	 * @return a {@link java.util.Set} object
 	 */
 	public Set<String> getFunctionNameSet() {
-		return Collections.unmodifiableSet(functionNames);
+		return functionNames;
+	}
+
+	private void ensureMetadataMutable() {
+		if (metadataFrozen) {
+			throw new IllegalStateException("Tuple metadata is frozen.");
+		}
+	}
+
+	private static <K, V> Map<K, V> freezeMap(Map<K, V> map) {
+		if (map.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		return Collections.unmodifiableMap(new HashMap<K, V>(map));
+	}
+
+	private static <T> Set<T> freezeSet(Set<T> set) {
+		if (set.isEmpty()) {
+			return Collections.emptySet();
+		}
+		return Collections.unmodifiableSet(new HashSet<T>(set));
 	}
 
 	private boolean requiresEvalGlobalFrame(Opcode opcode) {

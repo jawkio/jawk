@@ -1664,12 +1664,12 @@ public class AwkTuples implements Serializable {
 		if (!postProcessed) {
 			postProcess();
 		}
-		boolean modified = removeRedundantEvalSetNumGlobals();
-		modified |= peepholeOptimize();
-		if (modified) {
+		boolean queueModified = removeRedundantEvalSetNumGlobals();
+		queueModified |= peepholeOptimize();
+		if (queueModified) {
 			reprocessQueue();
 		}
-		modified |= simplifyControlFlow();
+		simplifyControlFlow();
 		optimizeQueue();
 		optimized = true;
 	}
@@ -2028,13 +2028,19 @@ public class AwkTuples implements Serializable {
 		boolean modified = false;
 		boolean[] remove = new boolean[size];
 		int[] redirectTargets = new int[size];
+		int[] visitStamps = new int[size];
+		int nextVisitStamp = 1;
 		Arrays.fill(redirectTargets, -1);
 
 		for (int i = 0; i < size; i++) {
 			Tuple tuple = queue.get(i);
 			Address address = tuple.getAddress();
 			if (address != null) {
-				int resolvedTarget = resolveJumpEquivalentIndex(address.index(), size);
+				int resolvedTarget = resolveJumpEquivalentIndex(
+						address.index(),
+						size,
+						visitStamps,
+						nextVisitStamp++);
 				if (resolvedTarget >= 0 && resolvedTarget != address.index()) {
 					addressManager.reassignAddress(address, resolvedTarget);
 					modified = true;
@@ -2043,7 +2049,11 @@ public class AwkTuples implements Serializable {
 
 			switch (tuple.getOpcode()) {
 			case NOP: {
-				int redirectTarget = resolveJumpEquivalentIndex(i + 1, size);
+				int redirectTarget = resolveJumpEquivalentIndex(
+						i + 1,
+						size,
+						visitStamps,
+						nextVisitStamp++);
 				if (redirectTarget >= 0) {
 					remove[i] = true;
 					redirectTargets[i] = redirectTarget;
@@ -2052,8 +2062,16 @@ public class AwkTuples implements Serializable {
 				break;
 			}
 			case GOTO: {
-				int target = resolveJumpEquivalentIndex(tuple.getAddress().index(), size);
-				int fallthroughTarget = resolveJumpEquivalentIndex(i + 1, size);
+				int target = resolveJumpEquivalentIndex(
+						tuple.getAddress().index(),
+						size,
+						visitStamps,
+						nextVisitStamp++);
+				int fallthroughTarget = resolveJumpEquivalentIndex(
+						i + 1,
+						size,
+						visitStamps,
+						nextVisitStamp++);
 				if (target >= 0 && target == fallthroughTarget) {
 					remove[i] = true;
 					redirectTargets[i] = fallthroughTarget;
@@ -2105,13 +2123,13 @@ public class AwkTuples implements Serializable {
 		return true;
 	}
 
-	private int resolveJumpEquivalentIndex(int index, int size) {
+	private int resolveJumpEquivalentIndex(int index, int size, int[] visitStamps, int stamp) {
 		if (index < 0 || index >= size) {
 			return -1;
 		}
-		Set<Integer> visited = new HashSet<Integer>();
 		int current = index;
-		while (current >= 0 && current < size && visited.add(Integer.valueOf(current))) {
+		while (current >= 0 && current < size && visitStamps[current] != stamp) {
+			visitStamps[current] = stamp;
 			Tuple tuple = queue.get(current);
 			switch (tuple.getOpcode()) {
 			case NOP:

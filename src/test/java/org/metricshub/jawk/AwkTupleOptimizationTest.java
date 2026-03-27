@@ -261,6 +261,7 @@ public class AwkTupleOptimizationTest {
 			tracker.next();
 		}
 
+		assertFalse("Expected at least one branch target in the optimized script", branchTargets.isEmpty());
 		for (Integer target : branchTargets) {
 			Opcode targetOpcode = opcodeAt(tuples, target.intValue());
 			assertNotEquals("Branch target should not remain on a NOP placeholder", Opcode.NOP, targetOpcode);

@@ -1871,7 +1871,6 @@ public class AVM implements VariableManager, Closeable {
 					if (array != null) {
 						array.clear();
 					}
-					runtimeStack.removeVariable(offset, isGlobal);
 					position.next();
 					break;
 				}

@@ -205,4 +205,20 @@ public class AssocArrayTest {
 
 		assertTrue(data.isEmpty());
 	}
+
+	@Test
+	public void testDeleteArrayKeepsInjectedMapBoundForLaterWrites() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+		data.put("a", "alpha");
+
+		AwkTestSupport
+				.awkTest("delete array keeps injected Map bound")
+				.script("BEGIN{ delete arr; arr[1] = \"after\"; print arr[1] }")
+				.preassign("arr", data)
+				.expectLines("after")
+				.runAndAssert();
+
+		assertFalse(data.containsKey("a"));
+		assertEquals("after", data.get(1L));
+	}
 }

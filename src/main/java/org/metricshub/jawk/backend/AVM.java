@@ -254,7 +254,7 @@ public class AVM implements VariableManager, Closeable {
 	 * or not. If not, then it is an Associative Array.
 	 */
 	private Map<String, Boolean> globalVariableArrays;
-	private Set<String> functionNames;
+	private Set<String> functionNames = Collections.emptySet();
 	private Map<String, Integer> initializedEvalGlobalVariableOffsets;
 	private Map<String, Boolean> initializedEvalGlobalVariableArrays;
 
@@ -502,7 +502,7 @@ public class AVM implements VariableManager, Closeable {
 		inputSourceFilelistAssignmentsApplied = false;
 		globalVariableOffsets = null;
 		globalVariableArrays = null;
-		functionNames = null;
+		functionNames = Collections.emptySet();
 		initializedEvalGlobalVariableOffsets = null;
 		initializedEvalGlobalVariableArrays = null;
 		installedEvalTuples = null;
@@ -2494,7 +2494,7 @@ public class AVM implements VariableManager, Closeable {
 		}
 
 		// make sure we're not receiving funcname=value assignments
-		if (functionNames != null && functionNames.contains(name)) {
+		if (functionNames.contains(name)) {
 			throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + name + ").");
 		}
 

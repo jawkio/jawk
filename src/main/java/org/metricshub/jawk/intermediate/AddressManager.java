@@ -67,6 +67,21 @@ class AddressManager implements Serializable {
 		return addressIndexes.get(index);
 	}
 
+	void reassignAddress(Address address, int index) {
+		Integer previousIndex = null;
+		for (Map.Entry<Integer, Address> entry : addressIndexes.entrySet()) {
+			if (entry.getValue() == address) {
+				previousIndex = entry.getKey();
+				break;
+			}
+		}
+		if (previousIndex != null) {
+			addressIndexes.remove(previousIndex);
+			addressIndexes.put(index, address);
+		}
+		address.assignIndex(index);
+	}
+
 	void remapIndexes(int[] indexMapping) {
 		Map<Integer, Address> updated = new HashMap<Integer, Address>();
 		for (Map.Entry<Integer, Address> entry : addressIndexes.entrySet()) {

@@ -1667,11 +1667,9 @@ public class AwkTuples implements Serializable {
 		boolean modified = removeRedundantEvalSetNumGlobals();
 		modified |= peepholeOptimize();
 		if (modified) {
-			assignSequentialNextPointers();
-			for (Tuple tuple : queue) {
-				tuple.touch(queue);
-			}
+			reprocessQueue();
 		}
+		modified |= simplifyControlFlow();
 		optimizeQueue();
 		optimized = true;
 	}
@@ -1999,6 +1997,139 @@ public class AwkTuples implements Serializable {
 			}
 		}
 		addressManager.remapIndexes(indexMapping);
+	}
+
+	private void reprocessQueue() {
+		assignSequentialNextPointers();
+		for (Tuple tuple : queue) {
+			tuple.touch(queue);
+		}
+	}
+
+	private boolean simplifyControlFlow() {
+		boolean modified = false;
+		boolean passModified;
+		do {
+			passModified = simplifyControlFlowPass();
+			if (passModified) {
+				reprocessQueue();
+			}
+			modified |= passModified;
+		} while (passModified);
+		return modified;
+	}
+
+	private boolean simplifyControlFlowPass() {
+		int size = queue.size();
+		if (size < 2) {
+			return false;
+		}
+
+		boolean modified = false;
+		boolean[] remove = new boolean[size];
+		int[] redirectTargets = new int[size];
+		Arrays.fill(redirectTargets, -1);
+
+		for (int i = 0; i < size; i++) {
+			Tuple tuple = queue.get(i);
+			Address address = tuple.getAddress();
+			if (address != null) {
+				int resolvedTarget = resolveJumpEquivalentIndex(address.index(), size);
+				if (resolvedTarget >= 0 && resolvedTarget != address.index()) {
+					addressManager.reassignAddress(address, resolvedTarget);
+					modified = true;
+				}
+			}
+
+			switch (tuple.getOpcode()) {
+			case NOP: {
+				int redirectTarget = resolveJumpEquivalentIndex(i + 1, size);
+				if (redirectTarget >= 0) {
+					remove[i] = true;
+					redirectTargets[i] = redirectTarget;
+					modified = true;
+				}
+				break;
+			}
+			case GOTO: {
+				int target = resolveJumpEquivalentIndex(tuple.getAddress().index(), size);
+				int fallthroughTarget = resolveJumpEquivalentIndex(i + 1, size);
+				if (target >= 0 && target == fallthroughTarget) {
+					remove[i] = true;
+					redirectTargets[i] = fallthroughTarget;
+					modified = true;
+				}
+				break;
+			}
+			default:
+				break;
+			}
+		}
+
+		if (!modified) {
+			return false;
+		}
+
+		boolean anyRemoved = false;
+		for (boolean removeTuple : remove) {
+			if (removeTuple) {
+				anyRemoved = true;
+				break;
+			}
+		}
+		if (!anyRemoved) {
+			return true;
+		}
+
+		int[] indexMapping = new int[size];
+		Arrays.fill(indexMapping, -1);
+		int nextIndex = 0;
+		for (int i = 0; i < size; i++) {
+			if (!remove[i]) {
+				indexMapping[i] = nextIndex++;
+			}
+		}
+		for (int i = 0; i < size; i++) {
+			if (remove[i] && redirectTargets[i] >= 0) {
+				indexMapping[i] = indexMapping[redirectTargets[i]];
+			}
+		}
+
+		for (int i = size - 1; i >= 0; i--) {
+			if (remove[i]) {
+				queue.remove(i);
+			}
+		}
+
+		remapAddresses(indexMapping);
+		return true;
+	}
+
+	private int resolveJumpEquivalentIndex(int index, int size) {
+		if (index < 0 || index >= size) {
+			return -1;
+		}
+		Set<Integer> visited = new HashSet<Integer>();
+		int current = index;
+		while (current >= 0 && current < size && visited.add(Integer.valueOf(current))) {
+			Tuple tuple = queue.get(current);
+			switch (tuple.getOpcode()) {
+			case NOP:
+				current++;
+				break;
+			case GOTO: {
+				Address address = tuple.getAddress();
+				if (address == null) {
+					return current;
+				}
+				current = address.index();
+				break;
+			}
+			default:
+				return current;
+			}
+		}
+		return -1;
 	}
 
 	private void assignSequentialNextPointers() {

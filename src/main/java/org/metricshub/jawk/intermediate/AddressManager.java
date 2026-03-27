@@ -40,6 +40,17 @@ class AddressManager implements Serializable {
 	private final Map<Integer, Address> addressIndexes = new HashMap<Integer, Address>();
 	private final Map<String, Integer> addressLabelCounts = new HashMap<String, Integer>();
 
+	/**
+	 * Creates a new unresolved address for the supplied label prefix.
+	 * <p>
+	 * Repeated requests for the same label receive monotonically numbered suffixes
+	 * so tuple generation can distinguish placeholder jump targets until they are
+	 * resolved to concrete queue indexes.
+	 * </p>
+	 *
+	 * @param label The logical label name used to derive a unique address identity
+	 * @return A new unresolved {@link Address} tracked by this manager
+	 */
 	Address createAddress(String label) {
 		Integer count = addressLabelCounts.get(label);
 		if (count == null) {
@@ -53,6 +64,13 @@ class AddressManager implements Serializable {
 		return address;
 	}
 
+	/**
+	 * Resolves a previously created address to its first concrete tuple index.
+	 *
+	 * @param address The unresolved address to bind
+	 * @param index The tuple index that now owns the address
+	 * @throws Error If the address is already resolved or belongs to another manager
+	 */
 	void resolveAddress(Address address, int index) {
 		if (unresolvedAddresses.contains(address)) {
 			unresolvedAddresses.remove(address);
@@ -63,10 +81,27 @@ class AddressManager implements Serializable {
 		}
 	}
 
+	/**
+	 * Returns the resolved address currently assigned to a tuple index.
+	 *
+	 * @param index The tuple index to inspect
+	 * @return The resolved {@link Address} for that index, or {@code null} when no
+	 *         address is bound there
+	 */
 	Address getAddress(int index) {
 		return addressIndexes.get(index);
 	}
 
+	/**
+	 * Retargets an already resolved address to a different tuple index.
+	 * <p>
+	 * This is used by tuple optimizations that collapse or reorder queue entries
+	 * after initial address resolution.
+	 * </p>
+	 *
+	 * @param address The resolved address to move
+	 * @param index The new tuple index for the address
+	 */
 	void reassignAddress(Address address, int index) {
 		int previousIndex = address.index();
 		if (previousIndex >= 0) {
@@ -79,6 +114,16 @@ class AddressManager implements Serializable {
 		address.assignIndex(index);
 	}
 
+	/**
+	 * Rebuilds the resolved-address index after queue compaction or reordering.
+	 * <p>
+	 * Each entry in {@code indexMapping} maps an old tuple index to its new index,
+	 * or {@code -1} when that tuple was removed entirely.
+	 * </p>
+	 *
+	 * @param indexMapping Old-to-new tuple index mapping produced by an optimizer
+	 *        pass
+	 */
 	void remapIndexes(int[] indexMapping) {
 		Map<Integer, Address> updated = new HashMap<Integer, Address>();
 		for (Map.Entry<Integer, Address> entry : addressIndexes.entrySet()) {

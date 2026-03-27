@@ -106,6 +106,28 @@ public class AwkEvalTest {
 	}
 
 	@Test
+	public void testCompileForEvalTernaryExpressionStartsWithoutGoto() throws Exception {
+		Awk awk = new Awk();
+		AwkTuples tuples = awk.compileForEval("($1 + 0) ? $2 : $3");
+		String dump = dumpTuples(tuples);
+
+		assertFalse(startsWithGoto(dump));
+		assertEquals("b", awk.eval(tuples, "1 b c"));
+		assertEquals("c", awk.eval(tuples, "0 b c"));
+	}
+
+	@Test
+	public void testCompileForEvalUnoptimizedTernaryExpressionResolvesBranchTargets() throws Exception {
+		Awk awk = new Awk();
+		AwkTuples tuples = awk.compileForEval("($1 + 0) ? $2 : $3", true);
+		String dump = dumpTuples(tuples);
+
+		assertFalse(startsWithGoto(dump));
+		assertEquals("b", awk.eval(tuples, "1 b c"));
+		assertEquals("c", awk.eval(tuples, "0 b c"));
+	}
+
+	@Test
 	public void testFieldOnlyEvalUsesFreshAvmPerInvocation() throws Exception {
 		CountingAwk awk = new CountingAwk();
 		AwkTuples tuples = awk.compileForEval("NF \":\" $2");

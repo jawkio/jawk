@@ -37,7 +37,6 @@ import java.util.Set;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import org.metricshub.jawk.ext.ExtensionFunction;
-import org.metricshub.jawk.jrt.AwkRuntimeException;
 import org.metricshub.jawk.jrt.JRT;
 
 /**
@@ -1787,12 +1786,7 @@ public class AwkTuples implements Serializable {
 				if ((oldIndex + 1) < originalSize) {
 					Tuple nextTuple = original.get(oldIndex + 1);
 					if (nextTuple.getOpcode() == Opcode.GET_INPUT_FIELD) {
-						long fieldIndex;
-						try {
-							fieldIndex = JRT.parseFieldNumber(literal);
-						} catch (AwkRuntimeException e) {
-							throw new AwkRuntimeException(tuple.getLineno(), e.getMessage(), e);
-						}
+						long fieldIndex = JRT.toLong(literal);
 						Tuple replacement = createGetInputFieldConst(
 								fieldIndex,
 								tuple.getLineno());

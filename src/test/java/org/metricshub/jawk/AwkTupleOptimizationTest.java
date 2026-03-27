@@ -337,6 +337,29 @@ public class AwkTupleOptimizationTest {
 	}
 
 	@Test
+	public void preservesRuntimeFailureForFoldedNegativeFieldInScriptBranch() throws Exception {
+		String script = "{ print ($1 == \"x\" ? $2 : $-1) }\n";
+		AwkTuples tuples = new Awk().compile(script);
+		String dump = dumpTuples(tuples);
+
+		assertTrue("Expected folded negative field access in tuple dump", dump.contains("GET_INPUT_FIELD_CONST, -1"));
+
+		AwkTestSupport
+				.awkTest("negative field branch remains runtime failure")
+				.script(script)
+				.stdin("x b c")
+				.expectLines("b")
+				.runAndAssert();
+
+		AwkTestSupport
+				.awkTest("negative field branch fails when executed")
+				.script(script)
+				.stdin("y b c")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
+	}
+
+	@Test
 	public void emitsArgcOffsetButNotArgvOffsetWhenUnreferenced() throws Exception {
 		String script = "{ print $0 }\n";
 		AwkTuples tuples = new Awk().compile(script);

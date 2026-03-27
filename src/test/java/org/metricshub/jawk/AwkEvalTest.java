@@ -96,6 +96,19 @@ public class AwkEvalTest {
 	}
 
 	@Test
+	public void testCompileForEvalNegativeFieldBranchStillFailsOnlyAtRuntime() throws Exception {
+		Awk awk = new Awk();
+		AwkTuples tuples = awk.compileForEval("$1 == \"x\" ? $2 : $-1");
+		String dump = dumpTuples(tuples);
+
+		assertTrue(dump.contains("GET_INPUT_FIELD_CONST, -1"));
+		assertEquals("b", awk.eval(tuples, "x b c"));
+
+		AwkRuntimeException thrown = assertThrows(AwkRuntimeException.class, () -> awk.eval(tuples, "y b c"));
+		assertEquals("Field $(-1) is incorrect.", thrown.getMessage());
+	}
+
+	@Test
 	public void testCompileForEvalKeepsSetNumGlobalsWhenGlobalMetadataIsNeeded() throws Exception {
 		Awk awk = new Awk();
 		AwkTuples tuples = awk.compileForEval("match($0, /a/)");

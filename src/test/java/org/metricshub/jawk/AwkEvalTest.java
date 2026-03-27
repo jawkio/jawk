@@ -76,8 +76,10 @@ public class AwkEvalTest {
 	public void testCompileForEvalOmitsSetNumGlobalsForFieldOnlyExpression() throws Exception {
 		Awk awk = new Awk();
 		AwkTuples tuples = awk.compileForEval("NF \":\" $2");
+		String dump = dumpTuples(tuples);
 
-		assertFalse(dumpTuples(tuples).contains("SET_NUM_GLOBALS"));
+		assertFalse(startsWithGoto(dump));
+		assertFalse(dump.contains("SET_NUM_GLOBALS"));
 		assertEquals("3:b", awk.eval(tuples, "a b c"));
 	}
 
@@ -85,9 +87,22 @@ public class AwkEvalTest {
 	public void testCompileForEvalKeepsSetNumGlobalsWhenGlobalMetadataIsNeeded() throws Exception {
 		Awk awk = new Awk();
 		AwkTuples tuples = awk.compileForEval("match($0, /a/)");
+		String dump = dumpTuples(tuples);
 
-		assertTrue(dumpTuples(tuples).contains("SET_NUM_GLOBALS"));
+		assertFalse(startsWithGoto(dump));
+		assertTrue(dump.contains("SET_NUM_GLOBALS"));
 		assertEquals(1, awk.eval(tuples, "a"));
+	}
+
+	@Test
+	public void testCompileForEvalStatefulGlobalExpressionStartsWithoutGoto() throws Exception {
+		Awk awk = new Awk();
+		AwkTuples tuples = awk.compileForEval("a++");
+		String dump = dumpTuples(tuples);
+
+		assertFalse(startsWithGoto(dump));
+		assertTrue(dump.contains("SET_NUM_GLOBALS"));
+		assertEquals(0.0, JRT.toDouble(awk.eval(tuples, "alpha")), 0.0);
 	}
 
 	@Test
@@ -435,6 +450,15 @@ public class AwkEvalTest {
 			tuples.dump(ps);
 		}
 		return out.toString(StandardCharsets.UTF_8.name());
+	}
+
+	private static boolean startsWithGoto(String dump) {
+		String firstLine = dump;
+		int newline = dump.indexOf('\n');
+		if (newline >= 0) {
+			firstLine = dump.substring(0, newline);
+		}
+		return firstLine.contains("GOTO");
 	}
 
 	private static final class SingleRecordInputSource implements InputSource {

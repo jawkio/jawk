@@ -2113,11 +2113,7 @@ public class AwkTuples implements Serializable {
 			}
 		}
 
-		for (int i = size - 1; i >= 0; i--) {
-			if (remove[i]) {
-				queue.remove(i);
-			}
-		}
+		compactQueue(remove);
 
 		remapAddresses(indexMapping);
 		return true;
@@ -2155,6 +2151,17 @@ public class AwkTuples implements Serializable {
 			Tuple nextTuple = (i + 1) < queue.size() ? queue.get(i + 1) : null;
 			queue.get(i).setNext(nextTuple);
 		}
+	}
+
+	private void compactQueue(boolean[] remove) {
+		ArrayList<Tuple> compactedQueue = new ArrayList<Tuple>(queue.size());
+		for (int i = 0; i < remove.length; i++) {
+			if (!remove[i]) {
+				compactedQueue.add(queue.get(i));
+			}
+		}
+		queue.clear();
+		queue.addAll(compactedQueue);
 	}
 
 	private void optimizeQueue() {
@@ -2266,32 +2273,13 @@ public class AwkTuples implements Serializable {
 			}
 		}
 
-		for (int i = size - 1; i >= 0; i--) {
-			if (remove[i]) {
-				queue.remove(i);
-			}
-		}
+		compactQueue(remove);
 
 		if (!queue.isEmpty()) {
 			assignSequentialNextPointers();
 		}
 
-		Set<Address> processedAddresses = Collections.newSetFromMap(new IdentityHashMap<Address, Boolean>());
-		for (Tuple tuple : queue) {
-			Address address = tuple.getAddress();
-			if (address != null && processedAddresses.add(address)) {
-				int oldIndex = address.index();
-				if (oldIndex >= 0 && oldIndex < indexMapping.length) {
-					int mappedIndex = indexMapping[oldIndex];
-					if (mappedIndex < 0) {
-						throw new Error("Address " + address + " references removed tuple " + oldIndex);
-					}
-					address.assignIndex(mappedIndex);
-				}
-			}
-		}
-
-		addressManager.remapIndexes(indexMapping);
+		remapAddresses(indexMapping);
 	}
 
 	private boolean fallsThrough(Opcode opcode) {

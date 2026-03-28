@@ -1435,7 +1435,10 @@ public class AVM implements VariableManager, Closeable {
 				case SWAP: {
 					// stack[0] = item1
 					// stack[1] = item2
-					swapOnStack();
+					Object o1 = pop();
+					Object o2 = pop();
+					push(o1);
+					push(o2);
 					position.next();
 					break;
 				}
@@ -1652,9 +1655,9 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case CONSUME_INPUT: {
 					// arg[0] = address
-					// false = do NOT put result on stack...
-					// instead, put it in field vars ($0, $1, ...)
-					if (avmConsumeInput(false)) {
+					// store the next record into $0, $1, ...
+					applyInputSourceFilelistAssignmentsIfNeeded();
+					if (jrt.consumeInput(resolvedInputSource)) {
 						position.next();
 					} else {
 						position.jump(position.addressArg());
@@ -1663,21 +1666,47 @@ public class AVM implements VariableManager, Closeable {
 				}
 
 				case GETLINE_INPUT: {
-					avmConsumeInputForGetline();
+					applyInputSourceFilelistAssignmentsIfNeeded();
+					push(jrt.consumeInput(resolvedInputSource) ? 1 : 0);
+					position.next();
+					break;
+				}
+				case GETLINE_INPUT_TO_TARGET: {
+					applyInputSourceFilelistAssignmentsIfNeeded();
+					String input = jrt.consumeInputToTarget(resolvedInputSource);
+					if (input != null) {
+						push(1);
+						push(input);
+					} else {
+						push(0);
+						push("");
+					}
 					position.next();
 					break;
 				}
 				case USE_AS_FILE_INPUT: {
-// stack[0] = filename
+					// stack[0] = filename
 					String s = jrt.toAwkString(pop());
-					avmConsumeFileInputForGetline(s);
+					if (jrt.jrtConsumeFileInput(s)) {
+						push(1);
+						push(jrt.getInputLine());
+					} else {
+						push(0);
+						push("");
+					}
 					position.next();
 					break;
 				}
 				case USE_AS_COMMAND_INPUT: {
-// stack[0] = command line
+					// stack[0] = command line
 					String s = jrt.toAwkString(pop());
-					avmConsumeCommandInputForGetline(s);
+					if (jrt.jrtConsumeCommandInput(s)) {
+						push(1);
+						push(jrt.getInputLine());
+					} else {
+						push(0);
+						push("");
+					}
 					position.next();
 					break;
 				}
@@ -2508,79 +2537,6 @@ public class AVM implements VariableManager, Closeable {
 				runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
 			}
 		}
-	}
-
-	private void swapOnStack() {
-		Object o1 = pop();
-		Object o2 = pop();
-		push(o1);
-		push(o2);
-	}
-
-	private void avmConsumeInputForGetline() throws IOException {
-		if (avmConsumeInput(true)) {
-			push(1);
-		} else {
-			push("");
-			push(0);
-		}
-		swapOnStack();
-	}
-
-	private void avmConsumeFileInputForGetline(String filename) throws IOException {
-		if (avmConsumeFileInput(filename)) {
-			push(1);
-		} else {
-			push(0);
-		}
-		swapOnStack();
-	}
-
-	private void avmConsumeCommandInputForGetline(String cmd) throws IOException {
-		if (avmConsumeCommandInput(cmd)) {
-			push(1);
-		} else {
-			push(0);
-		}
-		swapOnStack();
-	}
-
-	private boolean avmConsumeFileInput(String filename) throws IOException {
-		boolean retval = jrt.jrtConsumeFileInput(filename);
-		if (retval) {
-			push(jrt.getInputLine());
-		} else {
-			push("");
-		}
-		return retval;
-	}
-
-	private boolean avmConsumeCommandInput(String cmd) throws IOException {
-		boolean retval = jrt.jrtConsumeCommandInput(cmd);
-		if (retval) {
-			push(jrt.getInputLine());
-		} else {
-			push("");
-		}
-		return retval;
-	}
-
-	/**
-	 * Consume input from the current source defined in {@link #settings} and push
-	 * the line onto the stack when {@code getline} semantics are required.
-	 *
-	 * @param forGetline {@code true} when called for {@code getline}; otherwise
-	 *        fields are parsed immediately and nothing is pushed
-	 * @return {@code true} if a line of input was read
-	 * @throws IOException if an I/O error occurs while reading input
-	 */
-	private boolean avmConsumeInput(boolean forGetline) throws IOException {
-		applyInputSourceFilelistAssignmentsIfNeeded();
-		boolean retval = jrt.consumeInput(resolvedInputSource, forGetline);
-		if (retval && forGetline) {
-			push(jrt.getInputLine());
-		}
-		return retval;
 	}
 
 	private void applyInputSourceFilelistAssignmentsIfNeeded() {

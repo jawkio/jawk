@@ -1081,6 +1081,15 @@ public class AwkTuples implements Serializable {
 
 	/**
 	 * <p>
+	 * getlineInputToTarget.
+	 * </p>
+	 */
+	public void getlineInputToTarget() {
+		queue.add(new Tuple(Opcode.GETLINE_INPUT_TO_TARGET));
+	}
+
+	/**
+	 * <p>
 	 * useAsFileInput.
 	 * </p>
 	 */

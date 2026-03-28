@@ -4787,6 +4787,11 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
+			if (getAst1() == null && getAst3() == null && getAst2() == null) {
+				tuples.getlineInput();
+				popSourceLineNumber(tuples);
+				return 1;
+			}
 			if (getAst1() != null) {
 				getAst1().populateTuples(tuples);// stack has getAst1() (i.e., "command")
 				tuples.useAsCommandInput();
@@ -4795,7 +4800,7 @@ public class AwkParser {
 				getAst3().populateTuples(tuples); // stack has getAst3() (i.e., "filename")
 				tuples.useAsFileInput();
 			} else {
-				tuples.getlineInput();
+				tuples.getlineInputToTarget();
 			}
 			// 2 resultant values on the stack!
 			// 2nd - -1/0/1 for io-err,eof,success

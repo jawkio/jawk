@@ -97,6 +97,45 @@ public class InputSourceTest {
 	}
 
 	@Test
+	public void testFieldOnlyAccessAvoidsRecordTextLookup() throws Exception {
+		TrackingInputSource source = new TrackingInputSource(
+				Collections.singletonList(new ExplicitRecord("left|right", Arrays.asList("left", "right"))));
+		awkTest("field-only access avoids record text lookup")
+				.script("{ print $2 }")
+				.withInputSource(source)
+				.expectLines("right")
+				.runAndAssert();
+		assertEquals(0, source.getRecordTextCalls());
+		assertEquals(1, source.getFieldsCalls());
+	}
+
+	@Test
+	public void testDynamicFieldAccessAvoidsRecordTextLookup() throws Exception {
+		TrackingInputSource source = new TrackingInputSource(
+				Collections.singletonList(new ExplicitRecord("left|right", Arrays.asList("left", "right"))));
+		awkTest("dynamic field access avoids record text lookup")
+				.script("{ field = 2; print $field }")
+				.withInputSource(source)
+				.expectLines("right")
+				.runAndAssert();
+		assertEquals(0, source.getRecordTextCalls());
+		assertEquals(1, source.getFieldsCalls());
+	}
+
+	@Test
+	public void testDollarZeroAccessAvoidsFieldLookup() throws Exception {
+		TrackingInputSource source = new TrackingInputSource(
+				Collections.singletonList(new ExplicitRecord("left|right", Arrays.asList("left", "right"))));
+		awkTest("dollar-zero access avoids field lookup")
+				.script("{ print }")
+				.withInputSource(source)
+				.expectLines("left|right")
+				.runAndAssert();
+		assertEquals(1, source.getRecordTextCalls());
+		assertEquals(0, source.getFieldsCalls());
+	}
+
+	@Test
 	public void testOfsUsedWhenDollarZeroIsRebuilt() throws Exception {
 		awkTest("OFS applies when fields rebuild dollar zero")
 				.script("BEGIN { OFS = \",\" } { $1 = $1; print $0 }")
@@ -159,6 +198,22 @@ public class InputSourceTest {
 												new ExplicitRecord("left|right", Arrays.asList("left", "right")))))
 				.expectLines("left right")
 				.runAndAssert();
+	}
+
+	@Test
+	public void testGetlineIntoVariableMaterializesCurrentRecordBeforeAdvance() throws Exception {
+		TrackingInputSource source = new TrackingInputSource(
+				Arrays
+						.asList(
+								new ExplicitRecord("trigger", Collections.singletonList("trigger")),
+								new ExplicitRecord("left|right", Arrays.asList("left", "right"))));
+		awkTest("getline into variable materializes current record before advance")
+				.script("NR == 1 { getline line; print line; exit }")
+				.withInputSource(source)
+				.expectLines("left|right")
+				.runAndAssert();
+		assertEquals(2, source.getRecordTextCalls());
+		assertEquals(1, source.getFieldsCalls());
 	}
 
 	@Test
@@ -315,6 +370,50 @@ public class InputSourceTest {
 		@Override
 		public boolean isFromFilenameList() {
 			return false;
+		}
+	}
+
+	private static final class TrackingInputSource implements InputSource {
+
+		private final List<ExplicitRecord> records;
+		private int index = -1;
+		private int recordTextCalls;
+		private int fieldsCalls;
+
+		private TrackingInputSource(List<ExplicitRecord> records) {
+			this.records = records;
+		}
+
+		@Override
+		public boolean nextRecord() throws IOException {
+			index++;
+			return index < records.size();
+		}
+
+		@Override
+		public String getRecordText() {
+			recordTextCalls++;
+			return records.get(index).record;
+		}
+
+		@Override
+		public List<String> getFields() {
+			fieldsCalls++;
+			List<String> fields = records.get(index).fields;
+			return fields == null ? null : new ArrayList<String>(fields);
+		}
+
+		@Override
+		public boolean isFromFilenameList() {
+			return false;
+		}
+
+		private int getRecordTextCalls() {
+			return recordTextCalls;
+		}
+
+		private int getFieldsCalls() {
+			return fieldsCalls;
 		}
 	}
 

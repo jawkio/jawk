@@ -69,6 +69,7 @@ public class StreamInputSource implements InputSource, Closeable {
 	private PartitioningReader partitioningReader;
 	private boolean currentFromFilenameList;
 	private String currentRecord;
+	private boolean currentReaderExhausted;
 
 	/**
 	 * Creates a stream-backed input source.
@@ -92,16 +93,23 @@ public class StreamInputSource implements InputSource, Closeable {
 		initializeArgList();
 
 		while (true) {
-			if ((partitioningReader == null || currentRecord == null)
-					&& !prepareNextReader()) {
-				return false;
+			if (partitioningReader == null || currentReaderExhausted) {
+				if (!prepareNextReader()) {
+					return false;
+				}
+				currentReaderExhausted = false;
 			}
 
-			currentRecord = partitioningReader.readRecord();
-			if (currentRecord != null) {
+			String nextRecord = partitioningReader.readRecord();
+			if (nextRecord != null) {
+				currentRecord = nextRecord;
 				currentFromFilenameList = partitioningReader.fromFilenameList();
 				return true;
 			}
+			if (!partitioningReader.fromFilenameList()) {
+				return false;
+			}
+			currentReaderExhausted = true;
 		}
 	}
 

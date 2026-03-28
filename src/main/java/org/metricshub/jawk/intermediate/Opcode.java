@@ -922,7 +922,7 @@ public enum Opcode {
 	 * assignment as a regular expression.
 	 * <p>
 	 * If there is input available, the input string and a return code
-	 * of 1 is pushed. If EOF is reached, a blank (null) string ("")
+	 * of 1 is pushed. If EOF is reached, an empty string ("")
 	 * is pushed along with a 0 return code. Upon an IO error,
 	 * the exception is propagated.
 	 * <p>
@@ -942,7 +942,7 @@ public enum Opcode {
 	 * lines (records) of input until no more records are available.
 	 * <p>
 	 * If there is input available, the input string and a return code
-	 * of 1 is pushed. If EOF is reached, a blank (null) string ("")
+	 * of 1 is pushed. If EOF is reached, an empty string ("")
 	 * is pushed along with a 0 return code. Upon an IO error,
 	 * a blank string and a -1 is pushed onto the operand stack.
 	 * <p>
@@ -963,7 +963,7 @@ public enum Opcode {
 	 * lines (records) of input until no more records are available.
 	 * <p>
 	 * If there is input available, the input string and a return code
-	 * of 1 is pushed. If EOF is reached, a blank (null) string ("")
+	 * of 1 is pushed. If EOF is reached, an empty string ("")
 	 * is pushed along with a 0 return code. Upon an IO error,
 	 * a blank string and a -1 is pushed onto the operand stack.
 	 * <p>

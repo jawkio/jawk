@@ -113,6 +113,14 @@ public class AwkTupleOptimizationTest {
 	}
 
 	@Test
+	public void compilesGetlineIntoVariableWithDedicatedTargetOpcode() throws Exception {
+		String script = "{ getline line; print line; exit }\n";
+		AwkTuples tuples = new Awk().compile(script);
+		List<Opcode> opcodes = collectOpcodes(tuples);
+		assertTrue("getline target should use dedicated opcode", opcodes.contains(Opcode.GETLINE_INPUT_TO_TARGET));
+	}
+
+	@Test
 	public void doesNotFoldNumericConcatenation() throws Exception {
 		String script = "BEGIN { CONVFMT=\"%.2f\"; print 1 \"x\" }\n";
 		AwkTestSupport

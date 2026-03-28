@@ -38,6 +38,12 @@ public interface InputSource {
 
 	/**
 	 * Advances to the next input record.
+	 * <p>
+	 * Implementations should keep the current record accessible through
+	 * {@link #getRecordText()} and {@link #getFields()} until a subsequent call
+	 * successfully advances to a new record. This allows END blocks to continue
+	 * observing the last consumed record after the final EOF probe.
+	 * </p>
 	 *
 	 * @return {@code true} when a record is available, {@code false} when input
 	 *         is exhausted

@@ -124,8 +124,6 @@ public class JRT {
 	private String inputLine = null;
 	// Current record state ($0, $1, $2, ...).
 	private RecordState recordState;
-	// Pre-split fields captured during structured getline for bare getline assignment.
-	private List<String> pendingGetlineFields;
 	// The currently active InputSource (set during consumeInput calls).
 	private InputSource activeSource;
 	private static final UninitializedObject BLANK = new UninitializedObject();
@@ -340,7 +338,6 @@ public class JRT {
 		outputSinkCache.clear();
 		inputLine = null;
 		recordState = null;
-		pendingGetlineFields = null;
 		activeSource = null;
 		jrtInputString = null;
 		nr = 0L;
@@ -1329,76 +1326,71 @@ public class JRT {
 	public void setInputLine(String inputLine) {
 		this.inputLine = inputLine;
 		recordState = newRecordStateFromText(inputLine);
-		clearPendingGetlineFields();
 	}
 
 	/**
 	 * Assigns {@code $0} from a getline result and initializes {@code $1..$NF}.
-	 * <p>
-	 * When the previous getline consumed a structured {@link InputSource} record
-	 * with pre-split fields, those fields are applied directly. Otherwise fields
-	 * are parsed from {@code $0} using FS.
-	 * </p>
 	 *
 	 * @param value getline result assigned to {@code $0}
 	 */
 	public void assignInputLineFromGetline(Object value) {
 		String inputValue = value == null ? "" : value.toString();
 		inputLine = inputValue;
-		if (pendingGetlineFields != null) {
-			initializeInputFields(inputValue, pendingGetlineFields);
-		} else {
-			recordState = newRecordStateFromText(inputValue);
-		}
-		clearPendingGetlineFields();
+		recordState = newRecordStateFromText(inputValue);
 	}
 
 	/**
-	 * Attempt to consume one record from a structured input source.
+	 * Attempt to consume one record from a structured input source and expose it
+	 * as the current input record.
 	 *
 	 * @param source source strategy that provides records and optional
 	 *        pre-split fields
-	 * @param forGetline {@code true} when called for {@code getline}; when
-	 *        {@code false} the runtime initializes {@code $0..$NF}
 	 * @return {@code true} if a record was consumed; {@code false} when the
 	 *         source is exhausted
 	 * @throws IOException if the source raises an I/O error
 	 */
-	public boolean consumeInput(final InputSource source, boolean forGetline) throws IOException {
+	public boolean consumeInput(final InputSource source) throws IOException {
 		Objects.requireNonNull(source, "source");
 		activeSource = source;
 		if (!source.nextRecord()) {
-			clearPendingGetlineFields();
 			return false;
 		}
 
-		String recordText = source.getRecordText();
-		List<String> preFields = source.getFields();
-		if (recordText == null && preFields == null) {
-			throw new IllegalStateException(
-					"InputSource must provide record text, fields, or both after nextRecord()");
-		}
-
-		if (forGetline) {
-			List<String> sanitizedFields = preFields == null ? null : sanitizeFields(preFields);
-			inputLine = recordText != null ? recordText : joinFieldsWithLiteralSeparator(sanitizedFields, fs);
-			cacheGetlineFields(sanitizedFields);
-		} else {
-			inputLine = recordText;
-			clearPendingGetlineFields();
-			if (preFields == null) {
-				recordState = newRecordStateFromText(recordText);
-				recordState.ensureFieldsMaterialized();
-			} else {
-				recordState = newRecordStateFromSource(recordText, preFields);
-			}
-		}
+		inputLine = null;
+		recordState = newRecordStateFromSource(source);
 
 		this.nr++;
 		if (source.isFromFilenameList()) {
 			this.fnr++;
 		}
 		return true;
+	}
+
+	/**
+	 * Attempt to consume one record from a structured input source for
+	 * {@code getline target}, returning only the input text and leaving the
+	 * current input record state untouched.
+	 *
+	 * @param source source strategy that provides records and optional
+	 *        pre-split fields
+	 * @return the consumed input text, or {@code null} when the source is
+	 *         exhausted
+	 * @throws IOException if the source raises an I/O error
+	 */
+	public String consumeInputToTarget(final InputSource source) throws IOException {
+		Objects.requireNonNull(source, "source");
+		activeSource = source;
+		materializeCurrentRecord();
+		if (!source.nextRecord()) {
+			return null;
+		}
+
+		String input = newRecordStateFromSource(source).getRecordText();
+		this.nr++;
+		if (source.isFromFilenameList()) {
+			this.fnr++;
+		}
+		return input;
 	}
 
 	/**
@@ -1411,7 +1403,7 @@ public class JRT {
 	 * @throws IOException if the source raises an I/O error
 	 */
 	public boolean consumeInputForEval(InputSource source) throws IOException {
-		return consumeInput(source, false);
+		return consumeInput(source);
 	}
 
 	/**
@@ -1422,14 +1414,6 @@ public class JRT {
 	 */
 	protected void initializeInputFields(String record, List<String> preFields) {
 		recordState = newRecordStateFromSource(record, preFields);
-	}
-
-	protected void cacheGetlineFields(List<String> preFields) {
-		pendingGetlineFields = preFields == null ? null : sanitizeFields(preFields);
-	}
-
-	protected void clearPendingGetlineFields() {
-		pendingGetlineFields = null;
 	}
 
 	/**
@@ -1540,6 +1524,12 @@ public class JRT {
 		}
 	}
 
+	private void materializeCurrentRecord() {
+		if (recordState != null) {
+			recordState.materialize();
+		}
+	}
+
 	private RecordState ensureRecordStateForTextMutation() {
 		if (recordState == null) {
 			recordState = newRecordStateFromText(inputLine == null ? "" : inputLine);
@@ -1561,21 +1551,21 @@ public class JRT {
 		return copy;
 	}
 
-	private List<String> splitRecordText(String recordText) {
+	private List<String> splitRecordText(String recordText, String fieldSeparator) {
 		List<String> fields = new ArrayList<String>();
 		if (recordText == null || recordText.isEmpty()) {
 			return fields;
 		}
 
 		Enumeration<Object> tokenizer;
-		if (fs.equals(" ")) {
+		if (fieldSeparator.equals(" ")) {
 			tokenizer = new StringTokenizer(recordText);
-		} else if (fs.length() == 1) {
-			tokenizer = new SingleCharacterTokenizer(recordText, fs.charAt(0));
-		} else if (fs.equals("")) {
+		} else if (fieldSeparator.length() == 1) {
+			tokenizer = new SingleCharacterTokenizer(recordText, fieldSeparator.charAt(0));
+		} else if (fieldSeparator.equals("")) {
 			tokenizer = new CharacterTokenizer(recordText);
 		} else {
-			tokenizer = new RegexTokenizer(recordText, fs);
+			tokenizer = new RegexTokenizer(recordText, fieldSeparator);
 		}
 
 		while (tokenizer.hasMoreElements()) {
@@ -1603,54 +1593,85 @@ public class JRT {
 		return new RecordState(recordText, null);
 	}
 
+	private RecordState newRecordStateFromSource(InputSource source) {
+		return new RecordState(source);
+	}
+
 	private RecordState newRecordStateFromSource(String recordText, List<String> rawFields) {
 		return new RecordState(recordText, rawFields);
 	}
 
 	private final class RecordState {
 
+		private final String fieldSeparatorAtRead;
+		private final InputSource source;
 		private String recordText;
 		private List<String> fields;
 		private boolean recordTextAvailable;
 		private boolean fieldsAvailable;
 		private boolean recordTextDirty;
 		private boolean fieldsDirty;
+		private boolean recordTextLoadedFromSource;
+		private boolean fieldsLoadedFromSource;
+
+		private RecordState(InputSource source) {
+			this(null, null, source);
+		}
 
 		private RecordState(String recordText, List<String> rawFields) {
+			this(recordText, rawFields, null);
+		}
+
+		private RecordState(String recordText, List<String> rawFields, InputSource source) {
+			this.fieldSeparatorAtRead = fs;
+			this.source = source;
 			if (recordText != null) {
 				this.recordText = recordText;
 				this.recordTextAvailable = true;
-			} else if (rawFields == null) {
+			} else if (rawFields == null && source == null) {
 				this.recordText = "";
 				this.recordTextAvailable = true;
 			}
 			if (rawFields != null) {
 				this.fields = sanitizeFields(rawFields);
 				this.fieldsAvailable = true;
+				this.fieldsDirty = false;
 			} else {
 				this.fieldsAvailable = false;
+				this.fieldsDirty = true;
 			}
 			this.recordTextDirty = false;
-			this.fieldsDirty = rawFields == null;
 		}
 
 		private void ensureFieldsMaterialized() {
 			if (fieldsAvailable && !fieldsDirty) {
 				return;
 			}
-			fields = splitRecordText(getRecordText());
+			if (!recordTextDirty) {
+				loadFieldsFromSource();
+				if (fieldsAvailable && !fieldsDirty) {
+					return;
+				}
+			}
+			fields = splitRecordText(getRecordText(), fieldSeparatorAtRead);
 			fieldsAvailable = true;
 			fieldsDirty = false;
 		}
 
 		private String getRecordText() {
 			if (!recordTextAvailable || recordTextDirty) {
-				if (!fieldsAvailable) {
-					recordText = "";
-				} else if (recordTextDirty) {
+				if (recordTextDirty) {
 					recordText = rebuildRecordTextFromFields(fields);
 				} else {
-					recordText = joinFieldsWithLiteralSeparator(fields, fs);
+					loadRecordTextFromSource();
+					if (!recordTextAvailable) {
+						loadFieldsFromSource();
+						if (!fieldsAvailable) {
+							throw new IllegalStateException(
+									"InputSource must provide record text, fields, or both after nextRecord()");
+						}
+						recordText = joinFieldsWithLiteralSeparator(fields, fieldSeparatorAtRead);
+					}
 				}
 				recordTextAvailable = true;
 				recordTextDirty = false;
@@ -1696,6 +1717,33 @@ public class JRT {
 		private void markRecordTextDirty() {
 			recordTextDirty = true;
 			recordTextAvailable = fieldsAvailable;
+		}
+
+		private void materialize() {
+			getRecordText();
+			ensureFieldsMaterialized();
+		}
+
+		private void loadRecordTextFromSource() {
+			if (source == null || recordTextLoadedFromSource) {
+				return;
+			}
+			recordText = source.getRecordText();
+			recordTextAvailable = recordText != null;
+			recordTextLoadedFromSource = true;
+		}
+
+		private void loadFieldsFromSource() {
+			if (source == null || fieldsLoadedFromSource) {
+				return;
+			}
+			List<String> rawFields = source.getFields();
+			fieldsLoadedFromSource = true;
+			if (rawFields != null) {
+				fields = sanitizeFields(rawFields);
+				fieldsAvailable = true;
+				fieldsDirty = false;
+			}
 		}
 	}
 
@@ -1940,7 +1988,6 @@ public class JRT {
 	 * @throws java.io.IOException if any.
 	 */
 	public boolean jrtConsumeFileInput(String fileNameParam) throws IOException {
-		clearPendingGetlineFields();
 		Map<String, PartitioningReader> fileReaders = getIoState().fileReaders;
 		PartitioningReader pr = fileReaders.get(fileNameParam);
 		if (pr == null) {
@@ -1992,7 +2039,6 @@ public class JRT {
 	 * @throws java.io.IOException if any.
 	 */
 	public boolean jrtConsumeCommandInput(String cmd) throws IOException {
-		clearPendingGetlineFields();
 		IoState state = getIoState();
 		PartitioningReader pr = state.commandReaders.get(cmd);
 		if (pr == null) {

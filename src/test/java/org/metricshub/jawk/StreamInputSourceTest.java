@@ -144,6 +144,15 @@ public class StreamInputSourceTest {
 	}
 
 	@Test
+	public void testEndCanReadLastRecordAfterFinalEofProbe() throws Exception {
+		awkTest("StreamInputSource preserves last record for END")
+				.script("{ seen = NR } END { print $0; print $1 }")
+				.stdin("first line\nlast record\n")
+				.expectLines("last record", "last")
+				.runAndAssert();
+	}
+
+	@Test
 	public void testExpressionEvalThroughStreamInputSource() throws Exception {
 		awkTest("expression evaluation through StreamInputSource")
 				.script("$1 > 1 { print $0 }")

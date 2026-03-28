@@ -900,20 +900,36 @@ public enum Opcode {
 	 */
 	CONSUME_INPUT,
 	/**
+	 * Obtains input from stdin/filename-args, stores it into
+	 * {@code $0}, {@code $1..$NF}, and pushes only the status code
+	 * onto the stack.
+	 * The input is partitioned into records based on the RS variable
+	 * assignment as a regular expression.
+	 * <p>
+	 * If there is input available, a return code of 1 is pushed.
+	 * If EOF is reached, a 0 return code is pushed.
+	 * Upon an IO error, the exception is propagated.
+	 * <p>
+	 * Stack before: ...<br/>
+	 * Stack after: return-code ...
+	 */
+	GETLINE_INPUT,
+	/**
 	 * Obtains input from stdin/filename-args and pushes
-	 * input line and status code onto the stack.
+	 * the input line and status code onto the stack without
+	 * updating {@code $0}, {@code $1..$NF}.
 	 * The input is partitioned into records based on the RS variable
 	 * assignment as a regular expression.
 	 * <p>
 	 * If there is input available, the input string and a return code
-	 * of 1 is pushed. If EOF is reached, a blank (null) string ("")
+	 * of 1 is pushed. If EOF is reached, an empty string ("")
 	 * is pushed along with a 0 return code. Upon an IO error,
-	 * a blank string and a -1 is pushed onto the operand stack.
+	 * the exception is propagated.
 	 * <p>
 	 * Stack before: ...<br/>
 	 * Stack after: input-string return-code ...
 	 */
-	GETLINE_INPUT,
+	GETLINE_INPUT_TO_TARGET,
 	/**
 	 * Obtains input from a file and pushes
 	 * input line and status code onto the stack.
@@ -926,7 +942,7 @@ public enum Opcode {
 	 * lines (records) of input until no more records are available.
 	 * <p>
 	 * If there is input available, the input string and a return code
-	 * of 1 is pushed. If EOF is reached, a blank (null) string ("")
+	 * of 1 is pushed. If EOF is reached, an empty string ("")
 	 * is pushed along with a 0 return code. Upon an IO error,
 	 * a blank string and a -1 is pushed onto the operand stack.
 	 * <p>
@@ -947,7 +963,7 @@ public enum Opcode {
 	 * lines (records) of input until no more records are available.
 	 * <p>
 	 * If there is input available, the input string and a return code
-	 * of 1 is pushed. If EOF is reached, a blank (null) string ("")
+	 * of 1 is pushed. If EOF is reached, an empty string ("")
 	 * is pushed along with a 0 return code. Upon an IO error,
 	 * a blank string and a -1 is pushed onto the operand stack.
 	 * <p>

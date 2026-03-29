@@ -1,151 +1,77 @@
-# Jawk - AWK for Java
+keywords: jawk, awk, java, cli, text processing
+description: Pure Java AWK for command-line use and Java embedding.
+
+# Jawk: AWK for Java
 
 <!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
 
-## Introduction
+Jawk is a pure Java implementation of [AWK](https://en.wikipedia.org/wiki/AWK). You can run AWK programs from the command line, embed them in JVM applications, compile them to reusable tuples, evaluate expressions, provide structured input without converting it back to text, and opt into extensions or sandboxing when your host application needs them.
 
-Jawk is a pure Java implementation of [AWK](https://en.wikipedia.org/wiki/AWK). It executes the specified AWK scripts to parse and process text input, and generate a text output. Jawk can be used as a CLI, but more importantly it can be invoked from within your Java project.
+> [!TABS]
+> - CLI
+>
+>   ```shell-session
+>   $ echo "hello world" | java -jar jawk-${project.version}-standalone.jar '{ print $2 ", " $1 "!" }'
+>   world, hello!
+>   ```
+>
+> - Java
+>
+>   ```java
+>   Awk awk = new Awk();
+>   String result = awk.run("{ print toupper($0) }", "hello world");
+>   // result = "HELLO WORLD\n"
+>   ```
 
-This project is forked from the excellent [Jawk project](https://jawk.sourceforge.net/) that was maintained by [hoijui on GitHub](https://github.com/hoijui/Jawk).
+## What Jawk Is
 
-## Run Jawk CLI
+Jawk parses AWK source, performs semantic analysis, compiles the result to an intermediate tuple representation, and executes those tuples in a Java runtime. The same core engine powers both the CLI and the Java API, which means the command-line workflow and the embedding workflow share the same parser, tuple compiler, runtime, extensions, and sandbox rules.
 
-It's very simple:
+This project is a maintained fork of the original [Jawk project](https://jawk.sourceforge.net/). In this fork, errors are reported through Java exceptions rather than a logging framework, the public Java API has been expanded substantially, and the documentation focuses on practical embedding as much as on CLI use.
 
-* Download [jawk-${project.version}-standalone.jar](https://github.com/metricshub/Jawk/releases/download/v${project.version}/jawk-${project.version}-standalone.jar) from the [latest release](https://github.com/metricshub/Jawk/releases)
-* Make sure to have Java installed on your system ([download](https://adoptium.net/))
-* Execute `jawk-${project.version}-standalone.jar` just like the "traditional" AWK
+## What It Is Good For
 
-See [usage and examples of Jawk CLI](cli.html).
+Jawk fits well when you want AWK's text-processing model but need it to live inside a JVM process instead of a separate native toolchain.
 
-## Run AWK inside Java
+- Running AWK one-liners or scripts from the CLI
+- Embedding AWK rules inside Java applications
+- Reusing compiled expressions or full scripts in hot paths
+- Feeding existing rows or records through `InputSource` without serializing them back to text
+- Enabling only the extensions your application wants to expose
+- Locking execution down with sandboxed tuples and runtime components
 
-The `Awk` class exposes several APIs to evaluate expressions and execute
-scripts.
+## Choose Your Path
 
-### Evaluate an expression
+- If you want to run Jawk from the shell, start with the [CLI quickstart](cli.html).
+- If you want to add Jawk to a JVM application, start with the [Java quickstart](java.html).
+- If you need dependencies or the standalone jar, go to the [installation guide](install.html).
+- If you want extension loading or authoring, use [loading extensions](extensions.html) and [writing extensions](extensions-writing.html).
+- If you need tuple reuse, expression evaluation, or structured input, continue with [structured input and variables](java-input.html), [compile, eval, and reuse](java-compile.html), and [advanced runtime](java-advanced.html).
+- If you are comparing Jawk with other AWKs, see [compatibility and differences](compatibility.html).
 
-```java
-Object value = new Awk().eval("2 + 3");
-```
+## Key Capabilities
 
-For repeated evaluations, compile once and reuse the tuples:
+- CLI-compatible AWK execution with inline scripts, script files, operands, and input files
+- Java entry points for script execution, expression evaluation, tuple compilation, and repeated reuse
+- Structured input through `InputSource` for row-oriented or already-tokenized data
+- Explicit extension loading through the Java API or the CLI
+- Tuple serialization for CLI precompilation and later loading
+- Sandbox-specific tuples and runtime components through `SandboxedAwk`
 
-```java
-AwkSettings settings = new AwkSettings();
-settings.setFieldSeparator(",");
+> [!IMPORTANT]
+> Extensions are always opt-in. Sandbox mode exists for both the CLI and the Java API. Raw `AVM` access is intentionally advanced and stateful, and should only be used when you explicitly want to manage runtime reuse yourself.
 
-Awk awk = new Awk(settings);
-AwkTuples expression = awk.compileForEval("$2");
+## Safety and Advanced Topics
 
-Object first = awk.eval(expression, "alpha,beta");
-Object second = awk.eval(expression, "left,right");
-```
+For most Java applications, `Awk` is the right abstraction. The convenience methods on `Awk` create, use, and close a fresh runtime for each isolated operation. When you move to `Awk.prepareEval(...)` or raw `AVM`, you are choosing performance and lifecycle control over isolation.
 
-When you have one record and several expressions, prepare the record once:
+Likewise, `SandboxedAwk` and the CLI `-S` option deliberately restrict dangerous AWK features such as `system()`, redirections, and command pipelines. Use the sandbox when scripts come from untrusted or tightly controlled sources, and use the advanced runtime APIs only when you are comfortable owning the tradeoffs.
 
-```java
-AwkSettings settings = new AwkSettings();
-settings.setFieldSeparator(",");
+## Next Steps
 
-Awk awk = new Awk(settings);
-AwkTuples secondField = awk.compileForEval("$2");
-AwkTuples summary = awk.compileForEval("NF \":\" $NF");
-
-try (AVM prepared = awk.prepareEval("alpha,beta,gamma")) {
-    Object second = prepared.eval(secondField);
-    Object info = prepared.eval(summary);
-}
-```
-
-For the fastest variant of that flow, precompile the expressions once and pass
-the resulting tuples to `AVM.eval(AwkTuples)`.
-
-Prepared AVMs are intentionally stateful. They reuse the same mutable AVM
-instance across calls, so globals and AWK specials such as `RSTART` and
-`RLENGTH` can leak from one expression to the next. Use `Awk.eval(...)` when
-you need per-call isolation.
-
-`Awk.eval(...)` and `Awk.invoke(...)` always create, use, and close a fresh
-runtime, so each execution is isolated from the previous one.
-`Awk.prepareEval(...)` is the convenience API that creates and prepares a
-reusable `AVM`; direct `AVM.prepareForEval(...)` is the low-level expert
-equivalent. When you use `AVM` directly, you own its lifecycle and must call
-`close()` yourself.
-
-### Run a script directly
-
-```java
-String output = new Awk().run("{ print $1 }", "foo bar");
-```
-
-### Compile and invoke a script
-
-```java
-Awk awk = new Awk();
-awk.getSettings().setDefaultRS("\n");
-ByteArrayOutputStream out = new ByteArrayOutputStream();
-awk.getSettings().setOutputStream(new PrintStream(out));
-
-AwkTuples tuples = awk.compile("{ print $0 }");
-InputStream input = new ByteArrayInputStream("foo\nbar\n".getBytes(StandardCharsets.UTF_8));
-awk.invoke(tuples, input, Collections.emptyList());
-```
-
-Input and arguments are passed directly to the `invoke()` methods.
-`AwkSettings` is a purely behavioral configuration (field separator,
-record separator, output stream, variables, etc.).
-
-When your host application already has structured rows, implement
-`InputSource` and call `Awk.eval(...)` or `Awk.invoke(...)` directly on that
-structured source. Jawk also exposes `AVM` for advanced runtime reuse, but the
-recommended embedding API remains `Awk`.
-
-See [AWK in Java documentation](java.html) for advanced examples.
-
-## Features
-
-As stated earlier, **Jawk** interprets AWK scripts in Java. This is a full implementation of AWK, which includes:
-
-* An intuitive text processing paradigm, tightly integrated with regular expressions.
-* Functions with local, static scoping.
-* Scalar and associative array (map) variables.
-* Weakly typed variables for greatest flexibility with automatic string/number conversion.
-* Powerful IPC constructs similar to those used by most UNIX shells (pipes and IO redirect).
-* Highly intuitive error diagnostics.
-
-**Jawk** also offers the following features which the original AWK does not provide:
-
-* Output to a post-compiled, pre-interpreted format for both elimination of the compilation step and obfuscation of **Jawk** scripts.
-* Text dumps of abstract syntax tree and intermediate code representation (tuples).
-* Maintenance of associative arrays in key-sorted order.
-* Error detection for printf/sprintf format parameters (via the -r argument).
-* An opt-in, flexible extension facility with event blocking capabilities.
-
-Because we're using Java, the following differences exist in order to blend easily within the Java environment:
-
-* **Jawk** regular expressions are implemented with Java regular expressions. Therefore, they differ from AWK's regular expression semantics (mostly by adding functionality over AWK's regular expressions).
-* printf/sprintf formatting is done by java.util.Formatter. This is markedly different from C's, and thus AWK's printf(). Java's Formatter class does not attempt to implicitly convert its argument datatypes. If differing datatypes are present than what is expected, an IllegalFormatException will occur. Therefore, the script developer must keep track of implicit type conversions in Jawk.
-
-### Differences with the original Jawk
-
-There's a growing list of things that make our version diverge from the original Jawk written by Danny Daglas, and maintained by Robin Vobruba:
-
-* Removed all logging framework dependencies; Jawk now reports errors solely through Java exceptions
-* Removed the AWK-to-JVM bytecode compiler
-* Removed the Socket extension (to get a smaller jar)
-* Improved performance in parsing inputs and printed output
-* Support for long integers
-* Support for octal and hexadecimal notation in strings (allowing `ESC` characters to do fancy terminal effects)
-* Artifact *groupId* and package is `org.metricshub`
-* Added gawk's suite of unit tests
-* Added bwk's suite of unit tests
-* License is LGPL for the Maven artifact
-
-### Differences with other AWKs
-
-Other versions of AWK will run through a script and issue a "runtime error" if a user-defined function is not found. **Jawk** does not. It attempts to resolve all function calls to defined functions at _compile-time_ (after parsing the script and prior to assembling the intermediate code from the abstract syntax tree). This is necessary in order to produce intermediate code with branch statements fully resolved.
-
-Other versions of AWK provide command-line parameters to choose compile-time or run-time checks for function name resolution. **Jawk** does not, mainly to ensure semantic analysis is done for the reasons stated above. Also, to undo these semantic checks will result in unresolved references, most likely resulting in NullPointerExceptions.
-
-Other semantic checks include formal/actual parameter analysis and array/scalar operation verification. Again, these are necessary to produce coherent intermediate code.
+- [Install Jawk](install.html)
+- [Learn the CLI](cli.html)
+- [Embed Jawk in Java](java.html)
+- [Work with structured input and variables](java-input.html)
+- [Compile, evaluate, and reuse tuples](java-compile.html)
+- [Load or write extensions](extensions.html)

@@ -564,12 +564,14 @@ body {
 	--main-fgcolor: #292521;
 	--banner-bgcolor: #6D4635;
 	--link-color: #6D4635;
-	--alternate-bgcolor: #a5304b;
-	--alternate-fgcolor: #fff;
+	--alternate-bgcolor: #ddc7cc;
+	--alternate-fgcolor: #a5304b;
 }
 
 body.dark {
 	--link-color: #c0a295;
 	--main-bgcolor: #262626;
 	--main-fgcolor: #efede9;
+	--alternate-bgcolor: #a5304b;
+	--alternate-fgcolor: #ddc7cc;
 }

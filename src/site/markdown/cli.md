@@ -1,128 +1,123 @@
-# Jawk CLI
+keywords: cli, awk, command line, gawk, bwk, mawk
+description: Quickstart guide for running Jawk from the command line.
+
+# Jawk CLI Quickstart
 
 <!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
 
-## Getting Started
+Jawk CLI behaves like AWK, but runs entirely on the JVM. You can pass an inline program, read a script from a file, feed input through standard input or filenames, assign variables, load explicit extensions, dump syntax or tuples, precompile tuples, and switch to a sandboxed runtime when needed.
 
-* Download [jawk-${project.version}-standalone.jar](https://github.com/metricshub/Jawk/releases/download/v${project.version}/jawk-${project.version}-standalone.jar) from the [latest release](https://github.com/metricshub/Jawk/releases)
-* Make sure to have Java installed on your system ([download](https://adoptium.net/))
-* Execute `jawk-${project.version}-standalone.jar` just like the "traditional" AWK:
+> [!WARNING]
+> Shell quoting differs by platform. The examples below use separate command forms where quoting is meaningfully different. If a script works in one shell but not another, the quoting is usually the first thing to check.
 
-    ```shell-session
-    $ java -jar jawk-${project.version}-standalone.jar <command-line-arguments>
-    ```
+## Run an Inline Script
 
-## Examples
+> [!TABS]
+> - Linux/UNIX
+>
+>   ```shell-session
+>   $ echo "hello world" | java -jar jawk-${project.version}-standalone.jar '{ print $2 ", " $1 "!" }'
+>   world, hello!
+>   ```
+>
+> - Windows
+>
+>   ```shell-session
+>   C:\> echo hello world | java -jar jawk-${project.version}-standalone.jar "{ print $2 "", "" $1 ""!"" }"
+>   world, hello!
+>   ```
 
-### Processing of *stdin*
+If you do not pass `-f` or `-L`, Jawk expects the next non-option argument to be the AWK program itself.
 
-```shell-session
-$ echo "hello world" | java -jar jawk-${project.version}-standalone.jar '{print $2 ", " $1 "!"}'
+## Run a Script File
 
-world, hello!
-```
+Store the AWK program in a file:
 
-Execute on Windows (beware of double-double quotes!):
-
-```shell-session
-C:\> echo hello world | java -jar jawk-${project.version}-standalone.jar "{print $2 "", "" $1 ""!""}"
-
-world, hello!
-```
-
-### Classic processing of an input file
-
-```shell-session
-$ java -jar jawk-${project.version}-standalone.jar -F : '{print $1 "," $6}' /etc/passwd
-
-root,/root
-daemon,/usr/sbin
-bin,/bin
-sys,/dev
-sync,/bin
-games,/usr/games
-man,/var/cache/man
-lp,/var/spool/lpd
-mail,/var/mail
-```
-
-### Execute a script file
-
-**example.awk**:
+**`totals.awk`**:
 
 ```awk
 BEGIN {
-  totalUsed = 0
-  totalAvailable = 0
+  total = 0
 }
-$6 !~ "wsl" && $3 ~ "[0-9]+" {
-  totalUsed += $3
-  totalAvailable += $4
+{
+  total += $2
 }
 END {
-  printf "Total Used: %.1f GB\n", totalUsed / 1048576
-  printf "Total Available: %.1f GB\n", totalAvailable / 1048576
+  print total
 }
 ```
 
-```shell-session
-$ df -kP | java -jar jawk-${project.version}-standalone.jar -f example.awk
-
-Total Used: 559.8 GB
-Total Available: 2048.0 GB
-```
-
-### Matrix in your terminal (Linux)
+And point Jawk at it with `-f`:
 
 ```shell-session
-$ while :;do echo $LINES $COLUMNS $(( $RANDOM % $COLUMNS)) $(printf "\U$(($RANDOM % 500))");sleep 0.05;done|java -jar jawk-${project.version}-standalone.jar '{a[$3]=0;for (x in a){o=a[x];a[x]=a[x]+1;printf "\033[%s;%sH\033[2;32m%s",o,x,$4;printf "\033[%s;%sH\033[1;37m%s\033[0;0H",a[x],x,$4;if (a[x]>=$1){a[x]=0;}}}'
+$ java -jar jawk-${project.version}-standalone.jar -f totals.awk values.txt
 ```
 
-## Detailed Options
+You can repeat `-f` to combine multiple script sources before execution.
 
-To view the command line argument usage summary, execute:
+## Read from stdin
+
+If you do not provide input filenames after the script, Jawk reads from standard input:
 
 ```shell-session
-$ java -jar jawk-${project.version}-standalone.jar -?
+$ printf "alpha\nbeta\n" | java -jar jawk-${project.version}-standalone.jar '{ print NR ":" $0 }'
+1:alpha
+2:beta
 ```
 
-**Jawk** supports all of the standard AWK command line parameters:
+## Read Input Files
 
-* `-v <name=value>` - global variable assignments prior to the execution of the script.
-* `-F <fs>` - input field separator assignment. This is equivalent to `FS="fs"` prior to its use (by getline or by input rules).
-* `-f <filename>` - The script filename. If used, a script argument is not expected.
+Input filenames passed after the script become runtime operands and are processed as AWK input files:
 
-To enhance development and script execution over traditional AWK, **Jawk** also supports the following command-line parameter extensions:
+```shell-session
+$ java -jar jawk-${project.version}-standalone.jar -F : '{ print FILENAME ":" FNR ":" $1 }' /etc/passwd /etc/group
+```
 
-* `-t` - Maintain all associated arrays in key-sorted order. This is implemented by using a TreeMap instead of a HashMap as the backing store for the associated array.
-* `-K <filename>` - writes the tuples to `<filename>`, and then halts.
-* `-L <filename>` - load previously compiled tuples from the specified file.
-* `-l <extension>`/`--load <extension>` - load an extension by its registered name, simple class name or fully qualified class name.
-* `--list-ext` - list available extensions and exit. The output contains the registered name followed by the implementing class and can be used as input for `-l`.
+Jawk follows the usual AWK distinction between the script itself and the remaining operands. Files and `name=value` operands after the script are visible through `ARGV` and `ARGC`.
 
-When using extension names that contain spaces, wrap them in quotes so the shell passes the value as a single argument (for example `-l "My Custom Extension"`).
+## Pass Variables
 
-You can rely on the JVM `-cp`/`-classpath` option to add directories or JARs containing extensions before launching `java -jar jawk-….jar`.
+Use `-v` for variables that must exist before `BEGIN` runs:
 
-* `-o <filename>` - Override the default output filename for extended parameters -z and -Z.
-* `-S`/`--sandbox` - Run Jawk in sandbox mode, disabling `system()`, redirections (`getline < file`, `print > file`, etc.), command pipelines, and loading dynamic extensions.
-* `--dump-syntax` - Print abstract syntax tree. Code is not executed.
-* `--dump-intermediate` - Print the intermediate code (tuples). Code is not executed.
-* `-s`/`--no-optimize` - Skip tuple queue optimizations during compilation.
-* `-r` - Allow IllegalFormatExceptions to be thrown when using the java.util.Formatter class for printf/sprintf. If the argument is not provided, the interpreter/compiled result catches IllegalFormatExceptions and silently returns a blank string in its place. If the argument is provided, the interpreter/compiled result will halt by throwing this runtime exception.
-* `-h`/`-?` - Displays a usage screen. The screen contains a list of command-line arguments and what each does.
+```shell-session
+$ java -jar jawk-${project.version}-standalone.jar -v prefix=hello 'BEGIN { print prefix }'
+hello
+```
 
-If `-f` is not provided, a script argument is expected here.
+Use `name=value` operands after the script for AWK-style file-list assignments that take effect before the next input file is consumed:
 
-Finally, one or more of the following parameters are consumed by **Jawk** and provided to the script via the ARGV/ARGC variables. The script can add/remove to this array to modify the behavior of the interpreter/compiled result.
+```shell-session
+$ java -jar jawk-${project.version}-standalone.jar '{ print mode ":" $0 }' mode=csv data.txt
+```
 
-* `<filename>` - Uses this file as input to the script. If the filename is invalid, an error is produced on stderr, but Jawk has no direct way of notifying the script.
-* `<name=value>` - Performs this assignment as a global variable assignment prior to the consumption of the next input file.
+Set the field separator with `-F` when you want Jawk to split text records differently:
 
-If the parameter contains an `=`, **Jawk** treats it like a variable assignment. Otherwise, it's a filename.
+```shell-session
+$ java -jar jawk-${project.version}-standalone.jar -F : '{ print $1 "," $6 }' /etc/passwd
+```
 
-> **Note:** Parameters passed into the command-line which result in non-execution of the script (i.e., --dump-syntax, --dump-intermediate, -h, -? and -z) cause **Jawk** to ignore filename and name=value parameters._
+## Load Extensions
 
-**Jawk** parses command-line parameters via the [`Cli`](apidocs/org/metricshub/jawk/Cli.html) class.
+List the currently registered extension identifiers:
 
-If an invalid command-line parameter is provided, **Jawk** will throw an *IllegalArgumentException* and terminate execution.
+```shell-session
+$ java -jar jawk-${project.version}-standalone.jar --list-ext
+```
+
+Then load one explicitly:
+
+```shell-session
+$ java -jar jawk-${project.version}-standalone.jar -l stdin -f script.awk
+```
+
+Jawk accepts the registered extension name, the simple class name, or the fully qualified class name. Additional extension classes can be placed on the JVM classpath before launching Jawk.
+
+## Enable Sandbox Mode
+
+Use `-S` or `--sandbox` to switch to the sandboxed tuple compiler and runtime:
+
+```shell-session
+$ java -jar jawk-${project.version}-standalone.jar -S -f script.awk input.txt
+```
+
+Sandbox mode disables `system()`, input and output redirection, command pipelines, and related runtime features that are intentionally unsafe in a restricted host environment.

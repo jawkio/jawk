@@ -80,11 +80,30 @@
 			<item name="Jawk" href="https://metricshub.org/jawk" />
 		</breadcrumbs>
 
-		<menu name="User Documentation">
-			<item name="Getting Started" href="index.html" />
-			<item name="Jawk CLI" href="cli.html" />
-			<item name="AWK in Java" href="java.html" />
-			<item name="Extensions" href="extensions.html" />
+		<menu name="Getting Started">
+			<item name="Overview" href="index.html" />
+			<item name="Installation" href="install.html" />
+		</menu>
+
+		<menu name="CLI">
+			<item name="CLI Basics" href="cli.html" />
+			<item name="CLI Reference" href="cli-reference.html" />
+		</menu>
+
+		<menu name="Java">
+			<item name="Jawk Quickstart" href="java.html" />
+			<item name="Structured Input and Variables" href="java-input.html" />
+			<item name="Compile, Eval, and Reuse" href="java-compile.html" />
+			<item name="Advanced Runtime" href="java-advanced.html" />
+		</menu>
+
+		<menu name="Extensions">
+			<item name="Using Extensions" href="extensions.html" />
+			<item name="Writing Extensions" href="extensions-writing.html" />
+		</menu>
+
+		<menu name="Reference">
+			<item name="Compatibility and Differences" href="compatibility.html" />
 		</menu>
 
 		<menu ref="reports" />

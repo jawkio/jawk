@@ -1,5 +1,9 @@
 package org.metricshub.jawk;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import org.metricshub.jawk.ext.AbstractExtension;
 import org.metricshub.jawk.ext.JawkExtension;
@@ -33,8 +37,10 @@ public class TestExtension extends AbstractExtension implements JawkExtension {
 	public String myExtensionFunction(Number count, @JawkAssocArray Map<Object, Object> array) {
 		StringBuilder result = new StringBuilder();
 		int iterations = count.intValue();
+		List<Object> keys = new ArrayList<>(array.keySet());
+		Collections.sort(keys, Comparator.comparing(String::valueOf));
 		for (int i = 0; i < iterations; i++) {
-			for (Object key : array.keySet()) {
+			for (Object key : keys) {
 				result.append(array.get(key));
 			}
 		}

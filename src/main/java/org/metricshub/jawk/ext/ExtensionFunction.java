@@ -36,6 +36,7 @@ import java.util.Objects;
 
 import org.metricshub.jawk.ext.annotations.JawkAssocArray;
 import org.metricshub.jawk.ext.annotations.JawkFunction;
+import org.metricshub.jawk.jrt.AssocArray;
 import org.metricshub.jawk.jrt.IllegalAwkArgumentException;
 
 /**
@@ -124,11 +125,13 @@ public final class ExtensionFunction implements Serializable {
 				if (parameter.isVarArgs()) {
 					parameterType = parameterType.getComponentType();
 				}
-				if (!Map.class.isAssignableFrom(parameterType)) {
+				if (!Map.class.isAssignableFrom(parameterType)
+						|| !parameterType.isAssignableFrom(AssocArray.class)) {
 					throw new IllegalStateException(
 							"Parameter " + idx + " of " + methodParam
 									+ " annotated with @" + JawkAssocArray.class.getSimpleName()
-									+ " must accept " + Map.class.getName());
+									+ " must accept " + AssocArray.class.getName()
+									+ " instances via " + Map.class.getName());
 				}
 				assoc[idx] = true;
 			}

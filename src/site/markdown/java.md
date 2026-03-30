@@ -33,7 +33,7 @@ Construct it with extension instances when you want those functions available to
 Awk awk = new Awk(StdinExtension.INSTANCE, new MyExtension());
 ```
 
-When you write custom extensions, annotate associative array parameters with `@JawkAssocArray` and declare them as `Map` values. The dedicated [Writing Extensions](extensions-writing.html) guide covers that contract in more detail.
+When you write custom extensions, annotate associative array parameters with `@JawkAssocArray` and declare them as `Map` values rather than concrete map implementations. The dedicated [Writing Extensions](extensions-writing.html) guide covers that contract in more detail.
 
 ## The Shortest Path: run()
 

@@ -21,7 +21,7 @@ Awk awk = new Awk();
 String result = awk.run("{ print toupper($0) }", "hello world");
 ```
 
-When writing custom extensions, annotate associative array parameters with `@JawkAssocArray` and declare them as `Map` values rather than `AssocArray`.
+When writing custom extensions, annotate associative array parameters with `@JawkAssocArray` and declare them as `Map` values rather than concrete map implementations.
 
 ## Documentation
 

@@ -3,12 +3,13 @@ package org.metricshub.jawk;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.util.HashMap;
 import org.junit.Test;
+import org.metricshub.jawk.AwkTestSupport.TestResult;
 import org.metricshub.jawk.ext.AbstractExtension;
 import org.metricshub.jawk.ext.JawkExtension;
 import org.metricshub.jawk.ext.annotations.JawkAssocArray;
 import org.metricshub.jawk.ext.annotations.JawkFunction;
-import org.metricshub.jawk.AwkTestSupport.TestResult;
 import org.metricshub.jawk.jrt.AwkRuntimeException;
 import org.metricshub.jawk.jrt.IllegalAwkArgumentException;
 
@@ -103,6 +104,28 @@ public class ExtensionTest {
 			fail("Expected IllegalStateException");
 		} catch (IllegalStateException ex) {
 			assertTrue(ex.getMessage().contains("java.util.Map"));
+		}
+	}
+
+	@Test
+	public void testAnnotatedAssocArrayMustNotUseConcreteMapImplementation() {
+		class InvalidExtension extends AbstractExtension implements JawkExtension {
+
+			@Override
+			public String getExtensionName() {
+				return "invalid-map";
+			}
+
+			@JawkFunction("invalid")
+			public int invalid(@JawkAssocArray HashMap<Object, Object> value) {
+				return value.size();
+			}
+		}
+		try {
+			new InvalidExtension().getExtensionFunctions();
+			fail("Expected IllegalStateException");
+		} catch (IllegalStateException ex) {
+			assertTrue(ex.getMessage().contains("AssocArray"));
 		}
 	}
 }

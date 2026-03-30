@@ -5,7 +5,7 @@ description: Quickstart guide for using Jawk from Java applications.
 
 <!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
 
-For almost all embedding scenarios, the main entry point is [`Awk`](apidocs/org/metricshub/jawk/Awk.html). It gives you the safe, high-level APIs for running full AWK programs, evaluating expressions, compiling tuples for reuse, and preparing records for repeated evaluation without forcing you to manage the runtime directly.
+For almost all embedding scenarios, the main entry point is [`Awk`](apidocs/io/jawk/Awk.html). It gives you the safe, high-level APIs for running full AWK programs, evaluating expressions, compiling tuples for reuse, and preparing records for repeated evaluation without forcing you to manage the runtime directly.
 
 > [!WARNING]
 > Treat `run()` as the shortest path, not the most configurable one. It is a convenience API for default behavior. If you need custom settings, sandboxing, explicit operands, or advanced runtime reuse, use `invoke()`, `eval()`, `prepareEval()`, or compiled tuples instead.

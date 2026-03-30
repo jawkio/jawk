@@ -1,10 +1,10 @@
 # Jawk
 
-![GitHub release (with filter)](https://img.shields.io/github/v/release/metricshub/jawk)
-![Build](https://img.shields.io/github/actions/workflow/status/metricshub/jawk/deploy.yml)
+![GitHub release (with filter)](https://img.shields.io/github/v/release/jawkio/jawk)
+![Build](https://img.shields.io/github/actions/workflow/status/jawkio/jawk/deploy.yml)
 ![Reproducible](https://img.shields.io/badge/build-reproducible-green)
-![GitHub top language](https://img.shields.io/github/languages/top/metricshub/jawk)
-![License](https://img.shields.io/github/license/metricshub/jawk)
+![GitHub top language](https://img.shields.io/github/languages/top/jawkio/jawk)
+![License](https://img.shields.io/github/license/jawkio/jawk)
 
 Jawk is a pure Java implementation of [AWK](https://en.wikipedia.org/wiki/AWK). You can run it as a CLI, embed it directly in Java applications, compile scripts to reusable tuples, evaluate AWK expressions, feed it structured input, load extensions explicitly, and enable a sandboxed runtime when you need tighter execution constraints.
 
@@ -25,11 +25,11 @@ When writing custom extensions, annotate associative array parameters with `@Jaw
 
 ## Documentation
 
-- Overview: https://metricshub.org/Jawk/index.html
-- CLI: https://metricshub.org/Jawk/cli.html
-- Java: https://metricshub.org/Jawk/java.html
-- Extensions: https://metricshub.org/Jawk/extensions.html
-- Writing Extensions: https://metricshub.org/Jawk/extensions-writing.html
+- Overview: https://jawk.io/index.html
+- CLI: https://jawk.io/cli.html
+- Java: https://jawk.io/java.html
+- Extensions: https://jawk.io/extensions.html
+- Writing Extensions: https://jawk.io/extensions-writing.html
 
 ## Contributing
 

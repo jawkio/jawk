@@ -38,7 +38,7 @@ When Jawk exposes AWK arrays back to a Java `Map`, numeric indexes are represent
 
 ## Variables from AwkSettings
 
-Use [`AwkSettings`](apidocs/org/metricshub/jawk/util/AwkSettings.html) for variables that should be present every time the engine runs:
+Use [`AwkSettings`](apidocs/io/jawk/util/AwkSettings.html) for variables that should be present every time the engine runs:
 
 ```java
 AwkSettings settings = new AwkSettings();
@@ -74,7 +74,7 @@ At the high level, `Awk.eval(...)` does not expose per-call overrides. If you ne
 
 ## Structured Input with InputSource
 
-[`InputSource`](apidocs/org/metricshub/jawk/jrt/InputSource.html) lets you feed records directly from your own data structures without serializing them to text first. This is the preferred integration point when your application already has rows, columns, or tokenized fields in memory.
+[`InputSource`](apidocs/io/jawk/jrt/InputSource.html) lets you feed records directly from your own data structures without serializing them to text first. This is the preferred integration point when your application already has rows, columns, or tokenized fields in memory.
 
 You can pass an `InputSource` to both:
 
@@ -106,7 +106,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.metricshub.jawk.jrt.InputSource;
+import io.jawk.jrt.InputSource;
 
 public final class TableInputSource implements InputSource {
     private final List<List<String>> rows;

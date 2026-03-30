@@ -12,7 +12,7 @@ Modern Jawk extensions are small Java classes that expose AWK-callable functions
 
 ## Prefer AbstractExtension
 
-[`AbstractExtension`](apidocs/org/metricshub/jawk/ext/AbstractExtension.html) already handles common extension plumbing:
+[`AbstractExtension`](apidocs/io/jawk/ext/AbstractExtension.html) already handles common extension plumbing:
 
 - it stores the `VariableManager`, `JRT`, and `AwkSettings`
 - it scans the extension class for annotated functions
@@ -113,9 +113,9 @@ Or expose it to the CLI after placing the class on the JVM classpath and registe
 $ java -cp my-extension.jar -jar jawk-${project.version}-standalone.jar --list-ext
 SampleExtension - com.company.my.SampleExtension
 sample - com.company.my.SampleExtension
-org.metricshub.jawk.ext.StdinExtension - org.metricshub.jawk.ext.StdinExtension
-stdin - org.metricshub.jawk.ext.StdinExtension
-Stdin Support - org.metricshub.jawk.ext.StdinExtension
+io.jawk.ext.StdinExtension - io.jawk.ext.StdinExtension
+stdin - io.jawk.ext.StdinExtension
+Stdin Support - io.jawk.ext.StdinExtension
 
 $ java -cp my-extension.jar -jar jawk-${project.version}-standalone.jar -l sample 'BEGIN { print Repeat(3, "ha") }'
 hahaha

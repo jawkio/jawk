@@ -45,7 +45,7 @@ $ java -jar jawk-${project.version}-standalone.jar -l stdin -f script.awk
 ```
 
 ```shell-session
-$ java -jar jawk-${project.version}-standalone.jar -l org.metricshub.jawk.ext.StdinExtension -f script.awk
+$ java -jar jawk-${project.version}-standalone.jar -l io.jawk.ext.StdinExtension -f script.awk
 ```
 
 If the extension class is not already registered, the CLI can still resolve it by fully qualified class name as long as the class is available on the JVM classpath.
@@ -66,7 +66,7 @@ The current built-in registry includes the stdin extension, which is exposed thr
 
 - `stdin`
 - `StdinExtension`
-- `org.metricshub.jawk.ext.StdinExtension`
+- `io.jawk.ext.StdinExtension`
 
 That extension provides advanced helper functions including `StdinHasInput()`, `StdinGetline()`, and `StdinBlock()`.
 

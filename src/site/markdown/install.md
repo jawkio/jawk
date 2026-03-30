@@ -11,7 +11,7 @@ Add Jawk to your project:
 
 ```xml
 <dependency>
-  <groupId>org.metricshub</groupId>
+  <groupId>jawk.io</groupId>
   <artifactId>jawk</artifactId>
   <version>${project.version}</version>
 </dependency>
@@ -21,7 +21,7 @@ Jawk artifacts are published on Maven Central, so standard Maven and Gradle buil
 
 ## Standalone Jar
 
-Download [jawk-${project.version}-standalone.jar](https://github.com/metricshub/Jawk/releases/download/v${project.version}/jawk-${project.version}-standalone.jar) from the [latest release](https://github.com/metricshub/Jawk/releases), then run it with Java:
+Download [jawk-${project.version}-standalone.jar](https://github.com/jawkio/jawk/releases/download/v${project.version}/jawk-${project.version}-standalone.jar) from the [latest release](https://github.com/jawkio/jawk/releases), then run it with Java:
 
 ```shell-session
 $ java -jar jawk-${project.version}-standalone.jar -?

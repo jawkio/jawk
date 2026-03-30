@@ -12,59 +12,33 @@
 		<noDefaultLinks>true</noDefaultLinks>
 		<keywords>awk</keywords>
 		<social>
-			<linkedin>metricshub</linkedin>
-			<custom>
-				<title>Join us on Slack!</title>
-				<href>https://metricshub.slack.com</href>
-				<icon>fa-brands fa-slack</icon>
-			</custom>
 			<custom>
 				<title>Jawk on GitHub</title>
-				<href>https://github.com/metricshub/jawk</href>
+				<href>https://github.com/jawkio/jawk</href>
 				<icon>fa-brands fa-github</icon>
 			</custom>
 		</social>
 		<additionalLinks>
 			<link>
-				<name>Terms of Service</name>
-				<href>https://metricshub.com/legal/general.html</href>
+				<name>Issue Tracker</name>
+				<href>https://github.com/jawkio/jawk/issues</href>
 			</link>
 			<link>
 				<name>Licenses</name>
 				<href>licenses.html</href>
 			</link>
 			<link>
-				<name>Privacy Policy</name>
-				<href>https://metricshub.com/legal/privacy.html</href>
-			</link>
-			<link>
-				<name>Cookie Policy</name>
-				<href>https://metricshub.com/legal/cookies.html</href>
-			</link>
-			<link>
-				<name>Disclaimer</name>
-				<href>https://metricshub.com/legal/disclaimer.html</href>
-			</link>
-			<link>
-				<name>Trademarks</name>
-				<href>https://metricshub.com/legal/trademarks.html</href>
-			</link>
-			<link>
-				<name>Code of Ethics</name>
-				<href>https://metricshub.com/legal/ethics.html</href>
-			</link>
-			<link>
-				<name>Code of Conduct</name>
-				<href>https://metricshub.org/code-of-conduct.html</href>
+				<name>Releases</name>
+				<href>https://github.com/jawkio/jawk/releases</href>
 			</link>
 			<link>
 				<name>How to Contribute</name>
-				<href>https://metricshub.org/contributing.html</href>
+				<href>https://github.com/jawkio/jawk/blob/main/CONTRIBUTING.md</href>
 			</link>
 		</additionalLinks>
 	</custom>
 
-	<bannerLeft href="https://metricshub.org/jawk">
+	<bannerLeft href="https://jawk.io">
 		<image src="images/jawk-logo-color-dark-351x80.png" alt="Jawk Logo" />
 	</bannerLeft>
 
@@ -72,12 +46,11 @@
 
 		<links>
 			<item name="The GNU Awk User's Guide" href="https://www.gnu.org/software/gawk/manual/gawk.html" />
-			<item name="Powers MetricsHub&reg;" href="https://metricshub.com" />
+			<item name="Jawk on GitHub" href="https://github.com/jawkio/jawk" />
 		</links>
 
 		<breadcrumbs>
-			<item name="Open MetricsHub" href="https://metricshub.org" />
-			<item name="Jawk" href="https://metricshub.org/jawk" />
+			<item name="Jawk" href="https://jawk.io" />
 		</breadcrumbs>
 
 		<menu name="Getting Started">

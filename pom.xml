@@ -7,17 +7,18 @@
 		<version>4</version>
 	</parent>
 
+	<groupId>jawk.io</groupId>
 	<artifactId>jawk</artifactId>
 	<version>5.0.01-SNAPSHOT</version>
 
 	<name>Jawk</name>
 	<description>Java AWK interpreter, allowing Java to call and execute AWK scripts in the JVM.</description>
-	<url>https://metricshub.org/Jawk</url>
+	<url>https://jawk.io</url>
 	<inceptionYear>2006</inceptionYear>
 
 	<organization>
-		<name>MetricsHub</name>
-		<url>https://metricshub.com</url>
+		<name>Jawk</name>
+		<url>https://jawk.io</url>
 	</organization>
 
 	<licenses>
@@ -35,12 +36,12 @@
 
 	<issueManagement>
 		<system>GitHub</system>
-		<url>https://github.com/metricshub/Jawk/issues/</url>
+		<url>https://github.com/jawkio/jawk/issues/</url>
 	</issueManagement>
 
 	<scm>
-		<connection>scm:git:https://github.com/metricshub/Jawk.git</connection>
-		<url>https://github.com/metricshub/Jawk</url>
+		<connection>scm:git:https://github.com/jawkio/jawk.git</connection>
+		<url>https://github.com/jawkio/jawk</url>
 		<tag>HEAD</tag>
 	</scm>
 
@@ -203,7 +204,7 @@
 					<archive>
 						<manifest>
 							<packageName>${project.groupId}</packageName>
-                                                        <mainClass>org.metricshub.jawk.Cli</mainClass>
+                                                        <mainClass>io.jawk.Cli</mainClass>
 						</manifest>
 					</archive>
 				</configuration>

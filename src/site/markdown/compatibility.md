@@ -29,7 +29,7 @@ This maintained fork diverges from the original project in several practical way
 - parsing and output performance have been improved
 - Jawk supports long integers
 - Jawk supports octal and hexadecimal notation in strings
-- the Maven coordinates and package root are `org.metricshub`
+- the Maven coordinates are `jawk.io:jawk` and the package root is `io.jawk`
 - gawk and bwk compatibility test suites have been added
 - the Maven artifact is published under the LGPL
 

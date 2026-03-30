@@ -1,7 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>org.metricshub</groupId>
+	<groupId>jawk.io</groupId>
 	<artifactId>jawk</artifactId>
 	<version>4.0.00-SNAPSHOT</version>
 
@@ -9,12 +9,12 @@
 
 	<name>Jawk</name>
 	<description>Java AWK interpreter, allowing Java to call and execute AWK scripts in the JVM.</description>
-	<url>https://metricshub.org/Jawk</url>
+	<url>https://jawk.io</url>
 	<inceptionYear>2006</inceptionYear>
 
 	<organization>
-		<name>MetricsHub</name>
-		<url>https://metricshub.com</url>
+		<name>Jawk</name>
+		<url>https://jawk.io</url>
 	</organization>
 
 	<distributionManagement>
@@ -43,12 +43,12 @@
 
 	<issueManagement>
 		<system>GitHub</system>
-		<url>https://github.com/metricshub/Jawk/issues/</url>
+		<url>https://github.com/jawkio/jawk/issues/</url>
 	</issueManagement>
 
 	<scm>
-		<connection>scm:git:https://github.com/metricshub/Jawk.git</connection>
-		<url>https://github.com/metricshub/Jawk</url>
+		<connection>scm:git:https://github.com/jawkio/jawk.git</connection>
+		<url>https://github.com/jawkio/jawk</url>
 		<tag>HEAD</tag>
 	</scm>
 
@@ -163,7 +163,7 @@
 				<version>2.3.0</version>
 				<configuration>
 					<licenseName>lgpl_v3</licenseName>
-					<copyrightOwners>MetricsHub</copyrightOwners>
+					<copyrightOwners>Jawk</copyrightOwners>
 					<copyrightStringFormat>Copyright %1$s %2$s</copyrightStringFormat>
 					<includes>
 						<include>main/java/**/*.java</include>
@@ -240,7 +240,7 @@
 					<archive>
 						<manifest>
 							<packageName>${project.groupId}</packageName>
-                                                    <mainClass>org.metricshub.jawk.Awk</mainClass>
+                                                    <mainClass>io.jawk.Awk</mainClass>
 						</manifest>
 					</archive>
 				</configuration>

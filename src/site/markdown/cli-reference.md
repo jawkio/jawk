@@ -5,7 +5,7 @@ description: Reference for Jawk command-line options and runtime operands.
 
 <!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
 
-This page documents the CLI surface implemented by [`Cli`](apidocs/org/metricshub/jawk/Cli.html). It focuses on the actual parser-backed options in the current codebase rather than historical flags from older Jawk documentation.
+This page documents the CLI surface implemented by [`Cli`](apidocs/io/jawk/Cli.html). It focuses on the actual parser-backed options in the current codebase rather than historical flags from older Jawk documentation.
 
 > [!CAUTION]
 > Precompiled tuples loaded with `-L` use Java serialization and are version-sensitive. If Jawk reports that a tuples file is incompatible, recompile it with the current Jawk version instead of trying to reuse the old file.

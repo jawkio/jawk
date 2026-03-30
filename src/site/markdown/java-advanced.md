@@ -30,7 +30,7 @@ This API binds the record once, reuses the same runtime state on purpose, and st
 
 ## Raw AVM Control
 
-Use [`AVM`](apidocs/org/metricshub/jawk/backend/AVM.html) directly only when you explicitly want to manage the runtime yourself:
+Use [`AVM`](apidocs/io/jawk/backend/AVM.html) directly only when you explicitly want to manage the runtime yourself:
 
 ```java
 AwkSettings settings = new AwkSettings();

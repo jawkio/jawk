@@ -18,7 +18,7 @@ mvn verify
 * `jawk-<VERSION>.jar`, to be used in downstream projects requiring Jawk
 * `jawk-<VERSION>-standalone.jar`, an executable JAR that behaves like `awk` or `gawk`
 
-The [documentation](metricshub.org/Jawk) is generated with Maven too:
+The [documentation](https://jawk.io) is generated with Maven too:
 
 ```bash
 mvn site

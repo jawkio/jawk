@@ -107,14 +107,15 @@ Object value = awk.eval("Repeat(3, \"ha\")");
 // value = "hahaha"
 ```
 
-Or expose it to the CLI after placing the class on the JVM classpath and loading the extension:
+Or expose it to the CLI after placing the class on the JVM classpath and registering it:
 
 ```shell-session
-$ java -jar jawk-${project.version}-standalone.jar --list-ext
+$ java -cp my-extension.jar -jar jawk-${project.version}-standalone.jar --list-ext
+SampleExtension - com.company.my.SampleExtension
+sample - com.company.my.SampleExtension
 org.metricshub.jawk.ext.StdinExtension - org.metricshub.jawk.ext.StdinExtension
 stdin - org.metricshub.jawk.ext.StdinExtension
 Stdin Support - org.metricshub.jawk.ext.StdinExtension
-StdinExtension - org.metricshub.jawk.ext.StdinExtension
 
 $ java -cp my-extension.jar -jar jawk-${project.version}-standalone.jar -l sample 'BEGIN { print Repeat(3, "ha") }'
 hahaha

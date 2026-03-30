@@ -31,6 +31,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import org.metricshub.jawk.ext.annotations.JawkAssocArray;
@@ -115,6 +116,36 @@ public final class ExtensionFunction implements Serializable {
 		return method;
 	}
 
+	/**
+	 * Inspects the declared Java parameters and records which ones are annotated
+	 * with {@link JawkAssocArray}.
+	 * <p>
+	 * The validation is intentionally stricter than checking
+	 * {@code Map.class.isAssignableFrom(parameterType)} alone. Jawk passes runtime
+	 * associative arrays as {@link AssocArray} instances, so the declared parameter
+	 * type must satisfy two constraints:
+	 * </p>
+	 * <ul>
+	 * <li>it must be a {@link Map} type, because {@code @JawkAssocArray} is a
+	 * map-shaped contract for extension authors</li>
+	 * <li>it must also be able to receive an {@link AssocArray} instance at
+	 * invocation time</li>
+	 * </ul>
+	 * <p>
+	 * That second constraint rejects concrete map implementations such as
+	 * {@link java.util.HashMap}. A declaration like
+	 * {@code @JawkAssocArray HashMap<Object, Object>} is map-shaped, but it is not
+	 * compatible with the {@link AssocArray} values that Jawk actually passes, so
+	 * letting it register here would only defer the failure until reflective
+	 * invocation.
+	 * </p>
+	 *
+	 * @param methodParam method whose parameters are being inspected
+	 * @param parameters declared parameters of {@code methodParam}
+	 * @return flags indicating which parameter positions require associative arrays
+	 * @throws IllegalStateException when an annotated parameter cannot receive the
+	 *         runtime {@link AssocArray} values provided by Jawk
+	 */
 	private boolean[] inspectParameters(Method methodParam, Parameter[] parameters) {
 		boolean[] assoc = new boolean[parameters.length];
 		for (int idx = 0; idx < parameters.length; idx++) {
@@ -124,11 +155,13 @@ public final class ExtensionFunction implements Serializable {
 				if (parameter.isVarArgs()) {
 					parameterType = parameterType.getComponentType();
 				}
-				if (!AssocArray.class.isAssignableFrom(parameterType)) {
+				if (!Map.class.isAssignableFrom(parameterType)
+						|| !parameterType.isAssignableFrom(AssocArray.class)) {
 					throw new IllegalStateException(
 							"Parameter " + idx + " of " + methodParam
 									+ " annotated with @" + JawkAssocArray.class.getSimpleName()
-									+ " must accept " + AssocArray.class.getName());
+									+ " must accept " + AssocArray.class.getName()
+									+ " instances via " + Map.class.getName());
 				}
 				assoc[idx] = true;
 			}
@@ -336,7 +369,7 @@ public final class ExtensionFunction implements Serializable {
 				continue;
 			}
 			Object argument = args[idx];
-			if (!(argument instanceof AssocArray)) {
+			if (!(argument instanceof Map)) {
 				throw new IllegalAwkArgumentException(
 						"Argument " + idx + " passed to extension function '" + keyword
 								+ "' must be an associative array");
@@ -345,7 +378,7 @@ public final class ExtensionFunction implements Serializable {
 		if (varArgs && varArgAssocArray) {
 			for (int idx = mandatoryParameterCount; idx < argCount; idx++) {
 				Object argument = args[idx];
-				if (!(argument instanceof AssocArray)) {
+				if (!(argument instanceof Map)) {
 					throw new IllegalAwkArgumentException(
 							"Argument " + idx + " passed to extension function '" + keyword
 									+ "' must be an associative array");

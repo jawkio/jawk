@@ -21,12 +21,15 @@ Awk awk = new Awk();
 String result = awk.run("{ print toupper($0) }", "hello world");
 ```
 
+When writing custom extensions, annotate associative array parameters with `@JawkAssocArray` and declare them as `Map` values rather than `AssocArray`.
+
 ## Documentation
 
 - Overview: https://metricshub.org/Jawk/index.html
 - CLI: https://metricshub.org/Jawk/cli.html
 - Java: https://metricshub.org/Jawk/java.html
 - Extensions: https://metricshub.org/Jawk/extensions.html
+- Writing Extensions: https://metricshub.org/Jawk/extensions-writing.html
 
 ## Contributing
 

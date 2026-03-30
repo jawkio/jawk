@@ -4,6 +4,10 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import org.junit.Test;
+import org.metricshub.jawk.ext.AbstractExtension;
+import org.metricshub.jawk.ext.JawkExtension;
+import org.metricshub.jawk.ext.annotations.JawkAssocArray;
+import org.metricshub.jawk.ext.annotations.JawkFunction;
 import org.metricshub.jawk.AwkTestSupport.TestResult;
 import org.metricshub.jawk.jrt.AwkRuntimeException;
 import org.metricshub.jawk.jrt.IllegalAwkArgumentException;
@@ -78,5 +82,27 @@ public class ExtensionTest {
 			return;
 		}
 		fail("Expected IllegalAwkArgumentException but got " + thrown.getClass().getName());
+	}
+
+	@Test
+	public void testAnnotatedAssocArrayMustAcceptMap() {
+		class InvalidExtension extends AbstractExtension implements JawkExtension {
+
+			@Override
+			public String getExtensionName() {
+				return "invalid";
+			}
+
+			@JawkFunction("invalid")
+			public int invalid(@JawkAssocArray Number value) {
+				return value.intValue();
+			}
+		}
+		try {
+			new InvalidExtension().getExtensionFunctions();
+			fail("Expected IllegalStateException");
+		} catch (IllegalStateException ex) {
+			assertTrue(ex.getMessage().contains("java.util.Map"));
+		}
 	}
 }

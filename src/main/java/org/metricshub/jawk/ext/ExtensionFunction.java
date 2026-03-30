@@ -31,11 +31,11 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import org.metricshub.jawk.ext.annotations.JawkAssocArray;
 import org.metricshub.jawk.ext.annotations.JawkFunction;
-import org.metricshub.jawk.jrt.AssocArray;
 import org.metricshub.jawk.jrt.IllegalAwkArgumentException;
 
 /**
@@ -124,11 +124,11 @@ public final class ExtensionFunction implements Serializable {
 				if (parameter.isVarArgs()) {
 					parameterType = parameterType.getComponentType();
 				}
-				if (!AssocArray.class.isAssignableFrom(parameterType)) {
+				if (!Map.class.isAssignableFrom(parameterType)) {
 					throw new IllegalStateException(
 							"Parameter " + idx + " of " + methodParam
 									+ " annotated with @" + JawkAssocArray.class.getSimpleName()
-									+ " must accept " + AssocArray.class.getName());
+									+ " must accept " + Map.class.getName());
 				}
 				assoc[idx] = true;
 			}
@@ -336,7 +336,7 @@ public final class ExtensionFunction implements Serializable {
 				continue;
 			}
 			Object argument = args[idx];
-			if (!(argument instanceof AssocArray)) {
+			if (!(argument instanceof Map)) {
 				throw new IllegalAwkArgumentException(
 						"Argument " + idx + " passed to extension function '" + keyword
 								+ "' must be an associative array");
@@ -345,7 +345,7 @@ public final class ExtensionFunction implements Serializable {
 		if (varArgs && varArgAssocArray) {
 			for (int idx = mandatoryParameterCount; idx < argCount; idx++) {
 				Object argument = args[idx];
-				if (!(argument instanceof AssocArray)) {
+				if (!(argument instanceof Map)) {
 					throw new IllegalAwkArgumentException(
 							"Argument " + idx + " passed to extension function '" + keyword
 									+ "' must be an associative array");

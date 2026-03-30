@@ -26,9 +26,11 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.util.Map;
 
 /**
- * Marks an extension function parameter as requiring an associative array.
+ * Marks an extension function parameter as requiring an associative array
+ * backed by a {@link Map}.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.PARAMETER)

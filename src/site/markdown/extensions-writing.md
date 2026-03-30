@@ -39,11 +39,11 @@ The annotation value is the AWK function name seen by the script.
 
 ## Mark Assoc Array Parameters with @JawkAssocArray
 
-Use `@JawkAssocArray` on parameters that must receive an associative array:
+Use `@JawkAssocArray` on parameters that must receive an associative array. Annotated parameters must accept `Map`, which keeps the extension API decoupled from the concrete `AssocArray` implementation Jawk may provide at runtime:
 
 ```java
 @JawkFunction("AssocSize")
-public int assocSize(@JawkAssocArray AssocArray array) {
+public int assocSize(@JawkAssocArray Map<Object, Object> array) {
     return array.keySet().size();
 }
 ```
@@ -81,7 +81,7 @@ public final class SampleExtension extends AbstractExtension {
     }
 
     @JawkFunction("AssocSize")
-    public int assocSize(@JawkAssocArray AssocArray array) {
+    public int assocSize(@JawkAssocArray Map<Object, Object> array) {
         return array.keySet().size();
     }
 }
@@ -111,7 +111,15 @@ Or expose it to the CLI after placing the class on the JVM classpath and registe
 
 ```shell-session
 $ java -cp my-extension.jar -jar jawk-${project.version}-standalone.jar --list-ext
+SampleExtension - com.company.my.SampleExtension
+sample - com.company.my.SampleExtension
+org.metricshub.jawk.ext.StdinExtension - org.metricshub.jawk.ext.StdinExtension
+stdin - org.metricshub.jawk.ext.StdinExtension
+Stdin Support - org.metricshub.jawk.ext.StdinExtension
+StdinExtension - org.metricshub.jawk.ext.StdinExtension
+
 $ java -cp my-extension.jar -jar jawk-${project.version}-standalone.jar -l sample 'BEGIN { print Repeat(3, "ha") }'
+hahaha
 ```
 
 ## See Also

@@ -9,23 +9,25 @@ Jawk exposes three distinct concepts that are easy to blur together if you come 
 
 - runtime `arguments` are CLI-style operands exposed through `ARGV` and `ARGC`
 - `AwkSettings` variables are engine-level defaults
-- per-call `variableOverrides` are Java-side overrides on selected APIs
+- `run(...)` and `AVM.interpret(...)` accept per-call variable overrides
 
 > [!IMPORTANT]
-> `AwkSettings` is behavioral configuration, not an input carrier. Put field separators, locale, record separators, output streams, and engine-level variables there. Pass input and operands directly to `invoke()` or `eval()`.
+> `AwkSettings` is behavioral configuration, not an input carrier. Put field separators, locale, record separators, default output targets, and engine-level variables there. Pass input directly through `run(...)`, `AVM.interpret(...)`, or `eval(...)`.
 
 ## Runtime Arguments, ARGC, and ARGV
 
-The `arguments` parameter on `Awk.invoke(...)` is the Java equivalent of the CLI operands that appear after the script:
+The `arguments` passed to `run(...)` or `AVM.interpret(...)` are the Java equivalent of the CLI operands that appear after the script:
 
 ```java
 Awk awk = new Awk();
-AwkTuples tuples = awk.compile("BEGIN { print ARGC, ARGV[1] }");
+AwkProgram program = awk.compile("BEGIN { print ARGC, ARGV[1] }");
 
-InputStream input = new ByteArrayInputStream(new byte[0]);
-List<String> arguments = Arrays.asList("mode=csv");
-
-awk.invoke(tuples, input, arguments);
+awk.run(
+        program,
+        myInputSource,
+        Arrays.asList("mode=csv"),
+        null,
+        null);
 ```
 
 Those operands follow AWK rules:
@@ -55,31 +57,30 @@ When you pass a plain Java `Map`, Jawk exposes it directly to the script. The ru
 
 ## Per-Call Variable Overrides
 
-The tuple-based `Awk.invoke(...)` overloads accept per-call variable overrides on top of the settings-level defaults:
+Use the explicit `variableOverrides` parameter when the compiled program stays the same but one execution needs a different Java-supplied variable set:
 
 ```java
 Awk awk = new Awk();
-AwkTuples tuples = awk.compile("{ print prefix $0 }");
+AwkProgram program = awk.compile("{ print prefix $0 }");
 
-Map<String, Object> overrides = new HashMap<String, Object>();
-overrides.put("prefix", "row=");
-
-InputStream input = new ByteArrayInputStream("alpha\n".getBytes(StandardCharsets.UTF_8));
-awk.invoke(tuples, input, Collections.<String>emptyList(), overrides);
+awk.run(
+        program,
+        myInputSource,
+        Collections.<String>emptyList(),
+        Collections.<String, Object>singletonMap("prefix", "row="),
+        null);
 ```
 
-Use this when the compiled tuples stay the same but one invocation needs a different Java-supplied variable set.
-
-At the high level, `Awk.eval(...)` does not expose per-call overrides. If you need that shape for expression evaluation, the lower-level `AVM` API [exposes it directly](java-advanced.html).
+The same idea is available on the reusable runtime API through `AVM.interpret(...)` and `AVM.prepareForEval(...)`.
 
 ## Structured Input with InputSource
 
 [`InputSource`](apidocs/io/jawk/jrt/InputSource.html) lets you feed records directly from your own data structures without serializing them to text first. This is the preferred integration point when your application already has rows, columns, or tokenized fields in memory.
 
-You can pass an `InputSource` to both:
+You can use an `InputSource` with both:
 
-- `Awk.invoke(...)` for full AWK programs
-- `Awk.eval(...)` for expression evaluation
+- `Awk.run(program, inputSource, arguments, variableOverrides, sink)`
+- `Awk.eval(expression, source)` for one-off expression evaluation
 
 ## InputSource Contract
 
@@ -159,6 +160,6 @@ Object value = awk.eval("$1 \"-\" $3", source);
 
 ## See Also
 
-- [Java quickstart](java.html)
-- [Eval and tuple reuse](java-compile.html)
-- [Advanced runtime and `AVM`](java-advanced.html)
+- [Jawk in Java](java.html)
+- [Compile, eval, and reuse](java-compile.html)
+- [Advanced runtime](java-advanced.html)

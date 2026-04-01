@@ -85,7 +85,7 @@ public class AwkTuples implements Serializable {
 	/** Whether optimization passes have already been applied. */
 	private boolean optimized;
 
-	/** Whether this tuple stream was produced by {@code compileForEval()}. */
+	/** Whether this tuple stream was produced by {@code compileExpression()}. */
 	private boolean evalTupleStream;
 
 	/**

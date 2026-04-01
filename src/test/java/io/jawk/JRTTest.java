@@ -9,6 +9,7 @@ import org.junit.Assume;
 import org.junit.Test;
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.jrt.AssocArray;
+import io.jawk.jrt.AwkSink;
 import io.jawk.jrt.JRT;
 
 public class JRTTest {
@@ -144,7 +145,7 @@ public class JRTTest {
 	@Test
 	public void testSplitSetsFieldZero() {
 		AssocArray aa = AssocArray.createHash();
-		JRT jrt = new JRT(null, Locale.US);
+		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
 		jrt.setCONVFMT("%.6g");
 		int n = jrt.split(aa, "a b");
 		assertEquals(2, n);
@@ -154,7 +155,7 @@ public class JRTTest {
 	@Test
 	public void testSplitUsesLongIndexesForPlainMap() {
 		Map<Object, Object> map = new LinkedHashMap<>();
-		JRT jrt = new JRT(null, Locale.US);
+		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
 		jrt.setCONVFMT("%.6g");
 		int n = jrt.split(map, "a b");
 		assertEquals(2, n);
@@ -167,7 +168,7 @@ public class JRTTest {
 	@Test
 	public void testSplitRegexWhitespace() {
 		AssocArray aa = AssocArray.createHash();
-		JRT jrt = new JRT(null, Locale.US);
+		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
 		jrt.setCONVFMT("%.6g");
 		int n = jrt.split("[ \t]+", aa, " 9853   shen");
 		assertEquals(3, n);

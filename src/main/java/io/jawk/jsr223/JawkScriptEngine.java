@@ -22,13 +22,15 @@ import java.io.ByteArrayInputStream;
  * <http://www.gnu.org/licenses/lgpl-3.0.html>.
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
-import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.io.PrintStream;
 import java.io.Reader;
 import java.io.StringReader;
+import java.io.StringWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import javax.script.AbstractScriptEngine;
 import javax.script.Bindings;
 import javax.script.ScriptContext;
@@ -37,8 +39,11 @@ import javax.script.ScriptException;
 import javax.script.SimpleBindings;
 import io.jawk.Awk;
 import io.jawk.ExitException;
+import io.jawk.backend.AVM;
+import io.jawk.jrt.AppendableAwkSink;
+import io.jawk.jrt.InputSource;
+import io.jawk.jrt.StreamInputSource;
 import io.jawk.util.AwkSettings;
-import io.jawk.util.ScriptSource;
 
 /**
  * Simple JSR-223 script engine for Jawk that delegates execution to the
@@ -75,21 +80,20 @@ public class JawkScriptEngine extends AbstractScriptEngine {
 			AwkSettings settings = new AwkSettings();
 			settings.setDefaultRS("\n");
 			settings.setDefaultORS("\n");
-			ByteArrayOutputStream result = new ByteArrayOutputStream();
-			try {
-				settings.setOutputStream(new PrintStream(result, false, StandardCharsets.UTF_8.name()));
-			} catch (java.io.UnsupportedEncodingException e) {
-				throw new IllegalStateException(e);
-			}
+			StringWriter result = new StringWriter();
 			Awk awk = new Awk(settings);
-			// Execute the AWK script using the configured settings
-			awk
-					.invoke(
-							new ScriptSource(
-									ScriptSource.DESCRIPTION_COMMAND_LINE_SCRIPT,
-									scriptReader),
-							input);
-			String out = result.toString(StandardCharsets.UTF_8.name());
+			Map<String, Object> variableOverrides = extractVariableOverrides(context);
+			try (AVM avm = awk.createAvm()) {
+				avm.setAwkSink(new AppendableAwkSink(result, settings.getLocale()));
+				InputSource inputSource = new StreamInputSource(input, avm, avm.getJrt());
+				avm
+						.interpret(
+								awk.compile(scriptReader),
+								inputSource,
+								Collections.<String>emptyList(),
+								variableOverrides);
+			}
+			String out = result.toString();
 			Writer writer = context.getWriter();
 			if (writer != null) {
 				// Write result to the script context's writer if provided
@@ -123,5 +127,28 @@ public class JawkScriptEngine extends AbstractScriptEngine {
 	@Override
 	public ScriptEngineFactory getFactory() {
 		return factory;
+	}
+
+	private static Map<String, Object> extractVariableOverrides(ScriptContext context) {
+		Map<String, Object> variables = new HashMap<String, Object>();
+		mergeBindings(variables, context, ScriptContext.GLOBAL_SCOPE);
+		mergeBindings(variables, context, ScriptContext.ENGINE_SCOPE);
+		variables.remove("input");
+		return variables;
+	}
+
+	private static void mergeBindings(Map<String, Object> target, ScriptContext context, int scope) {
+		Bindings bindings = context.getBindings(scope);
+		if (bindings != null) {
+			for (Map.Entry<String, Object> entry : bindings.entrySet()) {
+				if (isSupportedBindingValue(entry.getValue())) {
+					target.put(entry.getKey(), entry.getValue());
+				}
+			}
+		}
+	}
+
+	private static boolean isSupportedBindingValue(Object value) {
+		return value instanceof String || value instanceof Number || value instanceof Map;
 	}
 }

@@ -1849,7 +1849,7 @@ public class AwkParser {
 		}
 	}
 
-	private ParsedPrintStatement parsePrintStatement() throws IOException {
+	private ParsedPrintStatement parsePrintStatement(String keyword) throws IOException {
 		AST funcParams;
 		Token outputToken;
 		AST outputExpr;
@@ -1857,7 +1857,7 @@ public class AwkParser {
 
 		if (token == Token.OPEN_PAREN) {
 			parenthesized = true;
-			funcParams = parseParenthesizedPrintArguments();
+			funcParams = parseParenthesizedPrintArguments(keyword);
 		} else if (endsPrintArgumentList(token)) {
 			funcParams = null;
 		} else {
@@ -1887,11 +1887,10 @@ public class AwkParser {
 				|| candidate == Token.EOF;
 	}
 
-	private AST parseParenthesizedPrintArguments() throws IOException {
+	private AST parseParenthesizedPrintArguments(String keyword) throws IOException {
 		lexer(); // consume '('
 		if (token == Token.CLOSE_PAREN) {
-			lexer(Token.CLOSE_PAREN);
-			return null;
+			throw parserException(keyword + "() requires at least one argument.");
 		}
 
 		AST params = EXPRESSION_LIST(true, true); // allow comparisons and “in” within parentheses
@@ -1914,7 +1913,7 @@ public class AwkParser {
 
 	AST PRINT_STATEMENT() throws IOException {
 		expectKeyword("print");
-		ParsedPrintStatement parsedPrintStatement = parsePrintStatement();
+		ParsedPrintStatement parsedPrintStatement = parsePrintStatement("print");
 
 		AST params = parsedPrintStatement.getFuncParams();
 		if (parsedPrintStatement.isParenthesized()
@@ -1939,7 +1938,7 @@ public class AwkParser {
 
 	AST PRINTF_STATEMENT() throws IOException {
 		expectKeyword("printf");
-		ParsedPrintStatement parsedPrintStatement = parsePrintStatement();
+		ParsedPrintStatement parsedPrintStatement = parsePrintStatement("printf");
 
 		AST params = parsedPrintStatement.getFuncParams();
 		if (parsedPrintStatement.isParenthesized()

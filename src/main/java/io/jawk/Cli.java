@@ -43,7 +43,6 @@ import io.jawk.ext.ExtensionRegistry;
 import io.jawk.ext.JawkExtension;
 import io.jawk.ext.StdinExtension;
 import io.jawk.frontend.AstNode;
-import io.jawk.intermediate.AwkTuples;
 import io.jawk.jrt.AwkRuntimeException;
 import io.jawk.util.AwkSettings;
 import io.jawk.util.ScriptFileSource;
@@ -73,7 +72,7 @@ public final class Cli {
 	private final List<String> nameValueOrFileNames = new ArrayList<String>();
 
 	private final List<ScriptSource> scriptSources = new ArrayList<ScriptSource>();
-	private AwkTuples precompiledTuples;
+	private AwkProgram precompiledProgram;
 	private final List<String> extensionSpecs = new ArrayList<String>();
 	private boolean listExtensions;
 
@@ -145,13 +144,13 @@ public final class Cli {
 	}
 
 	/**
-	 * Returns the precompiled tuples loaded via the <code>-L</code> option, if any.
+	 * Returns the precompiled program loaded via the <code>-L</code> option, if any.
 	 *
-	 * @return the tuples or {@code null} if none were loaded
+	 * @return the program or {@code null} if none were loaded
 	 */
 	@SuppressFBWarnings("EI_EXPOSE_REP")
-	public AwkTuples getPrecompiledTuples() {
-		return precompiledTuples;
+	public AwkProgram getPrecompiledProgram() {
+		return precompiledProgram;
 	}
 
 	/**
@@ -195,7 +194,7 @@ public final class Cli {
 				checkParameterHasArgument(args, argIdx);
 				String file = args[++argIdx];
 				try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
-					precompiledTuples = (AwkTuples) ois.readObject();
+					precompiledProgram = (AwkProgram) ois.readObject();
 				} catch (java.io.InvalidClassException ex) {
 					throw new IllegalArgumentException(
 							"Precompiled tuples '" + file + "' are not compatible with this version (" + ex.getMessage()
@@ -235,9 +234,6 @@ public final class Cli {
 			} else if (arg.equals("-t")) {
 				// -t : keep associative array keys sorted
 				settings.setUseSortedArrayKeys(true);
-			} else if (arg.equals("-r")) {
-				// -r : do not trap IllegalFormatExceptions
-				settings.setCatchIllegalFormatExceptions(false);
 			} else if (arg.equals("-F")) {
 				// -F fs : set field separator
 				checkParameterHasArgument(args, argIdx);
@@ -259,7 +255,7 @@ public final class Cli {
 			++argIdx;
 		}
 
-		if (scriptSources.isEmpty() && precompiledTuples == null) {
+		if (scriptSources.isEmpty() && precompiledProgram == null) {
 			if (argIdx >= args.length) {
 				throw new IllegalArgumentException("Awk script not provided.");
 			}
@@ -367,11 +363,8 @@ public final class Cli {
 		} else {
 			awk = extensions.isEmpty() ? new Awk(settings) : new Awk(extensions, settings);
 		}
-		// Use precompiled tuples if provided; otherwise compile the scripts now
-		AwkTuples tuples = precompiledTuples != null ? precompiledTuples : awk.compile(scriptSources, disableOptimize);
-		if (precompiledTuples != null && !disableOptimize) {
-			tuples.optimize();
-		}
+		// Use the precompiled program if provided; otherwise compile the scripts now.
+		AwkProgram program = precompiledProgram != null ? precompiledProgram : awk.compile(scriptSources, disableOptimize);
 		if (dumpSyntaxTree) {
 			AstNode ast = awk.getLastAst();
 			if (ast != null) {
@@ -379,12 +372,12 @@ public final class Cli {
 			}
 		}
 		if (dumpIntermediateCode) {
-			tuples.dump(out);
+			program.dump(out);
 		}
 		if (compileOutputFile != null) {
-			// Serialize tuples to the requested file and exit
+			// Serialize the compiled program to the requested file and exit.
 			try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(compileOutputFile))) {
-				oos.writeObject(tuples);
+				oos.writeObject(program);
 			}
 			return;
 		}
@@ -392,8 +385,8 @@ public final class Cli {
 			// If only dumping information, no need to execute the script
 			return;
 		}
-		// Finally run the compiled tuples with the input and arguments
-		awk.invoke(tuples, inputStream, nameValueOrFileNames);
+		// Finally run the compiled program with the input and arguments.
+		awk.execute(program, inputStream, nameValueOrFileNames, null, null);
 	}
 
 	/**
@@ -444,7 +437,6 @@ public final class Cli {
 		dest.println(" --dump-syntax = Print the syntax tree.");
 		dest.println(" --dump-intermediate = Print the intermediate code.");
 		dest.println(" -s, --no-optimize = (extension) Disable tuple queue optimizations during compilation.");
-		dest.println(" -r = (extension) Do NOT hide IllegalFormatExceptions for [s]printf.");
 		dest.println(" --locale Locale = (extension) Specify a locale to be used instead of US-English");
 		dest.println(" --list-ext = (extension) List available extensions.");
 		dest.println();

@@ -39,7 +39,6 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.IllegalFormatException;
 import java.util.List;
 import java.util.Locale;
@@ -89,37 +88,15 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
  */
 public class JRT {
 
-	/**
-	 * Abstraction used by the runtime to write AWK output. The default
-	 * implementation delegates to a {@link PrintStream}, but subclasses may
-	 * return sinks backed by structured writers or in-memory buffers.
-	 */
-	public interface OutputSink {
-
-		/**
-		 * Writes the provided string to the sink.
-		 *
-		 * @param value text to write
-		 */
-		void write(String value);
-
-		/**
-		 * Flushes any buffered output held by the sink.
-		 */
-		void flush();
-	}
-
 	private static final boolean IS_WINDOWS = System.getProperty("os.name").indexOf("Windows") >= 0;
 
-	private VariableManager vm;
+	private final VariableManager vm;
 
 	private IoState ioState;
-	private final Map<PrintStream, OutputSink> outputSinkCache = new IdentityHashMap<PrintStream, OutputSink>();
-	/** PrintStream used for command output */
-	private PrintStream output = System.out;
+	/** Output sink used for plain AWK print/printf output. */
+	private AwkSink awkSink;
 	/** PrintStream used for command error output */
-	private PrintStream error = System.err;
-
+	private final PrintStream error;
 	// Last input line consumed for getline-style transport.
 	private String inputLine = null;
 	// Current record state ($0, $1, $2, ...).
@@ -146,59 +123,74 @@ public class JRT {
 	private String convfmt; // number-to-string format
 	private String ofmt; // number-to-string for output
 	private String subsep; // subscript separator
-	private Locale locale; // locale for number formatting
+	private final Locale locale; // locale for number formatting
 
-	private static final class PrintStreamOutputSink implements OutputSink {
+	private static final class FileOutputState {
 
-		private final PrintStream printStream;
+		private final AwkSink sink;
 
-		private PrintStreamOutputSink(PrintStream printStream) {
-			this.printStream = printStream;
+		private FileOutputState(AwkSink sinkParam) {
+			this.sink = Objects.requireNonNull(sinkParam, "sink");
 		}
+	}
 
-		@Override
-		public void write(String value) {
-			printStream.print(value);
+	private static final class CommandInputState {
+
+		private final Process process;
+		private final PartitioningReader reader;
+		private final Thread errorPump;
+
+		private CommandInputState(Process processParam, PartitioningReader readerParam, Thread errorPumpParam) {
+			this.process = Objects.requireNonNull(processParam, "process");
+			this.reader = Objects.requireNonNull(readerParam, "reader");
+			this.errorPump = errorPumpParam;
 		}
+	}
 
-		@Override
-		public void flush() {
-			printStream.flush();
+	private static final class ProcessOutputState {
+
+		private final Process process;
+		private final AwkSink sink;
+		private final PrintStream processOutput;
+		private final Thread stdoutPump;
+		private final Thread stderrPump;
+
+		private ProcessOutputState(
+				Process processParam,
+				AwkSink sinkParam,
+				PrintStream processOutputParam,
+				Thread stdoutPumpParam,
+				Thread stderrPumpParam) {
+			this.process = Objects.requireNonNull(processParam, "process");
+			this.sink = Objects.requireNonNull(sinkParam, "sink");
+			this.processOutput = Objects.requireNonNull(processOutputParam, "processOutput");
+			this.stdoutPump = stdoutPumpParam;
+			this.stderrPump = stderrPumpParam;
 		}
 	}
 
 	private static final class IoState {
 
-		private final Map<String, Process> outputProcesses = new HashMap<String, Process>();
-		private final Map<String, PrintStream> outputStreams = new HashMap<String, PrintStream>();
 		private final Map<String, PartitioningReader> fileReaders = new HashMap<String, PartitioningReader>();
-		private final Map<String, PartitioningReader> commandReaders = new HashMap<String, PartitioningReader>();
-		private final Map<String, Process> commandProcesses = new HashMap<String, Process>();
-		private final Map<String, Thread> commandErrorPumps = new HashMap<String, Thread>();
-		private final Map<String, PrintStream> outputFiles = new HashMap<String, PrintStream>();
-		private final Map<String, Thread> outputStdoutPumps = new HashMap<String, Thread>();
-		private final Map<String, Thread> outputStderrPumps = new HashMap<String, Thread>();
+		private final Map<String, CommandInputState> commandInputs = new HashMap<String, CommandInputState>();
+		private final Map<String, FileOutputState> fileOutputs = new HashMap<String, FileOutputState>();
+		private final Map<String, ProcessOutputState> processOutputs = new HashMap<String, ProcessOutputState>();
 	}
 
 	/**
-	 * Create a JRT with a VariableManager
-	 *
-	 * @param vm The VariableManager to use with this JRT.
-	 */
-	public JRT(VariableManager vm) {
-		this(vm, Locale.getDefault());
-	}
-
-	/**
-	 * Create a JRT with a VariableManager and a Locale
+	 * Create a JRT with explicit default output and error streams.
 	 *
 	 * @param vm The VariableManager to use with this JRT.
 	 * @param locale The Locale to use for number formatting.
+	 * @param awkSink default output sink used by plain AWK print operations
+	 * @param error default error stream used for process stderr
 	 */
-	@SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "JRT must hold the provided VariableManager for later use")
-	public JRT(VariableManager vm, Locale locale) {
+	@SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "JRT must hold the provided runtime collaborators for later use")
+	public JRT(VariableManager vm, Locale locale, AwkSink awkSink, PrintStream error) {
 		this.vm = vm;
-		this.locale = locale;
+		this.locale = locale == null ? Locale.US : locale;
+		this.awkSink = Objects.requireNonNull(awkSink, "awkSink");
+		this.error = error == null ? System.err : error;
 		this.nr = 0L;
 		this.fnr = 0L;
 		this.rstart = 0;
@@ -214,14 +206,13 @@ public class JRT {
 	}
 
 	/**
-	 * Sets the streams for spawned command output and error.
+	 * Sets the sink used by default {@code print} and {@code printf}
+	 * operations.
 	 *
-	 * @param ps PrintStream to send command output to
-	 * @param err PrintStream to send command error output to
+	 * @param sink output sink to use
 	 */
-	public void setStreams(PrintStream ps, PrintStream err) {
-		output = ps == null ? System.out : ps;
-		error = err == null ? System.err : err;
+	public void setAwkSink(AwkSink sink) {
+		awkSink = Objects.requireNonNull(sink, "awkSink");
 	}
 
 	private IoState getIoState() {
@@ -335,7 +326,6 @@ public class JRT {
 	 */
 	private void clearExecutionState() {
 		ioState = null;
-		outputSinkCache.clear();
 		inputLine = null;
 		recordState = null;
 		activeSource = null;
@@ -1808,18 +1798,11 @@ public class JRT {
 	 * @return a {@link java.util.Map} object
 	 */
 	public Map<String, PrintStream> getOutputFiles() {
-		return getIoState().outputFiles;
-	}
-
-	/**
-	 * Returns the default output sink used by {@code print} and {@code printf}.
-	 * Subclasses may override this to direct output somewhere other than a
-	 * {@link PrintStream}.
-	 *
-	 * @return the current default output sink
-	 */
-	protected OutputSink getOutputSink() {
-		return toOutputSink(output);
+		Map<String, PrintStream> outputFiles = new HashMap<String, PrintStream>();
+		for (Map.Entry<String, FileOutputState> entry : getIoState().fileOutputs.entrySet()) {
+			outputFiles.put(entry.getKey(), entry.getValue().sink.getPrintStream());
+		}
+		return outputFiles;
 	}
 
 	/**
@@ -1829,8 +1812,8 @@ public class JRT {
 	 * @param append whether output should be appended
 	 * @return the sink that writes to the requested file
 	 */
-	protected OutputSink getFileOutputSink(String fileNameParam, boolean append) {
-		return toOutputSink(jrtGetPrintStream(fileNameParam, append));
+	protected AwkSink getFileAwkSink(String fileNameParam, boolean append) {
+		return getOrCreateFileOutputState(fileNameParam, append).sink;
 	}
 
 	/**
@@ -1839,17 +1822,18 @@ public class JRT {
 	 * @param cmd command to execute
 	 * @return the sink connected to the process stdin
 	 */
-	protected OutputSink getPipeOutputSink(String cmd) {
-		return toOutputSink(jrtSpawnForOutput(cmd));
+	protected AwkSink getPipeAwkSink(String cmd) {
+		return getOrCreateProcessOutputState(cmd).sink;
 	}
 
 	/**
 	 * Writes a standard AWK {@code print} operation to the default output.
 	 *
 	 * @param values values to print; an empty array prints {@code $0}
+	 * @throws IOException if the sink cannot be written to
 	 */
-	public void printDefault(Object[] values) {
-		print(getOutputSink(), values);
+	public void printDefault(Object[] values) throws IOException {
+		awkSink.print(ofs, ors, ofmt, values);
 	}
 
 	/**
@@ -1858,9 +1842,10 @@ public class JRT {
 	 * @param fileNameParam target file name
 	 * @param append whether output should be appended
 	 * @param values values to print; an empty array prints {@code $0}
+	 * @throws IOException if the sink cannot be written to
 	 */
-	public void printToFile(String fileNameParam, boolean append, Object[] values) {
-		print(getFileOutputSink(fileNameParam, append), values);
+	public void printToFile(String fileNameParam, boolean append, Object[] values) throws IOException {
+		getFileAwkSink(fileNameParam, append).print(ofs, ors, ofmt, values);
 	}
 
 	/**
@@ -1868,44 +1853,22 @@ public class JRT {
 	 *
 	 * @param cmd command to execute
 	 * @param values values to print; an empty array prints {@code $0}
+	 * @throws IOException if the sink cannot be written to
 	 */
-	public void printToProcess(String cmd, Object[] values) {
-		print(getPipeOutputSink(cmd), values);
-	}
-
-	/**
-	 * Writes a standard AWK {@code print} operation to the specified sink.
-	 *
-	 * @param sink output sink
-	 * @param values values to print; an empty array prints {@code $0}
-	 */
-	protected void print(OutputSink sink, Object[] values) {
-		if (values.length == 0) {
-			sink.write(jrtGetInputField(0).toString());
-			sink.write(getORSString());
-			sink.flush();
-			return;
-		}
-
-		String ofsString = getOFSString();
-		for (int i = 0; i < values.length; i++) {
-			sink.write(toAwkStringForOutput(values[i]));
-			if (i < values.length - 1) {
-				sink.write(ofsString);
-			}
-		}
-		sink.write(getORSString());
-		sink.flush();
+	public void printToProcess(String cmd, Object[] values) throws IOException {
+		getPipeAwkSink(cmd).print(ofs, ors, ofmt, values);
 	}
 
 	/**
 	 * Writes a formatted AWK output string to the specified sink.
 	 *
-	 * @param formattedValue pre-formatted text to write
-	 * @param flush whether the sink must be flushed afterwards
+	 * @param format format string passed to {@code printf}
+	 * @param values values supplied after the format string
+	 * @throws IOException if the sink cannot be written to
 	 */
-	public void printfDefault(String formattedValue, boolean flush) {
-		writeFormatted(getOutputSink(), formattedValue, flush);
+	public void printfDefault(String format, Object[] values) throws IOException {
+		awkSink.printf(ofs, ors, ofmt, format, values);
+		flushAfterPrintf(awkSink);
 	}
 
 	/**
@@ -1913,45 +1876,35 @@ public class JRT {
 	 *
 	 * @param fileNameParam target file name
 	 * @param append whether output should be appended
-	 * @param formattedValue pre-formatted text to write
-	 * @param flush whether the sink must be flushed afterwards
+	 * @param format format string passed to {@code printf}
+	 * @param values values supplied after the format string
+	 * @throws IOException if the sink cannot be written to
 	 */
-	public void printfToFile(String fileNameParam, boolean append, String formattedValue, boolean flush) {
-		writeFormatted(getFileOutputSink(fileNameParam, append), formattedValue, flush);
+	public void printfToFile(String fileNameParam, boolean append, String format, Object[] values)
+			throws IOException {
+		AwkSink sink = getFileAwkSink(fileNameParam, append);
+		sink.printf(ofs, ors, ofmt, format, values);
+		flushAfterPrintf(sink);
 	}
 
 	/**
 	 * Writes formatted AWK output to a redirected process.
 	 *
 	 * @param cmd command to execute
-	 * @param formattedValue pre-formatted text to write
-	 * @param flush whether the sink must be flushed afterwards
+	 * @param format format string passed to {@code printf}
+	 * @param values values supplied after the format string
+	 * @throws IOException if the sink cannot be written to
 	 */
-	public void printfToProcess(String cmd, String formattedValue, boolean flush) {
-		writeFormatted(getPipeOutputSink(cmd), formattedValue, flush);
+	public void printfToProcess(String cmd, String format, Object[] values) throws IOException {
+		AwkSink sink = getPipeAwkSink(cmd);
+		sink.printf(ofs, ors, ofmt, format, values);
+		flushAfterPrintf(sink);
 	}
 
-	/**
-	 * Writes a pre-formatted string to the specified sink.
-	 *
-	 * @param sink output sink
-	 * @param formattedValue pre-formatted text to write
-	 * @param flush whether the sink must be flushed afterwards
-	 */
-	protected void writeFormatted(OutputSink sink, String formattedValue, boolean flush) {
-		sink.write(formattedValue);
-		if (flush) {
+	private void flushAfterPrintf(AwkSink sink) throws IOException {
+		if (IS_WINDOWS) {
 			sink.flush();
 		}
-	}
-
-	private OutputSink toOutputSink(PrintStream printStream) {
-		OutputSink outputSink = outputSinkCache.get(printStream);
-		if (outputSink == null) {
-			outputSink = new PrintStreamOutputSink(printStream);
-			outputSinkCache.put(printStream, outputSink);
-		}
-		return outputSink;
 	}
 
 	/**
@@ -1963,19 +1916,7 @@ public class JRT {
 	 * @return a {@link java.io.PrintStream} object
 	 */
 	public PrintStream jrtGetPrintStream(String fileNameParam, boolean append) {
-		Map<String, PrintStream> outputFiles = getIoState().outputFiles;
-		PrintStream ps = outputFiles.get(fileNameParam);
-		if (ps == null) {
-			try {
-				ps = new PrintStream(new FileOutputStream(fileNameParam, append), true, StandardCharsets.UTF_8.name()); // true
-				// =
-				// autoflush
-				outputFiles.put(fileNameParam, ps);
-			} catch (IOException ioe) {
-				throw new AwkRuntimeException("Cannot open " + fileNameParam + " for writing: " + ioe);
-			}
-		}
-		return ps;
+		return getFileAwkSink(fileNameParam, append).getPrintStream();
 	}
 
 	/**
@@ -2039,35 +1980,8 @@ public class JRT {
 	 * @throws java.io.IOException if any.
 	 */
 	public boolean jrtConsumeCommandInput(String cmd) throws IOException {
-		IoState state = getIoState();
-		PartitioningReader pr = state.commandReaders.get(cmd);
-		if (pr == null) {
-			try {
-				Process p = spawnProcess(cmd);
-				// no input to this process!
-				p.getOutputStream().close();
-				Thread errorPump = DataPump.dumpAndReturnThread(cmd + " stderr", p.getErrorStream(), System.err);
-				state.commandErrorPumps.put(cmd, errorPump);
-				state.commandProcesses.put(cmd, p);
-				pr = new PartitioningReader(
-						new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8),
-						this.rs);
-				state.commandReaders.put(cmd, pr);
-				this.filename = "";
-			} catch (IOException ioe) {
-				state.commandReaders.remove(cmd);
-				Thread errorPump = state.commandErrorPumps.remove(cmd);
-				Process p = state.commandProcesses.get(cmd);
-				state.commandProcesses.remove(cmd);
-				if (p != null) {
-					p.destroy();
-				}
-				joinDataPump(errorPump);
-				throw ioe;
-			}
-		}
-
-		inputLine = pr.readRecord();
+		CommandInputState commandInput = getOrCreateCommandInputState(cmd);
+		inputLine = commandInput.reader.readRecord();
 		if (inputLine == null) {
 			return false;
 		} else {
@@ -2087,29 +2001,97 @@ public class JRT {
 	 *         input data to the process.
 	 */
 	public PrintStream jrtSpawnForOutput(String cmd) {
+		return getPipeAwkSink(cmd).getPrintStream();
+	}
+
+	private FileOutputState getOrCreateFileOutputState(String fileNameParam, boolean append) {
 		IoState state = getIoState();
-		PrintStream ps = state.outputStreams.get(cmd);
-		if (ps == null) {
-			Process p;
-			try {
-				p = spawnProcess(cmd);
-				Thread stderrPump = DataPump.dumpAndReturnThread(cmd + " stderr", p.getErrorStream(), error);
-				Thread stdoutPump = DataPump.dumpAndReturnThread(cmd + " stdout", p.getInputStream(), output);
-				state.outputStderrPumps.put(cmd, stderrPump);
-				state.outputStdoutPumps.put(cmd, stdoutPump);
-			} catch (IOException ioe) {
-				throw new AwkRuntimeException("Can't spawn " + cmd + ": " + ioe);
-			}
-			state.outputProcesses.put(cmd, p);
-			try {
-				ps = new PrintStream(p.getOutputStream(), true, StandardCharsets.UTF_8.name()); // true
-				// = auto-flush
-				state.outputStreams.put(cmd, ps);
-			} catch (java.io.UnsupportedEncodingException e) {
-				throw new IllegalStateException(e);
-			}
+		FileOutputState outputState = state.fileOutputs.get(fileNameParam);
+		if (outputState == null) {
+			outputState = createFileOutputState(fileNameParam, append);
+			state.fileOutputs.put(fileNameParam, outputState);
 		}
-		return ps;
+		return outputState;
+	}
+
+	private FileOutputState createFileOutputState(String fileNameParam, boolean append) {
+		try {
+			PrintStream printStream = new PrintStream(
+					new FileOutputStream(fileNameParam, append),
+					true,
+					StandardCharsets.UTF_8.name());
+			return new FileOutputState(new OutputStreamAwkSink(printStream, locale));
+		} catch (IOException ioe) {
+			throw new AwkRuntimeException("Cannot open " + fileNameParam + " for writing: " + ioe);
+		}
+	}
+
+	private CommandInputState getOrCreateCommandInputState(String cmd) throws IOException {
+		IoState state = getIoState();
+		CommandInputState commandInput = state.commandInputs.get(cmd);
+		if (commandInput == null) {
+			commandInput = createCommandInputState(cmd);
+			state.commandInputs.put(cmd, commandInput);
+			this.filename = "";
+		}
+		return commandInput;
+	}
+
+	private CommandInputState createCommandInputState(String cmd) throws IOException {
+		Process process = null;
+		Thread errorPump = null;
+		try {
+			process = spawnProcess(cmd);
+			process.getOutputStream().close();
+			errorPump = DataPump.dumpAndReturnThread(cmd + " stderr", process.getErrorStream(), error);
+			PartitioningReader reader = new PartitioningReader(
+					new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8),
+					this.rs);
+			return new CommandInputState(process, reader, errorPump);
+		} catch (IOException ioe) {
+			if (process != null) {
+				process.destroy();
+			}
+			joinDataPump(errorPump);
+			throw ioe;
+		}
+	}
+
+	private ProcessOutputState getOrCreateProcessOutputState(String cmd) {
+		IoState state = getIoState();
+		ProcessOutputState outputState = state.processOutputs.get(cmd);
+		if (outputState == null) {
+			outputState = createProcessOutputState(cmd);
+			state.processOutputs.put(cmd, outputState);
+		}
+		return outputState;
+	}
+
+	private ProcessOutputState createProcessOutputState(String cmd) {
+		Process process = null;
+		Thread stderrPump = null;
+		Thread stdoutPump = null;
+		PrintStream processOutput = null;
+		try {
+			processOutput = awkSink.getPrintStream();
+			process = spawnProcess(cmd);
+			stderrPump = DataPump.dumpAndReturnThread(cmd + " stderr", process.getErrorStream(), error);
+			stdoutPump = DataPump.dumpAndReturnThread(cmd + " stdout", process.getInputStream(), processOutput);
+			PrintStream processInput = new PrintStream(process.getOutputStream(), true, StandardCharsets.UTF_8.name());
+			return new ProcessOutputState(
+					process,
+					new OutputStreamAwkSink(processInput, locale),
+					processOutput,
+					stdoutPump,
+					stderrPump);
+		} catch (IOException ioe) {
+			if (process != null) {
+				process.destroy();
+			}
+			joinDataPump(stdoutPump);
+			joinDataPump(stderrPump);
+			throw new AwkRuntimeException("Can't spawn " + cmd + ": " + ioe);
+		}
 	}
 
 	/**
@@ -2150,13 +2132,13 @@ public class JRT {
 		for (String s : state.fileReaders.keySet()) {
 			set.add(s);
 		}
-		for (String s : state.commandReaders.keySet()) {
+		for (String s : state.commandInputs.keySet()) {
 			set.add(s);
 		}
-		for (String s : state.outputFiles.keySet()) {
+		for (String s : state.fileOutputs.keySet()) {
 			set.add(s);
 		}
-		for (String s : state.outputStreams.keySet()) {
+		for (String s : state.processOutputs.keySet()) {
 			set.add(s);
 		}
 		for (String s : set) {
@@ -2169,12 +2151,11 @@ public class JRT {
 		if (state == null) {
 			return false;
 		}
-		PrintStream ps = state.outputFiles.get(fileNameParam);
-		if (ps != null) {
-			ps.close();
-			state.outputFiles.remove(fileNameParam);
+		FileOutputState outputState = state.fileOutputs.remove(fileNameParam);
+		if (outputState != null) {
+			outputState.sink.getPrintStream().close();
 		}
-		return ps != null;
+		return outputState != null;
 	}
 
 	private boolean jrtCloseOutputStream(String cmd) {
@@ -2182,32 +2163,25 @@ public class JRT {
 		if (state == null) {
 			return false;
 		}
-		Process p = state.outputProcesses.get(cmd);
-		PrintStream ps = state.outputStreams.get(cmd);
-		if (ps == null) {
+		ProcessOutputState outputState = state.processOutputs.remove(cmd);
+		if (outputState == null) {
 			return false;
 		}
-		Thread stdoutPump = state.outputStdoutPumps.get(cmd);
-		Thread stderrPump = state.outputStderrPumps.get(cmd);
-		state.outputProcesses.remove(cmd);
-		state.outputStreams.remove(cmd);
-		ps.close();
+		outputState.sink.getPrintStream().close();
 		try {
 			// wait for the spawned process to finish to make sure
 			// all output has been flushed and captured
-			p.waitFor();
-			p.exitValue();
+			outputState.process.waitFor();
+			outputState.process.exitValue();
 		} catch (InterruptedException ie) {
 			Thread.currentThread().interrupt();
-			p.destroyForcibly();
+			outputState.process.destroyForcibly();
 			throw new AwkRuntimeException(
 					"Caught exception while waiting for process exit: " + ie);
 		} finally {
-			joinDataPump(stdoutPump);
-			joinDataPump(stderrPump);
-			state.outputStdoutPumps.remove(cmd);
-			state.outputStderrPumps.remove(cmd);
-			output.flush();
+			joinDataPump(outputState.stdoutPump);
+			joinDataPump(outputState.stderrPump);
+			outputState.processOutput.flush();
 			error.flush();
 		}
 		return true;
@@ -2236,24 +2210,20 @@ public class JRT {
 		if (state == null) {
 			return false;
 		}
-		Process p = state.commandProcesses.get(cmd);
-		PartitioningReader pr = state.commandReaders.get(cmd);
-		if (pr == null) {
+		CommandInputState commandInput = state.commandInputs.remove(cmd);
+		if (commandInput == null) {
 			return false;
 		}
-		Thread errorPump = state.commandErrorPumps.get(cmd);
-		state.commandReaders.remove(cmd);
-		state.commandProcesses.remove(cmd);
 		try {
-			pr.close();
+			commandInput.reader.close();
 			try {
 				// wait for the process to complete so that all
 				// data pumped from the command is captured
-				p.waitFor();
-				p.exitValue();
+				commandInput.process.waitFor();
+				commandInput.process.exitValue();
 			} catch (InterruptedException ie) {
 				Thread.currentThread().interrupt();
-				p.destroyForcibly();
+				commandInput.process.destroyForcibly();
 				throw new AwkRuntimeException(
 						"Caught exception while waiting for process exit: " + ie);
 			}
@@ -2261,9 +2231,7 @@ public class JRT {
 		} catch (IOException ioe) {
 			return false;
 		} finally {
-			joinDataPump(errorPump);
-			state.commandErrorPumps.remove(cmd);
-			output.flush();
+			joinDataPump(commandInput.errorPump);
 			error.flush();
 		}
 	}
@@ -2283,11 +2251,12 @@ public class JRT {
 	 */
 	public Integer jrtSystem(String cmd) {
 		try {
+			PrintStream processOutput = awkSink.getPrintStream();
 			Process p = spawnProcess(cmd);
 			// no input to this process!
 			p.getOutputStream().close();
 			Thread errorPump = DataPump.dumpAndReturnThread(cmd + " stderr", p.getErrorStream(), error);
-			Thread outputPump = DataPump.dumpAndReturnThread(cmd + " stdout", p.getInputStream(), output);
+			Thread outputPump = DataPump.dumpAndReturnThread(cmd + " stdout", p.getInputStream(), processOutput);
 			boolean interrupted = false;
 			int retcode;
 			while (true) {
@@ -2301,7 +2270,7 @@ public class JRT {
 			}
 			joinDataPump(outputPump);
 			joinDataPump(errorPump);
-			output.flush();
+			processOutput.flush();
 			error.flush();
 			if (interrupted) {
 				Thread.currentThread().interrupt();

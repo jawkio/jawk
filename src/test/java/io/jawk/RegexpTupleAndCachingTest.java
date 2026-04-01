@@ -1,11 +1,11 @@
 package io.jawk;
 
 /*-
- * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
+ * â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²
  * Jawk
- * ჻჻჻჻჻჻
+ * áƒ»áƒ»áƒ»áƒ»áƒ»áƒ»
  * Copyright (C) 2006 - 2025 MetricsHub
- * ჻჻჻჻჻჻
+ * áƒ»áƒ»áƒ»áƒ»áƒ»áƒ»
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3 of the
@@ -19,7 +19,7 @@ package io.jawk;
  * You should have received a copy of the GNU General Lesser Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/lgpl-3.0.html>.
- * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
+ * â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±
  */
 
 import static org.junit.Assert.assertEquals;
@@ -52,8 +52,8 @@ public class RegexpTupleAndCachingTest {
 				.expect("1\n")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
-		String dump = dumpTuples(tuples);
+		AwkProgram program = new Awk().compile(script);
+		String dump = dumpTuples(program);
 		assertTrue(
 				"Tuple dump should include precompiled pattern",
 				dump.contains("REGEXP, \"a.c\", /a.c/"));
@@ -69,19 +69,19 @@ public class RegexpTupleAndCachingTest {
 				.expect("1\n")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
-		String dump = dumpTuples(tuples);
+		AwkProgram program = new Awk().compile(script);
+		String dump = dumpTuples(program);
 		assertFalse("Dynamic regex should not emit REGEXP tuple", dump.contains("REGEXP"));
 	}
 
 	@Test
 	public void serializedTuplesPreservePrecompiledPattern() throws Exception {
 		String script = "BEGIN { print (\"abc\" ~ /a.c/) }\n";
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram program = new Awk().compile(script);
 
 		File tmp = File.createTempFile("jawk", ".tpl");
 		try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(tmp))) {
-			oos.writeObject(tuples);
+			oos.writeObject(program);
 		}
 
 		Cli cli = Cli.parseCommandLineArguments(new String[] { "-L", tmp.getAbsolutePath() });
@@ -92,10 +92,12 @@ public class RegexpTupleAndCachingTest {
 		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
 		new Awk(settings)
-				.invoke(
-						cli.getPrecompiledTuples(),
+				.execute(
+						cli.getPrecompiledProgram(),
 						new ByteArrayInputStream(new byte[0]),
-						Collections.emptyList());
+						Collections.emptyList(),
+						null,
+						null);
 
 		// Should still match and print 1 using the serialized pattern
 		assertEquals("1\n", out.toString(StandardCharsets.UTF_8.name()));
@@ -103,10 +105,12 @@ public class RegexpTupleAndCachingTest {
 
 	@Test
 	public void serializedEvalTuplesPreserveSetNumGlobalsOptimization() throws Exception {
-		AwkTuples tuples = new Awk().compileForEval("NF \":\" $2");
-		assertFalse("Field-only eval tuples should omit SET_NUM_GLOBALS", dumpTuples(tuples).contains("SET_NUM_GLOBALS"));
+		AwkExpression expression = new Awk().compileExpression("NF \":\" $2");
+		assertFalse(
+				"Field-only eval tuples should omit SET_NUM_GLOBALS",
+				dumpTuples(expression).contains("SET_NUM_GLOBALS"));
 
-		AwkTuples deserialized = roundTrip(tuples);
+		AwkExpression deserialized = roundTrip(expression);
 
 		assertFalse(
 				"Serialized eval tuples should keep the SET_NUM_GLOBALS optimization",
@@ -114,7 +118,15 @@ public class RegexpTupleAndCachingTest {
 		assertEquals("2:right", new Awk().eval(deserialized, "left right"));
 	}
 
-	private static String dumpTuples(AwkTuples tuples) throws Exception {
+	private static String dumpTuples(AwkProgram program) throws Exception {
+		return dumpTupleStream(program);
+	}
+
+	private static String dumpTuples(AwkExpression expression) throws Exception {
+		return dumpTupleStream(expression);
+	}
+
+	private static String dumpTupleStream(AwkTuples tuples) throws Exception {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		try (PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8.name())) {
 			tuples.dump(ps);
@@ -122,7 +134,11 @@ public class RegexpTupleAndCachingTest {
 		return out.toString(StandardCharsets.UTF_8.name());
 	}
 
-	private static AwkTuples roundTrip(AwkTuples tuples) throws Exception {
+	private static AwkExpression roundTrip(AwkExpression expression) throws Exception {
+		return (AwkExpression) roundTripTupleStream(expression);
+	}
+
+	private static AwkTuples roundTripTupleStream(AwkTuples tuples) throws Exception {
 		ByteArrayOutputStream serialized = new ByteArrayOutputStream();
 		try (ObjectOutputStream oos = new ObjectOutputStream(serialized)) {
 			oos.writeObject(tuples);

@@ -24,6 +24,7 @@ package io.jawk.jrt;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.Locale;
 import io.jawk.AwkSandboxException;
 
 /**
@@ -33,12 +34,25 @@ import io.jawk.AwkSandboxException;
 public class SandboxedJRT extends JRT {
 
 	/**
-	 * Creates a sandboxed runtime facade bound to the supplied variable manager.
+	 * Creates a sandboxed runtime facade with explicit default output settings.
 	 *
 	 * @param vm Variable manager used by the sandboxed runtime
+	 * @param locale locale to use for runtime formatting
+	 * @param awkSink default output sink
+	 * @param error error stream for spawned-process stderr
 	 */
-	public SandboxedJRT(VariableManager vm) {
-		super(vm);
+	public SandboxedJRT(VariableManager vm, Locale locale, AwkSink awkSink, PrintStream error) {
+		super(vm, locale, awkSink, error);
+	}
+
+	@Override
+	protected AwkSink getFileAwkSink(String filename, boolean append) {
+		return sandboxViolation("Output redirection is disabled in sandbox mode");
+	}
+
+	@Override
+	protected AwkSink getPipeAwkSink(String cmd) {
+		return sandboxViolation("Command execution through pipelines is disabled in sandbox mode");
 	}
 
 	@Override

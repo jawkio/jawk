@@ -1,4 +1,4 @@
-package io.jawk.backend;
+package io.jawk;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -22,31 +22,18 @@ package io.jawk.backend;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import java.util.Map;
-import io.jawk.ext.JawkExtension;
-import io.jawk.jrt.JRT;
-import io.jawk.jrt.SandboxedJRT;
-import io.jawk.util.AwkSettings;
-
 /**
- * {@link AVM} variant enforcing sandbox restrictions at runtime.
+ * Public view of a compiled AWK program.
+ * <p>
+ * Programs are compiled into immutable tuple streams that can be reused across
+ * multiple executions. Instances are produced by {@link Awk#compile(String)}.
+ * </p>
  */
-public class SandboxedAVM extends AVM {
+public class AwkProgram extends io.jawk.intermediate.AwkTuples {
 
-	/**
-	 * Creates a sandboxed AVM with the provided settings and extension instances.
-	 *
-	 * @param parameters Runtime settings to honor
-	 * @param extensionInstances Available extension implementations
-	 */
-	public SandboxedAVM(AwkSettings parameters,
-			Map<String, JawkExtension> extensionInstances) {
-		super(parameters, extensionInstances);
+	private static final long serialVersionUID = 1L;
+
+	AwkProgram() {
+		super();
 	}
-
-	@Override
-	protected JRT createJrt() {
-		return new SandboxedJRT(this, getLocale(), getAwkSink(), System.err);
-	}
-
 }

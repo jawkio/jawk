@@ -63,7 +63,7 @@ Jawk fits well when you want AWK's text-processing model but need it to live ins
 
 ## Safety and Advanced Topics
 
-For most Java applications, `Awk` is the right abstraction. The convenience methods on `Awk` create, use, and close a fresh runtime for each isolated operation. When you move to `Awk.prepareEval(...)` or raw `AVM`, you are choosing performance and lifecycle control over isolation.
+For most Java applications, `Awk` is the right abstraction. The convenience methods on `Awk` create, use, and close a fresh runtime for each isolated operation. When you move to raw `AVM`, you are choosing performance and lifecycle control over isolation.
 
 Likewise, `SandboxedAwk` and the CLI `-S` option deliberately restrict dangerous AWK features such as `system()`, redirections, and command pipelines. Use the sandbox when scripts come from untrusted or tightly controlled sources, and use the advanced runtime APIs only when you are comfortable owning the tradeoffs.
 

@@ -22,6 +22,7 @@ package io.jawk.util;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import java.io.OutputStream;
 import java.io.PrintStream;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.HashMap;
@@ -29,6 +30,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
+import io.jawk.jrt.AppendableAwkSink;
+import io.jawk.jrt.AwkSink;
+import io.jawk.jrt.OutputStreamAwkSink;
 
 /**
  * Reusable behavioral configuration for the Jawk engine.
@@ -37,13 +41,19 @@ import java.util.concurrent.atomic.AtomicLong;
  * (field separator, locale, output stream, etc.) but do <em>not</em> carry
  * per-execution state such as input sources or filename arguments. This
  * separation allows a single {@code AwkSettings} object to be shared
- * across many invocations of {@link io.jawk.Awk#eval} or
- * {@link io.jawk.Awk#invoke}.
+ * across many invocations of {@link io.jawk.Awk#eval},
+ * {@link io.jawk.Awk#run}, or {@link io.jawk.Awk#createAvm()}.
  * </p>
  *
  * @author Danny Daglas
  */
 public class AwkSettings {
+
+	private enum ManagedSinkType {
+		STREAM,
+		APPENDABLE,
+		CUSTOM
+	}
 
 	/**
 	 * Shared immutable settings instance representing the default configuration.
@@ -80,24 +90,40 @@ public class AwkSettings {
 	private volatile boolean useSortedArrayKeys = false;
 
 	/**
-	 * Whether to trap <code>IllegalFormatExceptions</code>
-	 * for <code>[s]printf</code>;
-	 * <code>true</code> by default.
-	 */
-	private volatile boolean catchIllegalFormatExceptions = true;
-
-	/**
-	 * Output stream;
-	 * <code>System.out</code> by default,
-	 * which means we will print to stdout by default
-	 */
-	private volatile PrintStream outputStream = System.out;
-
-	/**
 	 * Locale for the output of numbers
 	 * <code>US-English</code> by default.
 	 */
 	private volatile Locale locale = Locale.US;
+
+	/**
+	 * Output stream used when output is directed to a {@link PrintStream}.
+	 * <p>
+	 * The default is {@code System.out}. When output is redirected to a custom
+	 * {@link AwkSink} that is not stream-backed, this field becomes
+	 * {@code null}.
+	 */
+	private volatile PrintStream outputStream = System.out;
+
+	/**
+	 * Appendable used when output is captured directly into characters instead of
+	 * a stream-backed sink.
+	 */
+	private volatile Appendable outputAppendable = null;
+
+	/**
+	 * Output sink used by plain AWK {@code print} and {@code printf}
+	 * operations.
+	 * <p>
+	 * The default sink writes to {@code System.out}. Callers may replace it with
+	 * an appendable-backed or fully custom implementation.
+	 */
+	private volatile AwkSink awkSink = AwkSink.from(System.out, Locale.US);
+
+	/**
+	 * Records whether the current sink is managed directly by these settings or
+	 * supplied by the caller.
+	 */
+	private volatile ManagedSinkType managedSinkType = ManagedSinkType.STREAM;
 
 	/**
 	 * Default value for RS, when not set specifically by the AWK script
@@ -131,8 +157,6 @@ public class AwkSettings {
 		desc.append("variables = ").append(getVariables()).append(newLine);
 		desc.append("fieldSeparator = ").append(getFieldSeparator()).append(newLine);
 		desc.append("useSortedArrayKeys = ").append(isUseSortedArrayKeys()).append(newLine);
-		desc.append("catchIllegalFormatExceptions = ").append(isCatchIllegalFormatExceptions()).append(newLine);
-
 		return desc.toString();
 	}
 
@@ -149,9 +173,6 @@ public class AwkSettings {
 
 		if (isUseSortedArrayKeys()) {
 			extensions.append(", associative array keys are sorted");
-		}
-		if (isCatchIllegalFormatExceptions()) {
-			extensions.append(", IllegalFormatExceptions NOT trapped");
 		}
 		if (extensions.length() > 0) {
 			return "{extensions: " + extensions.substring(2) + "}";
@@ -285,11 +306,13 @@ public class AwkSettings {
 	}
 
 	/**
-	 * Output stream;
-	 * <code>System.out</code> by default,
-	 * which means we will print to stdout by default
+	 * Returns the configured output stream when plain AWK output is currently
+	 * stream-backed.
+	 * <p>
+	 * This method returns {@code null} after {@link #setOutputAppendable(Appendable)}
+	 * or {@link #setAwkSink(AwkSink)} installs a non-stream sink.
 	 *
-	 * @return the output stream
+	 * @return the output stream, or {@code null} when output is not stream-backed
 	 */
 	@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "OutputStream reference is intentionally shared so callers can control output.")
 	public PrintStream getOutputStream() {
@@ -297,36 +320,70 @@ public class AwkSettings {
 	}
 
 	/**
-	 * Sets the OutputStream to print to (instead of System.out by default)
+	 * Returns the sink used by plain AWK {@code print} and {@code printf}
+	 * statements.
 	 *
-	 * @param pOutputStream OutputStream to use for print statements
+	 * @return the configured output sink, never {@code null}
 	 */
-	public void setOutputStream(PrintStream pOutputStream) {
-		outputStream = Objects.requireNonNull(pOutputStream, "outputStream");
+	public AwkSink getAwkSink() {
+		return awkSink;
+	}
+
+	/**
+	 * Sets the stream used by AWK output operations.
+	 *
+	 * @param outputStreamParam stream to use for print statements
+	 */
+	public void setOutputStream(OutputStream outputStreamParam) {
+		outputStream = toPrintStream(outputStreamParam);
+		outputAppendable = null;
+		awkSink = new OutputStreamAwkSink(outputStream, locale);
+		managedSinkType = ManagedSinkType.STREAM;
 		markModified();
 	}
 
 	/**
-	 * Whether to trap <code>IllegalFormatExceptions</code>
-	 * for <code>[s]printf</code>;
-	 * <code>true</code> by default.
+	 * Sets the appendable used by AWK output operations.
+	 * <p>
+	 * This is convenient for capturing output directly into a
+	 * {@link StringBuilder}, {@link java.io.StringWriter}, or custom appendable.
 	 *
-	 * @return the catchIllegalFormatExceptions
+	 * @param appendable appendable destination for AWK output
 	 */
-	public boolean isCatchIllegalFormatExceptions() {
-		return catchIllegalFormatExceptions;
+	public void setOutputAppendable(Appendable appendable) {
+		outputAppendable = Objects.requireNonNull(appendable, "appendable");
+		outputStream = null;
+		awkSink = new AppendableAwkSink(outputAppendable, locale);
+		managedSinkType = ManagedSinkType.APPENDABLE;
+		markModified();
 	}
 
 	/**
-	 * Whether to trap <code>IllegalFormatExceptions</code>
-	 * for <code>[s]printf</code>;
-	 * <code>true</code> by default.
+	 * Sets the sink used by AWK output operations.
+	 * <p>
+	 * Callers may override {@link AwkSink#print(String, String, String, Object...)} to collect raw
+	 * {@code print} arguments instead of rendered text.
 	 *
-	 * @param catchIllegalFormatExceptions the catchIllegalFormatExceptions to set
+	 * @param awkSinkParam output sink to use for plain AWK output
 	 */
-	public void setCatchIllegalFormatExceptions(boolean catchIllegalFormatExceptions) {
-		this.catchIllegalFormatExceptions = catchIllegalFormatExceptions;
+	public void setAwkSink(AwkSink awkSinkParam) {
+		awkSink = Objects.requireNonNull(awkSinkParam, "awkSink");
+		outputStream = null;
+		outputAppendable = null;
+		managedSinkType = ManagedSinkType.CUSTOM;
 		markModified();
+	}
+
+	private static PrintStream toPrintStream(OutputStream outputStreamParam) {
+		Objects.requireNonNull(outputStreamParam, "outputStream");
+		if (outputStreamParam instanceof PrintStream) {
+			return (PrintStream) outputStreamParam;
+		}
+		try {
+			return new PrintStream(outputStreamParam, false, "UTF-8");
+		} catch (java.io.UnsupportedEncodingException e) {
+			throw new IllegalStateException(e);
+		}
 	}
 
 	/**
@@ -341,13 +398,37 @@ public class AwkSettings {
 	}
 
 	/**
-	 * Sets the Locale for outputting numbers
+	 * Sets the Locale for outputting numbers.
+	 * <p>
+	 * When the current sink is managed by these settings through
+	 * {@link #setOutputStream(OutputStream)} or
+	 * {@link #setOutputAppendable(Appendable)}, the sink is rebuilt so future
+	 * output uses the new locale. Caller-supplied sinks installed through
+	 * {@link #setAwkSink(AwkSink)} are left unchanged.
+	 * </p>
 	 *
 	 * @param pLocale The locale to be used (e.g.: <code>Locale.US</code>)
 	 */
 	public void setLocale(Locale pLocale) {
-		locale = pLocale;
+		locale = pLocale == null ? Locale.US : pLocale;
+		rebuildManagedAwkSink();
 		markModified();
+	}
+
+	private void rebuildManagedAwkSink() {
+		switch (managedSinkType) {
+		case STREAM:
+			awkSink = new OutputStreamAwkSink(outputStream == null ? System.out : outputStream, locale);
+			break;
+		case APPENDABLE:
+			if (outputAppendable != null) {
+				awkSink = new AppendableAwkSink(outputAppendable, locale);
+			}
+			break;
+		case CUSTOM:
+		default:
+			break;
+		}
 	}
 
 	/**
@@ -423,12 +504,17 @@ public class AwkSettings {
 		}
 
 		@Override
-		public void setOutputStream(PrintStream pOutputStream) {
+		public void setOutputStream(OutputStream outputStreamParam) {
 			throw unsupported();
 		}
 
 		@Override
-		public void setCatchIllegalFormatExceptions(boolean catchIllegalFormatExceptions) {
+		public void setOutputAppendable(Appendable appendable) {
+			throw unsupported();
+		}
+
+		@Override
+		public void setAwkSink(AwkSink awkSinkParam) {
 			throw unsupported();
 		}
 

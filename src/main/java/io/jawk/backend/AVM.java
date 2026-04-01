@@ -40,17 +40,19 @@ import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import io.jawk.AwkExpression;
+import io.jawk.AwkProgram;
 import io.jawk.AwkSandboxException;
 import io.jawk.ExitException;
 import io.jawk.ext.AbstractExtension;
 import io.jawk.ext.ExtensionFunction;
 import io.jawk.ext.JawkExtension;
 import io.jawk.intermediate.Address;
-import io.jawk.intermediate.AwkTuples;
 import io.jawk.intermediate.Opcode;
 import io.jawk.intermediate.PositionTracker;
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.jrt.AwkRuntimeException;
+import io.jawk.jrt.AwkSink;
 import io.jawk.jrt.BlockManager;
 import io.jawk.jrt.BlockObject;
 import io.jawk.jrt.CharacterTokenizer;
@@ -99,8 +101,6 @@ import org.metricshub.printf4j.Printf4J;
  */
 public class AVM implements VariableManager, Closeable {
 
-	private static final boolean IS_WINDOWS = System.getProperty("os.name").indexOf("Windows") >= 0;
-
 	private RuntimeStack runtimeStack = new RuntimeStack();
 
 	// operand stack
@@ -112,8 +112,8 @@ public class AVM implements VariableManager, Closeable {
 	private Map<String, Object> executionInitialVariables;
 	private Map<String, Object> executionSpecialVariables;
 	private String initialFsValue;
-	private boolean trapIllegalFormatExceptions;
 	private JRT jrt;
+	private AwkSink awkSink;
 	private final Locale locale;
 	private Map<String, JawkExtension> extensionInstances;
 
@@ -134,7 +134,7 @@ public class AVM implements VariableManager, Closeable {
 	private final AwkSettings settings;
 	private boolean inputSourceFilelistAssignmentsApplied;
 	private InputSource resolvedInputSource;
-	private AwkTuples installedEvalTuples;
+	private AwkExpression installedEvalExpression;
 
 	/**
 	 * Construct the interpreter.
@@ -156,8 +156,7 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	public AVM(final AwkSettings parameters,
 			final Map<String, JawkExtension> extensionInstances) {
-		boolean hasProvidedSettings = parameters != null;
-		this.settings = hasProvidedSettings ? parameters : AwkSettings.DEFAULT_SETTINGS;
+		this.settings = parameters != null ? parameters : AwkSettings.DEFAULT_SETTINGS;
 		this.extensionInstances = extensionInstances == null ?
 				Collections.<String, JawkExtension>emptyMap() : extensionInstances;
 
@@ -169,16 +168,14 @@ public class AVM implements VariableManager, Closeable {
 		executionInitialVariables = baseInitialVariables;
 		executionSpecialVariables = baseSpecialVariables;
 		initialFsValue = this.settings.getFieldSeparator();
-		trapIllegalFormatExceptions = hasProvidedSettings
-				&& this.settings.isCatchIllegalFormatExceptions();
+		awkSink = this.settings.getAwkSink();
 
 		jrt = createJrt();
-		jrt.setStreams(settings.getOutputStream(), System.err);
 		initExtensions();
 	}
 
 	protected JRT createJrt() {
-		return new JRT(this, settings.getLocale());
+		return new JRT(this, settings.getLocale(), awkSink, System.err);
 	}
 
 	/**
@@ -189,6 +186,152 @@ public class AVM implements VariableManager, Closeable {
 	@SuppressFBWarnings("EI_EXPOSE_REP")
 	public JRT getJrt() {
 		return jrt;
+	}
+
+	/**
+	 * Sets the sink used by default {@code print} and {@code printf}
+	 * operations on this runtime.
+	 *
+	 * @param sink sink to use
+	 */
+	public void setAwkSink(AwkSink sink) {
+		awkSink = Objects.requireNonNull(sink, "sink");
+		jrt.setAwkSink(awkSink);
+	}
+
+	/**
+	 * Returns the default sink used by this runtime.
+	 *
+	 * @return the current AWK sink
+	 */
+	public AwkSink getAwkSink() {
+		return awkSink;
+	}
+
+	/**
+	 * Returns the locale configured for this runtime.
+	 *
+	 * @return runtime locale
+	 */
+	protected Locale getLocale() {
+		return locale;
+	}
+
+	/**
+	 * Evaluates a compiled expression against the AVM state exactly as it
+	 * currently stands.
+	 *
+	 * @param expression compiled expression to evaluate
+	 * @return the resulting value
+	 * @throws IOException if evaluation fails
+	 */
+	public Object eval(AwkExpression expression) throws IOException {
+		AwkExpression compiledExpression = Objects.requireNonNull(expression, "expression");
+		installExpressionMetadata(compiledExpression);
+
+		try {
+			executeTuples(compiledExpression.top());
+		} catch (ExitException e) {
+			// Expression tuples must never contain EXIT opcodes. If callers pass an
+			// invalid compiled expression, fail fast without poisoning later evals.
+			throwExitException = false;
+			exitCode = 0;
+			throw new IllegalStateException("eval(AwkExpression) cannot execute EXIT opcodes.", e);
+		}
+		return operandStack.isEmpty() ? null : pop();
+	}
+
+	/**
+	 * Evaluates a compiled expression against the supplied input source.
+	 *
+	 * @param expression compiled expression to evaluate
+	 * @param inputSource input source providing the current record
+	 * @return the resulting value
+	 * @throws IOException if evaluation fails
+	 */
+	public Object eval(AwkExpression expression, InputSource inputSource) throws IOException {
+		return eval(expression, inputSource, null);
+	}
+
+	/**
+	 * Evaluates a compiled expression against the supplied input source with
+	 * per-call variable overrides.
+	 *
+	 * @param expression compiled expression to evaluate
+	 * @param inputSource input source providing the current record
+	 * @param variableOverrides additional variable assignments applied on top of
+	 *        the settings-level variables (may be {@code null})
+	 * @return the resulting value
+	 * @throws IOException if evaluation fails
+	 */
+	public Object eval(
+			AwkExpression expression,
+			InputSource inputSource,
+			Map<String, Object> variableOverrides)
+			throws IOException {
+		prepareForEval(inputSource, Collections.<String>emptyList(), variableOverrides);
+		return eval(expression);
+	}
+
+	/**
+	 * Interprets a compiled AWK program with the current runtime defaults.
+	 *
+	 * @param program compiled program to execute
+	 * @param inputSource input source providing records
+	 * @throws ExitException when the program terminates via {@code exit}
+	 * @throws IOException if execution fails
+	 */
+	public void interpret(AwkProgram program, InputSource inputSource) throws ExitException, IOException {
+		interpret(program, inputSource, Collections.<String>emptyList(), null);
+	}
+
+	/**
+	 * Interprets a compiled AWK program with explicit runtime arguments.
+	 *
+	 * @param program compiled program to execute
+	 * @param inputSource input source providing records
+	 * @param runtimeArguments name=value or filename entries from the command line
+	 * @throws ExitException when the program terminates via {@code exit}
+	 * @throws IOException if execution fails
+	 */
+	public void interpret(AwkProgram program, InputSource inputSource, List<String> runtimeArguments)
+			throws ExitException,
+			IOException {
+		interpret(program, inputSource, runtimeArguments, null);
+	}
+
+	/**
+	 * Interprets a compiled AWK program with explicit runtime arguments and
+	 * variable overrides.
+	 *
+	 * @param program compiled program to execute
+	 * @param inputSource input source providing records
+	 * @param runtimeArguments name=value or filename entries from the command line
+	 * @param variableOverrides additional variable assignments applied on top of
+	 *        the settings-level variables (may be {@code null})
+	 * @throws ExitException when the program terminates via {@code exit}
+	 * @throws IOException if execution fails
+	 */
+	public void interpret(
+			AwkProgram program,
+			InputSource inputSource,
+			List<String> runtimeArguments,
+			Map<String, Object> variableOverrides)
+			throws ExitException,
+			IOException {
+		AwkProgram compiledProgram = Objects.requireNonNull(program, "program");
+		InputSource resolvedSource = Objects.requireNonNull(inputSource, "inputSource");
+		resetRuntimeState(runtimeArguments, variableOverrides);
+		globalVariableOffsets = compiledProgram.getGlobalVariableOffsetMap();
+		globalVariableArrays = compiledProgram.getGlobalVariableAarrayMap();
+		functionNames = compiledProgram.getFunctionNameSet();
+
+		jrt.prepareForExecution(initialFsValue, settings.getDefaultRS(), settings.getDefaultORS());
+		if (!executionSpecialVariables.isEmpty()) {
+			jrt.applySpecialVariables(executionSpecialVariables);
+		}
+		rebindResolvedInputSource(resolvedSource);
+		executeTuples(compiledProgram.top());
 	}
 
 	private void initExtensions() {
@@ -257,75 +400,6 @@ public class AVM implements VariableManager, Closeable {
 	private Set<String> functionNames = Collections.emptySet();
 	private Map<String, Integer> initializedEvalGlobalVariableOffsets;
 	private Map<String, Boolean> initializedEvalGlobalVariableArrays;
-
-	/**
-	 * Evaluate the provided tuples as an AWK expression.
-	 *
-	 * @param tuples Tuples representing the expression
-	 * @param inputSource the input source providing records for the evaluation
-	 * @return The resulting value of the expression
-	 * @throws IOException if an IO error occurs during evaluation
-	 */
-	public Object eval(AwkTuples tuples, InputSource inputSource) throws IOException {
-		return eval(tuples, inputSource, null);
-	}
-
-	/**
-	 * Evaluate the provided tuples against the AVM state exactly as it currently
-	 * stands. This method does not reset variables, stacks, random state, special
-	 * variables, or input fields.
-	 * <p>
-	 * Use {@link #prepareForEval(InputSource)} before calling this method when you
-	 * want a fresh eval state for a new record. Repeated calls to this method
-	 * intentionally reuse the same mutable runtime state and therefore form an
-	 * expert-only "footgun" API.
-	 * </p>
-	 *
-	 * @param tuples Tuples representing the expression
-	 * @return The resulting value of the expression
-	 * @throws IOException if an IO error occurs during evaluation
-	 */
-	public Object eval(AwkTuples tuples) throws IOException {
-		AwkTuples compiledTuples = Objects.requireNonNull(tuples, "tuples");
-		installEvalTupleMetadata(compiledTuples);
-
-		try {
-			executeTuples(compiledTuples.top());
-		} catch (ExitException e) {
-			// Expression tuples must never contain EXIT opcodes. If callers pass a
-			// script tuple stream by mistake, fail fast without poisoning later evals.
-			throwExitException = false;
-			exitCode = 0;
-			throw new IllegalStateException("eval(AwkTuples) cannot execute EXIT opcodes.", e);
-		}
-		return operandStack.isEmpty() ? null : pop();
-	}
-
-	/**
-	 * Evaluate the provided tuples as an AWK expression with per-call variable
-	 * overrides.
-	 * <p>
-	 * This method prepares the AVM for the supplied input and then executes the
-	 * tuples on the same mutable runtime. It does not automatically release any
-	 * bound input or runtime I/O resources afterwards; callers using AVM directly
-	 * are responsible for eventually calling {@link #close()}.
-	 * </p>
-	 *
-	 * @param tuples Tuples representing the expression
-	 * @param inputSource the input source providing records for the evaluation
-	 * @param variableOverrides additional variable assignments applied on top of
-	 *        the settings-level variables (may be {@code null})
-	 * @return The resulting value of the expression
-	 * @throws IOException if an IO error occurs during evaluation
-	 */
-	public Object eval(
-			AwkTuples tuples,
-			InputSource inputSource,
-			Map<String, Object> variableOverrides)
-			throws IOException {
-		prepareForEval(inputSource, Collections.<String>emptyList(), variableOverrides);
-		return eval(tuples);
-	}
 
 	/**
 	 * Resets the interpreter to a fresh eval state and binds one text record as
@@ -408,87 +482,6 @@ public class AVM implements VariableManager, Closeable {
 		return jrt.consumeInputForEval(resolvedInputSource);
 	}
 
-	/**
-	 * Traverse the tuples, executing their associated opcodes to provide
-	 * an execution platform for Jawk scripts.
-	 * <p>
-	 * When AVM is used directly, the caller is responsible for eventually
-	 * calling {@link #close()} to release any bound input and runtime I/O
-	 * resources.
-	 * </p>
-	 *
-	 * @param tuples the compiled tuple instructions to execute
-	 * @param inputSource the input source providing records
-	 * @throws ExitException when the AWK program terminates via {@code exit}
-	 * @throws IOException in case of I/O problems (with getline typically)
-	 */
-	public void interpret(AwkTuples tuples, InputSource inputSource) throws ExitException, IOException {
-		interpret(tuples, inputSource, Collections.emptyList());
-	}
-
-	/**
-	 * Traverse the tuples, executing their associated opcodes to provide
-	 * an execution platform for Jawk scripts.
-	 * <p>
-	 * When AVM is used directly, the caller is responsible for eventually
-	 * calling {@link #close()} to release any bound input and runtime I/O
-	 * resources.
-	 * </p>
-	 *
-	 * @param tuples the compiled tuple instructions to execute
-	 * @param inputSource the input source providing records
-	 * @param runtimeArguments name=value or filename entries from the command line
-	 * @throws ExitException when the AWK program terminates via {@code exit}
-	 * @throws IOException in case of I/O problems (with getline typically)
-	 */
-	public void interpret(
-			AwkTuples tuples,
-			InputSource inputSource,
-			List<String> runtimeArguments)
-			throws ExitException,
-			IOException {
-		interpret(tuples, inputSource, runtimeArguments, null);
-	}
-
-	/**
-	 * Traverse the tuples, executing their associated opcodes to provide
-	 * an execution platform for Jawk scripts.
-	 * <p>
-	 * When AVM is used directly, the caller is responsible for eventually
-	 * calling {@link #close()} to release any bound input and runtime I/O
-	 * resources.
-	 * </p>
-	 *
-	 * @param tuples the compiled tuple instructions to execute
-	 * @param inputSource the input source providing records
-	 * @param runtimeArguments name=value or filename entries from the command line
-	 * @param variableOverrides additional variable assignments applied on top of
-	 *        the settings-level variables (may be {@code null})
-	 * @throws ExitException when the AWK program terminates via {@code exit}
-	 * @throws IOException in case of I/O problems (with getline typically)
-	 */
-	public void interpret(
-			AwkTuples tuples,
-			InputSource inputSource,
-			List<String> runtimeArguments,
-			Map<String, Object> variableOverrides)
-			throws ExitException,
-			IOException {
-		AwkTuples compiledTuples = Objects.requireNonNull(tuples, "tuples");
-		InputSource resolvedSource = Objects.requireNonNull(inputSource, "inputSource");
-		resetRuntimeState(runtimeArguments, variableOverrides);
-		globalVariableOffsets = compiledTuples.getGlobalVariableOffsetMap();
-		globalVariableArrays = compiledTuples.getGlobalVariableAarrayMap();
-		functionNames = compiledTuples.getFunctionNameSet();
-
-		jrt.prepareForExecution(initialFsValue, settings.getDefaultRS(), settings.getDefaultORS());
-		if (!executionSpecialVariables.isEmpty()) {
-			jrt.applySpecialVariables(executionSpecialVariables);
-		}
-		rebindResolvedInputSource(resolvedSource);
-		executeTuples(tuples.top());
-	}
-
 	private void resetRuntimeState(List<String> runtimeArguments, Map<String, Object> variableOverrides) {
 		// Reset the AVM-owned state that must not leak across executions.
 		operandStack.clear();
@@ -505,7 +498,7 @@ public class AVM implements VariableManager, Closeable {
 		functionNames = Collections.emptySet();
 		initializedEvalGlobalVariableOffsets = null;
 		initializedEvalGlobalVariableArrays = null;
-		installedEvalTuples = null;
+		installedEvalExpression = null;
 		runtimeStack.reset();
 		randomNumberGenerator.setSeed(1);
 		oldseed = 1;
@@ -529,14 +522,14 @@ public class AVM implements VariableManager, Closeable {
 		}
 	}
 
-	private void installEvalTupleMetadata(AwkTuples compiledTuples) {
-		if (installedEvalTuples == compiledTuples) {
+	private void installExpressionMetadata(AwkExpression compiledExpression) {
+		if (installedEvalExpression == compiledExpression) {
 			return;
 		}
-		globalVariableOffsets = compiledTuples.getGlobalVariableOffsetMap();
-		globalVariableArrays = compiledTuples.getGlobalVariableAarrayMap();
-		functionNames = compiledTuples.getFunctionNameSet();
-		installedEvalTuples = compiledTuples;
+		globalVariableOffsets = compiledExpression.getGlobalVariableOffsetMap();
+		globalVariableArrays = compiledExpression.getGlobalVariableAarrayMap();
+		functionNames = compiledExpression.getFunctionNameSet();
+		installedEvalExpression = compiledExpression;
 	}
 
 	private void rebindResolvedInputSource(InputSource resolvedSource) {
@@ -566,10 +559,11 @@ public class AVM implements VariableManager, Closeable {
 			throws ExitException,
 			IOException {
 		Map<Integer, ConditionPair> conditionPairs = null;
+		Opcode opcode = null;
 		try {
 			while (!position.isEOF()) {
 				// System_out.println("--> "+position);
-				Opcode opcode = position.opcode();
+				opcode = position.opcode();
 				// switch on OPCODE
 				switch (opcode) {
 				case PRINT: {
@@ -578,7 +572,7 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = item 2
 					// etc.
 					long numArgs = position.intArg(0);
-					jrt.printDefault(popArguments(numArgs));
+					jrt.printDefault(numArgs == 0 ? new Object[] { jrt.jrtGetInputField(0) } : popArguments(numArgs));
 					position.next();
 					break;
 				}
@@ -589,10 +583,15 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = item 1
 					// stack[2] = item 2
 					// etc.
-					long numArgs = position.intArg(0);
 					boolean append = position.boolArg(1);
 					String key = jrt.toAwkString(pop());
-					jrt.printToFile(key, append, popArguments(numArgs));
+					long numArgs = position.intArg(0);
+					jrt
+							.printToFile(
+									key,
+									append,
+									numArgs == 0 ? new Object[]
+									{ jrt.jrtGetInputField(0) } : popArguments(numArgs));
 					position.next();
 					break;
 				}
@@ -602,9 +601,13 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = item 1
 					// stack[2] = item 2
 					// etc.
-					long numArgs = position.intArg(0);
 					String cmd = jrt.toAwkString(pop());
-					jrt.printToProcess(cmd, popArguments(numArgs));
+					long numArgs = position.intArg(0);
+					jrt
+							.printToProcess(
+									cmd,
+									numArgs == 0 ? new Object[]
+									{ jrt.jrtGetInputField(0) } : popArguments(numArgs));
 					position.next();
 					break;
 				}
@@ -614,7 +617,9 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = item 1
 					// etc.
 					long numArgs = position.intArg(0);
-					jrt.printfDefault(sprintfFunction(numArgs), IS_WINDOWS);
+					Object[] values = popArguments(numArgs - 1);
+					String format = jrt.toAwkString(pop());
+					jrt.printfDefault(format, values);
 					position.next();
 					break;
 				}
@@ -625,10 +630,12 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = format string
 					// stack[2] = item 1
 					// etc.
-					long numArgs = position.intArg(0);
 					boolean append = position.boolArg(1);
 					String key = jrt.toAwkString(pop());
-					jrt.printfToFile(key, append, sprintfFunction(numArgs), IS_WINDOWS);
+					long numArgs = position.intArg(0);
+					Object[] values = popArguments(numArgs - 1);
+					String format = jrt.toAwkString(pop());
+					jrt.printfToFile(key, append, format, values);
 					position.next();
 					break;
 				}
@@ -638,9 +645,11 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = format string
 					// stack[2] = item 1
 					// etc.
-					long numArgs = position.intArg(0);
 					String cmd = jrt.toAwkString(pop());
-					jrt.printfToProcess(cmd, sprintfFunction(numArgs), IS_WINDOWS);
+					long numArgs = position.intArg(0);
+					Object[] values = popArguments(numArgs - 1);
+					String format = jrt.toAwkString(pop());
+					jrt.printfToProcess(cmd, format, values);
 					position.next();
 					break;
 				}
@@ -2234,6 +2243,15 @@ public class AVM implements VariableManager, Closeable {
 				}
 			}
 
+		} catch (IOException ioe) {
+			// clear runtime stack
+			runtimeStack.popAllFrames();
+			// clear operand stack
+			operandStack.clear();
+			if (isOutputOpcode(opcode)) {
+				throw new AwkRuntimeException(position.lineNumber(), "Failed to write AWK output.", ioe);
+			}
+			throw ioe;
 		} catch (RuntimeException re) {
 			// clear runtime stack
 			runtimeStack.popAllFrames();
@@ -2261,11 +2279,9 @@ public class AVM implements VariableManager, Closeable {
 	 * Releases any prepared input source and runtime I/O resources owned by this
 	 * AVM.
 	 * <p>
-	 * Call this when you are done with an AVM returned by
-	 * {@link io.jawk.Awk#prepareEval(String)} or
-	 * {@link io.jawk.Awk#prepareEval(io.jawk.jrt.InputSource)},
-	 * or after direct {@link #eval(AwkTuples, InputSource)} /
-	 * {@link #interpret(AwkTuples, InputSource)} usage.
+	 * Call this when you are done with an AVM obtained through expert-level
+	 * integration, or after direct {@link #eval(AwkExpression, InputSource)} /
+	 * {@link #interpret(AwkProgram, InputSource)} usage.
 	 * The AVM may be prepared again afterwards, but callers should treat a closed
 	 * instance as end-of-use unless they intentionally reinitialize it.
 	 * </p>
@@ -2307,29 +2323,22 @@ public class AVM implements VariableManager, Closeable {
 		return args;
 	}
 
+	private static boolean isOutputOpcode(Opcode opcode) {
+		return opcode == Opcode.PRINT
+				|| opcode == Opcode.PRINT_TO_FILE
+				|| opcode == Opcode.PRINT_TO_PIPE
+				|| opcode == Opcode.PRINTF
+				|| opcode == Opcode.PRINTF_TO_FILE
+				|| opcode == Opcode.PRINTF_TO_PIPE;
+	}
+
 	/**
 	 * sprintf() functionality
 	 */
 	private String sprintfFunction(long numArgs) {
-		// Silly case
-		if (numArgs == 0) {
-			return "";
-		}
-
-		// all but the format argument
-		Object[] argArray = new Object[(int) (numArgs - 1)];
-
-		Object[] args = popArguments(numArgs - 1);
-		System.arraycopy(args, 0, argArray, 0, args.length);
-
-		// the format argument!
+		Object[] argArray = popArguments(numArgs - 1);
 		String fmt = jrt.toAwkString(pop());
-
-		if (trapIllegalFormatExceptions) {
-			return Printf4J.sprintf(locale, fmt, argArray);
-		} else {
-			return JRT.sprintfNoCatch(locale, fmt, argArray);
-		}
+		return Printf4J.sprintf(locale, fmt, argArray);
 	}
 
 	private void setNumOnJRT(long fieldNum, double num) {

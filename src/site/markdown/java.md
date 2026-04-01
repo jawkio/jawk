@@ -5,12 +5,13 @@ description: Quickstart guide for using Jawk from Java applications.
 
 <!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
 
-For almost all embedding scenarios, the main entry point is [`Awk`](apidocs/io/jawk/Awk.html). It gives you the safe, high-level APIs for running full AWK programs, evaluating expressions, compiling tuples for reuse, and preparing records for repeated evaluation without forcing you to manage the runtime directly.
+For most Java applications, start with [`Awk`](apidocs/io/jawk/Awk.html). It gives you:
 
-> [!WARNING]
-> Treat `run()` as the shortest path, not the most configurable one. It is a convenience API for default behavior. If you need custom settings, sandboxing, explicit operands, or advanced runtime reuse, use `invoke()`, `eval()`, `prepareEval()`, or compiled tuples instead.
+- short convenience methods for string-in, string-out use cases
+- compiled `AwkProgram` and `AwkExpression` artifacts for reuse
+- direct access to [`AVM`](apidocs/io/jawk/backend/AVM.html) when you want one reusable runtime
 
-## The Main Entry Point: Awk
+## Start with Awk
 
 Create an `Awk` instance directly for normal use:
 
@@ -18,11 +19,12 @@ Create an `Awk` instance directly for normal use:
 Awk awk = new Awk();
 ```
 
-Construct it with `AwkSettings` when you need behavioral configuration such as field separators, locale, or output capture:
+Construct it with `AwkSettings` when you need engine defaults such as field separators, locale, record separators, or a default output target:
 
 ```java
 AwkSettings settings = new AwkSettings();
 settings.setFieldSeparator(",");
+settings.setOutputAppendable(new StringBuilder());
 
 Awk awk = new Awk(settings);
 ```
@@ -37,7 +39,7 @@ When you write custom extensions, annotate associative array parameters with `@J
 
 ## The Shortest Path: run()
 
-`run()` is the most concise way to execute a full AWK program and collect its printed output as a Java `String`:
+`run()` is the smallest API surface for full AWK programs when you want the printed output back as a Java `String`:
 
 ```java
 Awk awk = new Awk();
@@ -45,77 +47,121 @@ String result = awk.run("{ print toupper($0) }", "hello world");
 // result = "HELLO WORLD\n"
 ```
 
-Use this when all of the following are true:
+Use this when:
 
-- you want default behavior
-- you have a script and input already in memory
-- you want the printed output as a `String`
+- you already have the script and input in memory
+- you want the rendered AWK output as a `String`
+- you do not need explicit `ARGV`, per-execution variables, or runtime reuse
 
-If you outgrow any of those assumptions, switch to `invoke()` or `eval()`.
+## Compiled Programs and Explicit Output
 
-## Full Script Execution: invoke()
-
-Use `invoke()` when you need full control over input, operands, or compiled tuples:
+When the same script will be reused, compile it once and run the compiled program:
 
 ```java
 Awk awk = new Awk();
-AwkTuples tuples = awk.compile("{ print $1 }");
-InputStream input = new ByteArrayInputStream("alpha beta\n".getBytes(StandardCharsets.UTF_8));
+AwkProgram program = awk.compile("{ print prefix $1 }");
 
-awk.invoke(tuples, input, Collections.<String>emptyList());
+awk.run(
+        program,
+        new ByteArrayInputStream("alpha beta\n".getBytes(StandardCharsets.UTF_8)),
+        new AppendableAwkSink(new StringBuilder(), Locale.US));
 ```
 
-This is the main API for:
+For full control, use the explicit advanced overload:
 
-- full AWK programs instead of single expressions
-- input streams or structured `InputSource` implementations
-- `ARGV` / `ARGC` operands
-- per-call variable overrides on the tuple-based overloads
+```java
+awk.run(
+        program,
+        myInputSource,
+        Arrays.asList("mode=csv"),
+        Collections.<String, Object>singletonMap("prefix", "row="),
+        mySink);
+```
 
-## Capturing Output with AwkSettings
+`AwkSettings` still holds the defaults for the `Awk` instance. Passing a sink directly to `run(...)` overrides that default for one call only.
 
-`AwkSettings` controls runtime behavior such as field separators, locale, record separators, and the output stream.
+## Default Output and Per-Call Output
+
+`AwkSettings` holds the default output target for an `Awk` instance:
 
 ```java
 AwkSettings settings = new AwkSettings();
-settings.setDefaultRS("\n");
-settings.setDefaultORS("\n");
-
-ByteArrayOutputStream out = new ByteArrayOutputStream();
-settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
+StringBuilder output = new StringBuilder();
+settings.setOutputAppendable(output);
 
 Awk awk = new Awk(settings);
-AwkTuples tuples = awk.compile("{ print $0 }");
-InputStream input = new ByteArrayInputStream("foo\nbar\n".getBytes(StandardCharsets.UTF_8));
-
-awk.invoke(tuples, input, Collections.<String>emptyList());
-
-String result = out.toString(StandardCharsets.UTF_8.name());
 ```
 
-Input itself is not stored in `AwkSettings`. Pass input directly to `invoke()` or `eval()`.
+Use:
+
+- `setOutputStream(...)` for normal text output to a stream
+- `setOutputAppendable(...)` for text capture into a `StringBuilder` or `Writer`
+- `setAwkSink(...)` for a custom output strategy
+
+When one execution needs a different destination, pass that `AwkSink` directly to `run(...)` instead of mutating shared settings.
+
+## Custom Output with AwkSink
+
+Use [`AwkSink`](apidocs/io/jawk/jrt/AwkSink.html) when plain text is not the right abstraction.
+
+An `AwkSink` receives raw `print(...)` and `printf(...)` calls together with the current AWK formatting state. The sink's numeric locale is fixed when you construct it:
+
+```java
+public final class CollectingSink extends AwkSink {
+    private final List<List<Object>> prints = new ArrayList<List<Object>>();
+    private final PrintStream processOutput = System.out;
+
+    public CollectingSink() {
+        super(Locale.US);
+    }
+
+    @Override
+    public void print(String ofs, String ors, String ofmt, Object... values) {
+        prints.add(Arrays.asList(Arrays.copyOf(values, values.length)));
+    }
+
+    @Override
+    public void printf(String ofs, String ors, String ofmt, String format, Object... values) {
+        // store format + values however your application wants
+    }
+
+    @Override
+    public PrintStream getPrintStream() {
+        return processOutput;
+    }
+}
+```
+
+This is the extension point to use when your host application wants structured AWK output instead of rendered text.
+
+## Reusable Runtime: AVM
+
+When you want to keep the same runtime alive across several calls, create an `AVM`:
+
+```java
+Awk awk = new Awk();
+AwkProgram program = awk.compile("BEGIN { print \"value\" }");
+
+try (AVM avm = awk.createAvm()) {
+    avm.setAwkSink(mySink);
+    avm.interpret(program, myInputSource, Collections.<String>emptyList(), null);
+    avm.interpret(program, myOtherInputSource);
+}
+```
+
+`AVM` is sequential-only and intentionally stateful. Use it when performance matters and you want one reusable runtime for repeated program runs or repeated expression evaluation.
 
 ## Which API Should I Use?
 
-> [!ACCORDION]
-> - `run()`
->
->   Use this for zero-configuration convenience only. It is best for quick string-in, string-out execution with a plain `Awk` instance.
->
-> - `invoke()`
->
->   Use this for full AWK programs when you need explicit input, `ARGV` operands, structured `InputSource`, output capture, or tuple reuse.
->
-> - `eval()`
->
->   Use this when you want the value of an AWK expression rather than the printed output of a whole program.
->
-> - `compile()` and `compileForEval()`
->
->   Use these when the same program or expression will be reused and you want to pay the compile cost once.
+- `run(String, String)` or `run(String, InputStream)` for the shortest string-in, string-out path.
+- `compile(...)` plus `run(...)` when a whole AWK program is reused.
+- `compileExpression(...)` plus `eval(...)` when one expression is reused.
+- `createAvm()` when you want one reusable runtime across several calls.
 
 ## Next Steps
 
-- [Variables, `ARGV`, and structured input](java-input.html)
-- [Expression evaluation and tuple reuse](java-compile.html)
-- [Prepared eval, raw `AVM`, sandboxing, and JSR 223](java-advanced.html)
+- [Structured input and variables](java-input.html)
+- [Compile, eval, and reuse](java-compile.html)
+- [Advanced runtime, AVM, sandboxing, and JSR 223](java-advanced.html)
+
+

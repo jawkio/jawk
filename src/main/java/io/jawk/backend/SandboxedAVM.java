@@ -46,7 +46,8 @@ public class SandboxedAVM extends AVM {
 
 	@Override
 	protected JRT createJrt() {
-		return new SandboxedJRT(this, getLocale(), getAwkSink(), System.err);
+		AwkSettings s = getSettings();
+		return new SandboxedJRT(this, s.getLocale(), s.getAwkSink(), System.err);
 	}
 
 }

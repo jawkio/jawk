@@ -103,10 +103,17 @@ public abstract class AwkSink {
 	/**
 	 * Returns a {@link PrintStream} view that receives raw process output written
 	 * by spawned commands such as {@code system("...")}.
+	 * <p>
+	 * The default implementation throws {@link UnsupportedOperationException}.
+	 * Override this method in sinks that need to handle process output.
+	 * </p>
 	 *
 	 * @return print stream that should receive raw process output
+	 * @throws UnsupportedOperationException if this sink does not support raw process output
 	 */
-	public abstract PrintStream getPrintStream();
+	public PrintStream getPrintStream() {
+		throw new UnsupportedOperationException("This sink does not support raw process output.");
+	}
 
 	/**
 	 * Creates a sink backed by an {@link OutputStream}.

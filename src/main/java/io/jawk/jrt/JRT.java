@@ -215,6 +215,24 @@ public class JRT {
 		awkSink = Objects.requireNonNull(sink, "awkSink");
 	}
 
+	/**
+	 * Returns the default output sink used by {@code print} and {@code printf}.
+	 *
+	 * @return the current AWK sink
+	 */
+	public AwkSink getAwkSink() {
+		return awkSink;
+	}
+
+	/**
+	 * Returns the locale used for number formatting in this runtime.
+	 *
+	 * @return the runtime locale
+	 */
+	public Locale getLocale() {
+		return locale;
+	}
+
 	private IoState getIoState() {
 		if (ioState == null) {
 			ioState = new IoState();
@@ -1868,7 +1886,7 @@ public class JRT {
 	 */
 	public void printfDefault(String format, Object[] values) throws IOException {
 		awkSink.printf(ofs, ors, ofmt, format, values);
-		flushAfterPrintf(awkSink);
+		awkSink.flush();
 	}
 
 	/**
@@ -1884,7 +1902,7 @@ public class JRT {
 			throws IOException {
 		AwkSink sink = getFileAwkSink(fileNameParam, append);
 		sink.printf(ofs, ors, ofmt, format, values);
-		flushAfterPrintf(sink);
+		sink.flush();
 	}
 
 	/**
@@ -1898,13 +1916,7 @@ public class JRT {
 	public void printfToProcess(String cmd, String format, Object[] values) throws IOException {
 		AwkSink sink = getPipeAwkSink(cmd);
 		sink.printf(ofs, ors, ofmt, format, values);
-		flushAfterPrintf(sink);
-	}
-
-	private void flushAfterPrintf(AwkSink sink) throws IOException {
-		if (IS_WINDOWS) {
-			sink.flush();
-		}
+		sink.flush();
 	}
 
 	/**

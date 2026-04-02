@@ -623,7 +623,8 @@ public class AwkEvalTest {
 
 		@Override
 		protected JRT createJrt() {
-			trackingJrt = new TrackingJRT(this, getLocale(), getAwkSink());
+			AwkSettings s = getSettings();
+			trackingJrt = new TrackingJRT(this, s.getLocale(), s.getAwkSink());
 			return trackingJrt;
 		}
 

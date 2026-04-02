@@ -323,7 +323,7 @@ public class Awk {
 	public void run(AwkProgram program, InputStream input, AwkSink awkSink)
 			throws IOException,
 			ExitException {
-		execute(program, input, Collections.<String>emptyList(), null, awkSink, settings);
+		execute(program, input, Collections.<String>emptyList(), null, awkSink);
 	}
 
 	/**
@@ -348,7 +348,7 @@ public class Awk {
 			AwkSink awkSink)
 			throws IOException,
 			ExitException {
-		execute(program, input, arguments, variableOverrides, awkSink, settings);
+		execute(program, input, arguments, variableOverrides, awkSink);
 	}
 
 	/**
@@ -374,7 +374,7 @@ public class Awk {
 			AwkSink awkSink)
 			throws IOException,
 			ExitException {
-		execute(program, inputSource, arguments, variableOverrides, awkSink, settings);
+		execute(program, inputSource, arguments, variableOverrides, awkSink);
 	}
 
 	/**
@@ -808,22 +808,10 @@ public class Awk {
 			AwkSink awkSink)
 			throws IOException,
 			ExitException {
-		execute(program, inputStream, arguments, variableOverrides, awkSink, settings);
-	}
-
-	void execute(
-			AwkProgram program,
-			InputStream inputStream,
-			List<String> arguments,
-			Map<String, Object> variableOverrides,
-			AwkSink awkSink,
-			AwkSettings runtimeSettings)
-			throws IOException,
-			ExitException {
 		Objects.requireNonNull(program, "program");
 		List<String> runtimeArguments = arguments == null ? Collections.<String>emptyList() : arguments;
 		InputStream resolvedInput = inputStream == null ? new ByteArrayInputStream(new byte[0]) : inputStream;
-		try (AVM avm = createAvm(runtimeSettings)) {
+		try (AVM avm = createAvm(settings)) {
 			if (awkSink != null) {
 				avm.setAwkSink(awkSink);
 			}
@@ -850,22 +838,10 @@ public class Awk {
 			AwkSink awkSink)
 			throws IOException,
 			ExitException {
-		execute(program, inputSource, arguments, variableOverrides, awkSink, settings);
-	}
-
-	void execute(
-			AwkProgram program,
-			InputSource inputSource,
-			List<String> arguments,
-			Map<String, Object> variableOverrides,
-			AwkSink awkSink,
-			AwkSettings runtimeSettings)
-			throws IOException,
-			ExitException {
 		Objects.requireNonNull(program, "program");
 		List<String> runtimeArguments = arguments == null ? Collections.<String>emptyList() : arguments;
 		InputSource resolvedSource = inputSource == null ? new SingleRecordInputSource(null) : inputSource;
-		try (AVM avm = createAvm(runtimeSettings)) {
+		try (AVM avm = createAvm(settings)) {
 			if (awkSink != null) {
 				avm.setAwkSink(awkSink);
 			}

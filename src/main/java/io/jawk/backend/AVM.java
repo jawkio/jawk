@@ -113,8 +113,6 @@ public class AVM implements VariableManager, Closeable {
 	private Map<String, Object> executionSpecialVariables;
 	private String initialFsValue;
 	private JRT jrt;
-	private AwkSink awkSink;
-	private final Locale locale;
 	private Map<String, JawkExtension> extensionInstances;
 
 	private static final Object NULL_OPERAND = new Object();
@@ -160,7 +158,6 @@ public class AVM implements VariableManager, Closeable {
 		this.extensionInstances = extensionInstances == null ?
 				Collections.<String, JawkExtension>emptyMap() : extensionInstances;
 
-		locale = this.settings.getLocale();
 		arguments = Collections.emptyList();
 		sortedArrayKeys = this.settings.isUseSortedArrayKeys();
 		baseInitialVariables = new HashMap<String, Object>(this.settings.getVariables());
@@ -168,14 +165,22 @@ public class AVM implements VariableManager, Closeable {
 		executionInitialVariables = baseInitialVariables;
 		executionSpecialVariables = baseSpecialVariables;
 		initialFsValue = this.settings.getFieldSeparator();
-		awkSink = this.settings.getAwkSink();
 
 		jrt = createJrt();
 		initExtensions();
 	}
 
 	protected JRT createJrt() {
-		return new JRT(this, settings.getLocale(), awkSink, System.err);
+		return new JRT(this, this.settings.getLocale(), this.settings.getAwkSink(), System.err);
+	}
+
+	/**
+	 * Returns the runtime settings associated with this interpreter.
+	 *
+	 * @return the settings, never {@code null}
+	 */
+	protected AwkSettings getSettings() {
+		return settings;
 	}
 
 	/**
@@ -195,8 +200,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @param sink sink to use
 	 */
 	public void setAwkSink(AwkSink sink) {
-		awkSink = Objects.requireNonNull(sink, "sink");
-		jrt.setAwkSink(awkSink);
+		jrt.setAwkSink(Objects.requireNonNull(sink, "sink"));
 	}
 
 	/**
@@ -205,7 +209,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @return the current AWK sink
 	 */
 	public AwkSink getAwkSink() {
-		return awkSink;
+		return jrt.getAwkSink();
 	}
 
 	/**
@@ -214,7 +218,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @return runtime locale
 	 */
 	protected Locale getLocale() {
-		return locale;
+		return jrt.getLocale();
 	}
 
 	/**
@@ -2338,7 +2342,7 @@ public class AVM implements VariableManager, Closeable {
 	private String sprintfFunction(long numArgs) {
 		Object[] argArray = popArguments(numArgs - 1);
 		String fmt = jrt.toAwkString(pop());
-		return Printf4J.sprintf(locale, fmt, argArray);
+		return Printf4J.sprintf(jrt.getLocale(), fmt, argArray);
 	}
 
 	private void setNumOnJRT(long fieldNum, double num) {

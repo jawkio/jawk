@@ -200,6 +200,10 @@ public final class Cli {
 							"Precompiled tuples '" + file + "' are not compatible with this version (" + ex.getMessage()
 									+ "). Please recompile.",
 							ex);
+				} catch (ClassCastException ex) {
+					throw new IllegalArgumentException(
+							"File '" + file + "' does not contain a valid precompiled AwkProgram. Please recompile.",
+							ex);
 				} catch (IOException | ClassNotFoundException ex) {
 					throw new IllegalArgumentException(
 							"Failed to read tuples '" + file + "': " + ex.getMessage(),

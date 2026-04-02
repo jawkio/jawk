@@ -22,11 +22,20 @@ package io.jawk;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.ObjectOutputStream;
 import org.junit.Test;
+import org.junit.Rule;
+import org.junit.rules.TemporaryFolder;
 
 public class CliOptionTest {
+
+	@Rule
+	public TemporaryFolder tempFolder = new TemporaryFolder();
 
 	@Test
 	public void shortNoOptimizeOptionDisablesOptimization() {
@@ -42,5 +51,21 @@ public class CliOptionTest {
 		cli.parse(new String[] { "--no-optimize", "{ print 1 }" });
 
 		assertTrue(cli.isDisableOptimize());
+	}
+
+	@Test
+	public void loadOptionWithWrongSerializedTypeThrowsFriendlyError() throws Exception {
+		File bad = tempFolder.newFile("wrong-type.ser");
+		try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(bad))) {
+			oos.writeObject("not an AwkProgram");
+		}
+
+		Cli cli = new Cli();
+		IllegalArgumentException ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> cli.parse(new String[]
+				{ "-L", bad.getAbsolutePath(), "{ print }" }));
+		assertTrue(ex.getMessage().contains("does not contain a valid precompiled AwkProgram"));
+		assertTrue(ex.getCause() instanceof ClassCastException);
 	}
 }

@@ -1829,7 +1829,7 @@ public class JRT {
 	/**
 	 * Writes a standard AWK {@code print} operation to the default output.
 	 *
-	 * @param values values to print; an empty array prints {@code $0}
+	 * @param values values to print
 	 * @throws IOException if the sink cannot be written to
 	 */
 	public void printDefault(Object[] values) throws IOException {

@@ -79,11 +79,11 @@
 
 	<dependencies>
 
-               <dependency>
-                       <groupId>org.metricshub</groupId>
-                       <artifactId>printf4j</artifactId>
-                       <version>0.9.08</version>
-               </dependency>
+		<dependency>
+			<groupId>org.metricshub</groupId>
+			<artifactId>printf4j</artifactId>
+			<version>0.9.08</version>
+		</dependency>
 
 		<dependency>
 			<groupId>com.github.stefanbirkner</groupId>
@@ -141,6 +141,10 @@
 				<version>2.7.1</version>
 				<configuration>
 					<licenseName>lgpl_v3</licenseName>
+					<includes>
+						<include>main/java/**/*.java</include>
+						<include>test/java/**/*.java</include>
+					</includes>
 				</configuration>
 			</plugin>
 

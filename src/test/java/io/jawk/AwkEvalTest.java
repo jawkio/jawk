@@ -1,7 +1,7 @@
 package io.jawk;
 
 /*-
- * â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²
+ * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
  * Copyright (C) 2006 - 2026 MetricsHub
@@ -19,7 +19,7 @@ package io.jawk;
  * You should have received a copy of the GNU General Lesser Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/lgpl-3.0.html>.
- * â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±
+ * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
 import static org.junit.Assert.assertEquals;

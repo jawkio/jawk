@@ -879,6 +879,28 @@ public class AwkTest {
 	}
 
 	@Test
+	public void awkTestSupportRestoresManagedAppendableOutputConfiguration() throws Exception {
+		StringBuilder output = new StringBuilder();
+		AwkSettings settings = new AwkSettings();
+		settings.setDefaultORS("\n");
+		settings.setOutputAppendable(output);
+		Awk awk = new Awk(settings);
+
+		AwkTestSupport
+				.awkTest("restore managed appendable output")
+				.withAwk(awk)
+				.script("BEGIN { print \"alpha\" }")
+				.expect("alpha\n")
+				.runAndAssert();
+
+		settings.setLocale(java.util.Locale.FRANCE);
+		awk.run(awk.compile("BEGIN { print 1.5 }"));
+
+		assertEquals(output, settings.getOutputAppendable());
+		assertEquals("1,5\n", output.toString());
+	}
+
+	@Test
 	public void settingsOutputSinkCanCaptureStructuredPrintArguments() throws Exception {
 		StructuredOutputSink sink = new StructuredOutputSink();
 		AwkSettings settings = new AwkSettings();

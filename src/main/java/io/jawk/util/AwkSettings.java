@@ -330,6 +330,17 @@ public class AwkSettings {
 	}
 
 	/**
+	 * Returns the appendable used by AWK output operations when the current sink
+	 * was configured through {@link #setOutputAppendable(Appendable)}.
+	 *
+	 * @return the configured appendable, or {@code null} when AWK output is not
+	 *         currently appendable-backed
+	 */
+	public Appendable getOutputAppendable() {
+		return outputAppendable;
+	}
+
+	/**
 	 * Sets the stream used by AWK output operations.
 	 *
 	 * @param outputStreamParam stream to use for print statements

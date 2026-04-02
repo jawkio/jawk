@@ -967,6 +967,7 @@ public final class AwkTestSupport {
 			List<String> operands = resolvedOperands(env);
 			Awk awk;
 			PrintStream originalOutputStream = null;
+			Appendable originalOutputAppendable = null;
 			AwkSink originalAwkSink = null;
 			Map<String, Object> originalVars = null;
 			if (customAwk != null) {
@@ -975,6 +976,7 @@ public final class AwkTestSupport {
 				// Save original state so we can restore it after execution,
 				// preventing configuration leaks across invocations.
 				originalOutputStream = awkSettings.getOutputStream();
+				originalOutputAppendable = awkSettings.getOutputAppendable();
 				originalAwkSink = awkSettings.getAwkSink();
 				originalVars = new LinkedHashMap<>(awkSettings.getVariables());
 				for (Map.Entry<String, Object> entry : preAssignments.entrySet()) {
@@ -1007,6 +1009,8 @@ public final class AwkTestSupport {
 					if (!preserveAwkOutput) {
 						if (originalOutputStream != null) {
 							awkSettings.setOutputStream(originalOutputStream);
+						} else if (originalOutputAppendable != null) {
+							awkSettings.setOutputAppendable(originalOutputAppendable);
 						} else {
 							awkSettings.setAwkSink(originalAwkSink);
 						}

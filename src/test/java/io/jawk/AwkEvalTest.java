@@ -3,9 +3,9 @@ package io.jawk;
 /*-
  * â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²â•±â•²
  * Jawk
- * â€¢â€¢â€¢â€¢â€¢â€¢
+ * ჻჻჻჻჻჻
  * Copyright (C) 2006 - 2026 MetricsHub
- * â€¢â€¢â€¢â€¢â€¢â€¢
+ * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3 of the
@@ -75,7 +75,7 @@ public class AwkEvalTest {
 	}
 
 	@Test
-	public void testcompileExpressionOmitsSetNumGlobalsForFieldOnlyExpression() throws Exception {
+	public void testCompileExpressionOmitsSetNumGlobalsForFieldOnlyExpression() throws Exception {
 		Awk awk = new Awk();
 		AwkExpression expression = awk.compileExpression("NF \":\" $2");
 		String dump = dumpTuples(expression);
@@ -86,7 +86,7 @@ public class AwkEvalTest {
 	}
 
 	@Test
-	public void testcompileExpressionSimpleFieldExpressionFoldsToConstFieldAccess() throws Exception {
+	public void testCompileExpressionSimpleFieldExpressionFoldsToConstFieldAccess() throws Exception {
 		Awk awk = new Awk();
 		AwkExpression expression = awk.compileExpression("$2");
 		String dump = dumpTuples(expression);
@@ -98,7 +98,7 @@ public class AwkEvalTest {
 	}
 
 	@Test
-	public void testcompileExpressionNegativeFieldBranchStillFailsOnlyAtRuntime() throws Exception {
+	public void testCompileExpressionNegativeFieldBranchStillFailsOnlyAtRuntime() throws Exception {
 		Awk awk = new Awk();
 		AwkExpression expression = awk.compileExpression("$1 == \"x\" ? $2 : $-1");
 		String dump = dumpTuples(expression);
@@ -111,7 +111,7 @@ public class AwkEvalTest {
 	}
 
 	@Test
-	public void testcompileExpressionKeepsSetNumGlobalsWhenGlobalMetadataIsNeeded() throws Exception {
+	public void testCompileExpressionKeepsSetNumGlobalsWhenGlobalMetadataIsNeeded() throws Exception {
 		Awk awk = new Awk();
 		AwkExpression expression = awk.compileExpression("match($0, /a/)");
 		String dump = dumpTuples(expression);
@@ -122,7 +122,7 @@ public class AwkEvalTest {
 	}
 
 	@Test
-	public void testcompileExpressionStatefulGlobalExpressionStartsWithoutGoto() throws Exception {
+	public void testCompileExpressionStatefulGlobalExpressionStartsWithoutGoto() throws Exception {
 		Awk awk = new Awk();
 		AwkExpression expression = awk.compileExpression("a++");
 		String dump = dumpTuples(expression);
@@ -133,7 +133,7 @@ public class AwkEvalTest {
 	}
 
 	@Test
-	public void testcompileExpressionTernaryFoldsAllLiteralFieldAccessesIncludingLabeledEntries() throws Exception {
+	public void testCompileExpressionTernaryFoldsAllLiteralFieldAccessesIncludingLabeledEntries() throws Exception {
 		Awk awk = new Awk();
 		AwkExpression expression = awk.compileExpression("$1 == \"x\" ? $2 : $3");
 		String dump = dumpTuples(expression);
@@ -150,7 +150,7 @@ public class AwkEvalTest {
 	}
 
 	@Test
-	public void testcompileExpressionTernaryFoldsLabeledBinaryLiteralBranch() throws Exception {
+	public void testCompileExpressionTernaryFoldsLabeledBinaryLiteralBranch() throws Exception {
 		Awk awk = new Awk();
 		AwkExpression expression = awk.compileExpression("$1 == \"x\" ? (1 + 2) : (4 + 5)");
 		String dump = dumpTuples(expression);
@@ -167,7 +167,7 @@ public class AwkEvalTest {
 	}
 
 	@Test
-	public void testcompileExpressionTernaryExpressionStartsWithoutGoto() throws Exception {
+	public void testCompileExpressionTernaryExpressionStartsWithoutGoto() throws Exception {
 		Awk awk = new Awk();
 		AwkExpression expression = awk.compileExpression("($1 + 0) ? $2 : $3");
 		String dump = dumpTuples(expression);
@@ -178,7 +178,7 @@ public class AwkEvalTest {
 	}
 
 	@Test
-	public void testcompileExpressionUnoptimizedTernaryExpressionResolvesBranchTargets() throws Exception {
+	public void testCompileExpressionUnoptimizedTernaryExpressionResolvesBranchTargets() throws Exception {
 		Awk awk = new Awk();
 		AwkExpression expression = awk.compileExpression("($1 + 0) ? $2 : $3", true);
 		String dump = dumpTuples(expression);

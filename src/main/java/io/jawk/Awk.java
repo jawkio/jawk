@@ -541,7 +541,7 @@ public class Awk {
 	 * @throws IOException if an I/O error occurs while reading the
 	 *         scripts
 	 */
-	AwkProgram compile(List<ScriptSource> scripts)
+	public AwkProgram compile(List<ScriptSource> scripts)
 			throws IOException {
 		return compile(scripts, false);
 	}
@@ -556,7 +556,7 @@ public class Awk {
 	 * @throws IOException if an I/O error occurs while reading the
 	 *         scripts
 	 */
-	AwkProgram compile(List<ScriptSource> scripts, boolean disableOptimizeParam)
+	public AwkProgram compile(List<ScriptSource> scripts, boolean disableOptimizeParam)
 			throws IOException {
 		return compileProgram(scripts, disableOptimizeParam, new AwkProgram());
 	}
@@ -621,7 +621,7 @@ public class Awk {
 	 * @return compiled immutable expression
 	 * @throws IOException if anything goes wrong with the compilation
 	 */
-	AwkExpression compileExpression(String expression, boolean disableOptimizeParam) throws IOException {
+	public AwkExpression compileExpression(String expression, boolean disableOptimizeParam) throws IOException {
 		return compileExpression(expression, disableOptimizeParam, new AwkExpression());
 	}
 

@@ -22,7 +22,6 @@ package io.jawk.jrt;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import java.io.ByteArrayOutputStream;
 import java.io.Flushable;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -102,28 +101,23 @@ public final class AppendableAwkSink extends AwkSink {
 	private static final class AppendableOutputStream extends OutputStream {
 
 		private final Appendable appendable;
-		private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 
 		private AppendableOutputStream(Appendable appendableParam) {
 			this.appendable = appendableParam;
 		}
 
 		@Override
-		public void write(int value) {
-			buffer.write(value);
+		public void write(int value) throws IOException {
+			appendable.append((char) value);
 		}
 
 		@Override
-		public void write(byte[] bytes, int off, int len) {
-			buffer.write(bytes, off, len);
+		public void write(byte[] bytes, int off, int len) throws IOException {
+			appendable.append(new String(bytes, off, len, StandardCharsets.UTF_8));
 		}
 
 		@Override
 		public void flush() throws IOException {
-			if (buffer.size() > 0) {
-				appendable.append(new String(buffer.toByteArray(), StandardCharsets.UTF_8));
-				buffer.reset();
-			}
 			if (appendable instanceof Flushable) {
 				((Flushable) appendable).flush();
 			}

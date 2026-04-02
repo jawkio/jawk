@@ -82,12 +82,12 @@ public final class SandboxedAwk extends Awk {
 	}
 
 	@Override
-	AwkProgram compile(List<ScriptSource> scripts, boolean disableOptimizeParam) throws java.io.IOException {
+	public AwkProgram compile(List<ScriptSource> scripts, boolean disableOptimizeParam) throws java.io.IOException {
 		return compileProgram(scripts, disableOptimizeParam, new SandboxedCompiledAwkProgram());
 	}
 
 	@Override
-	AwkExpression compileExpression(String expression, boolean disableOptimizeParam) throws java.io.IOException {
+	public AwkExpression compileExpression(String expression, boolean disableOptimizeParam) throws java.io.IOException {
 		return compileExpression(expression, disableOptimizeParam, new SandboxedCompiledAwkExpression());
 	}
 

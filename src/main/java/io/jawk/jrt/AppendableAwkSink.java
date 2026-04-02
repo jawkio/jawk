@@ -76,7 +76,6 @@ public final class AppendableAwkSink extends AwkSink {
 			}
 		}
 		appendable.append(ors);
-		flush();
 	}
 
 	@Override

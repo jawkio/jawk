@@ -28,6 +28,7 @@ import java.io.PrintStream;
 import java.math.BigDecimal;
 import java.util.Locale;
 import org.metricshub.printf4j.Printf4J;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 /**
  * Output target used by AWK {@code print} and {@code printf} statements.
@@ -104,15 +105,39 @@ public abstract class AwkSink {
 	 * Returns a {@link PrintStream} view that receives raw process output written
 	 * by spawned commands such as {@code system("...")}.
 	 * <p>
-	 * The default implementation throws {@link UnsupportedOperationException}.
-	 * Override this method in sinks that need to handle process output.
+	 * The default implementation returns a stream that silently discards all
+	 * output. Override this method in sinks that need to capture process output.
 	 * </p>
 	 *
 	 * @return print stream that should receive raw process output
-	 * @throws UnsupportedOperationException if this sink does not support raw process output
 	 */
+	@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "The shared discard stream is stateless and safe to expose.")
 	public PrintStream getPrintStream() {
-		throw new UnsupportedOperationException("This sink does not support raw process output.");
+		return NULL_PRINT_STREAM;
+	}
+
+	/** Shared discard stream returned by the default {@link #getPrintStream()}. */
+	private static final PrintStream NULL_PRINT_STREAM = newNullPrintStream();
+
+	private static PrintStream newNullPrintStream() {
+		try {
+			return new PrintStream(
+					new OutputStream() {
+						@Override
+						public void write(int b) {
+							// discard
+						}
+
+						@Override
+						public void write(byte[] b, int off, int len) {
+							// discard
+						}
+					},
+					false,
+					"UTF-8");
+		} catch (java.io.UnsupportedEncodingException e) {
+			throw new IllegalStateException(e);
+		}
 	}
 
 	/**
@@ -195,6 +220,25 @@ public abstract class AwkSink {
 	}
 
 	/**
+	 * Formats a string in the same way as AWK's {@code sprintf()} built-in.
+	 * <p>
+	 * Subclasses may override this method to customize formatting. The default
+	 * implementation delegates to {@link Printf4J#sprintf(Locale, String, Object...)}.
+	 * Because {@link #printf(String, String, String, String, Object...)} uses this
+	 * method internally, overriding it ensures that both {@code printf} and
+	 * {@code sprintf} produce consistent output.
+	 * </p>
+	 *
+	 * @param format format string
+	 * @param values arguments supplied after the format string
+	 * @return formatted text
+	 */
+	public String sprintf(String format, Object... values) {
+		Object[] safeValues = values == null ? new Object[0] : values;
+		return Printf4J.sprintf(locale, format, safeValues);
+	}
+
+	/**
 	 * Formats one {@code printf} result string using this sink's locale.
 	 *
 	 * @param format format string passed to {@code printf}
@@ -202,8 +246,7 @@ public abstract class AwkSink {
 	 * @return formatted text
 	 */
 	protected final String formatPrintfResult(String format, Object... values) {
-		Object[] safeValues = values == null ? new Object[0] : values;
-		return Printf4J.sprintf(locale, format, safeValues);
+		return sprintf(format, values);
 	}
 
 	/**
@@ -237,7 +280,7 @@ public abstract class AwkSink {
 	 * @param locale locale used for numeric formatting
 	 * @return textual output for {@code value}
 	 */
-	protected static String formatOutputValue(Object value, String ofmt, Locale locale) {
+	public static String formatOutputValue(Object value, String ofmt, Locale locale) {
 		if (value == null) {
 			return "";
 		}

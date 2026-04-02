@@ -95,7 +95,6 @@ public final class OutputStreamAwkSink extends AwkSink {
 			}
 		}
 		printStream.print(ors);
-		printStream.flush();
 	}
 
 	@Override

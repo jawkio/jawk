@@ -65,7 +65,6 @@ import io.jawk.jrt.SingleCharacterTokenizer;
 import io.jawk.jrt.VariableManager;
 import io.jawk.util.AwkSettings;
 import io.jawk.jrt.BSDRandom;
-import org.metricshub.printf4j.Printf4J;
 
 /**
  * The Jawk interpreter.
@@ -2342,7 +2341,7 @@ public class AVM implements VariableManager, Closeable {
 	private String sprintfFunction(long numArgs) {
 		Object[] argArray = popArguments(numArgs - 1);
 		String fmt = jrt.toAwkString(pop());
-		return Printf4J.sprintf(jrt.getLocale(), fmt, argArray);
+		return jrt.getAwkSink().sprintf(fmt, argArray);
 	}
 
 	private void setNumOnJRT(long fieldNum, double num) {

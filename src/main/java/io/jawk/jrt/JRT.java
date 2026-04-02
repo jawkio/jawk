@@ -569,63 +569,7 @@ public class JRT {
 	 * @param locale a {@link java.util.Locale} object
 	 */
 	private static String toAwkString(Object o, String convfmt, Locale locale) {
-		if (o == null) {
-			return "";
-		}
-		if (o instanceof Number) {
-			// It is a number, some processing is required here
-			double d = ((Number) o).doubleValue();
-			if (isActuallyLong(d)) {
-				// If an integer, represent it as an integer (no floating point and decimals)
-				return Long.toString((long) Math.rint(d));
-			} else {
-				// It's not a integer, represent it with the specified format
-				try {
-					String s = String.format(locale, convfmt, d);
-					// Surprisingly, while %.6g is the official representation of numbers in AWK
-					// which should include trailing zeroes, AWK seems to trim them. So, we will
-					// do the same: trim the trailing zeroes
-					if ((s.indexOf('.') > -1 || s.indexOf(',') > -1) && (s.indexOf('e') + s.indexOf('E') == -2)) {
-						while (s.endsWith("0")) {
-							s = s.substring(0, s.length() - 1);
-						}
-						if (s.endsWith(".") || s.endsWith(",")) {
-							s = s.substring(0, s.length() - 1);
-						}
-					}
-					return s;
-				} catch (java.util.UnknownFormatConversionException ufce) {
-					// Impossible case
-					return "";
-				}
-			}
-		} else {
-			// It's not a number, easy
-			return o.toString();
-		}
-	}
-
-	/**
-	 * Convert a String, Integer, or Double to String
-	 * based on the OFMT variable contents. Jawk will
-	 * subsequently use this String for output via print().
-	 *
-	 * @param o Object to convert.
-	 * @return A String representation of o.
-	 */
-	public String toAwkStringForOutput(Object o) {
-		// Even if specified Object o is not officially a number, we try to convert
-		// it to a Double. Because if it's a literal representation of a number,
-		// we will need to display it as a number ("12.00" --> 12)
-		Object val = o;
-		if (!(val instanceof Number)) {
-			try {
-				val = new BigDecimal(val.toString()).doubleValue();
-			} catch (NumberFormatException e) {// NOPMD - EmptyCatchBlock: intentionally ignored
-			}
-		}
-
-		return toAwkString(val, this.ofmt, this.locale);
+		return AwkSink.formatOutputValue(o, convfmt, locale);
 	}
 
 	/**
@@ -1886,7 +1830,6 @@ public class JRT {
 	 */
 	public void printfDefault(String format, Object[] values) throws IOException {
 		awkSink.printf(ofs, ors, ofmt, format, values);
-		awkSink.flush();
 	}
 
 	/**
@@ -1902,7 +1845,6 @@ public class JRT {
 			throws IOException {
 		AwkSink sink = getFileAwkSink(fileNameParam, append);
 		sink.printf(ofs, ors, ofmt, format, values);
-		sink.flush();
 	}
 
 	/**
@@ -1916,7 +1858,6 @@ public class JRT {
 	public void printfToProcess(String cmd, String format, Object[] values) throws IOException {
 		AwkSink sink = getPipeAwkSink(cmd);
 		sink.printf(ofs, ors, ofmt, format, values);
-		sink.flush();
 	}
 
 	/**

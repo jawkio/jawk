@@ -190,14 +190,14 @@ public final class Cli {
 				checkParameterHasArgument(args, argIdx);
 				scriptSources.add(new ScriptFileSource(args[++argIdx]));
 			} else if (arg.equals("-L")) {
-				// -L filename : load precompiled tuples
+				// -L filename : load precompiled program
 				checkParameterHasArgument(args, argIdx);
 				String file = args[++argIdx];
 				try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
 					precompiledProgram = (AwkProgram) ois.readObject();
 				} catch (java.io.InvalidClassException ex) {
 					throw new IllegalArgumentException(
-							"Precompiled tuples '" + file + "' are not compatible with this version (" + ex.getMessage()
+							"Precompiled program '" + file + "' is not compatible with this version (" + ex.getMessage()
 									+ "). Please recompile.",
 							ex);
 				} catch (ClassCastException ex) {
@@ -206,7 +206,7 @@ public final class Cli {
 							ex);
 				} catch (IOException | ClassNotFoundException ex) {
 					throw new IllegalArgumentException(
-							"Failed to read tuples '" + file + "': " + ex.getMessage(),
+							"Failed to read program '" + file + "': " + ex.getMessage(),
 							ex);
 				}
 			} else if (arg.equals("-l") || arg.equals("--load")) {

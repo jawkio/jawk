@@ -1128,11 +1128,11 @@ public class AwkTest {
 	}
 
 	/**
-	 * Loads precompiled tuples from disk via the <code>-L</code> option and executes
-	 * them through the CLI.
+	 * Loads a precompiled program from disk via the <code>-L</code> option and
+	 * executes it through the CLI.
 	 */
 	@Test
-	public void loadSerializedTuples() throws Exception {
+	public void loadSerializedProgram() throws Exception {
 		String script = "{ print toupper($0) }";
 		AwkProgram program = AWK.compile(script);
 

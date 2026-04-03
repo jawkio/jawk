@@ -37,13 +37,13 @@ Awk awk = new Awk(StdinExtension.INSTANCE, new MyExtension());
 
 When you write custom extensions, annotate associative array parameters with `@JawkAssocArray` and declare them as `Map` values rather than concrete map implementations. The dedicated [Writing Extensions](extensions-writing.html) guide covers that contract in more detail.
 
-## The Shortest Path: run()
+## The Shortest Path: run().capture()
 
-`run()` is the smallest API surface for full AWK programs when you want the printed output back as a Java `String`:
+`run().capture()` is the smallest API surface for full AWK programs when you want the printed output back as a Java `String`:
 
 ```java
 Awk awk = new Awk();
-String result = awk.run("{ print toupper($0) }", "hello world");
+String result = awk.run("{ print toupper($0) }").input("hello world").capture();
 // result = "HELLO WORLD\n"
 ```
 
@@ -61,24 +61,24 @@ When the same script will be reused, compile it once and run the compiled progra
 Awk awk = new Awk();
 AwkProgram program = awk.compile("{ print prefix $1 }");
 
-awk.run(
-        program,
-        new ByteArrayInputStream("alpha beta\n".getBytes(StandardCharsets.UTF_8)),
-        new AppendableAwkSink(new StringBuilder(), Locale.US));
+awk.run(program)
+        .input(new ByteArrayInputStream("alpha beta\n".getBytes(StandardCharsets.UTF_8)))
+        .sink(new AppendableAwkSink(new StringBuilder(), Locale.US))
+        .execute();
 ```
 
-For full control, use the explicit advanced overload:
+For full control, use the fluent builder:
 
 ```java
-awk.run(
-        program,
-        myInputSource,
-        Arrays.asList("mode=csv"),
-        Collections.<String, Object>singletonMap("prefix", "row="),
-        mySink);
+awk.run(program)
+        .input(myInputSource)
+        .arguments("mode=csv")
+        .variables(Collections.<String, Object>singletonMap("prefix", "row="))
+        .sink(mySink)
+        .execute();
 ```
 
-`AwkSettings` still holds the defaults for the `Awk` instance. Passing a sink directly to `run(...)` overrides that default for one call only.
+`AwkSettings` still holds the defaults for the `Awk` instance. Passing a sink via `.sink(...)` overrides that default for one call only.
 
 ## Default Output and Per-Call Output
 
@@ -98,7 +98,7 @@ Use:
 - `setOutputAppendable(...)` for text capture into a `StringBuilder` or `Writer`
 - `setAwkSink(...)` for a custom output strategy
 
-When one execution needs a different destination, pass that `AwkSink` directly to `run(...)` instead of mutating shared settings.
+When one execution needs a different destination, pass that `AwkSink` via `.sink(...)` on the run builder instead of mutating shared settings.
 
 ## Custom Output with AwkSink
 
@@ -144,8 +144,8 @@ AwkProgram program = awk.compile("BEGIN { print \"value\" }");
 
 try (AVM avm = awk.createAvm()) {
     avm.setAwkSink(mySink);
-    avm.interpret(program, myInputSource, Collections.<String>emptyList(), null);
-    avm.interpret(program, myOtherInputSource);
+    avm.execute(program, myInputSource, Collections.<String>emptyList(), null);
+    avm.execute(program, myOtherInputSource);
 }
 ```
 
@@ -153,8 +153,8 @@ try (AVM avm = awk.createAvm()) {
 
 ## Which API Should I Use?
 
-- `run(String, String)` or `run(String, InputStream)` for the shortest string-in, string-out path.
-- `compile(...)` plus `run(...)` when a whole AWK program is reused.
+- `run(script).input(text).capture()` for the shortest string-in, string-out path.
+- `compile(...)` plus `run(program).execute()` when a whole AWK program is reused.
 - `compileExpression(...)` plus `eval(...)` when one expression is reused.
 - `createAvm()` when you want one reusable runtime across several calls.
 

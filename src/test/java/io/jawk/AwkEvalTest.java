@@ -405,9 +405,9 @@ public class AwkEvalTest {
 		settings.setOutputStream(new PrintStream(new ByteArrayOutputStream(), false, StandardCharsets.UTF_8.name()));
 
 		try (AVM avm = new AVM(settings, Collections.emptyMap())) {
-			avm.interpret(program, first);
+			avm.execute(program, first);
 			assertFalse(first.isClosed());
-			avm.interpret(program, second);
+			avm.execute(program, second);
 			assertTrue(first.isClosed());
 			assertFalse(second.isClosed());
 		}

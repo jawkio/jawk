@@ -277,19 +277,19 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	/**
-	 * Interprets a compiled AWK program with the current runtime defaults.
+	 * Executes a compiled AWK program with the current runtime defaults.
 	 *
 	 * @param program compiled program to execute
 	 * @param inputSource input source providing records
 	 * @throws ExitException when the program terminates via {@code exit}
 	 * @throws IOException if execution fails
 	 */
-	public void interpret(AwkProgram program, InputSource inputSource) throws ExitException, IOException {
-		interpret(program, inputSource, Collections.<String>emptyList(), null);
+	public void execute(AwkProgram program, InputSource inputSource) throws ExitException, IOException {
+		execute(program, inputSource, Collections.<String>emptyList(), null);
 	}
 
 	/**
-	 * Interprets a compiled AWK program with explicit runtime arguments.
+	 * Executes a compiled AWK program with explicit runtime arguments.
 	 *
 	 * @param program compiled program to execute
 	 * @param inputSource input source providing records
@@ -297,14 +297,14 @@ public class AVM implements VariableManager, Closeable {
 	 * @throws ExitException when the program terminates via {@code exit}
 	 * @throws IOException if execution fails
 	 */
-	public void interpret(AwkProgram program, InputSource inputSource, List<String> runtimeArguments)
+	public void execute(AwkProgram program, InputSource inputSource, List<String> runtimeArguments)
 			throws ExitException,
 			IOException {
-		interpret(program, inputSource, runtimeArguments, null);
+		execute(program, inputSource, runtimeArguments, null);
 	}
 
 	/**
-	 * Interprets a compiled AWK program with explicit runtime arguments and
+	 * Executes a compiled AWK program with explicit runtime arguments and
 	 * variable overrides.
 	 *
 	 * @param program compiled program to execute
@@ -315,7 +315,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @throws ExitException when the program terminates via {@code exit}
 	 * @throws IOException if execution fails
 	 */
-	public void interpret(
+	public void execute(
 			AwkProgram program,
 			InputSource inputSource,
 			List<String> runtimeArguments,
@@ -414,29 +414,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @throws IOException if binding the input fails
 	 */
 	public boolean prepareForEval(String input) throws IOException {
-		return prepareForEval(input, Collections.<String>emptyList(), null);
-	}
-
-	/**
-	 * Resets the interpreter to a fresh eval state and binds one text record as
-	 * the current input.
-	 *
-	 * @param input text record to expose as {@code $0}
-	 * @param runtimeArguments CLI-style runtime arguments visible through
-	 *        {@code ARGC}/{@code ARGV}; use {@code variableOverrides} for Java
-	 *        SDK variable assignments
-	 * @param variableOverrides additional variable assignments applied on top of
-	 *        the settings-level variables (may be {@code null})
-	 * @return {@code true} when a record was prepared, {@code false} when the
-	 *         provided text represents no input
-	 * @throws IOException if binding the input fails
-	 */
-	public boolean prepareForEval(
-			String input,
-			List<String> runtimeArguments,
-			Map<String, Object> variableOverrides)
-			throws IOException {
-		return prepareForEval(new SingleRecordInputSource(input), runtimeArguments, variableOverrides);
+		return prepareForEval(new SingleRecordInputSource(input), Collections.<String>emptyList(), null);
 	}
 
 	/**
@@ -453,22 +431,7 @@ public class AVM implements VariableManager, Closeable {
 		return prepareForEval(inputSource, Collections.<String>emptyList(), null);
 	}
 
-	/**
-	 * Resets the interpreter to a fresh eval state and binds at most one record
-	 * from the provided input source as the current input. Calling this method
-	 * again on the same source advances to the next available record.
-	 *
-	 * @param inputSource source providing the record to bind
-	 * @param runtimeArguments CLI-style runtime arguments visible through
-	 *        {@code ARGC}/{@code ARGV}; use {@code variableOverrides} for Java
-	 *        SDK variable assignments
-	 * @param variableOverrides additional variable assignments applied on top of
-	 *        the settings-level variables (may be {@code null})
-	 * @return {@code true} when a record was prepared, {@code false} when the
-	 *         source is exhausted
-	 * @throws IOException if reading the input fails
-	 */
-	public boolean prepareForEval(
+	private boolean prepareForEval(
 			InputSource inputSource,
 			List<String> runtimeArguments,
 			Map<String, Object> variableOverrides)
@@ -2251,9 +2214,6 @@ public class AVM implements VariableManager, Closeable {
 			runtimeStack.popAllFrames();
 			// clear operand stack
 			operandStack.clear();
-			if (isOutputOpcode(opcode)) {
-				throw new AwkRuntimeException(position.lineNumber(), "Failed to write AWK output.", ioe);
-			}
 			throw ioe;
 		} catch (RuntimeException re) {
 			// clear runtime stack
@@ -2284,7 +2244,7 @@ public class AVM implements VariableManager, Closeable {
 	 * <p>
 	 * Call this when you are done with an AVM obtained through expert-level
 	 * integration, or after direct {@link #eval(AwkExpression, InputSource)} /
-	 * {@link #interpret(AwkProgram, InputSource)} usage.
+	 * {@link #execute(AwkProgram, InputSource)} usage.
 	 * The AVM may be prepared again afterwards, but callers should treat a closed
 	 * instance as end-of-use unless they intentionally reinitialize it.
 	 * </p>
@@ -2324,15 +2284,6 @@ public class AVM implements VariableManager, Closeable {
 			args[i] = pop();
 		}
 		return args;
-	}
-
-	private static boolean isOutputOpcode(Opcode opcode) {
-		return opcode == Opcode.PRINT
-				|| opcode == Opcode.PRINT_TO_FILE
-				|| opcode == Opcode.PRINT_TO_PIPE
-				|| opcode == Opcode.PRINTF
-				|| opcode == Opcode.PRINTF_TO_FILE
-				|| opcode == Opcode.PRINTF_TO_PIPE;
 	}
 
 	/**

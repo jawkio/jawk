@@ -40,17 +40,17 @@ AwkProgram program = awk.compile("{ print $1 }");
 
 try (AVM avm = awk.createAvm()) {
     avm.setAwkSink(new AppendableAwkSink(new StringBuilder(), Locale.US));
-    avm.interpret(
+    avm.execute(
             program,
             firstSource,
             Collections.<String>emptyList(),
             null);
 
-    avm.interpret(program, secondSource);
+    avm.execute(program, secondSource);
 }
 ```
 
-Each `interpret(...)` resets the AWK execution state before the program starts again, but it still reuses the same interpreter instance and runtime infrastructure.
+Each `execute(...)` resets the AWK execution state before the program starts again, but it still reuses the same interpreter instance and runtime infrastructure.
 
 ## Why Stateful Eval Is Powerful and Dangerous
 
@@ -78,14 +78,9 @@ Use `SandboxedAwk` when you want the same restrictions as the CLI `-S` mode:
 Awk awk = new SandboxedAwk();
 AwkProgram program = awk.compile("{ print $0 }");
 
-awk.run(
-        program,
-        new ByteArrayInputStream("safe\n".getBytes(StandardCharsets.UTF_8)),
-        null);
-```
-
-Scripts that rely on `system()`, redirections, or command pipelines will fail under the sandboxed compiler or runtime. That is the intended behavior.
-
+awk.run(program)
+        .input(new ByteArrayInputStream("safe\n".getBytes(StandardCharsets.UTF_8)))
+        .execute();
 ## JSR 223 ScriptEngine
 
 Jawk also exposes a JSR 223 `ScriptEngine`:

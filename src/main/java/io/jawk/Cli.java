@@ -390,7 +390,7 @@ public final class Cli {
 			return;
 		}
 		// Finally run the compiled program with the input and arguments.
-		awk.execute(program, inputStream, nameValueOrFileNames, null, null);
+		awk.run(program).input(inputStream).arguments(nameValueOrFileNames).execute();
 	}
 
 	/**

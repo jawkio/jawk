@@ -556,20 +556,7 @@ public class JRT {
 	 * @return A String representation of o.
 	 */
 	public String toAwkString(Object o) {
-		return toAwkString(o, this.convfmt, this.locale);
-	}
-
-	/**
-	 * Convert Strings, Integers, and Doubles to Strings
-	 * based on the CONVFMT variable contents.
-	 *
-	 * @param o Object to convert.
-	 * @param convfmt The contents of the CONVFMT variable.
-	 * @return A String representation of o.
-	 * @param locale a {@link java.util.Locale} object
-	 */
-	private static String toAwkString(Object o, String convfmt, Locale locale) {
-		return AwkSink.formatOutputValue(o, convfmt, locale);
+		return AwkSink.formatOutputValue(o, this.convfmt, this.locale);
 	}
 
 	/**

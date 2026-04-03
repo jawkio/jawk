@@ -92,12 +92,9 @@ public class RegexpTupleAndCachingTest {
 		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
 		new Awk(settings)
-				.execute(
-						cli.getPrecompiledProgram(),
-						new ByteArrayInputStream(new byte[0]),
-						Collections.emptyList(),
-						null,
-						null);
+				.run(cli.getPrecompiledProgram())
+				.input(new ByteArrayInputStream(new byte[0]))
+				.execute();
 
 		// Should still match and print 1 using the serialized pattern
 		assertEquals("1\n", out.toString(StandardCharsets.UTF_8.name()));

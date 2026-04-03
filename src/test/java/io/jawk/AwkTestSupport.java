@@ -1018,9 +1018,9 @@ public final class AwkTestSupport {
 				ScriptSource scriptSource = new ScriptSource(description(), new StringReader(resolvedScript));
 				AwkProgram program = awk.compile(Collections.singletonList(scriptSource));
 				if (inputSource != null) {
-					awk.execute(program, inputSource, operands, null, null);
+					awk.run(program).input(inputSource).arguments(operands).execute();
 				} else {
-					awk.execute(program, stdinStream, operands, null, null);
+					awk.run(program).input(stdinStream).arguments(operands).execute();
 				}
 			} catch (ExitException ex) {
 				exitCode = ex.getCode();

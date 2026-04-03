@@ -9,25 +9,23 @@ Jawk exposes three distinct concepts that are easy to blur together if you come 
 
 - runtime `arguments` are CLI-style operands exposed through `ARGV` and `ARGC`
 - `AwkSettings` variables are engine-level defaults
-- `run(...)` and `AVM.interpret(...)` accept per-call variable overrides
+- `run(...)` and `AVM.execute(...)` accept per-call variable overrides
 
 > [!IMPORTANT]
-> `AwkSettings` is behavioral configuration, not an input carrier. Put field separators, locale, record separators, default output targets, and engine-level variables there. Pass input directly through `run(...)`, `AVM.interpret(...)`, or `eval(...)`.
+> `AwkSettings` is behavioral configuration, not an input carrier. Put field separators, locale, record separators, default output targets, and engine-level variables there. Pass input directly through `run(...)`, `AVM.execute(...)`, or `eval(...)`.
 
 ## Runtime Arguments, ARGC, and ARGV
 
-The `arguments` passed to `run(...)` or `AVM.interpret(...)` are the Java equivalent of the CLI operands that appear after the script:
+The `arguments` passed to `run(...)` or `AVM.execute(...)` are the Java equivalent of the CLI operands that appear after the script:
 
 ```java
 Awk awk = new Awk();
 AwkProgram program = awk.compile("BEGIN { print ARGC, ARGV[1] }");
 
-awk.run(
-        program,
-        myInputSource,
-        Arrays.asList("mode=csv"),
-        null,
-        null);
+awk.run(program)
+        .input(myInputSource)
+        .arguments("mode=csv")
+        .execute();
 ```
 
 Those operands follow AWK rules:
@@ -63,15 +61,13 @@ Use the explicit `variableOverrides` parameter when the compiled program stays t
 Awk awk = new Awk();
 AwkProgram program = awk.compile("{ print prefix $0 }");
 
-awk.run(
-        program,
-        myInputSource,
-        Collections.<String>emptyList(),
-        Collections.<String, Object>singletonMap("prefix", "row="),
-        null);
+awk.run(program)
+        .input(myInputSource)
+        .variables(Collections.<String, Object>singletonMap("prefix", "row="))
+        .execute();
 ```
 
-The same idea is available on the reusable runtime API through `AVM.interpret(...)` and `AVM.prepareForEval(...)`.
+The same idea is available on the reusable runtime API through `AVM.execute(...)` and `AVM.prepareForEval(...)`.
 
 ## Structured Input with InputSource
 
@@ -79,7 +75,7 @@ The same idea is available on the reusable runtime API through `AVM.interpret(..
 
 You can use an `InputSource` with both:
 
-- `Awk.run(program, inputSource, arguments, variableOverrides, sink)`
+- `Awk.run(program).input(inputSource).execute()`
 - `Awk.eval(expression, source)` for one-off expression evaluation
 
 ## InputSource Contract

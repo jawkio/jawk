@@ -286,137 +286,41 @@ public class Awk {
 	}
 
 	/**
-	 * Executes a compiled AWK program using this {@link Awk} instance's default
-	 * sink and no input.
+	 * Starts building a run request for a compiled AWK program.
+	 * <p>
+	 * Use the returned {@link RunBuilder} to configure input, arguments,
+	 * variables, and output sink, then call {@link RunBuilder#execute() execute()}
+	 * or {@link RunBuilder#capture() capture()} to run the program.
+	 * </p>
+	 *
+	 * <pre>{@code
+	 * awk.run(program).input(stream).sink(mySink).execute();
+	 * String out = awk.run(program).input("hello").capture();
+	 * }</pre>
 	 *
 	 * @param program compiled program to execute
-	 * @throws IOException if execution fails
-	 * @throws ExitException if the script terminates with a non-zero exit code
+	 * @return a builder for configuring and executing the run
 	 */
-	public void run(AwkProgram program) throws IOException, ExitException {
-		run(program, (InputStream) null, null);
+	public RunBuilder run(AwkProgram program) {
+		return new RunBuilder(Objects.requireNonNull(program, "program"));
 	}
 
 	/**
-	 * Executes a compiled AWK program using this {@link Awk} instance's default
-	 * sink.
+	 * Compiles the script and starts building a run request.
+	 * <p>
+	 * Equivalent to {@code run(compile(script))}.
+	 * </p>
 	 *
-	 * @param program compiled program to execute
-	 * @param input input stream to process; {@code null} means no input
-	 * @throws IOException if execution fails
-	 * @throws ExitException if the script terminates with a non-zero exit code
-	 */
-	public void run(AwkProgram program, InputStream input) throws IOException, ExitException {
-		run(program, input, null);
-	}
-
-	/**
-	 * Executes a compiled AWK program with an explicit per-call output sink.
-	 *
-	 * @param program compiled program to execute
-	 * @param input input stream to process; {@code null} means no input
-	 * @param awkSink output sink to use for this call, or {@code null} to use the
-	 *        sink configured in {@link AwkSettings}
-	 * @throws IOException if execution fails
-	 * @throws ExitException if the script terminates with a non-zero exit code
-	 */
-	public void run(AwkProgram program, InputStream input, AwkSink awkSink)
-			throws IOException,
-			ExitException {
-		execute(program, input, Collections.<String>emptyList(), null, awkSink);
-	}
-
-	/**
-	 * Executes a compiled AWK program with full per-call control over text input,
-	 * arguments, variables, and output.
-	 *
-	 * @param program compiled program to execute
-	 * @param input input stream to process; {@code null} means no input
-	 * @param arguments runtime arguments visible through {@code ARGC}/{@code ARGV}
-	 * @param variableOverrides additional variable assignments applied on top of
-	 *        the settings-level variables (may be {@code null})
-	 * @param awkSink output sink to use for this call, or {@code null} to use the
-	 *        sink configured in {@link AwkSettings}
-	 * @throws IOException if execution fails
-	 * @throws ExitException if the script terminates with a non-zero exit code
-	 */
-	public void run(
-			AwkProgram program,
-			InputStream input,
-			List<String> arguments,
-			Map<String, Object> variableOverrides,
-			AwkSink awkSink)
-			throws IOException,
-			ExitException {
-		execute(program, input, arguments, variableOverrides, awkSink);
-	}
-
-	/**
-	 * Executes a compiled AWK program with full per-call control over input,
-	 * arguments, variables, and output.
-	 *
-	 * @param program compiled program to execute
-	 * @param inputSource input source providing records; {@code null} means no
-	 *        input
-	 * @param arguments runtime arguments visible through {@code ARGC}/{@code ARGV}
-	 * @param variableOverrides additional variable assignments applied on top of
-	 *        the settings-level variables (may be {@code null})
-	 * @param awkSink output sink to use for this call, or {@code null} to use the
-	 *        sink configured in {@link AwkSettings}
-	 * @throws IOException if execution fails
-	 * @throws ExitException if the script terminates with a non-zero exit code
-	 */
-	public void run(
-			AwkProgram program,
-			InputSource inputSource,
-			List<String> arguments,
-			Map<String, Object> variableOverrides,
-			AwkSink awkSink)
-			throws IOException,
-			ExitException {
-		execute(program, inputSource, arguments, variableOverrides, awkSink);
-	}
-
-	/**
-	 * Compiles and executes an AWK program with an explicit per-call output sink.
+	 * <pre>{@code
+	 * awk.run("{ print toupper($0) }").input("hello").capture();
+	 * }</pre>
 	 *
 	 * @param script AWK program source
-	 * @param input input stream to process; {@code null} means no input
-	 * @param awkSink output sink to use for this call, or {@code null} to use the
-	 *        sink configured in {@link AwkSettings}
-	 * @throws IOException if compilation or execution fails
-	 * @throws ExitException if the script terminates with a non-zero exit code
+	 * @return a builder for configuring and executing the run
+	 * @throws IOException if compilation fails
 	 */
-	public void run(String script, InputStream input, AwkSink awkSink)
-			throws IOException,
-			ExitException {
-		run(compile(script), input, awkSink);
-	}
-
-	/**
-	 * Compiles and executes an AWK program with full per-call control over input,
-	 * arguments, variables, and output.
-	 *
-	 * @param script AWK program source
-	 * @param inputSource input source providing records; {@code null} means no
-	 *        input
-	 * @param arguments runtime arguments visible through {@code ARGC}/{@code ARGV}
-	 * @param variableOverrides additional variable assignments applied on top of
-	 *        the settings-level variables (may be {@code null})
-	 * @param awkSink output sink to use for this call, or {@code null} to use the
-	 *        sink configured in {@link AwkSettings}
-	 * @throws IOException if compilation or execution fails
-	 * @throws ExitException if the script terminates with a non-zero exit code
-	 */
-	public void run(
-			String script,
-			InputSource inputSource,
-			List<String> arguments,
-			Map<String, Object> variableOverrides,
-			AwkSink awkSink)
-			throws IOException,
-			ExitException {
-		run(compile(script), inputSource, arguments, variableOverrides, awkSink);
+	public RunBuilder run(String script) throws IOException {
+		return run(compile(script));
 	}
 
 	/**
@@ -467,42 +371,6 @@ public class Awk {
 	}
 
 	/**
-	 * Executes the specified AWK script against the given input and returns the
-	 * printed output as a {@link String}.
-	 *
-	 * @param script AWK script to execute
-	 * @param input text to process
-	 * @return result of the execution as a String
-	 * @throws IOException if an I/O error occurs
-	 * @throws ExitException if the script terminates with a non-zero exit code
-	 */
-	public String run(String script, String input)
-			throws IOException,
-			ExitException {
-		StringBuilder output = new StringBuilder();
-		run(compile(script), toInputStream(input), new AppendableAwkSink(output, settings.getLocale()));
-		return output.toString();
-	}
-
-	/**
-	 * Executes the specified AWK script against the provided input stream and
-	 * returns the printed output as a {@link String}.
-	 *
-	 * @param script AWK script to execute
-	 * @param input stream to process
-	 * @return result of the execution as a String
-	 * @throws IOException if an I/O error occurs
-	 * @throws ExitException if the script terminates with a non-zero exit code
-	 */
-	public String run(String script, InputStream input)
-			throws IOException,
-			ExitException {
-		StringBuilder output = new StringBuilder();
-		run(script, input, new AppendableAwkSink(output, settings.getLocale()));
-		return output.toString();
-	}
-
-	/**
 	 * Compiles the specified AWK script and returns an immutable AWK program.
 	 *
 	 * @param script AWK script to compile
@@ -534,7 +402,7 @@ public class Awk {
 
 	/**
 	 * Compiles a list of script sources into an immutable AWK program that can be
-	 * interpreted by the {@link AVM} runtime.
+	 * executed by the {@link AVM} runtime.
 	 *
 	 * @param scripts script sources to compile
 	 * @return compiled immutable program
@@ -548,7 +416,7 @@ public class Awk {
 
 	/**
 	 * Compiles a list of script sources into an immutable AWK program that can be
-	 * interpreted by the {@link AVM} runtime.
+	 * executed by the {@link AVM} runtime.
 	 *
 	 * @param scripts script sources to compile
 	 * @param disableOptimizeParam {@code true} to skip tuple optimization
@@ -800,58 +668,173 @@ public class Awk {
 		return new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8));
 	}
 
-	void execute(
-			AwkProgram program,
-			InputStream inputStream,
-			List<String> arguments,
-			Map<String, Object> variableOverrides,
-			AwkSink awkSink)
-			throws IOException,
-			ExitException {
-		Objects.requireNonNull(program, "program");
-		List<String> runtimeArguments = arguments == null ? Collections.<String>emptyList() : arguments;
-		InputStream resolvedInput = inputStream == null ? new ByteArrayInputStream(new byte[0]) : inputStream;
-		try (AVM avm = createAvm(settings)) {
-			if (awkSink != null) {
-				avm.setAwkSink(awkSink);
-			}
-			try {
-				avm
-						.interpret(
-								program,
-								new StreamInputSource(resolvedInput, avm, avm.getJrt()),
-								runtimeArguments,
-								variableOverrides);
-			} catch (ExitException e) {
-				if (e.getCode() != 0) {
-					throw e;
+	/**
+	 * Fluent builder for configuring and executing an AWK program run.
+	 * <p>
+	 * Obtain an instance through {@link Awk#run(AwkProgram)} or
+	 * {@link Awk#run(String)}, configure input, arguments, variables, and
+	 * output sink with the setter methods, then call {@link #execute()} or
+	 * {@link #capture()} to run the program.
+	 * </p>
+	 *
+	 * <pre>{@code
+	 * // Fire-and-forget execution
+	 * awk.run(program).input(stream).execute();
+	 *
+	 * // Capture printed output as a String
+	 * String result = awk.run("{ print toupper($0) }").input("hello").capture();
+	 *
+	 * // Full control
+	 * awk
+	 * 		.run(program)
+	 * 		.input(mySource)
+	 * 		.arguments("mode=csv")
+	 * 		.variables(Collections.singletonMap("prefix", "row="))
+	 * 		.sink(mySink)
+	 * 		.execute();
+	 * }</pre>
+	 */
+	public final class RunBuilder {
+
+		private final AwkProgram program;
+		private InputStream inputStream;
+		private InputSource inputSource;
+		private List<String> arguments;
+		private Map<String, Object> variableOverrides;
+		private AwkSink sink;
+
+		RunBuilder(AwkProgram program) {
+			this.program = program;
+		}
+
+		/**
+		 * Sets the text input to process.
+		 *
+		 * @param input text input (encoded as UTF-8 internally)
+		 * @return this builder
+		 */
+		public RunBuilder input(String input) {
+			this.inputStream = toInputStream(input);
+			return this;
+		}
+
+		/**
+		 * Sets the byte-stream input to process.
+		 *
+		 * @param input byte stream, or {@code null} for no input
+		 * @return this builder
+		 */
+		public RunBuilder input(InputStream input) {
+			this.inputStream = input;
+			return this;
+		}
+
+		/**
+		 * Sets a structured {@link InputSource} to process.
+		 *
+		 * @param source structured record source
+		 * @return this builder
+		 */
+		public RunBuilder input(InputSource source) {
+			this.inputSource = source;
+			return this;
+		}
+
+		/**
+		 * Sets runtime arguments visible through {@code ARGC}/{@code ARGV}.
+		 *
+		 * @param args runtime arguments
+		 * @return this builder
+		 */
+		@SuppressFBWarnings("EI_EXPOSE_REP2")
+		public RunBuilder arguments(List<String> args) {
+			this.arguments = args;
+			return this;
+		}
+
+		/**
+		 * Sets runtime arguments visible through {@code ARGC}/{@code ARGV}.
+		 *
+		 * @param args runtime arguments
+		 * @return this builder
+		 */
+		public RunBuilder arguments(String... args) {
+			this.arguments = Arrays.asList(args);
+			return this;
+		}
+
+		/**
+		 * Sets per-call variable overrides applied on top of the settings-level
+		 * variables.
+		 *
+		 * @param overrides variable assignments (may be {@code null})
+		 * @return this builder
+		 */
+		@SuppressFBWarnings("EI_EXPOSE_REP2")
+		public RunBuilder variables(Map<String, Object> overrides) {
+			this.variableOverrides = overrides;
+			return this;
+		}
+
+		/**
+		 * Sets the output sink for this run, overriding the default configured
+		 * in {@link AwkSettings}.
+		 *
+		 * @param awkSink output sink
+		 * @return this builder
+		 */
+		public RunBuilder sink(AwkSink awkSink) {
+			this.sink = awkSink;
+			return this;
+		}
+
+		/**
+		 * Executes the configured run.
+		 *
+		 * @throws IOException if execution fails
+		 * @throws ExitException if the script terminates with a non-zero exit code
+		 */
+		public void execute() throws IOException, ExitException {
+			List<String> resolvedArguments = arguments == null ? Collections.<String>emptyList() : arguments;
+			try (AVM avm = createAvm(settings)) {
+				if (sink != null) {
+					avm.setAwkSink(sink);
+				}
+				try {
+					InputSource resolvedSource;
+					if (inputSource != null) {
+						resolvedSource = inputSource;
+					} else if (inputStream != null) {
+						resolvedSource = new StreamInputSource(inputStream, avm, avm.getJrt());
+					} else {
+						resolvedSource = new SingleRecordInputSource(null);
+					}
+					avm.execute(program, resolvedSource, resolvedArguments, variableOverrides);
+				} catch (ExitException e) {
+					if (e.getCode() != 0) {
+						throw e;
+					}
 				}
 			}
 		}
-	}
 
-	void execute(
-			AwkProgram program,
-			InputSource inputSource,
-			List<String> arguments,
-			Map<String, Object> variableOverrides,
-			AwkSink awkSink)
-			throws IOException,
-			ExitException {
-		Objects.requireNonNull(program, "program");
-		List<String> runtimeArguments = arguments == null ? Collections.<String>emptyList() : arguments;
-		InputSource resolvedSource = inputSource == null ? new SingleRecordInputSource(null) : inputSource;
-		try (AVM avm = createAvm(settings)) {
-			if (awkSink != null) {
-				avm.setAwkSink(awkSink);
-			}
-			try {
-				avm.interpret(program, resolvedSource, runtimeArguments, variableOverrides);
-			} catch (ExitException e) {
-				if (e.getCode() != 0) {
-					throw e;
-				}
-			}
+		/**
+		 * Executes the configured run and returns the printed output as a
+		 * {@link String}.
+		 * <p>
+		 * This terminal installs an internal capturing sink, so any sink set
+		 * via {@link #sink(AwkSink)} is ignored.
+		 * </p>
+		 *
+		 * @return printed output
+		 * @throws IOException if execution fails
+		 * @throws ExitException if the script terminates with a non-zero exit code
+		 */
+		public String capture() throws IOException, ExitException {
+			StringBuilder output = new StringBuilder();
+			sink(new AppendableAwkSink(output, settings.getLocale()));
+			execute();
+			return output.toString();
 		}
 	}
 

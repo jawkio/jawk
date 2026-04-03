@@ -59,10 +59,9 @@ For full AWK programs, compile to `AwkProgram` and then run that compiled progra
 Awk awk = new Awk();
 AwkProgram program = awk.compile("{ print $1 }");
 
-awk.run(
-        program,
-        new ByteArrayInputStream("alpha beta\n".getBytes(StandardCharsets.UTF_8)),
-        null);
+awk.run(program)
+        .input(new ByteArrayInputStream("alpha beta\n".getBytes(StandardCharsets.UTF_8)))
+        .execute();
 ```
 
 This keeps compilation and execution separate, which is useful when the same AWK program is reused across multiple inputs.
@@ -90,6 +89,6 @@ Use this when runtime allocation and teardown matter, or when you intentionally 
 
 - Use `eval(String...)` when the expression is cheap and called only occasionally.
 - Use `AwkExpression` plus `eval(...)` when one expression is reused across many records.
-- Use `AwkProgram` plus `run(...)` when a whole AWK program is reused.
+- Use `AwkProgram` plus `run(program).execute()` when a whole AWK program is reused.
 - Use `AVM` when you want to keep one runtime alive across several calls.
 

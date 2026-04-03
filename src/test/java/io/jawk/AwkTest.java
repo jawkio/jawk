@@ -853,12 +853,9 @@ public class AwkTest {
 		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
 		new Awk(settings)
-				.execute(
-						program,
-						new ByteArrayInputStream("foo\nbar\n".getBytes(StandardCharsets.UTF_8)),
-						Collections.emptyList(),
-						null,
-						null);
+				.run(program)
+				.input(new ByteArrayInputStream("foo\nbar\n".getBytes(StandardCharsets.UTF_8)))
+				.execute();
 
 		assertEquals("foo\nbar\n", out.toString(StandardCharsets.UTF_8.name()));
 	}
@@ -916,7 +913,7 @@ public class AwkTest {
 				.runAndAssert();
 
 		settings.setLocale(java.util.Locale.FRANCE);
-		awk.run(awk.compile("BEGIN { print 1.5 }"));
+		awk.run(awk.compile("BEGIN { print 1.5 }")).execute();
 
 		assertEquals(output, settings.getOutputAppendable());
 		assertEquals("1,5\n", output.toString());
@@ -957,16 +954,15 @@ public class AwkTest {
 
 		StringBuilder perCallOutput = new StringBuilder();
 		awk
-				.run(
-						"BEGIN { print \"alpha\" }",
-						(ByteArrayInputStream) null,
-						new AppendableAwkSink(perCallOutput, settings.getLocale()));
+				.run("BEGIN { print \"alpha\" }")
+				.sink(new AppendableAwkSink(perCallOutput, settings.getLocale()))
+				.execute();
 
 		assertEquals("alpha\n", perCallOutput.toString());
 		assertEquals("", defaultOutput.toString());
 
 		AwkProgram program = awk.compile("BEGIN { print \"beta\" }");
-		awk.run(program);
+		awk.run(program).execute();
 
 		assertEquals("beta\n", defaultOutput.toString());
 	}
@@ -976,7 +972,7 @@ public class AwkTest {
 		StructuredOutputSink sink = new StructuredOutputSink();
 		Awk awk = new Awk();
 
-		awk.run("BEGIN { print 1, \"two\", 3; printf(\"<%s>\", \"done\") }", (ByteArrayInputStream) null, sink);
+		awk.run("BEGIN { print 1, \"two\", 3; printf(\"<%s>\", \"done\") }").sink(sink).execute();
 
 		assertEquals(1, sink.printedValues.size());
 		assertEquals(3, sink.printedValues.get(0).size());
@@ -997,7 +993,7 @@ public class AwkTest {
 		settings.setOutputStream(output);
 
 		Awk awk = new Awk(settings);
-		awk.run(awk.compile("BEGIN { print \"alpha\" }"));
+		awk.run(awk.compile("BEGIN { print \"alpha\" }")).execute();
 
 		assertEquals("alpha\n", output.toString(StandardCharsets.UTF_8.name()));
 	}
@@ -1007,10 +1003,9 @@ public class AwkTest {
 		ByteArrayOutputStream output = new ByteArrayOutputStream();
 
 		new Awk()
-				.run(
-						"BEGIN { print \"alpha\" }",
-						(ByteArrayInputStream) null,
-						new OutputStreamAwkSink(output, java.util.Locale.US));
+				.run("BEGIN { print \"alpha\" }")
+				.sink(new OutputStreamAwkSink(output, java.util.Locale.US))
+				.execute();
 
 		assertEquals("alpha" + System.lineSeparator(), output.toString(StandardCharsets.UTF_8.name()));
 	}
@@ -1020,10 +1015,9 @@ public class AwkTest {
 		ByteArrayOutputStream output = new ByteArrayOutputStream();
 
 		new Awk()
-				.run(
-						"BEGIN { print \"alpha\"; exit 0 }",
-						(ByteArrayInputStream) null,
-						new OutputStreamAwkSink(output, java.util.Locale.US));
+				.run("BEGIN { print \"alpha\"; exit 0 }")
+				.sink(new OutputStreamAwkSink(output, java.util.Locale.US))
+				.execute();
 
 		assertEquals("alpha" + System.lineSeparator(), output.toString(StandardCharsets.UTF_8.name()));
 	}
@@ -1062,13 +1056,13 @@ public class AwkTest {
 		try (AVM avm = awk.createAvm()) {
 			avm.setAwkSink(new AppendableAwkSink(firstOutput, settings.getLocale()));
 			avm
-					.interpret(
+					.execute(
 							program,
 							emptyInput,
 							Collections.<String>emptyList(),
 							null);
 			avm.setAwkSink(settings.getAwkSink());
-			avm.interpret(program, emptyInput);
+			avm.execute(program, emptyInput);
 		}
 
 		assertEquals("value\n", firstOutput.toString());
@@ -1091,12 +1085,9 @@ public class AwkTest {
 		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
 		new Awk(settings)
-				.execute(
-						program,
-						new ByteArrayInputStream("one\n".getBytes(StandardCharsets.UTF_8)),
-						Collections.emptyList(),
-						null,
-						null);
+				.run(program)
+				.input(new ByteArrayInputStream("one\n".getBytes(StandardCharsets.UTF_8)))
+				.execute();
 
 		assertEquals("one\n", out.toString(StandardCharsets.UTF_8.name()));
 	}
@@ -1117,12 +1108,9 @@ public class AwkTest {
 		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
 		new Awk(settings)
-				.execute(
-						program,
-						new ByteArrayInputStream("value\n".getBytes(StandardCharsets.UTF_8)),
-						Collections.emptyList(),
-						null,
-						null);
+				.run(program)
+				.input(new ByteArrayInputStream("value\n".getBytes(StandardCharsets.UTF_8)))
+				.execute();
 
 		assertEquals("value\n", out.toString(StandardCharsets.UTF_8.name()));
 	}
@@ -1149,12 +1137,9 @@ public class AwkTest {
 		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
 		new Awk(settings)
-				.execute(
-						cli.getPrecompiledProgram(),
-						new ByteArrayInputStream("abc\n".getBytes(StandardCharsets.UTF_8)),
-						Collections.emptyList(),
-						null,
-						null);
+				.run(cli.getPrecompiledProgram())
+				.input(new ByteArrayInputStream("abc\n".getBytes(StandardCharsets.UTF_8)))
+				.execute();
 
 		assertEquals("ABC\n", out.toString(StandardCharsets.UTF_8.name()));
 	}
@@ -1176,12 +1161,9 @@ public class AwkTest {
 		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
 		new Awk(settings)
-				.execute(
-						cli.getPrecompiledProgram(),
-						new ByteArrayInputStream("abc\n".getBytes(StandardCharsets.UTF_8)),
-						Collections.emptyList(),
-						null,
-						null);
+				.run(cli.getPrecompiledProgram())
+				.input(new ByteArrayInputStream("abc\n".getBytes(StandardCharsets.UTF_8)))
+				.execute();
 
 		assertEquals("ABC\n", out.toString(StandardCharsets.UTF_8.name()));
 	}
@@ -1253,12 +1235,9 @@ public class AwkTest {
 		assertThrows(
 				AwkSandboxException.class,
 				() -> sandboxAwk
-						.execute(
-								program,
-								new ByteArrayInputStream(new byte[0]),
-								Collections.emptyList(),
-								null,
-								null));
+						.run(program)
+						.input(new ByteArrayInputStream(new byte[0]))
+						.execute());
 	}
 
 	@Test

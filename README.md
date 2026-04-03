@@ -18,7 +18,7 @@ echo "hello world" | java -jar jawk-${project.version}-standalone.jar '{ print $
 
 ```java
 Awk awk = new Awk();
-String result = awk.run("{ print toupper($0) }", "hello world");
+String result = awk.run("{ print toupper($0) }").input("hello world").capture();
 ```
 
 When writing custom extensions, annotate associative array parameters with `@JawkAssocArray` and declare them as `Map` values rather than concrete map implementations.

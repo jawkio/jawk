@@ -65,6 +65,7 @@
 
 		<menu name="Java">
 			<item name="Jawk Quickstart" href="java.html" />
+			<item name="Custom Output" href="java-output.html" />
 			<item name="Structured Input and Variables" href="java-input.html" />
 			<item name="Compile, Eval, and Reuse" href="java-compile.html" />
 			<item name="Advanced Runtime" href="java-advanced.html" />
@@ -77,6 +78,7 @@
 
 		<menu name="Reference">
 			<item name="Compatibility and Differences" href="compatibility.html" />
+			<item name="Javadoc (API)" href="apidocs/index.html" />
 		</menu>
 
 		<menu ref="reports" />

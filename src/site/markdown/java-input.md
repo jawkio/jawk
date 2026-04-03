@@ -154,8 +154,28 @@ Awk awk = new Awk();
 Object value = awk.eval("$1 \"-\" $3", source);
 ```
 
+## AwkSettings Reference
+
+[`AwkSettings`](apidocs/io/jawk/util/AwkSettings.html) holds the behavioral configuration for a Jawk engine instance. It is not an input carrier — use it for engine defaults that apply to every execution.
+
+| Setting | Setter | Type | Default | Description |
+| --- | --- | --- | --- | --- |
+| Field separator | `setFieldSeparator(String)` | `String` | `null` (default AWK FS) | The initial value of `FS` |
+| Locale | `setLocale(Locale)` | `Locale` | `Locale.US` | Locale for numeric output formatting |
+| Output stream | `setOutputStream(PrintStream)` | `PrintStream` | `System.out` | Where `print`/`printf` output goes |
+| Output appendable | `setOutputAppendable(Appendable)` | `Appendable` | `null` | Alternative output to `StringBuilder`, `StringWriter`, etc. |
+| Custom sink | `setAwkSink(AwkSink)` | `AwkSink` | Stream-backed | Full control over output handling |
+| Record separator | `setDefaultRS(String)` | `String` | Platform line separator | Default `RS` when not set by the script |
+| Output record separator | `setDefaultORS(String)` | `String` | Platform line separator | Default `ORS` when not set by the script |
+| Sorted array keys | `setUseSortedArrayKeys(boolean)` | `boolean` | `false` | Keep associative array keys in sorted order |
+| Variables | `putVariable(String, Object)` | `Map<String, Object>` | Empty map | Pre-set variables available before `BEGIN` |
+
+Output settings (`setOutputStream`, `setOutputAppendable`, `setAwkSink`) are mutually exclusive. Setting one clears the others. See the [Custom Output](java-output.html) guide for details.
+
 ## See Also
 
-- [Jawk in Java](java.html)
-- [Compile, eval, and reuse](java-compile.html)
+- [Java Quickstart](java.html)
+- [Custom Output](java-output.html)
+- [Compile, Eval, and Reuse](java-compile.html)
+- [Advanced Runtime](java-advanced.html)
 - [Advanced runtime](java-advanced.html)

@@ -102,37 +102,19 @@ When one execution needs a different destination, pass that `AwkSink` via `.sink
 
 ## Custom Output with AwkSink
 
-Use [`AwkSink`](apidocs/io/jawk/jrt/AwkSink.html) when plain text is not the right abstraction.
-
-An `AwkSink` receives raw `print(...)` and `printf(...)` calls together with the current AWK formatting state. The sink's numeric locale is fixed when you construct it:
+Use [`AwkSink`](apidocs/io/jawk/jrt/AwkSink.html) when plain text is not the right abstraction. An `AwkSink` receives raw `print(...)` and `printf(...)` calls together with the current AWK formatting state, so your host application can collect structured AWK output instead of rendered text.
 
 ```java
-public final class CollectingSink extends AwkSink {
-    private final List<List<Object>> prints = new ArrayList<List<Object>>();
-    private final PrintStream processOutput = System.out;
+Awk awk = new Awk();
+CollectingSink sink = new CollectingSink();
 
-    public CollectingSink() {
-        super(Locale.US);
-    }
-
-    @Override
-    public void print(String ofs, String ors, String ofmt, Object... values) {
-        prints.add(Arrays.asList(Arrays.copyOf(values, values.length)));
-    }
-
-    @Override
-    public void printf(String ofs, String ors, String ofmt, String format, Object... values) {
-        // store format + values however your application wants
-    }
-
-    @Override
-    public PrintStream getPrintStream() {
-        return processOutput;
-    }
-}
+awk.run("{ print $1, $2 }")
+        .input("alpha beta\ngamma delta\n")
+        .sink(sink)
+        .execute();
 ```
 
-This is the extension point to use when your host application wants structured AWK output instead of rendered text.
+See the [Custom Output](java-output.html) guide for the full `AwkSink` contract, built-in implementations, and detailed examples.
 
 ## Reusable Runtime: AVM
 
@@ -157,6 +139,43 @@ try (AVM avm = awk.createAvm()) {
 - `compile(...)` plus `run(program).execute()` when a whole AWK program is reused.
 - `compileExpression(...)` plus `eval(...)` when one expression is reused.
 - `createAvm()` when you want one reusable runtime across several calls.
+
+## Complete Example
+
+The example below reads CSV input, sums the second column per category in the first column, and captures the result:
+
+```java
+import io.jawk.Awk;
+import io.jawk.util.AwkSettings;
+
+public class JawkDemo {
+    public static void main(String[] args) throws Exception {
+        // Configure the engine for CSV input
+        AwkSettings settings = new AwkSettings();
+        settings.setFieldSeparator(",");
+
+        Awk awk = new Awk(settings);
+
+        // AWK script: accumulate totals by category, print sorted results
+        String script = "{ totals[$1] += $2 } END { for (k in totals) print k, totals[k] }";
+
+        // Input data
+        String csv = "fruit,10\nvegetable,20\nfruit,15\nvegetable,5\n";
+
+        // Execute and capture the printed output
+        String result = awk.run(script).input(csv).capture();
+        System.out.println(result);
+    }
+}
+```
+
+## See Also
+
+- [Custom Output](java-output.html)
+- [Structured Input and Variables](java-input.html)
+- [Compile, Eval, and Reuse](java-compile.html)
+- [Advanced Runtime](java-advanced.html)
+- [Using Extensions](extensions.html)
 
 ## Next Steps
 

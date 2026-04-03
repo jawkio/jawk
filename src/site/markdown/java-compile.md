@@ -66,29 +66,17 @@ awk.run(program)
 
 This keeps compilation and execution separate, which is useful when the same AWK program is reused across multiple inputs.
 
-## Reuse One AVM
-
-When you also want to reuse the runtime itself, keep one `AVM` alive:
-
-```java
-Awk awk = new Awk();
-AwkExpression secondField = awk.compileExpression("$2");
-
-try (AVM avm = awk.createAvm()) {
-    avm.prepareForEval("alpha beta");
-    Object first = avm.eval(secondField);
-
-    avm.prepareForEval("left right");
-    Object second = avm.eval(secondField);
-}
-```
-
-Use this when runtime allocation and teardown matter, or when you intentionally want stateful repeated evaluation.
-
 ## Choosing the Right Reuse Strategy
 
 - Use `eval(String...)` when the expression is cheap and called only occasionally.
 - Use `AwkExpression` plus `eval(...)` when one expression is reused across many records.
 - Use `AwkProgram` plus `run(program).execute()` when a whole AWK program is reused.
-- Use `AVM` when you want to keep one runtime alive across several calls.
+- Use `AVM` when you want to keep one runtime alive across several calls. See the [Advanced Runtime](java-advanced.html) guide for AVM-level reuse patterns.
+
+## See Also
+
+- [Java Quickstart](java.html)
+- [Structured Input and Variables](java-input.html)
+- [Custom Output](java-output.html)
+- [Advanced Runtime](java-advanced.html)
 

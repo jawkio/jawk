@@ -81,6 +81,8 @@ AwkProgram program = awk.compile("{ print $0 }");
 awk.run(program)
         .input(new ByteArrayInputStream("safe\n".getBytes(StandardCharsets.UTF_8)))
         .execute();
+```
+
 ## JSR 223 ScriptEngine
 
 Jawk also exposes a JSR 223 `ScriptEngine`:
@@ -105,4 +107,38 @@ The `input` binding may be either:
 - a `String`
 
 If no explicit input binding is present, the script engine falls back to `System.in`.
+
+## Thread Safety
+
+Jawk's classes are designed for single-threaded use within each instance. The key rules:
+
+- **`Awk` instances are not thread-safe.** Do not call `run(...)`, `eval(...)`, or `compile(...)` on the same `Awk` instance concurrently from multiple threads.
+- **`AVM` is sequential-only.** A single `AVM` must not be shared across threads. It is intentionally mutable and stateful.
+- **`AwkProgram` and `AwkExpression` are immutable.** Compiled artifacts can be safely shared across threads and reused by different `Awk` or `AVM` instances.
+- **`AwkSettings` should not be mutated during execution.** Configure settings before creating an `Awk` instance or before calling `run(...)`.
+- **`AwkSink` instances should not be shared** across concurrent executions unless the implementation is explicitly thread-safe.
+
+For concurrent AWK processing, create a separate `Awk` instance per thread:
+
+```java
+// Thread-safe: each thread gets its own Awk instance
+ExecutorService pool = Executors.newFixedThreadPool(4);
+AwkProgram program = new Awk().compile("{ print toupper($0) }");
+
+for (String input : inputs) {
+    pool.submit(() -> {
+        Awk awk = new Awk();
+        return awk.run(program).input(input).capture();
+    });
+}
+```
+
+The compiled `AwkProgram` is shared safely because it is immutable; each thread creates its own `Awk` to execute it.
+
+## See Also
+
+- [Java Quickstart](java.html)
+- [Custom Output](java-output.html)
+- [Structured Input and Variables](java-input.html)
+- [Compile, Eval, and Reuse](java-compile.html)
 

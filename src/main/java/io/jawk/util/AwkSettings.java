@@ -22,38 +22,32 @@ package io.jawk.util;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import java.io.OutputStream;
-import java.io.PrintStream;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
-import io.jawk.jrt.AppendableAwkSink;
-import io.jawk.jrt.AwkSink;
-import io.jawk.jrt.OutputStreamAwkSink;
 
 /**
  * Reusable behavioral configuration for the Jawk engine.
  * <p>
  * Instances hold settings that control how the AWK interpreter behaves
- * (field separator, locale, output stream, etc.) but do <em>not</em> carry
- * per-execution state such as input sources or filename arguments. This
+ * (field separator, locale, sorted keys, initial variables, and default
+ * record separator) but do <em>not</em> carry per-execution state such as
+ * input sources, filename arguments, or output destinations. This
  * separation allows a single {@code AwkSettings} object to be shared
  * across many invocations of {@link io.jawk.Awk#eval},
- * {@link io.jawk.Awk#run}, or {@link io.jawk.Awk#createAvm()}.
+ * {@link io.jawk.Awk#script}, or {@link io.jawk.Awk#createAvm()}.
+ * </p>
+ * <p>
+ * Output is configured on the execution builder returned by
+ * {@link io.jawk.Awk#script(String)} or {@link io.jawk.Awk#program} and
+ * is therefore always per-execution.
  * </p>
  *
  * @author Danny Daglas
  */
 public class AwkSettings {
-
-	private enum ManagedSinkType {
-		STREAM,
-		APPENDABLE,
-		CUSTOM
-	}
 
 	/**
 	 * Shared immutable settings instance representing the default configuration.
@@ -96,44 +90,9 @@ public class AwkSettings {
 	private volatile Locale locale = Locale.US;
 
 	/**
-	 * Output stream used when output is directed to a {@link PrintStream}.
-	 * <p>
-	 * The default is {@code System.out}. When output is redirected to a custom
-	 * {@link AwkSink} that is not stream-backed, this field becomes
-	 * {@code null}.
-	 */
-	private volatile PrintStream outputStream = System.out;
-
-	/**
-	 * Appendable used when output is captured directly into characters instead of
-	 * a stream-backed sink.
-	 */
-	private volatile Appendable outputAppendable = null;
-
-	/**
-	 * Output sink used by plain AWK {@code print} and {@code printf}
-	 * operations.
-	 * <p>
-	 * The default sink writes to {@code System.out}. Callers may replace it with
-	 * an appendable-backed or fully custom implementation.
-	 */
-	private volatile AwkSink awkSink = AwkSink.from(System.out, Locale.US);
-
-	/**
-	 * Records whether the current sink is managed directly by these settings or
-	 * supplied by the caller.
-	 */
-	private volatile ManagedSinkType managedSinkType = ManagedSinkType.STREAM;
-
-	/**
 	 * Default value for RS, when not set specifically by the AWK script
 	 */
 	private volatile String defaultRS = System.getProperty("line.separator", "\n");
-
-	/**
-	 * Default value for ORS, when not set specifically by the AWK script
-	 */
-	private volatile String defaultORS = System.getProperty("line.separator", "\n");
 
 	/**
 	 * Monotonically increasing counter incremented whenever the settings change.
@@ -306,98 +265,6 @@ public class AwkSettings {
 	}
 
 	/**
-	 * Returns the configured output stream when plain AWK output is currently
-	 * stream-backed.
-	 * <p>
-	 * This method returns {@code null} after {@link #setOutputAppendable(Appendable)}
-	 * or {@link #setAwkSink(AwkSink)} installs a non-stream sink.
-	 *
-	 * @return the output stream, or {@code null} when output is not stream-backed
-	 */
-	@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "OutputStream reference is intentionally shared so callers can control output.")
-	public PrintStream getOutputStream() {
-		return outputStream;
-	}
-
-	/**
-	 * Returns the sink used by plain AWK {@code print} and {@code printf}
-	 * statements.
-	 *
-	 * @return the configured output sink, never {@code null}
-	 */
-	public AwkSink getAwkSink() {
-		return awkSink;
-	}
-
-	/**
-	 * Returns the appendable used by AWK output operations when the current sink
-	 * was configured through {@link #setOutputAppendable(Appendable)}.
-	 *
-	 * @return the configured appendable, or {@code null} when AWK output is not
-	 *         currently appendable-backed
-	 */
-	public Appendable getOutputAppendable() {
-		return outputAppendable;
-	}
-
-	/**
-	 * Sets the stream used by AWK output operations.
-	 *
-	 * @param outputStreamParam stream to use for print statements
-	 */
-	public void setOutputStream(OutputStream outputStreamParam) {
-		outputStream = toPrintStream(outputStreamParam);
-		outputAppendable = null;
-		awkSink = new OutputStreamAwkSink(outputStream, locale);
-		managedSinkType = ManagedSinkType.STREAM;
-		markModified();
-	}
-
-	/**
-	 * Sets the appendable used by AWK output operations.
-	 * <p>
-	 * This is convenient for capturing output directly into a
-	 * {@link StringBuilder}, {@link java.io.StringWriter}, or custom appendable.
-	 *
-	 * @param appendable appendable destination for AWK output
-	 */
-	public void setOutputAppendable(Appendable appendable) {
-		outputAppendable = Objects.requireNonNull(appendable, "appendable");
-		outputStream = null;
-		awkSink = new AppendableAwkSink(outputAppendable, locale);
-		managedSinkType = ManagedSinkType.APPENDABLE;
-		markModified();
-	}
-
-	/**
-	 * Sets the sink used by AWK output operations.
-	 * <p>
-	 * Callers may override {@link AwkSink#print(String, String, String, Object...)} to collect raw
-	 * {@code print} arguments instead of rendered text.
-	 *
-	 * @param awkSinkParam output sink to use for plain AWK output
-	 */
-	public void setAwkSink(AwkSink awkSinkParam) {
-		awkSink = Objects.requireNonNull(awkSinkParam, "awkSink");
-		outputStream = null;
-		outputAppendable = null;
-		managedSinkType = ManagedSinkType.CUSTOM;
-		markModified();
-	}
-
-	private static PrintStream toPrintStream(OutputStream outputStreamParam) {
-		Objects.requireNonNull(outputStreamParam, "outputStream");
-		if (outputStreamParam instanceof PrintStream) {
-			return (PrintStream) outputStreamParam;
-		}
-		try {
-			return new PrintStream(outputStreamParam, false, "UTF-8");
-		} catch (java.io.UnsupportedEncodingException e) {
-			throw new IllegalStateException(e);
-		}
-	}
-
-	/**
 	 * <p>
 	 * Getter for the field <code>locale</code>.
 	 * </p>
@@ -410,36 +277,12 @@ public class AwkSettings {
 
 	/**
 	 * Sets the Locale for outputting numbers.
-	 * <p>
-	 * When the current sink is managed by these settings through
-	 * {@link #setOutputStream(OutputStream)} or
-	 * {@link #setOutputAppendable(Appendable)}, the sink is rebuilt so future
-	 * output uses the new locale. Caller-supplied sinks installed through
-	 * {@link #setAwkSink(AwkSink)} are left unchanged.
-	 * </p>
 	 *
 	 * @param pLocale The locale to be used (e.g.: <code>Locale.US</code>)
 	 */
 	public void setLocale(Locale pLocale) {
 		locale = pLocale == null ? Locale.US : pLocale;
-		rebuildManagedAwkSink();
 		markModified();
-	}
-
-	private void rebuildManagedAwkSink() {
-		switch (managedSinkType) {
-		case STREAM:
-			awkSink = new OutputStreamAwkSink(outputStream == null ? System.out : outputStream, locale);
-			break;
-		case APPENDABLE:
-			if (outputAppendable != null) {
-				awkSink = new AppendableAwkSink(outputAppendable, locale);
-			}
-			break;
-		case CUSTOM:
-		default:
-			break;
-		}
 	}
 
 	/**
@@ -460,27 +303,6 @@ public class AwkSettings {
 	 */
 	public void setDefaultRS(String rs) {
 		defaultRS = Objects.requireNonNull(rs, "defaultRS");
-		markModified();
-	}
-
-	/**
-	 * <p>
-	 * Getter for the field <code>defaultORS</code>.
-	 * </p>
-	 *
-	 * @return the default ORS, when not set by the AWK script
-	 */
-	public String getDefaultORS() {
-		return defaultORS;
-	}
-
-	/**
-	 * Sets the default ORS, when not set by the AWK script
-	 *
-	 * @param ors The string that separates output records (with the print statement)
-	 */
-	public void setDefaultORS(String ors) {
-		defaultORS = Objects.requireNonNull(ors, "defaultORS");
 		markModified();
 	}
 
@@ -515,32 +337,12 @@ public class AwkSettings {
 		}
 
 		@Override
-		public void setOutputStream(OutputStream outputStreamParam) {
-			throw unsupported();
-		}
-
-		@Override
-		public void setOutputAppendable(Appendable appendable) {
-			throw unsupported();
-		}
-
-		@Override
-		public void setAwkSink(AwkSink awkSinkParam) {
-			throw unsupported();
-		}
-
-		@Override
 		public void setLocale(Locale pLocale) {
 			throw unsupported();
 		}
 
 		@Override
 		public void setDefaultRS(String rs) {
-			throw unsupported();
-		}
-
-		@Override
-		public void setDefaultORS(String ors) {
 			throw unsupported();
 		}
 

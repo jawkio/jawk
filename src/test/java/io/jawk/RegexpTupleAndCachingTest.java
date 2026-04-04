@@ -87,14 +87,13 @@ public class RegexpTupleAndCachingTest {
 		Cli cli = Cli.parseCommandLineArguments(new String[] { "-L", tmp.getAbsolutePath() });
 		AwkSettings settings = cli.getSettings();
 		settings.setDefaultRS("\n");
-		settings.setDefaultORS("\n");
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
 		new Awk(settings)
-				.run(cli.getPrecompiledProgram())
+				.program(cli.getPrecompiledProgram())
+				.variable("ORS", "\n")
 				.input(new ByteArrayInputStream(new byte[0]))
-				.execute();
+				.execute(out);
 
 		// Should still match and print 1 using the serialized pattern
 		assertEquals("1\n", out.toString(StandardCharsets.UTF_8.name()));

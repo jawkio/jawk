@@ -53,7 +53,6 @@ import java.util.stream.Stream;
 import io.jawk.ext.JawkExtension;
 import io.jawk.intermediate.AwkTuples;
 import io.jawk.jrt.InputSource;
-import io.jawk.jrt.AwkSink;
 import io.jawk.util.AwkSettings;
 import io.jawk.util.ScriptSource;
 
@@ -338,7 +337,6 @@ public final class AwkTestSupport {
 		private Awk customAwk;
 		private final List<JawkExtension> extensions = new ArrayList<>();
 		private InputSource inputSource;
-		private boolean preserveAwkOutput;
 
 		private AwkTestBuilder(String description) {
 			super(description);
@@ -360,8 +358,8 @@ public final class AwkTestSupport {
 		/**
 		 * Supplies an {@link Awk} instance to use when invoking the script.
 		 * The instance must have been created with mutable
-		 * {@link AwkSettings} so that the test framework can configure or
-		 * preserve the output sink and pre-assigned variables before execution.
+		 * {@link AwkSettings} so that the test framework can configure
+		 * pre-assigned variables before execution.
 		 *
 		 * @param awkEngine the engine to execute the script with
 		 * @return this builder for method chaining
@@ -372,18 +370,6 @@ public final class AwkTestSupport {
 				throw new IllegalArgumentException("Awk instance must not be null");
 			}
 			this.customAwk = awkEngine;
-			return this;
-		}
-
-		/**
-		 * Keeps the output configuration already present on the supplied
-		 * {@link Awk} instance instead of replacing it with the framework's
-		 * capture stream.
-		 *
-		 * @return this builder for method chaining
-		 */
-		public AwkTestBuilder preserveAwkOutput() {
-			this.preserveAwkOutput = true;
 			return this;
 		}
 
@@ -452,8 +438,7 @@ public final class AwkTestSupport {
 					preAssignments,
 					customAwk,
 					extensions,
-					inputSource,
-					preserveAwkOutput);
+					inputSource);
 		}
 	}
 
@@ -949,7 +934,6 @@ public final class AwkTestSupport {
 		private final Awk customAwk;
 		private final List<JawkExtension> extensions;
 		private final InputSource inputSource;
-		private final boolean preserveAwkOutput;
 
 		AwkTestCase(
 				TestLayout layout,
@@ -960,14 +944,12 @@ public final class AwkTestSupport {
 				Map<String, Object> preAssignments,
 				Awk customAwk,
 				List<JawkExtension> extensions,
-				InputSource inputSource,
-				boolean preserveAwkOutput) {
+				InputSource inputSource) {
 			super(layout, fileContents, operandSpecs, pathPlaceholders, requiresPosix);
 			this.preAssignments = new LinkedHashMap<>(preAssignments);
 			this.customAwk = customAwk;
 			this.extensions = new ArrayList<>(extensions);
 			this.inputSource = inputSource;
-			this.preserveAwkOutput = preserveAwkOutput;
 		}
 
 		@Override
@@ -985,27 +967,17 @@ public final class AwkTestSupport {
 				stdinStream = new ByteArrayInputStream(new byte[0]);
 			}
 			ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
-			settings.setOutputStream(new PrintStream(outBytes, true, StandardCharsets.UTF_8.name()));
 			List<String> operands = resolvedOperands(env);
 			Awk awk;
-			PrintStream originalOutputStream = null;
-			Appendable originalOutputAppendable = null;
-			AwkSink originalAwkSink = null;
 			Map<String, Object> originalVars = null;
 			if (customAwk != null) {
 				awk = customAwk;
 				AwkSettings awkSettings = awk.getSettings();
-				// Save original state so we can restore it after execution,
+				// Save original variables so we can restore them after execution,
 				// preventing configuration leaks across invocations.
-				originalOutputStream = awkSettings.getOutputStream();
-				originalOutputAppendable = awkSettings.getOutputAppendable();
-				originalAwkSink = awkSettings.getAwkSink();
 				originalVars = new LinkedHashMap<>(awkSettings.getVariables());
 				for (Map.Entry<String, Object> entry : preAssignments.entrySet()) {
 					awkSettings.putVariable(entry.getKey(), entry.getValue());
-				}
-				if (!preserveAwkOutput) {
-					awkSettings.setOutputStream(settings.getOutputStream());
 				}
 			} else if (!extensions.isEmpty()) {
 				awk = new Awk(extensions, settings);
@@ -1018,26 +990,16 @@ public final class AwkTestSupport {
 				ScriptSource scriptSource = new ScriptSource(description(), new StringReader(resolvedScript));
 				AwkProgram program = awk.compile(Collections.singletonList(scriptSource));
 				if (inputSource != null) {
-					awk.run(program).input(inputSource).arguments(operands).execute();
+					awk.program(program).input(inputSource).arguments(operands).execute(outBytes);
 				} else {
-					awk.run(program).input(stdinStream).arguments(operands).execute();
+					awk.program(program).input(stdinStream).arguments(operands).execute(outBytes);
 				}
 			} catch (ExitException ex) {
 				exitCode = ex.getCode();
 			} finally {
-				// Restore original settings when a custom Awk instance was used
+				// Restore original variables when a custom Awk instance was used
 				if (customAwk != null) {
-					AwkSettings awkSettings = customAwk.getSettings();
-					if (!preserveAwkOutput) {
-						if (originalOutputStream != null) {
-							awkSettings.setOutputStream(originalOutputStream);
-						} else if (originalOutputAppendable != null) {
-							awkSettings.setOutputAppendable(originalOutputAppendable);
-						} else {
-							awkSettings.setAwkSink(originalAwkSink);
-						}
-					}
-					awkSettings.setVariables(originalVars);
+					customAwk.getSettings().setVariables(originalVars);
 				}
 			}
 			return new ActualResult(

@@ -19,12 +19,11 @@ Create an `Awk` instance directly for normal use:
 Awk awk = new Awk();
 ```
 
-Construct it with `AwkSettings` when you need engine defaults such as field separators, locale, record separators, or a default output target:
+Construct it with `AwkSettings` when you need engine defaults such as field separators, locale, or record separators:
 
 ```java
 AwkSettings settings = new AwkSettings();
 settings.setFieldSeparator(",");
-settings.setOutputAppendable(new StringBuilder());
 
 Awk awk = new Awk(settings);
 ```
@@ -35,15 +34,15 @@ Construct it with extension instances when you want those functions available to
 Awk awk = new Awk(StdinExtension.INSTANCE, new MyExtension());
 ```
 
-When you write custom extensions, annotate associative array parameters with `@JawkAssocArray` and declare them as `Map` values rather than concrete map implementations. The dedicated [Writing Extensions](extensions-writing.html) guide covers that contract in more detail.
+The dedicated [Writing Extensions](extensions-writing.html) guide covers how to write your own extensions to expose new functions, written in Java, to your AWK scripts.
 
-## The Shortest Path: run().capture()
+## The Shortest Path: script().capture()
 
-`run().capture()` is the smallest API surface for full AWK programs when you want the printed output back as a Java `String`:
+`script().capture()` is the smallest API surface for full AWK programs when you want the printed output back as a Java `String`:
 
 ```java
 Awk awk = new Awk();
-String result = awk.run("{ print toupper($0) }").input("hello world").capture();
+String result = awk.script("{ print toupper($0) }").input("hello world").capture();
 // result = "HELLO WORLD\n"
 ```
 
@@ -61,44 +60,30 @@ When the same script will be reused, compile it once and run the compiled progra
 Awk awk = new Awk();
 AwkProgram program = awk.compile("{ print prefix $1 }");
 
-awk.run(program)
+awk.program(program)
         .input(new ByteArrayInputStream("alpha beta\n".getBytes(StandardCharsets.UTF_8)))
-        .sink(new AppendableAwkSink(new StringBuilder(), Locale.US))
-        .execute();
+        .execute(new AppendableAwkSink(new StringBuilder(), Locale.US));
 ```
 
 For full control, use the fluent builder:
 
 ```java
-awk.run(program)
+awk.program(program)
         .input(myInputSource)
-        .arguments("mode=csv")
+        .argument("mode=csv")
         .variables(Collections.<String, Object>singletonMap("prefix", "row="))
-        .sink(mySink)
-        .execute();
+        .execute(mySink);
 ```
 
-`AwkSettings` still holds the defaults for the `Awk` instance. Passing a sink via `.sink(...)` overrides that default for one call only.
+## Output Destination
 
-## Default Output and Per-Call Output
+Output is specified per-call on the builder, not in `AwkSettings`:
 
-`AwkSettings` holds the default output target for an `Awk` instance:
-
-```java
-AwkSettings settings = new AwkSettings();
-StringBuilder output = new StringBuilder();
-settings.setOutputAppendable(output);
-
-Awk awk = new Awk(settings);
-```
-
-Use:
-
-- `setOutputStream(...)` for normal text output to a stream
-- `setOutputAppendable(...)` for text capture into a `StringBuilder` or `Writer`
-- `setAwkSink(...)` for a custom output strategy
-
-When one execution needs a different destination, pass that `AwkSink` via `.sink(...)` on the run builder instead of mutating shared settings.
+- `execute()` sends output to `System.out`
+- `execute(OutputStream)` sends output to a specific stream
+- `execute(Appendable)` captures text into a `StringBuilder` or `Writer`
+- `execute(AwkSink)` uses a fully custom output strategy
+- `capture()` returns the printed output as a `String`
 
 ## Custom Output with AwkSink
 
@@ -108,10 +93,9 @@ Use [`AwkSink`](apidocs/io/jawk/jrt/AwkSink.html) when plain text is not the rig
 Awk awk = new Awk();
 CollectingSink sink = new CollectingSink();
 
-awk.run("{ print $1, $2 }")
+awk.script("{ print $1, $2 }")
         .input("alpha beta\ngamma delta\n")
-        .sink(sink)
-        .execute();
+        .execute(sink);
 ```
 
 See the [Custom Output](java-output.html) guide for the full `AwkSink` contract, built-in implementations, and detailed examples.
@@ -135,8 +119,8 @@ try (AVM avm = awk.createAvm()) {
 
 ## Which API Should I Use?
 
-- `run(script).input(text).capture()` for the shortest string-in, string-out path.
-- `compile(...)` plus `run(program).execute()` when a whole AWK program is reused.
+- `script(text).input(text).capture()` for the shortest string-in, string-out path.
+- `compile(...)` plus `program(compiled).execute()` when a whole AWK program is reused.
 - `compileExpression(...)` plus `eval(...)` when one expression is reused.
 - `createAvm()` when you want one reusable runtime across several calls.
 
@@ -163,7 +147,7 @@ public class JawkDemo {
         String csv = "fruit,10\nvegetable,20\nfruit,15\nvegetable,5\n";
 
         // Execute and capture the printed output
-        String result = awk.run(script).input(csv).capture();
+        String result = awk.script(script).input(csv).capture();
         System.out.println(result);
     }
 }

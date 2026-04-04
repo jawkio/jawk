@@ -402,7 +402,6 @@ public class AwkEvalTest {
 		CloseTrackingInputSource first = new CloseTrackingInputSource(Collections.singletonList(Arrays.asList("a", "b")));
 		CloseTrackingInputSource second = new CloseTrackingInputSource(Collections.singletonList(Arrays.asList("x", "y")));
 		AwkSettings settings = new AwkSettings();
-		settings.setOutputStream(new PrintStream(new ByteArrayOutputStream(), false, StandardCharsets.UTF_8.name()));
 
 		try (AVM avm = new AVM(settings, Collections.emptyMap())) {
 			avm.execute(program, first);
@@ -624,7 +623,7 @@ public class AwkEvalTest {
 		@Override
 		protected JRT createJrt() {
 			AwkSettings s = getSettings();
-			trackingJrt = new TrackingJRT(this, s.getLocale(), s.getAwkSink());
+			trackingJrt = new TrackingJRT(this, s.getLocale(), AwkSink.from(System.out, s.getLocale()));
 			return trackingJrt;
 		}
 

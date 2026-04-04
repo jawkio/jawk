@@ -28,6 +28,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintStream;
@@ -102,8 +103,6 @@ public final class Cli {
 	public Cli(InputStream in, PrintStream out, @SuppressWarnings("unused") PrintStream err) {
 		this.out = out;
 		this.inputStream = in;
-		// Configure AWK settings with provided streams
-		settings.setOutputStream(out);
 	}
 
 	/**
@@ -390,7 +389,7 @@ public final class Cli {
 			return;
 		}
 		// Finally run the compiled program with the input and arguments.
-		awk.run(program).input(inputStream).arguments(nameValueOrFileNames).execute();
+		awk.program(program).input(inputStream).arguments(nameValueOrFileNames).execute((OutputStream) out);
 	}
 
 	/**

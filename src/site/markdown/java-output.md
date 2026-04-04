@@ -5,68 +5,66 @@ description: Control where Jawk sends output, from simple streams to fully custo
 
 <!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
 
-By default, Jawk sends `print` and `printf` output to `System.out`. You can redirect it to a stream, an `Appendable`, or a fully custom [`AwkSink`](apidocs/io/jawk/jrt/AwkSink.html) that receives raw AWK values instead of rendered text.
+Output is specified per-call on the builder, not in `AwkSettings`. By default, `print` and `printf` go to `System.out`. Every builder terminal method lets you redirect output to a stream, an `Appendable`, a custom [`AwkSink`](apidocs/io/jawk/jrt/AwkSink.html), or a `String`.
 
 ## Default: Standard Output
 
-A plain `Awk` instance prints to `System.out`:
+A plain `execute()` call prints to `System.out`:
 
 ```java
 Awk awk = new Awk();
-awk.run("BEGIN { print \"hello\" }").execute();
+awk.script("BEGIN { print \"hello\" }").execute();
 // prints "hello" to stdout
 ```
 
 ## Redirect to a Stream
 
-Use `AwkSettings.setOutputStream(...)` to send output to any `PrintStream`:
+Pass an `OutputStream` to `execute(...)`:
 
 ```java
-AwkSettings settings = new AwkSettings();
-settings.setOutputStream(new PrintStream(new FileOutputStream("output.txt")));
-
-Awk awk = new Awk(settings);
-awk.run("BEGIN { print \"logged\" }").execute();
+Awk awk = new Awk();
+awk.script("BEGIN { print \"logged\" }").execute(new FileOutputStream("output.txt"));
 ```
 
 ## Capture into an Appendable
 
-Use `AwkSettings.setOutputAppendable(...)` to collect output in a `StringBuilder`, `StringWriter`, or any `Appendable`:
+Pass an `Appendable` to `execute(...)` to collect output in a `StringBuilder`, `StringWriter`, or any `Appendable`:
 
 ```java
-AwkSettings settings = new AwkSettings();
+Awk awk = new Awk();
 StringBuilder output = new StringBuilder();
-settings.setOutputAppendable(output);
-
-Awk awk = new Awk(settings);
-awk.run("BEGIN { print \"captured\" }").execute();
+awk.script("BEGIN { print \"captured\" }").execute(output);
 // output.toString() == "captured\n"
 ```
 
-The `run(...).capture()` convenience method uses this mechanism internally.
+## Capture as a String
 
-## Per-Call Output Override
+The `capture()` convenience method returns the printed output directly as a `String`:
 
-When a single execution needs a different destination, pass an `AwkSink` via `.sink(...)` instead of mutating shared settings:
+```java
+Awk awk = new Awk();
+String result = awk.script("BEGIN { print \"captured\" }").capture();
+// result == "captured\n"
+```
+
+## Per-Call Output
+
+Each builder invocation specifies its own output destination. This lets you direct different executions of the same program to different targets without any shared mutable state:
 
 ```java
 Awk awk = new Awk();
 AwkProgram program = awk.compile("{ print $1 }");
 
 StringBuilder first = new StringBuilder();
-awk.run(program)
+awk.program(program)
         .input("alpha beta\n")
-        .sink(new AppendableAwkSink(first, Locale.US))
-        .execute();
+        .execute(first);
 
 StringBuilder second = new StringBuilder();
-awk.run(program)
+awk.program(program)
         .input("gamma delta\n")
-        .sink(new AppendableAwkSink(second, Locale.US))
-        .execute();
+        .execute(second);
 ```
-
-The `.sink(...)` override applies only to that one execution. The `AwkSettings` default remains unchanged.
 
 ## Custom Output with AwkSink
 
@@ -130,16 +128,15 @@ The `printf(...)` callback additionally receives:
 
 ### Using a Custom Sink
 
-Pass the sink to `.sink(...)` on the run builder or set it as the default through `AwkSettings.setAwkSink(...)`:
+Pass the sink to `execute(...)` on the builder:
 
 ```java
 Awk awk = new Awk();
 CollectingSink sink = new CollectingSink();
 
-awk.run("{ print $1, $2 }")
+awk.script("{ print $1, $2 }")
         .input("alpha beta\ngamma delta\n")
-        .sink(sink)
-        .execute();
+        .execute(sink);
 
 // sink.getCollectedPrints() contains [[alpha, beta], [gamma, delta]]
 ```
@@ -163,12 +160,11 @@ AwkSink frenchSink = AwkSink.from(System.out, Locale.FRANCE);
 
 | Goal | API | Example |
 | --- | --- | --- |
-| Print to stdout | Default | `awk.run(script).execute()` |
-| Print to a file | `setOutputStream` | `settings.setOutputStream(new PrintStream(...))` |
-| Capture as `String` | `.capture()` | `awk.run(script).input(text).capture()` |
-| Capture to `StringBuilder` | `setOutputAppendable` | `settings.setOutputAppendable(sb)` |
-| Structured collection | Custom `AwkSink` | `awk.run(script).sink(mySink).execute()` |
-| Per-call override | `.sink(...)` | See Per-Call Output Override above |
+| Print to stdout | `execute()` | `awk.script(s).execute()` |
+| Print to a stream | `execute(OutputStream)` | `awk.script(s).execute(fileOut)` |
+| Capture as `String` | `capture()` | `awk.script(s).input(text).capture()` |
+| Capture to `Appendable` | `execute(Appendable)` | `awk.script(s).execute(sb)` |
+| Structured collection | `execute(AwkSink)` | `awk.script(s).execute(mySink)` |
 
 ## See Also
 

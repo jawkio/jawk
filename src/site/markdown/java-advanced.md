@@ -78,7 +78,7 @@ Use `SandboxedAwk` when you want the same restrictions as the CLI `-S` mode:
 Awk awk = new SandboxedAwk();
 AwkProgram program = awk.compile("{ print $0 }");
 
-awk.run(program)
+awk.program(program)
         .input(new ByteArrayInputStream("safe\n".getBytes(StandardCharsets.UTF_8)))
         .execute();
 ```
@@ -112,10 +112,10 @@ If no explicit input binding is present, the script engine falls back to `System
 
 Jawk's classes are designed for single-threaded use within each instance. The key rules:
 
-- **`Awk` instances are not thread-safe.** Do not call `run(...)`, `eval(...)`, or `compile(...)` on the same `Awk` instance concurrently from multiple threads.
+- **`Awk` instances are not thread-safe.** Do not call `script(...)`, `program(...)`, `eval(...)`, or `compile(...)` on the same `Awk` instance concurrently from multiple threads.
 - **`AVM` is sequential-only.** A single `AVM` must not be shared across threads. It is intentionally mutable and stateful.
 - **`AwkProgram` and `AwkExpression` are immutable.** Compiled artifacts can be safely shared across threads and reused by different `Awk` or `AVM` instances.
-- **`AwkSettings` should not be mutated during execution.** Configure settings before creating an `Awk` instance or before calling `run(...)`.
+- **`AwkSettings` should not be mutated during execution.** Configure settings before creating an `Awk` instance or before calling `script(...)` or `program(...)`.
 - **`AwkSink` instances should not be shared** across concurrent executions unless the implementation is explicitly thread-safe.
 
 For concurrent AWK processing, create a separate `Awk` instance per thread:
@@ -128,7 +128,7 @@ AwkProgram program = new Awk().compile("{ print toupper($0) }");
 for (String input : inputs) {
     pool.submit(() -> {
         Awk awk = new Awk();
-        return awk.run(program).input(input).capture();
+        return awk.program(program).input(input).capture();
     });
 }
 ```

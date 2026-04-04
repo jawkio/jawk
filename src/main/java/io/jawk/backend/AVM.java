@@ -170,7 +170,7 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	protected JRT createJrt() {
-		return new JRT(this, this.settings.getLocale(), this.settings.getAwkSink(), System.err);
+		return new JRT(this, this.settings.getLocale(), AwkSink.from(System.out, this.settings.getLocale()), System.err);
 	}
 
 	/**
@@ -329,7 +329,7 @@ public class AVM implements VariableManager, Closeable {
 		globalVariableArrays = compiledProgram.getGlobalVariableAarrayMap();
 		functionNames = compiledProgram.getFunctionNameSet();
 
-		jrt.prepareForExecution(initialFsValue, settings.getDefaultRS(), settings.getDefaultORS());
+		jrt.prepareForExecution(initialFsValue, settings.getDefaultRS(), System.lineSeparator());
 		if (!executionSpecialVariables.isEmpty()) {
 			jrt.applySpecialVariables(executionSpecialVariables);
 		}
@@ -441,7 +441,7 @@ public class AVM implements VariableManager, Closeable {
 		rebindResolvedInputSource(resolvedSource);
 
 		jrt.jrtCloseAll();
-		jrt.prepareForExecution(initialFsValue, settings.getDefaultRS(), settings.getDefaultORS());
+		jrt.prepareForExecution(initialFsValue, settings.getDefaultRS(), System.lineSeparator());
 		if (!executionSpecialVariables.isEmpty()) {
 			jrt.applySpecialVariables(executionSpecialVariables);
 		}

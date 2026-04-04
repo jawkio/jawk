@@ -59,7 +59,7 @@ For full AWK programs, compile to `AwkProgram` and then run that compiled progra
 Awk awk = new Awk();
 AwkProgram program = awk.compile("{ print $1 }");
 
-awk.run(program)
+awk.program(program)
         .input(new ByteArrayInputStream("alpha beta\n".getBytes(StandardCharsets.UTF_8)))
         .execute();
 ```

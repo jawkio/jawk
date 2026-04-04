@@ -9,10 +9,10 @@ Jawk exposes three distinct concepts that are easy to blur together if you come 
 
 - runtime `arguments` are CLI-style operands exposed through `ARGV` and `ARGC`
 - `AwkSettings` variables are engine-level defaults
-- `run(...)` and `AVM.execute(...)` accept per-call variable overrides
+- `script(...)`, `program(...)`, and `AVM.execute(...)` accept per-call variable overrides
 
 > [!IMPORTANT]
-> `AwkSettings` is behavioral configuration, not an input carrier. Put field separators, locale, record separators, default output targets, and engine-level variables there. Pass input directly through `run(...)`, `AVM.execute(...)`, or `eval(...)`.
+> `AwkSettings` is behavioral configuration, not an input carrier. Put field separators, locale, record separators, and engine-level variables there. Pass input and output directly through `script(...)`, `program(...)`, `AVM.execute(...)`, or `eval(...)`.
 
 ## Runtime Arguments, ARGC, and ARGV
 
@@ -22,7 +22,7 @@ The `arguments` passed to `run(...)` or `AVM.execute(...)` are the Java equivale
 Awk awk = new Awk();
 AwkProgram program = awk.compile("BEGIN { print ARGC, ARGV[1] }");
 
-awk.run(program)
+awk.program(program)
         .input(myInputSource)
         .arguments("mode=csv")
         .execute();
@@ -61,7 +61,7 @@ Use the explicit `variableOverrides` parameter when the compiled program stays t
 Awk awk = new Awk();
 AwkProgram program = awk.compile("{ print prefix $0 }");
 
-awk.run(program)
+awk.program(program)
         .input(myInputSource)
         .variables(Collections.<String, Object>singletonMap("prefix", "row="))
         .execute();
@@ -75,7 +75,7 @@ The same idea is available on the reusable runtime API through `AVM.execute(...)
 
 You can use an `InputSource` with both:
 
-- `Awk.run(program).input(inputSource).execute()`
+- `Awk.program(compiled).input(inputSource).execute()`
 - `Awk.eval(expression, source)` for one-off expression evaluation
 
 ## InputSource Contract
@@ -162,15 +162,11 @@ Object value = awk.eval("$1 \"-\" $3", source);
 | --- | --- | --- | --- | --- |
 | Field separator | `setFieldSeparator(String)` | `String` | `null` (default AWK FS) | The initial value of `FS` |
 | Locale | `setLocale(Locale)` | `Locale` | `Locale.US` | Locale for numeric output formatting |
-| Output stream | `setOutputStream(PrintStream)` | `PrintStream` | `System.out` | Where `print`/`printf` output goes |
-| Output appendable | `setOutputAppendable(Appendable)` | `Appendable` | `null` | Alternative output to `StringBuilder`, `StringWriter`, etc. |
-| Custom sink | `setAwkSink(AwkSink)` | `AwkSink` | Stream-backed | Full control over output handling |
 | Record separator | `setDefaultRS(String)` | `String` | Platform line separator | Default `RS` when not set by the script |
-| Output record separator | `setDefaultORS(String)` | `String` | Platform line separator | Default `ORS` when not set by the script |
 | Sorted array keys | `setUseSortedArrayKeys(boolean)` | `boolean` | `false` | Keep associative array keys in sorted order |
 | Variables | `putVariable(String, Object)` | `Map<String, Object>` | Empty map | Pre-set variables available before `BEGIN` |
 
-Output settings (`setOutputStream`, `setOutputAppendable`, `setAwkSink`) are mutually exclusive. Setting one clears the others. See the [Custom Output](java-output.html) guide for details.
+Output destination is specified per-call on the builder (`execute()`, `execute(OutputStream)`, `execute(Appendable)`, `execute(AwkSink)`, or `capture()`). See the [Custom Output](java-output.html) guide for details.
 
 ## See Also
 
@@ -178,4 +174,3 @@ Output settings (`setOutputStream`, `setOutputAppendable`, `setAwkSink`) are mut
 - [Custom Output](java-output.html)
 - [Compile, Eval, and Reuse](java-compile.html)
 - [Advanced Runtime](java-advanced.html)
-- [Advanced runtime](java-advanced.html)

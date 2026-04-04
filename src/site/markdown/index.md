@@ -19,7 +19,7 @@ Jawk is a pure Java implementation of [AWK](https://en.wikipedia.org/wiki/AWK). 
 >
 >   ```java
 >   Awk awk = new Awk();
->   String result = awk.run("{ print toupper($0) }").input("hello world").capture();
+>   String result = awk.script("{ print toupper($0) }").input("hello world").capture();
 >   // result = "HELLO WORLD\n"
 >   ```
 

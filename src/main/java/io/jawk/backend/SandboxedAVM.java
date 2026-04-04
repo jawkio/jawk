@@ -24,6 +24,7 @@ package io.jawk.backend;
 
 import java.util.Map;
 import io.jawk.ext.JawkExtension;
+import io.jawk.jrt.AwkSink;
 import io.jawk.jrt.JRT;
 import io.jawk.jrt.SandboxedJRT;
 import io.jawk.util.AwkSettings;
@@ -47,7 +48,7 @@ public class SandboxedAVM extends AVM {
 	@Override
 	protected JRT createJrt() {
 		AwkSettings s = getSettings();
-		return new SandboxedJRT(this, s.getLocale(), s.getAwkSink(), System.err);
+		return new SandboxedJRT(this, s.getLocale(), AwkSink.from(System.out, s.getLocale()), System.err);
 	}
 
 }

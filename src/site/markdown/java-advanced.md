@@ -78,9 +78,9 @@ Use `SandboxedAwk` when you want the same restrictions as the CLI `-S` mode:
 Awk awk = new SandboxedAwk();
 AwkProgram program = awk.compile("{ print $0 }");
 
-awk.program(program)
+awk.script(program)
         .input(new ByteArrayInputStream("safe\n".getBytes(StandardCharsets.UTF_8)))
-        .execute();
+        .execute(System.out);
 ```
 
 ## JSR 223 ScriptEngine
@@ -128,7 +128,7 @@ AwkProgram program = new Awk().compile("{ print toupper($0) }");
 for (String input : inputs) {
     pool.submit(() -> {
         Awk awk = new Awk();
-        return awk.program(program).input(input).capture();
+        return awk.script(program).input(input).execute();
     });
 }
 ```

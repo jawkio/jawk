@@ -41,8 +41,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * </p>
  * <p>
  * Output is configured on the execution builder returned by
- * {@link io.jawk.Awk#script(String)} or {@link io.jawk.Awk#program} and
- * is therefore always per-execution.
+ * {@link io.jawk.Awk#script(String)} or {@link io.jawk.Awk#script(io.jawk.AwkProgram)}
+ * and is therefore always per-execution.
  * </p>
  *
  * @author Danny Daglas

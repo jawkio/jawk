@@ -36,13 +36,13 @@ Awk awk = new Awk(StdinExtension.INSTANCE, new MyExtension());
 
 The dedicated [Writing Extensions](extensions-writing.html) guide covers how to write your own extensions to expose new functions, written in Java, to your AWK scripts.
 
-## The Shortest Path: script().capture()
+## The Shortest Path: script().execute()
 
-`script().capture()` is the smallest API surface for full AWK programs when you want the printed output back as a Java `String`:
+`script().execute()` is the smallest API surface for full AWK programs when you want the printed output back as a Java `String`:
 
 ```java
 Awk awk = new Awk();
-String result = awk.script("{ print toupper($0) }").input("hello world").capture();
+String result = awk.script("{ print toupper($0) }").input("hello world").execute();
 // result = "HELLO WORLD\n"
 ```
 
@@ -60,7 +60,7 @@ When the same script will be reused, compile it once and run the compiled progra
 Awk awk = new Awk();
 AwkProgram program = awk.compile("{ print prefix $1 }");
 
-awk.program(program)
+awk.script(program)
         .input(new ByteArrayInputStream("alpha beta\n".getBytes(StandardCharsets.UTF_8)))
         .execute(new AppendableAwkSink(new StringBuilder(), Locale.US));
 ```
@@ -68,7 +68,7 @@ awk.program(program)
 For full control, use the fluent builder:
 
 ```java
-awk.program(program)
+awk.script(program)
         .input(myInputSource)
         .argument("mode=csv")
         .variables(Collections.<String, Object>singletonMap("prefix", "row="))
@@ -79,11 +79,10 @@ awk.program(program)
 
 Output is specified per-call on the builder, not in `AwkSettings`:
 
-- `execute()` sends output to `System.out`
+- `execute()` returns the printed output as a `String`
 - `execute(OutputStream)` sends output to a specific stream
 - `execute(Appendable)` captures text into a `StringBuilder` or `Writer`
 - `execute(AwkSink)` uses a fully custom output strategy
-- `capture()` returns the printed output as a `String`
 
 ## Custom Output with AwkSink
 
@@ -119,8 +118,8 @@ try (AVM avm = awk.createAvm()) {
 
 ## Which API Should I Use?
 
-- `script(text).input(text).capture()` for the shortest string-in, string-out path.
-- `compile(...)` plus `program(compiled).execute()` when a whole AWK program is reused.
+- `script(text).input(text).execute()` for the shortest string-in, string-out path.
+- `compile(...)` plus `script(compiled).execute(out)` when a whole AWK program is reused.
 - `compileExpression(...)` plus `eval(...)` when one expression is reused.
 - `createAvm()` when you want one reusable runtime across several calls.
 
@@ -147,7 +146,7 @@ public class JawkDemo {
         String csv = "fruit,10\nvegetable,20\nfruit,15\nvegetable,5\n";
 
         // Execute and capture the printed output
-        String result = awk.script(script).input(csv).capture();
+        String result = awk.script(script).input(csv).execute();
         System.out.println(result);
     }
 }

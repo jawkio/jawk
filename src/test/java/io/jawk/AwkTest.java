@@ -852,7 +852,7 @@ public class AwkTest {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 
 		new Awk(settings)
-				.program(program)
+				.script(program)
 				.input(new ByteArrayInputStream("foo\nbar\n".getBytes(StandardCharsets.UTF_8)))
 				.variable("ORS", "\n")
 				.execute(out);
@@ -866,7 +866,7 @@ public class AwkTest {
 		String result = awk
 				.script("BEGIN { print \"alpha\"; printf(\"beta\") }")
 				.variable("ORS", "\n")
-				.capture();
+				.execute();
 
 		assertEquals("alpha\nbeta", result);
 	}
@@ -880,7 +880,7 @@ public class AwkTest {
 		String result = awk
 				.script("BEGIN { print 1.5 }")
 				.variable("ORS", "\n")
-				.capture();
+				.execute();
 
 		assertEquals("1,5\n", result);
 	}
@@ -1041,7 +1041,7 @@ public class AwkTest {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 
 		new Awk(settings)
-				.program(program)
+				.script(program)
 				.input(new ByteArrayInputStream("one\n".getBytes(StandardCharsets.UTF_8)))
 				.variable("ORS", "\n")
 				.execute(out);
@@ -1063,7 +1063,7 @@ public class AwkTest {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 
 		new Awk(settings)
-				.program(program)
+				.script(program)
 				.input(new ByteArrayInputStream("value\n".getBytes(StandardCharsets.UTF_8)))
 				.variable("ORS", "\n")
 				.execute(out);
@@ -1091,7 +1091,7 @@ public class AwkTest {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 
 		new Awk(settings)
-				.program(cli.getPrecompiledProgram())
+				.script(cli.getPrecompiledProgram())
 				.input(new ByteArrayInputStream("abc\n".getBytes(StandardCharsets.UTF_8)))
 				.variable("ORS", "\n")
 				.execute(out);
@@ -1114,7 +1114,7 @@ public class AwkTest {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 
 		new Awk(settings)
-				.program(cli.getPrecompiledProgram())
+				.script(cli.getPrecompiledProgram())
 				.input(new ByteArrayInputStream("abc\n".getBytes(StandardCharsets.UTF_8)))
 				.variable("ORS", "\n")
 				.execute(out);
@@ -1188,7 +1188,7 @@ public class AwkTest {
 		assertThrows(
 				AwkSandboxException.class,
 				() -> sandboxAwk
-						.program(program)
+						.script(program)
 						.variable("ORS", "\n")
 						.input(new ByteArrayInputStream(new byte[0]))
 						.execute(out));

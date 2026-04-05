@@ -90,7 +90,7 @@ public class RegexpTupleAndCachingTest {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 
 		new Awk(settings)
-				.program(cli.getPrecompiledProgram())
+				.script(cli.getPrecompiledProgram())
 				.variable("ORS", "\n")
 				.input(new ByteArrayInputStream(new byte[0]))
 				.execute(out);

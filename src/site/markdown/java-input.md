@@ -22,7 +22,7 @@ The `arguments` passed to `run(...)` or `AVM.execute(...)` are the Java equivale
 Awk awk = new Awk();
 AwkProgram program = awk.compile("BEGIN { print ARGC, ARGV[1] }");
 
-awk.program(program)
+awk.script(program)
         .input(myInputSource)
         .arguments("mode=csv")
         .execute();
@@ -61,7 +61,7 @@ Use the explicit `variableOverrides` parameter when the compiled program stays t
 Awk awk = new Awk();
 AwkProgram program = awk.compile("{ print prefix $0 }");
 
-awk.program(program)
+awk.script(program)
         .input(myInputSource)
         .variables(Collections.<String, Object>singletonMap("prefix", "row="))
         .execute();
@@ -75,7 +75,7 @@ The same idea is available on the reusable runtime API through `AVM.execute(...)
 
 You can use an `InputSource` with both:
 
-- `Awk.program(compiled).input(inputSource).execute()`
+- `Awk.script(compiled).input(inputSource).execute()`
 - `Awk.eval(expression, source)` for one-off expression evaluation
 
 ## InputSource Contract

@@ -59,9 +59,9 @@ For full AWK programs, compile to `AwkProgram` and then run that compiled progra
 Awk awk = new Awk();
 AwkProgram program = awk.compile("{ print $1 }");
 
-awk.program(program)
+awk.script(program)
         .input(new ByteArrayInputStream("alpha beta\n".getBytes(StandardCharsets.UTF_8)))
-        .execute();
+        .execute(System.out);
 ```
 
 This keeps compilation and execution separate, which is useful when the same AWK program is reused across multiple inputs.

@@ -292,39 +292,39 @@ public class Awk {
 	/**
 	 * Starts building a run request for a compiled AWK program.
 	 * <p>
-	 * Use the returned {@link ScriptBuilder} to configure input, arguments,
+	 * Use the returned {@link AwkRunBuilder} to configure input, arguments,
 	 * variables, and output, then call one of the terminal methods to execute.
 	 * </p>
 	 *
 	 * <pre>{@code
-	 * awk.program(program).input(stream).execute(mySink);
-	 * String out = awk.program(program).input("hello").capture();
+	 * awk.script(program).input(stream).execute(mySink);
+	 * String out = awk.script(program).input("hello").execute();
 	 * }</pre>
 	 *
 	 * @param program compiled program to execute
 	 * @return a builder for configuring and executing the run
 	 */
-	public ScriptBuilder program(AwkProgram program) {
-		return new ScriptBuilder(Objects.requireNonNull(program, "program"));
+	public AwkRunBuilder script(AwkProgram program) {
+		return new AwkRunBuilder(Objects.requireNonNull(program, "program"));
 	}
 
 	/**
 	 * Starts building a run request from an AWK script string.
 	 * <p>
 	 * The script is compiled and executed when a terminal method is called.
-	 * Additional scripts can be appended by calling {@link ScriptBuilder#script(String)}
+	 * Additional scripts can be appended by calling {@link AwkRunBuilder#script(String)}
 	 * on the returned builder.
 	 * </p>
 	 *
 	 * <pre>{@code
-	 * awk.script("{ print toupper($0) }").input("hello").capture();
+	 * String result = awk.script("{ print toupper($0) }").input("hello").execute();
 	 * }</pre>
 	 *
 	 * @param scriptText AWK program source
 	 * @return a builder for configuring and executing the run
 	 */
-	public ScriptBuilder script(String scriptText) {
-		return new ScriptBuilder().script(Objects.requireNonNull(scriptText, "script"));
+	public AwkRunBuilder script(String scriptText) {
+		return new AwkRunBuilder().script(Objects.requireNonNull(scriptText, "script"));
 	}
 
 	/**
@@ -676,29 +676,25 @@ public class Awk {
 	 * Fluent builder for configuring and executing an AWK script or program.
 	 * <p>
 	 * Obtain an instance through {@link Awk#script(String)} or
-	 * {@link Awk#program(AwkProgram)}, configure input, arguments, and
-	 * variables, then call one of the terminal methods to execute and direct
-	 * output.
+	 * {@link Awk#script(AwkProgram)}, configure input, arguments, and
+	 * variables, then call one of the terminal methods to execute.
 	 * </p>
 	 *
 	 * <pre>{@code
-	 * // Capture printed output as a String
-	 * String result = awk.script("{ print toupper($0) }").input("hello").capture();
+	 * // Execute and capture printed output as a String
+	 * String result = awk.script("{ print toupper($0) }").input("hello").execute();
 	 *
-	 * // Execute to stdout
-	 * awk.program(program).input(stream).execute();
+	 * // Execute to a specific stream
+	 * awk.script(program).input(stream).execute(outputStream);
 	 *
 	 * // Execute with a custom sink
 	 * awk.script("{ print $1 }").input(source).execute(mySink);
-	 *
-	 * // Execute to a specific stream
-	 * awk.script("{ print $1 }").input(source).execute(outputStream);
 	 *
 	 * // Execute to an appendable
 	 * awk.script("{ print $1 }").input(source).execute(appendable);
 	 * }</pre>
 	 */
-	public final class ScriptBuilder {
+	public final class AwkRunBuilder {
 
 		private AwkProgram compiledProgram;
 		private List<String> scripts;
@@ -707,9 +703,9 @@ public class Awk {
 		private List<String> arguments;
 		private Map<String, Object> variableOverrides;
 
-		ScriptBuilder() {}
+		AwkRunBuilder() {}
 
-		ScriptBuilder(AwkProgram program) {
+		AwkRunBuilder(AwkProgram program) {
 			this.compiledProgram = program;
 		}
 
@@ -722,7 +718,7 @@ public class Awk {
 		 * @return this builder
 		 * @throws IllegalStateException if a precompiled program was already set
 		 */
-		public ScriptBuilder script(String scriptText) {
+		public AwkRunBuilder script(String scriptText) {
 			if (compiledProgram != null) {
 				throw new IllegalStateException("Cannot add scripts when a precompiled program is set");
 			}
@@ -739,7 +735,7 @@ public class Awk {
 		 * @param input text input (encoded as UTF-8 internally)
 		 * @return this builder
 		 */
-		public ScriptBuilder input(String input) {
+		public AwkRunBuilder input(String input) {
 			this.inputStream = toInputStream(input);
 			return this;
 		}
@@ -750,7 +746,7 @@ public class Awk {
 		 * @param input byte stream, or {@code null} for no input
 		 * @return this builder
 		 */
-		public ScriptBuilder input(InputStream input) {
+		public AwkRunBuilder input(InputStream input) {
 			this.inputStream = input;
 			return this;
 		}
@@ -761,7 +757,7 @@ public class Awk {
 		 * @param source structured record source
 		 * @return this builder
 		 */
-		public ScriptBuilder input(InputSource source) {
+		public AwkRunBuilder input(InputSource source) {
 			this.inputSource = source;
 			return this;
 		}
@@ -773,7 +769,7 @@ public class Awk {
 		 * @return this builder
 		 */
 		@SuppressFBWarnings("EI_EXPOSE_REP2")
-		public ScriptBuilder arguments(List<String> args) {
+		public AwkRunBuilder arguments(List<String> args) {
 			this.arguments = args;
 			return this;
 		}
@@ -784,7 +780,7 @@ public class Awk {
 		 * @param args runtime arguments
 		 * @return this builder
 		 */
-		public ScriptBuilder arguments(String... args) {
+		public AwkRunBuilder arguments(String... args) {
 			this.arguments = Arrays.asList(args);
 			return this;
 		}
@@ -795,7 +791,7 @@ public class Awk {
 		 * @param arg runtime argument
 		 * @return this builder
 		 */
-		public ScriptBuilder argument(String arg) {
+		public AwkRunBuilder argument(String arg) {
 			if (this.arguments == null) {
 				this.arguments = new ArrayList<String>();
 			}
@@ -811,7 +807,7 @@ public class Awk {
 		 * @return this builder
 		 */
 		@SuppressFBWarnings("EI_EXPOSE_REP2")
-		public ScriptBuilder variables(Map<String, Object> overrides) {
+		public AwkRunBuilder variables(Map<String, Object> overrides) {
 			this.variableOverrides = overrides;
 			return this;
 		}
@@ -823,7 +819,7 @@ public class Awk {
 		 * @param value variable value
 		 * @return this builder
 		 */
-		public ScriptBuilder variable(String name, Object value) {
+		public AwkRunBuilder variable(String name, Object value) {
 			if (this.variableOverrides == null) {
 				this.variableOverrides = new LinkedHashMap<String, Object>();
 			}
@@ -835,13 +831,16 @@ public class Awk {
 		}
 
 		/**
-		 * Executes the script, sending output to {@code System.out}.
+		 * Executes the script and returns the printed output as a {@link String}.
 		 *
+		 * @return printed output
 		 * @throws IOException if compilation or execution fails
 		 * @throws ExitException if the script terminates with a non-zero exit code
 		 */
-		public void execute() throws IOException, ExitException {
-			doExecute(null);
+		public String execute() throws IOException, ExitException {
+			StringBuilder output = new StringBuilder();
+			doExecute(new AppendableAwkSink(output, settings.getLocale()));
+			return output.toString();
 		}
 
 		/**
@@ -881,26 +880,11 @@ public class Awk {
 							settings.getLocale()));
 		}
 
-		/**
-		 * Executes the script and returns the printed output as a {@link String}.
-		 *
-		 * @return printed output
-		 * @throws IOException if compilation or execution fails
-		 * @throws ExitException if the script terminates with a non-zero exit code
-		 */
-		public String capture() throws IOException, ExitException {
-			StringBuilder output = new StringBuilder();
-			doExecute(new AppendableAwkSink(output, settings.getLocale()));
-			return output.toString();
-		}
-
 		private void doExecute(AwkSink sink) throws IOException, ExitException {
 			AwkProgram program = resolveProgram();
 			List<String> resolvedArguments = arguments == null ? Collections.<String>emptyList() : arguments;
 			try (AVM avm = createAvm(settings)) {
-				if (sink != null) {
-					avm.setAwkSink(sink);
-				}
+				avm.setAwkSink(sink);
 				try {
 					InputSource resolvedSource;
 					if (inputSource != null) {

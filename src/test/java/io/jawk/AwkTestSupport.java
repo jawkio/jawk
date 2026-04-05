@@ -990,9 +990,9 @@ public final class AwkTestSupport {
 				ScriptSource scriptSource = new ScriptSource(description(), new StringReader(resolvedScript));
 				AwkProgram program = awk.compile(Collections.singletonList(scriptSource));
 				if (inputSource != null) {
-					awk.program(program).input(inputSource).arguments(operands).execute(outBytes);
+					awk.script(program).input(inputSource).arguments(operands).execute(outBytes);
 				} else {
-					awk.program(program).input(stdinStream).arguments(operands).execute(outBytes);
+					awk.script(program).input(stdinStream).arguments(operands).execute(outBytes);
 				}
 			} catch (ExitException ex) {
 				exitCode = ex.getCode();

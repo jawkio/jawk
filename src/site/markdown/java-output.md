@@ -5,16 +5,16 @@ description: Control where Jawk sends output, from simple streams to fully custo
 
 <!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
 
-Output is specified per-call on the builder, not in `AwkSettings`. By default, `print` and `printf` go to `System.out`. Every builder terminal method lets you redirect output to a stream, an `Appendable`, a custom [`AwkSink`](apidocs/io/jawk/jrt/AwkSink.html), or a `String`.
+Output is specified per-call on the builder, not in `AwkSettings`. Every `execute(...)` overload lets you direct output to a stream, an `Appendable`, a custom [`AwkSink`](apidocs/io/jawk/jrt/AwkSink.html), or back as a `String`.
 
-## Default: Standard Output
+## Capture as a String
 
-A plain `execute()` call prints to `System.out`:
+A no-argument `execute()` returns the printed output as a `String`:
 
 ```java
 Awk awk = new Awk();
-awk.script("BEGIN { print \"hello\" }").execute();
-// prints "hello" to stdout
+String result = awk.script("BEGIN { print \"hello\" }").execute();
+// result == "hello\n"
 ```
 
 ## Redirect to a Stream
@@ -24,6 +24,12 @@ Pass an `OutputStream` to `execute(...)`:
 ```java
 Awk awk = new Awk();
 awk.script("BEGIN { print \"logged\" }").execute(new FileOutputStream("output.txt"));
+```
+
+To print to `System.out` explicitly:
+
+```java
+awk.script("BEGIN { print \"hello\" }").execute(System.out);
 ```
 
 ## Capture into an Appendable
@@ -37,16 +43,6 @@ awk.script("BEGIN { print \"captured\" }").execute(output);
 // output.toString() == "captured\n"
 ```
 
-## Capture as a String
-
-The `capture()` convenience method returns the printed output directly as a `String`:
-
-```java
-Awk awk = new Awk();
-String result = awk.script("BEGIN { print \"captured\" }").capture();
-// result == "captured\n"
-```
-
 ## Per-Call Output
 
 Each builder invocation specifies its own output destination. This lets you direct different executions of the same program to different targets without any shared mutable state:
@@ -56,12 +52,12 @@ Awk awk = new Awk();
 AwkProgram program = awk.compile("{ print $1 }");
 
 StringBuilder first = new StringBuilder();
-awk.program(program)
+awk.script(program)
         .input("alpha beta\n")
         .execute(first);
 
 StringBuilder second = new StringBuilder();
-awk.program(program)
+awk.script(program)
         .input("gamma delta\n")
         .execute(second);
 ```
@@ -106,21 +102,25 @@ public final class CollectingSink extends AwkSink {
 
 ### Sink Parameters
 
-The `print(...)` callback receives:
-
-| Parameter | AWK Variable | Description |
-| --- | --- | --- |
-| `ofs` | `OFS` | Output Field Separator, inserted between values |
-| `ors` | `ORS` | Output Record Separator, appended after the record |
-| `ofmt` | `OFMT` | Default numeric output format |
-| `values` | `$1..$NF` | The raw AWK values passed to `print` |
-
-The `printf(...)` callback additionally receives:
-
-| Parameter | Description |
-| --- | --- |
-| `format` | The AWK format string |
-| `values` | The AWK values to be formatted |
+> [!TABS]
+> * `print(...)`
+>
+>   | Parameter | AWK Variable | Description |
+>   | --- | --- | --- |
+>   | `ofs` | `OFS` | Output Field Separator, inserted between values |
+>   | `ors` | `ORS` | Output Record Separator, appended after the record |
+>   | `ofmt` | `OFMT` | Default numeric output format |
+>   | `values` | — | The raw AWK values passed to `print` |
+>
+> * `printf(...)`
+>
+>   | Parameter | AWK Variable | Description |
+>   | --- | --- | --- |
+>   | `ofs` | `OFS` | Output Field Separator, inserted between values |
+>   | `ors` | `ORS` | Output Record Separator, appended after the record |
+>   | `ofmt` | `OFMT` | Default numeric output format |
+>   | `format` | — | The AWK format string |
+>   | `values` | — | The AWK values to be formatted |
 
 ### getPrintStream
 
@@ -160,9 +160,9 @@ AwkSink frenchSink = AwkSink.from(System.out, Locale.FRANCE);
 
 | Goal | API | Example |
 | --- | --- | --- |
-| Print to stdout | `execute()` | `awk.script(s).execute()` |
+| Capture as `String` | `execute()` | `awk.script(s).execute()` |
 | Print to a stream | `execute(OutputStream)` | `awk.script(s).execute(fileOut)` |
-| Capture as `String` | `capture()` | `awk.script(s).input(text).capture()` |
+| Print to stdout | `execute(System.out)` | `awk.script(s).execute(System.out)` |
 | Capture to `Appendable` | `execute(Appendable)` | `awk.script(s).execute(sb)` |
 | Structured collection | `execute(AwkSink)` | `awk.script(s).execute(mySink)` |
 

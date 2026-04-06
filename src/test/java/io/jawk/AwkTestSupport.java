@@ -897,7 +897,7 @@ public final class AwkTestSupport {
 
 				if (entry.getValue() != null) {
 					try (BufferedWriter writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
-						writer.write(entry.getValue().replace("\n", System.lineSeparator()));
+						writer.write(entry.getValue());
 					}
 				}
 				placeholders.put(entry.getKey(), path);
@@ -962,7 +962,7 @@ public final class AwkTestSupport {
 			String stdin = resolvedStdin(env);
 			if (stdin != null) {
 				stdinStream = new ByteArrayInputStream(
-						stdin.replace("\n", System.lineSeparator()).getBytes(StandardCharsets.UTF_8));
+						stdin.getBytes(StandardCharsets.UTF_8));
 			} else {
 				stdinStream = new ByteArrayInputStream(new byte[0]);
 			}
@@ -1003,7 +1003,7 @@ public final class AwkTestSupport {
 				}
 			}
 			return new ActualResult(
-					outBytes.toString(StandardCharsets.UTF_8.name()).replace(System.lineSeparator(), "\n"),
+					outBytes.toString(StandardCharsets.UTF_8.name()).replace("\r\n", "\n"),
 					exitCode);
 		}
 	}
@@ -1029,7 +1029,7 @@ public final class AwkTestSupport {
 		protected ActualResult execute(ExecutionEnvironment env) throws Exception {
 			String stdin = resolvedStdin(env);
 			InputStream in = stdin != null ?
-					new ByteArrayInputStream(stdin.replace("\n", System.lineSeparator()).getBytes(StandardCharsets.UTF_8)) :
+					new ByteArrayInputStream(stdin.getBytes(StandardCharsets.UTF_8)) :
 					new ByteArrayInputStream(new byte[0]);
 			ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
 			ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
@@ -1060,7 +1060,7 @@ public final class AwkTestSupport {
 				exitCode = ex.getCode();
 			}
 			return new ActualResult(
-					outBytes.toString(StandardCharsets.UTF_8.name()).replace(System.lineSeparator(), "\n"),
+					outBytes.toString(StandardCharsets.UTF_8.name()).replace("\r\n", "\n"),
 					exitCode);
 		}
 	}

@@ -297,18 +297,17 @@ public class JRT {
 	 * <p>
 	 * The {@code defaultFs} and {@code defaultRs} parameters allow the caller
 	 * to configure the initial field and record separators. Other special variables
-	 * ({@code OFS}, {@code CONVFMT}, {@code OFMT}, {@code SUBSEP}) use their
-	 * POSIX-mandated defaults ({@code " "}, {@code "%.6g"}, {@code "%.6g"},
-	 * {@code "\034"}) which are platform-independent and therefore not
-	 * parameterized. {@code ORS} defaults to the platform line separator because
-	 * AWK output should match the host OS convention.
+	 * ({@code OFS}, {@code ORS}, {@code CONVFMT}, {@code OFMT}, {@code SUBSEP})
+	 * use their POSIX-mandated defaults ({@code " "}, {@code "\n"},
+	 * {@code "%.6g"}, {@code "%.6g"}, {@code "\034"}) which are
+	 * platform-independent and therefore not parameterized. Platform-specific
+	 * end-of-line handling is the responsibility of the {@link AwkSink}.
 	 *
 	 * @param defaultFs default field separator, or {@code null} for the AWK
 	 *        default ({@code " "})
 	 * @param defaultRs default record separator
-	 * @param defaultOrs default output record separator
 	 */
-	public void prepareForExecution(String defaultFs, String defaultRs, String defaultOrs) {
+	public void prepareForExecution(String defaultFs, String defaultRs) {
 		// Clear per-execution state (IO handles, counters, input state).
 		ioState = null;
 		inputLine = null;
@@ -325,7 +324,7 @@ public class JRT {
 		setFS(defaultFs == null ? " " : defaultFs);
 		setRS(defaultRs);
 		setOFS(" ");
-		setORS(defaultOrs);
+		setORS("\n");
 		setCONVFMT("%.6g");
 		setOFMT("%.6g");
 		setSUBSEP(String.valueOf((char) 28));

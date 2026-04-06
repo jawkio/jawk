@@ -90,9 +90,11 @@ public class AwkSettings {
 	private volatile Locale locale = Locale.US;
 
 	/**
-	 * Default value for RS, when not set specifically by the AWK script
+	 * Default value for RS, when not set specifically by the AWK script.
+	 * Defaults to {@code "\n"} per POSIX. Platform-specific end-of-line
+	 * handling is the responsibility of the input source.
 	 */
-	private volatile String defaultRS = System.getProperty("line.separator", "\n");
+	private volatile String defaultRS = "\n";
 
 	/**
 	 * Monotonically increasing counter incremented whenever the settings change.

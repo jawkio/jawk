@@ -644,9 +644,9 @@ public class AwkEvalTest {
 		}
 
 		@Override
-		public void prepareForExecution(String defaultFs, String defaultRs, String defaultOrs) {
+		public void prepareForExecution(String defaultFs, String defaultRs) {
 			prepareForExecutionCount++;
-			super.prepareForExecution(defaultFs, defaultRs, defaultOrs);
+			super.prepareForExecution(defaultFs, defaultRs);
 		}
 
 		@Override

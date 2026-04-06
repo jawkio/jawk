@@ -121,12 +121,10 @@ public class AwkMan7Test {
 
 	@Test
 	public void spec08RsEmptyParagraphMode() throws Exception {
-		String escapedEOL = System.lineSeparator().replace("\n", "\\\\n").replace("\r", "\\\\r");
 		AwkTestSupport
 				.awkTest("8. RS empty paragraph mode")
 				.script(
-						"BEGIN{RS=\"\"}{n=split($0, lines, \"" + escapedEOL
-								+ "\"); count=0; for(i=1;i<=n;i++){if(lines[i]!=\"\"){count++}}; print \"REC:\" NR \":\" count \"lines\"}")
+						"BEGIN{RS=\"\"}{n=split($0, lines, \"\\\\n\"); count=0; for(i=1;i<=n;i++){if(lines[i]!=\"\"){count++}}; print \"REC:\" NR \":\" count \"lines\"}")
 				.stdin("p1-line1\n\n\np2-line1\np2-line2\n\np3\n")
 				.expectLines("REC:1:4lines")
 				.runAndAssert();
@@ -929,12 +927,10 @@ public class AwkMan7Test {
 
 	@Test
 	public void spec90RsEmptyIgnoresLeadingBlanks() throws Exception {
-		String escapedEOL = System.lineSeparator().replace("\n", "\\\\n").replace("\r", "\\\\r");
 		AwkTestSupport
 				.awkTest("90. RS empty ignores leading blanks")
 				.script(
-						"BEGIN{RS=\"\"}{gsub(\"(" + escapedEOL
-								+ ")+\",\" \",$0); sub(\"^ +\",\"\",$0); sub(\" +$\",\"\",$0); print \"REC-\" NR \":\" $0}")
+						"BEGIN{RS=\"\"}{gsub(\"(\\\\n)+\",\" \",$0); sub(\"^ +\",\"\",$0); sub(\" +$\",\"\",$0); print \"REC-\" NR \":\" $0}")
 				.stdin("\n\npara1\n\n\npara2\n\n")
 				.expectLines("REC-1:para1 para2")
 				.runAndAssert();

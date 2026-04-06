@@ -963,14 +963,14 @@ public class AwkTest {
 	}
 
 	@Test
-	public void executeToOutputStreamUsesSystemLineSeparator() throws Exception {
+	public void executeToOutputStreamUsesPosixOrs() throws Exception {
 		ByteArrayOutputStream output = new ByteArrayOutputStream();
 
 		new Awk()
 				.script("BEGIN { print \"alpha\" }")
 				.execute(output);
 
-		assertEquals("alpha" + System.lineSeparator(), output.toString(StandardCharsets.UTF_8.name()));
+		assertEquals("alpha\n", output.toString(StandardCharsets.UTF_8.name()));
 	}
 
 	@Test
@@ -981,7 +981,7 @@ public class AwkTest {
 				.script("BEGIN { print \"alpha\"; exit 0 }")
 				.execute(output);
 
-		assertEquals("alpha" + System.lineSeparator(), output.toString(StandardCharsets.UTF_8.name()));
+		assertEquals("alpha\n", output.toString(StandardCharsets.UTF_8.name()));
 	}
 
 	@Test

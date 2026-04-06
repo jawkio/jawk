@@ -340,7 +340,7 @@ public class AVM implements VariableManager, Closeable {
 		globalVariableArrays = compiledProgram.getGlobalVariableAarrayMap();
 		functionNames = compiledProgram.getFunctionNameSet();
 
-		jrt.prepareForExecution(defaultFs, settings.getDefaultRS(), System.lineSeparator());
+		jrt.prepareForExecution(defaultFs, settings.getDefaultRS());
 		if (!executionSpecialVariables.isEmpty()) {
 			jrt.applySpecialVariables(executionSpecialVariables);
 		}
@@ -452,7 +452,7 @@ public class AVM implements VariableManager, Closeable {
 		rebindResolvedInputSource(resolvedSource);
 
 		jrt.jrtCloseAll();
-		jrt.prepareForExecution(defaultFs, settings.getDefaultRS(), System.lineSeparator());
+		jrt.prepareForExecution(defaultFs, settings.getDefaultRS());
 		if (!executionSpecialVariables.isEmpty()) {
 			jrt.applySpecialVariables(executionSpecialVariables);
 		}

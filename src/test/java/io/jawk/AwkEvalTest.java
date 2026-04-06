@@ -437,7 +437,6 @@ public class AwkEvalTest {
 			assertEquals(1, avm.eval(expression, new SingleRecordInputSource("a")));
 			assertEquals(1, avm.eval(expression, new SingleRecordInputSource("a")));
 			assertEquals(2, avm.getPrepareForExecutionCount());
-			assertEquals(0, avm.getLegacyInitializationCount());
 		}
 		assertEquals(3, avm.getCloseAllCount());
 	}
@@ -452,7 +451,6 @@ public class AwkEvalTest {
 			assertEquals("3:b", avm.eval(expression, new SingleRecordInputSource("a b c")));
 			assertEquals("2:right", avm.eval(expression, new SingleRecordInputSource("left right")));
 			assertEquals(2, avm.getPrepareForExecutionCount());
-			assertEquals(0, avm.getLegacyInitializationCount());
 		}
 		assertEquals(3, avm.getCloseAllCount());
 	}
@@ -631,10 +629,6 @@ public class AwkEvalTest {
 			return trackingJrt.getPrepareForExecutionCount();
 		}
 
-		private int getLegacyInitializationCount() {
-			return trackingJrt.getLegacyInitializationCount();
-		}
-
 		private int getCloseAllCount() {
 			return trackingJrt.getCloseAllCount();
 		}
@@ -643,7 +637,6 @@ public class AwkEvalTest {
 	private static final class TrackingJRT extends JRT {
 
 		private int prepareForExecutionCount;
-		private int legacyInitializationCount;
 		private int closeAllCount;
 
 		private TrackingJRT(AVM avm, Locale locale, AwkSink awkSink) {
@@ -651,21 +644,9 @@ public class AwkEvalTest {
 		}
 
 		@Override
-		public void prepareForExecution(String initialFsValue, String defaultRs, String defaultOrs) {
+		public void prepareForExecution(String defaultFs, String defaultRs, String defaultOrs) {
 			prepareForExecutionCount++;
-			super.prepareForExecution(initialFsValue, defaultRs, defaultOrs);
-		}
-
-		@Override
-		public void initializeRuntimeState(String initialFsValue, String defaultRs, String defaultOrs) {
-			legacyInitializationCount++;
-			super.initializeRuntimeState(initialFsValue, defaultRs, defaultOrs);
-		}
-
-		@Override
-		public void initializeFreshRuntimeState(String initialFsValue, String defaultRs, String defaultOrs) {
-			legacyInitializationCount++;
-			super.initializeFreshRuntimeState(initialFsValue, defaultRs, defaultOrs);
+			super.prepareForExecution(defaultFs, defaultRs, defaultOrs);
 		}
 
 		@Override
@@ -676,10 +657,6 @@ public class AwkEvalTest {
 
 		private int getPrepareForExecutionCount() {
 			return prepareForExecutionCount;
-		}
-
-		private int getLegacyInitializationCount() {
-			return legacyInitializationCount;
 		}
 
 		private int getCloseAllCount() {

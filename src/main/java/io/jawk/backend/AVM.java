@@ -111,7 +111,7 @@ public class AVM implements VariableManager, Closeable {
 	private final Map<String, Object> baseSpecialVariables;
 	private Map<String, Object> executionInitialVariables;
 	private Map<String, Object> executionSpecialVariables;
-	private String initialFsValue;
+	private String defaultFs;
 	private JRT jrt;
 	private Map<String, JawkExtension> extensionInstances;
 
@@ -164,7 +164,7 @@ public class AVM implements VariableManager, Closeable {
 		baseSpecialVariables = JRT.copySpecialVariables(baseInitialVariables);
 		executionInitialVariables = baseInitialVariables;
 		executionSpecialVariables = baseSpecialVariables;
-		initialFsValue = this.settings.getFieldSeparator();
+		defaultFs = this.settings.getFieldSeparator();
 
 		jrt = createJrt();
 		initExtensions();
@@ -340,7 +340,7 @@ public class AVM implements VariableManager, Closeable {
 		globalVariableArrays = compiledProgram.getGlobalVariableAarrayMap();
 		functionNames = compiledProgram.getFunctionNameSet();
 
-		jrt.prepareForExecution(initialFsValue, settings.getDefaultRS(), System.lineSeparator());
+		jrt.prepareForExecution(defaultFs, settings.getDefaultRS(), System.lineSeparator());
 		if (!executionSpecialVariables.isEmpty()) {
 			jrt.applySpecialVariables(executionSpecialVariables);
 		}
@@ -452,7 +452,7 @@ public class AVM implements VariableManager, Closeable {
 		rebindResolvedInputSource(resolvedSource);
 
 		jrt.jrtCloseAll();
-		jrt.prepareForExecution(initialFsValue, settings.getDefaultRS(), System.lineSeparator());
+		jrt.prepareForExecution(defaultFs, settings.getDefaultRS(), System.lineSeparator());
 		if (!executionSpecialVariables.isEmpty()) {
 			jrt.applySpecialVariables(executionSpecialVariables);
 		}

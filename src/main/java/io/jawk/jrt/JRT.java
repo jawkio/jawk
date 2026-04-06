@@ -292,67 +292,24 @@ public class JRT {
 	}
 
 	/**
-	 * Clears execution-specific state so the same JRT instance can be reused for
-	 * another evaluation or interpretation run.
-	 */
-	public void resetRuntimeState() {
-		jrtCloseAll();
-		clearExecutionState();
-	}
-
-	/**
-	 * Clears per-execution JRT state and re-applies the default runtime special
+	 * Resets per-execution JRT state and re-applies the default runtime special
 	 * variables for a new script or expression execution.
-	 *
-	 * @param initialFsValue initial field separator, or {@code null} to use the
-	 *        AWK default
-	 * @param defaultRs default record separator
-	 * @param defaultOrs default output record separator
-	 */
-	public void prepareForExecution(String initialFsValue, String defaultRs, String defaultOrs) {
-		clearExecutionState();
-		applyDefaultRuntimeVariables(initialFsValue, defaultRs, defaultOrs);
-	}
-
-	/**
-	 * Initializes JRT-managed special variables to their per-execution defaults
-	 * after first closing all JRT-managed resources from the previous run.
-	 *
-	 * @param initialFsValue initial field separator, or {@code null} to use the
-	 *        AWK default
-	 * @param defaultRs default record separator
-	 * @param defaultOrs default output record separator
-	 */
-	public void initializeRuntimeState(String initialFsValue, String defaultRs, String defaultOrs) {
-		resetRuntimeState();
-		applyDefaultRuntimeVariables(initialFsValue, defaultRs, defaultOrs);
-	}
-
-	/**
-	 * Initializes JRT-managed special variables for a brand-new runtime instance.
 	 * <p>
-	 * Unlike {@link #initializeRuntimeState(String, String, String)}, this method
-	 * assumes no prior execution state is present and therefore skips the full
-	 * reset/close cycle.
-	 * </p>
+	 * The {@code defaultFs} and {@code defaultRs} parameters allow the caller
+	 * to configure the initial field and record separators. Other special variables
+	 * ({@code OFS}, {@code CONVFMT}, {@code OFMT}, {@code SUBSEP}) use their
+	 * POSIX-mandated defaults ({@code " "}, {@code "%.6g"}, {@code "%.6g"},
+	 * {@code "\034"}) which are platform-independent and therefore not
+	 * parameterized. {@code ORS} defaults to the platform line separator because
+	 * AWK output should match the host OS convention.
 	 *
-	 * @param initialFsValue initial field separator, or {@code null} to use the
-	 *        AWK default
+	 * @param defaultFs default field separator, or {@code null} for the AWK
+	 *        default ({@code " "})
 	 * @param defaultRs default record separator
 	 * @param defaultOrs default output record separator
 	 */
-	public void initializeFreshRuntimeState(String initialFsValue, String defaultRs, String defaultOrs) {
-		prepareForExecution(initialFsValue, defaultRs, defaultOrs);
-	}
-
-	/**
-	 * Clears all JRT state that is specific to a single execution.
-	 * <p>
-	 * Resource closing is intentionally handled by the caller before this method
-	 * is used, so the method only drops references and resets counters.
-	 * </p>
-	 */
-	private void clearExecutionState() {
+	public void prepareForExecution(String defaultFs, String defaultRs, String defaultOrs) {
+		// Clear per-execution state (IO handles, counters, input state).
 		ioState = null;
 		inputLine = null;
 		recordState = null;
@@ -363,18 +320,9 @@ public class JRT {
 		rstart = 0;
 		rlength = 0;
 		filename = "";
-	}
 
-	/**
-	 * Restores the runtime-managed special variables to their execution defaults.
-	 *
-	 * @param initialFsValue initial field separator, or {@code null} to use the
-	 *        AWK default
-	 * @param defaultRs default record separator
-	 * @param defaultOrs default output record separator
-	 */
-	private void applyDefaultRuntimeVariables(String initialFsValue, String defaultRs, String defaultOrs) {
-		setFS(initialFsValue == null ? " " : initialFsValue);
+		// Apply default runtime special variables.
+		setFS(defaultFs == null ? " " : defaultFs);
 		setRS(defaultRs);
 		setOFS(" ");
 		setORS(defaultOrs);

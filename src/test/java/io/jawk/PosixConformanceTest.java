@@ -692,6 +692,7 @@ public class PosixConformanceTest {
 	public void posix99PipelineWriteClose() throws Exception {
 		AwkTestSupport
 				.awkTest("POSIX 9.9 pipeline write close")
+				.posixOnly()
 				.path("pipe.txt")
 				.script(
 						"BEGIN{ f=\"{{pipe.txt}}\"; cmd=\"cat > \" f; print \"hi\" | cmd; print (close(cmd)==0 ? \"ok\":\"bad\") }")

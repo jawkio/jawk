@@ -24,6 +24,7 @@ package io.jawk.backend;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.ArrayDeque;
@@ -200,6 +201,16 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	public void setAwkSink(AwkSink sink) {
 		jrt.setAwkSink(Objects.requireNonNull(sink, "sink"));
+	}
+
+	/**
+	 * Sets the stream used for the stderr output of spawned processes
+	 * (e.g.&nbsp;{@code system("...")}).
+	 *
+	 * @param errorStream stream to receive process stderr
+	 */
+	public void setErrorStream(PrintStream errorStream) {
+		jrt.setErrorStream(errorStream);
 	}
 
 	/**

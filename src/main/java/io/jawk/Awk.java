@@ -702,6 +702,7 @@ public class Awk {
 		private InputSource inputSource;
 		private List<String> arguments;
 		private Map<String, Object> variableOverrides;
+		private PrintStream errorStream;
 
 		AwkRunBuilder() {}
 
@@ -796,6 +797,22 @@ public class Awk {
 				this.arguments = new ArrayList<String>();
 			}
 			this.arguments.add(Objects.requireNonNull(arg, "arg"));
+			return this;
+		}
+
+		/**
+		 * Sets the stream used for the stderr output of spawned processes
+		 * (e.g.&nbsp;{@code system("...")}).
+		 * <p>
+		 * When not set, process stderr is merged into the main output sink.
+		 * The CLI sets this explicitly to {@code System.err} so that command
+		 * errors appear on the console rather than being mixed with normal output.
+		 *
+		 * @param stream stream to receive process stderr
+		 * @return this builder
+		 */
+		public AwkRunBuilder errorStream(PrintStream stream) {
+			this.errorStream = Objects.requireNonNull(stream, "errorStream");
 			return this;
 		}
 
@@ -897,6 +914,7 @@ public class Awk {
 			List<String> resolvedArguments = arguments == null ? Collections.<String>emptyList() : arguments;
 			try (AVM avm = createAvm(settings)) {
 				avm.setAwkSink(sink);
+				avm.setErrorStream(errorStream != null ? errorStream : sink.getPrintStream());
 				try {
 					InputSource resolvedSource;
 					if (inputSource != null) {

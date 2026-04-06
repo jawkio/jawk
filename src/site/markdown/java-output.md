@@ -166,6 +166,24 @@ AwkSink frenchSink = AwkSink.from(System.out, Locale.FRANCE);
 | Capture to `Appendable` | `execute(Appendable)` | `awk.script(s).execute(sb)` |
 | Structured collection | `execute(AwkSink)` | `awk.script(s).execute(mySink)` |
 
+## Subprocess Error Output
+
+When AWK runs an external command via `system("...")` or a pipe (`print ... | "cmd"`),
+the command's **stdout** goes to the main output sink, and its **stderr** is merged
+into the main output by default. This means `execute()` captures both stdout and
+stderr of subprocesses.
+
+To send subprocess stderr to a separate stream, use `errorStream(PrintStream)`:
+
+```java
+awk.script("BEGIN { system(\"mycommand\") }")
+        .errorStream(System.err)
+        .execute(System.out);
+```
+
+The CLI uses `.errorStream(System.err)` so that command errors appear on the
+console rather than mixing with normal output.
+
 ## See Also
 
 - [Java Quickstart](java.html)

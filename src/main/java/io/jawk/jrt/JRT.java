@@ -96,7 +96,7 @@ public class JRT {
 	/** Output sink used for plain AWK print/printf output. */
 	private AwkSink awkSink;
 	/** PrintStream used for command error output */
-	private final PrintStream error;
+	private PrintStream error;
 	// Last input line consumed for getline-style transport.
 	private String inputLine = null;
 	// Current record state ($0, $1, $2, ...).
@@ -213,6 +213,16 @@ public class JRT {
 	 */
 	public void setAwkSink(AwkSink sink) {
 		awkSink = Objects.requireNonNull(sink, "awkSink");
+	}
+
+	/**
+	 * Sets the stream used for the stderr output of spawned processes
+	 * (e.g.&nbsp;{@code system("...")}).
+	 *
+	 * @param errorStream stream to receive process stderr
+	 */
+	public void setErrorStream(PrintStream errorStream) {
+		this.error = Objects.requireNonNull(errorStream, "errorStream");
 	}
 
 	/**

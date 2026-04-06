@@ -119,6 +119,36 @@ public abstract class AwkSink {
 	/** Shared discard stream returned by the default {@link #getPrintStream()}. */
 	private static final PrintStream NULL_PRINT_STREAM = newNullPrintStream();
 
+	/**
+	 * Returns a no-op sink that silently discards all output.
+	 * <p>
+	 * This is used as a placeholder in the AVM/JRT constructor; the real
+	 * sink is installed via {@link #getPrintStream()} before execution begins.
+	 *
+	 * @param locale locale for numeric formatting
+	 * @return a sink that discards all output
+	 */
+	public static AwkSink noOp(Locale locale) {
+		return new NoOpAwkSink(locale);
+	}
+
+	private static final class NoOpAwkSink extends AwkSink {
+
+		NoOpAwkSink(Locale locale) {
+			super(locale);
+		}
+
+		@Override
+		public void print(String ofs, String ors, String ofmt, Object... values) {
+			// discard
+		}
+
+		@Override
+		public void printf(String ofs, String ors, String ofmt, String format, Object... values) {
+			// discard
+		}
+	}
+
 	private static PrintStream newNullPrintStream() {
 		try {
 			return new PrintStream(

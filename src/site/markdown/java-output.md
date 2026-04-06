@@ -161,8 +161,8 @@ AwkSink frenchSink = AwkSink.from(System.out, Locale.FRANCE);
 | Goal | API | Example |
 | --- | --- | --- |
 | Capture as `String` | `execute()` | `awk.script(s).execute()` |
-| Print to a stream | `execute(OutputStream)` | `awk.script(s).execute(fileOut)` |
-| Print to stdout | `execute(System.out)` | `awk.script(s).execute(System.out)` |
+| Print to a `PrintStream` | `execute(PrintStream)` | `awk.script(s).execute(System.out)` |
+| Print to an `OutputStream` | `execute(OutputStream)` | `awk.script(s).execute(fileOut)` |
 | Capture to `Appendable` | `execute(Appendable)` | `awk.script(s).execute(sb)` |
 | Structured collection | `execute(AwkSink)` | `awk.script(s).execute(mySink)` |
 

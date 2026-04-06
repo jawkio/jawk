@@ -166,7 +166,7 @@ Object value = awk.eval("$1 \"-\" $3", source);
 | Sorted array keys | `setUseSortedArrayKeys(boolean)` | `boolean` | `false` | Keep associative array keys in sorted order |
 | Variables | `putVariable(String, Object)` | `Map<String, Object>` | Empty map | Pre-set variables available before `BEGIN` |
 
-Output destination is specified per-call on the builder (`execute()`, `execute(OutputStream)`, `execute(Appendable)`, `execute(AwkSink)`, or `capture()`). See the [Custom Output](java-output.html) guide for details.
+Output destination is specified per-call on the builder (`execute()`, `execute(PrintStream)`, `execute(OutputStream)`, `execute(Appendable)`, or `execute(AwkSink)`). See the [Custom Output](java-output.html) guide for details.
 
 ## See Also
 

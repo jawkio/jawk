@@ -855,6 +855,18 @@ public class Awk {
 		}
 
 		/**
+		 * Executes the script, sending output to the specified {@link PrintStream}.
+		 *
+		 * @param out print stream (e.g. {@code System.out})
+		 * @throws IOException if compilation or execution fails
+		 * @throws ExitException if the script terminates with a non-zero exit code
+		 */
+		public void execute(PrintStream out) throws IOException, ExitException {
+			Objects.requireNonNull(out, "out");
+			doExecute(new OutputStreamAwkSink(out, settings.getLocale()));
+		}
+
+		/**
 		 * Executes the script, sending output to the specified {@link OutputStream}.
 		 *
 		 * @param out output stream

@@ -28,7 +28,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintStream;
@@ -389,7 +388,7 @@ public final class Cli {
 			return;
 		}
 		// Finally run the compiled program with the input and arguments.
-		awk.script(program).input(inputStream).arguments(nameValueOrFileNames).execute((OutputStream) out);
+		awk.script(program).input(inputStream).arguments(nameValueOrFileNames).execute(out);
 	}
 
 	/**

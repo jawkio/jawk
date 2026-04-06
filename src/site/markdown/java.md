@@ -80,7 +80,8 @@ awk.script(program)
 Output is specified per-call on the builder, not in `AwkSettings`:
 
 - `execute()` returns the printed output as a `String`
-- `execute(OutputStream)` sends output to a specific stream
+- `execute(PrintStream)` sends output to a `PrintStream` such as `System.out`
+- `execute(OutputStream)` sends output to any `OutputStream`
 - `execute(Appendable)` captures text into a `StringBuilder` or `Writer`
 - `execute(AwkSink)` uses a fully custom output strategy
 

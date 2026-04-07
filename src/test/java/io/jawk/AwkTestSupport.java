@@ -51,7 +51,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import io.jawk.ext.JawkExtension;
-import io.jawk.intermediate.AwkTuples;
 import io.jawk.jrt.InputSource;
 import io.jawk.util.AwkSettings;
 import io.jawk.util.ScriptSource;
@@ -954,20 +953,6 @@ public final class AwkTestSupport {
 
 		@Override
 		protected ActualResult execute(ExecutionEnvironment env) throws Exception {
-			AwkSettings settings = new AwkSettings();
-			for (Map.Entry<String, Object> entry : preAssignments.entrySet()) {
-				settings.putVariable(entry.getKey(), entry.getValue());
-			}
-			InputStream stdinStream;
-			String stdin = resolvedStdin(env);
-			if (stdin != null) {
-				stdinStream = new ByteArrayInputStream(
-						stdin.getBytes(StandardCharsets.UTF_8));
-			} else {
-				stdinStream = new ByteArrayInputStream(new byte[0]);
-			}
-			ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
-			List<String> operands = resolvedOperands(env);
 			Awk awk;
 			Map<String, Object> originalVars = null;
 			if (customAwk != null) {
@@ -980,31 +965,44 @@ public final class AwkTestSupport {
 					awkSettings.putVariable(entry.getKey(), entry.getValue());
 				}
 			} else if (!extensions.isEmpty()) {
+				AwkSettings settings = new AwkSettings();
+				for (Map.Entry<String, Object> entry : preAssignments.entrySet()) {
+					settings.putVariable(entry.getKey(), entry.getValue());
+				}
 				awk = new Awk(extensions, settings);
 			} else {
+				AwkSettings settings = new AwkSettings();
+				for (Map.Entry<String, Object> entry : preAssignments.entrySet()) {
+					settings.putVariable(entry.getKey(), entry.getValue());
+				}
 				awk = new Awk(settings);
+			}
+			StringBuilder out = new StringBuilder();
+			String resolvedScript = resolvedScript(env);
+			ScriptSource scriptSource = new ScriptSource(description(), new StringReader(resolvedScript));
+			AwkProgram program = awk.compile(Collections.singletonList(scriptSource));
+			Awk.AwkRunBuilder builder = awk.script(program).arguments(resolvedOperands(env));
+			if (inputSource != null) {
+				builder.input(inputSource);
+			} else {
+				String stdin = resolvedStdin(env);
+				builder
+						.input(
+								stdin != null ?
+										new ByteArrayInputStream(stdin.getBytes(StandardCharsets.UTF_8)) :
+										new ByteArrayInputStream(new byte[0]));
 			}
 			int exitCode = 0;
 			try {
-				String resolvedScript = resolvedScript(env);
-				ScriptSource scriptSource = new ScriptSource(description(), new StringReader(resolvedScript));
-				AwkProgram program = awk.compile(Collections.singletonList(scriptSource));
-				if (inputSource != null) {
-					awk.script(program).input(inputSource).arguments(operands).execute(outBytes);
-				} else {
-					awk.script(program).input(stdinStream).arguments(operands).execute(outBytes);
-				}
+				builder.execute(out);
 			} catch (ExitException ex) {
 				exitCode = ex.getCode();
 			} finally {
-				// Restore original variables when a custom Awk instance was used
 				if (customAwk != null) {
 					customAwk.getSettings().setVariables(originalVars);
 				}
 			}
-			return new ActualResult(
-					outBytes.toString(StandardCharsets.UTF_8.name()).replace("\r\n", "\n"),
-					exitCode);
+			return new ActualResult(out.toString().replace("\r\n", "\n"), exitCode);
 		}
 	}
 

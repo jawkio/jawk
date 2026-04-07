@@ -78,11 +78,9 @@ public class JawkScriptEngine extends AbstractScriptEngine {
 				input = System.in;
 			}
 			AwkSettings settings = new AwkSettings();
-			settings.setDefaultRS("\n");
 			StringWriter result = new StringWriter();
 			Awk awk = new Awk(settings);
 			Map<String, Object> variableOverrides = extractVariableOverrides(context);
-			variableOverrides.put("ORS", "\n");
 			try (AVM avm = awk.createAvm()) {
 				avm.setAwkSink(new AppendableAwkSink(result, settings.getLocale()));
 				InputSource inputSource = new StreamInputSource(input, avm, avm.getJrt());

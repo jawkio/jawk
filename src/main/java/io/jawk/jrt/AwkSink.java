@@ -159,7 +159,13 @@ public abstract class AwkSink {
 						}
 					},
 					false,
-					"UTF-8");
+					"UTF-8") {
+
+				@Override
+				public void close() {
+					// Prevent closing; this stream is a shared singleton.
+				}
+			};
 		} catch (java.io.UnsupportedEncodingException e) {
 			throw new IllegalStateException(e);
 		}

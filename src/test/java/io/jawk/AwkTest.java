@@ -930,6 +930,23 @@ public class AwkTest {
 	}
 
 	@Test
+	public void appendableSinkHandlesSplitMultiByteUtf8() throws Exception {
+		StringBuilder output = new StringBuilder();
+		AppendableAwkSink sink = new AppendableAwkSink(output);
+		PrintStream ps = sink.getPrintStream();
+
+		// "café" in UTF-8: 63 61 66 C3 A9
+		byte[] utf8 = "café".getBytes(StandardCharsets.UTF_8);
+		// Write bytes one-by-one to force a split inside the 2-byte é sequence
+		for (byte b : utf8) {
+			ps.write(new byte[] { b }, 0, 1);
+		}
+		ps.flush();
+
+		assertEquals("café", output.toString());
+	}
+
+	@Test
 	public void executeWithStructuredOutputSink() throws Exception {
 		StructuredOutputSink sink = new StructuredOutputSink();
 		Awk awk = new Awk();

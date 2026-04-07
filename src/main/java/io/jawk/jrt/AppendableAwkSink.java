@@ -26,6 +26,9 @@ import java.io.Flushable;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharsetDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Objects;
@@ -100,19 +103,46 @@ public final class AppendableAwkSink extends AwkSink {
 	private static final class AppendableOutputStream extends OutputStream {
 
 		private final Appendable appendable;
+		private final CharsetDecoder decoder;
+		private byte[] trailingBytes = new byte[0];
 
 		private AppendableOutputStream(Appendable appendableParam) {
 			this.appendable = appendableParam;
+			this.decoder = StandardCharsets.UTF_8.newDecoder();
 		}
 
 		@Override
 		public void write(int value) throws IOException {
-			appendable.append((char) value);
+			write(new byte[] { (byte) value }, 0, 1);
 		}
 
 		@Override
 		public void write(byte[] bytes, int off, int len) throws IOException {
-			appendable.append(new String(bytes, off, len, StandardCharsets.UTF_8));
+			// Merge with any trailing incomplete UTF-8 sequence from the previous call
+			ByteBuffer input;
+			if (trailingBytes.length > 0) {
+				byte[] merged = new byte[trailingBytes.length + len];
+				System.arraycopy(trailingBytes, 0, merged, 0, trailingBytes.length);
+				System.arraycopy(bytes, off, merged, trailingBytes.length, len);
+				input = ByteBuffer.wrap(merged);
+			} else {
+				input = ByteBuffer.wrap(bytes, off, len);
+			}
+
+			CharBuffer output = CharBuffer.allocate(input.remaining());
+			decoder.decode(input, output, false);
+			output.flip();
+			if (output.hasRemaining()) {
+				appendable.append(output);
+			}
+
+			// Save any remaining bytes (incomplete trailing sequence)
+			if (input.hasRemaining()) {
+				trailingBytes = new byte[input.remaining()];
+				input.get(trailingBytes);
+			} else {
+				trailingBytes = new byte[0];
+			}
 		}
 
 		@Override
@@ -124,6 +154,18 @@ public final class AppendableAwkSink extends AwkSink {
 
 		@Override
 		public void close() throws IOException {
+			// Finalize any remaining trailing bytes
+			if (trailingBytes.length > 0) {
+				ByteBuffer input = ByteBuffer.wrap(trailingBytes);
+				CharBuffer output = CharBuffer.allocate(trailingBytes.length);
+				decoder.decode(input, output, true);
+				decoder.flush(output);
+				output.flip();
+				if (output.hasRemaining()) {
+					appendable.append(output);
+				}
+				trailingBytes = new byte[0];
+			}
 			flush();
 		}
 	}

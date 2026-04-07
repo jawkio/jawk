@@ -22,10 +22,6 @@ package io.jawk.jrt;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-// NOTE: This class imports io.jawk.Awk for POSIX default constants
-// and io.jawk.intermediate.UninitializedObject for field placeholders.
-// All other JRT runtime classes live in io.jawk.jrt.
-
 import java.io.FileOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -1760,7 +1756,9 @@ public class JRT {
 	 * @throws IOException if the sink cannot be written to
 	 */
 	public void printToProcess(String cmd, Object[] values) throws IOException {
-		getPipeAwkSink(cmd).print(ofs, ors, ofmt, values);
+		AwkSink sink = getPipeAwkSink(cmd);
+		sink.print(ofs, ors, ofmt, values);
+		sink.flush();
 	}
 
 	/**
@@ -1800,6 +1798,7 @@ public class JRT {
 	public void printfToProcess(String cmd, String format, Object[] values) throws IOException {
 		AwkSink sink = getPipeAwkSink(cmd);
 		sink.printf(ofs, ors, ofmt, format, values);
+		sink.flush();
 	}
 
 	/**

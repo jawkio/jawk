@@ -36,7 +36,7 @@ Awk awk = new Awk(StdinExtension.INSTANCE, new MyExtension());
 
 The dedicated [Writing Extensions](extensions-writing.html) guide covers how to write your own extensions to expose new functions, written in Java, to your AWK scripts.
 
-## The Shortest Path: script().execute()
+## The Shortest Path: `script().execute()`
 
 `script().execute()` is the smallest API surface for full AWK programs when you want the printed output back as a Java `String`:
 
@@ -52,7 +52,7 @@ Use this when:
 - you want the rendered AWK output as a `String`
 - you do not need explicit `ARGV`, per-execution variables, or runtime reuse
 
-## Compiled Programs and Explicit Output
+## Compiled Programs
 
 When the same script will be reused, compile it once and run the compiled program:
 
@@ -61,28 +61,18 @@ Awk awk = new Awk();
 AwkProgram program = awk.compile("{ print prefix $1 }");
 
 awk.script(program)
-        .input(new ByteArrayInputStream("alpha beta\n".getBytes(StandardCharsets.UTF_8)))
-        .execute(new AppendableAwkSink(new StringBuilder(), Locale.US));
-```
-
-For full control, use the fluent builder:
-
-```java
-awk.script(program)
-        .input(myInputSource)
-        .argument("mode=csv")
-        .variables(Collections.<String, Object>singletonMap("prefix", "row="))
-        .execute(mySink);
+        .input("alpha beta\n")
+        .execute();
 ```
 
 ## Output Destination
 
-Output is specified per-call on the builder, not in `AwkSettings`:
+Output is specified per-call on the builder:
 
 - `execute()` returns the printed output as a `String`
 - `execute(PrintStream)` sends output to a `PrintStream` such as `System.out`
 - `execute(OutputStream)` sends output to any `OutputStream`
-- `execute(Appendable)` captures text into a `StringBuilder` or `Writer`
+- `execute(Appendable)` captures text into a `StringBuilder` or `Appendable`
 - `execute(AwkSink)` uses a fully custom output strategy
 
 ## Custom Output with AwkSink

@@ -947,6 +947,17 @@ public class AwkTest {
 	}
 
 	@Test
+	public void crlfInputFileProducesCleanRecords() throws Exception {
+		AwkTestSupport
+				.awkTest("CRLF input produces clean records")
+				.script("{ print $0 }")
+				.file("input.txt", "alpha\r\nbeta\r\ngamma\r\n")
+				.operand("{{input.txt}}")
+				.expectLines("alpha", "beta", "gamma")
+				.runAndAssert();
+	}
+
+	@Test
 	public void executeWithStructuredOutputSink() throws Exception {
 		StructuredOutputSink sink = new StructuredOutputSink();
 		Awk awk = new Awk();

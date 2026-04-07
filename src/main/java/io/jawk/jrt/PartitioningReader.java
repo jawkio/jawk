@@ -108,8 +108,11 @@ public class PartitioningReader extends FilterReader {
 			if ("".equals(recordSeparator)) {
 				consumeAll = true;
 				rs = Pattern.compile("\\z", Pattern.DOTALL | Pattern.MULTILINE);
-			} else if ("\n".equals(recordSeparator) || "\r\n".equals(recordSeparator) || "\r".equals(recordSeparator)) {
-				// For performance reason, handle the default RS in a specific way here
+			} else if ("\n".equals(recordSeparator)) {
+				// Match \r?\n so that CRLF inputs produce clean records without trailing \r
+				consumeAll = false;
+				rs = Pattern.compile("\\r?\\n");
+			} else if ("\r\n".equals(recordSeparator) || "\r".equals(recordSeparator)) {
 				consumeAll = false;
 				rs = Pattern.compile(recordSeparator, Pattern.LITERAL);
 			} else {

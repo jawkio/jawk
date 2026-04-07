@@ -120,22 +120,17 @@ public abstract class AwkSink {
 	private static final PrintStream NULL_PRINT_STREAM = newNullPrintStream();
 
 	/**
-	 * Returns a no-op sink that silently discards all output.
+	 * A shared no-op sink that silently discards all output.
 	 * <p>
-	 * This is used as a placeholder in the AVM/JRT constructor; the real
-	 * sink is installed via {@link #getPrintStream()} before execution begins.
-	 *
-	 * @param locale locale for numeric formatting
-	 * @return a sink that discards all output
+	 * This singleton is safe to share across all JRT/AVM instances because
+	 * every method (including {@code close}) is a no-op.
 	 */
-	public static AwkSink noOp(Locale locale) {
-		return new NoOpAwkSink(locale);
-	}
+	public static final AwkSink NOP_SINK = new NoOpAwkSink();
 
 	private static final class NoOpAwkSink extends AwkSink {
 
-		NoOpAwkSink(Locale locale) {
-			super(locale);
+		NoOpAwkSink() {
+			super();
 		}
 
 		@Override

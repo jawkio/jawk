@@ -169,7 +169,7 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	protected JRT createJrt() {
-		return new JRT(this, this.settings.getLocale(), AwkSink.noOp(this.settings.getLocale()), null);
+		return new JRT(this, this.settings.getLocale(), AwkSink.NOP_SINK, null);
 	}
 
 	/**

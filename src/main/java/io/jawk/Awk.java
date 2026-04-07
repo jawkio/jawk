@@ -83,6 +83,27 @@ import io.jawk.util.ScriptSource;
  */
 public class Awk {
 
+	/** POSIX default field separator ({@code " "}). */
+	public static final String DEFAULT_FS = " ";
+
+	/** POSIX default record separator ({@code "\n"}). */
+	public static final String DEFAULT_RS = "\n";
+
+	/** POSIX default output field separator ({@code " "}). */
+	public static final String DEFAULT_OFS = " ";
+
+	/** POSIX default output record separator ({@code "\n"}). */
+	public static final String DEFAULT_ORS = "\n";
+
+	/** POSIX default number-to-string conversion format ({@code "%.6g"}). */
+	public static final String DEFAULT_CONVFMT = "%.6g";
+
+	/** POSIX default output number format ({@code "%.6g"}). */
+	public static final String DEFAULT_OFMT = "%.6g";
+
+	/** POSIX default subscript separator ({@code "\034"}). */
+	public static final String DEFAULT_SUBSEP = String.valueOf((char) 28);
+
 	private final Map<String, ExtensionFunction> extensionFunctions;
 
 	private final Map<String, JawkExtension> extensionInstances;

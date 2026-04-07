@@ -27,6 +27,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
+import io.jawk.Awk;
 
 /**
  * Reusable behavioral configuration for the Jawk engine.
@@ -91,10 +92,10 @@ public class AwkSettings {
 
 	/**
 	 * Default value for RS, when not set specifically by the AWK script.
-	 * Defaults to {@code "\n"} per POSIX. Platform-specific end-of-line
-	 * handling is the responsibility of the input source.
+	 * Defaults to {@link Awk#DEFAULT_RS} per POSIX. Platform-specific
+	 * end-of-line handling is the responsibility of the input source.
 	 */
-	private volatile String defaultRS = "\n";
+	private volatile String defaultRS = Awk.DEFAULT_RS;
 
 	/**
 	 * Monotonically increasing counter incremented whenever the settings change.

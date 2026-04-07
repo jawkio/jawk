@@ -49,6 +49,7 @@ import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.math.BigDecimal;
+import io.jawk.Awk;
 import io.jawk.intermediate.UninitializedObject;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
@@ -196,13 +197,13 @@ public class JRT {
 		this.rstart = 0;
 		this.rlength = 0;
 		this.filename = "";
-		this.fs = " ";
-		this.rs = "\n";
-		this.ofs = " ";
-		this.ors = "\n";
-		this.convfmt = "%.6g";
-		this.ofmt = "%.6g";
-		this.subsep = String.valueOf((char) 28);
+		this.fs = Awk.DEFAULT_FS;
+		this.rs = Awk.DEFAULT_RS;
+		this.ofs = Awk.DEFAULT_OFS;
+		this.ors = Awk.DEFAULT_ORS;
+		this.convfmt = Awk.DEFAULT_CONVFMT;
+		this.ofmt = Awk.DEFAULT_OFMT;
+		this.subsep = Awk.DEFAULT_SUBSEP;
 	}
 
 	/**
@@ -298,13 +299,12 @@ public class JRT {
 	 * The {@code defaultFs} and {@code defaultRs} parameters allow the caller
 	 * to configure the initial field and record separators. Other special variables
 	 * ({@code OFS}, {@code ORS}, {@code CONVFMT}, {@code OFMT}, {@code SUBSEP})
-	 * use their POSIX-mandated defaults ({@code " "}, {@code "\n"},
-	 * {@code "%.6g"}, {@code "%.6g"}, {@code "\034"}) which are
+	 * use their POSIX-mandated defaults (see {@link Awk} constants) which are
 	 * platform-independent and therefore not parameterized. Platform-specific
 	 * end-of-line handling is the responsibility of the {@link AwkSink}.
 	 *
-	 * @param defaultFs default field separator, or {@code null} for the AWK
-	 *        default ({@code " "})
+	 * @param defaultFs default field separator, or {@code null} for
+	 *        {@link Awk#DEFAULT_FS}
 	 * @param defaultRs default record separator
 	 */
 	public void prepareForExecution(String defaultFs, String defaultRs) {
@@ -321,13 +321,13 @@ public class JRT {
 		filename = "";
 
 		// Apply default runtime special variables.
-		setFS(defaultFs == null ? " " : defaultFs);
+		setFS(defaultFs == null ? Awk.DEFAULT_FS : defaultFs);
 		setRS(defaultRs);
-		setOFS(" ");
-		setORS("\n");
-		setCONVFMT("%.6g");
-		setOFMT("%.6g");
-		setSUBSEP(String.valueOf((char) 28));
+		setOFS(Awk.DEFAULT_OFS);
+		setORS(Awk.DEFAULT_ORS);
+		setCONVFMT(Awk.DEFAULT_CONVFMT);
+		setOFMT(Awk.DEFAULT_OFMT);
+		setSUBSEP(Awk.DEFAULT_SUBSEP);
 		setFILENAMEViaJrt("");
 		setNR(0);
 		setFNR(0);

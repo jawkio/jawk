@@ -940,10 +940,9 @@ public class Awk {
 					InputSource resolvedSource;
 					if (inputSource != null) {
 						resolvedSource = inputSource;
-					} else if (inputStream != null) {
-						resolvedSource = new StreamInputSource(inputStream, avm, avm.getJrt());
 					} else {
-						resolvedSource = new SingleRecordInputSource(null);
+						InputStream in = inputStream != null ? inputStream : new ByteArrayInputStream(new byte[0]);
+						resolvedSource = new StreamInputSource(in, avm, avm.getJrt());
 					}
 					avm.execute(program, resolvedSource, resolvedArguments, variableOverrides);
 				} catch (ExitException e) {

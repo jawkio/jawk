@@ -53,7 +53,6 @@ import java.util.stream.Stream;
 import io.jawk.ext.JawkExtension;
 import io.jawk.jrt.InputSource;
 import io.jawk.util.AwkSettings;
-import io.jawk.util.ScriptSource;
 
 /**
  * Reusable helpers for building and executing Jawk tests. This consolidates the
@@ -978,19 +977,15 @@ public final class AwkTestSupport {
 				awk = new Awk(settings);
 			}
 			StringBuilder out = new StringBuilder();
-			String resolvedScript = resolvedScript(env);
-			ScriptSource scriptSource = new ScriptSource(description(), new StringReader(resolvedScript));
-			AwkProgram program = awk.compile(Collections.singletonList(scriptSource));
+			AwkProgram program = awk.compile(resolvedScript(env));
 			Awk.AwkRunBuilder builder = awk.script(program).arguments(resolvedOperands(env));
 			if (inputSource != null) {
 				builder.input(inputSource);
 			} else {
 				String stdin = resolvedStdin(env);
-				builder
-						.input(
-								stdin != null ?
-										new ByteArrayInputStream(stdin.getBytes(StandardCharsets.UTF_8)) :
-										new ByteArrayInputStream(new byte[0]));
+				if (stdin != null) {
+					builder.input(stdin);
+				}
 			}
 			int exitCode = 0;
 			try {

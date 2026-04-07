@@ -969,7 +969,7 @@ public final class AwkTestSupport {
 			} catch (ExitException ex) {
 				exitCode = ex.getCode();
 			}
-			return new ActualResult(out.toString().replace("\r\n", "\n"), exitCode);
+			return new ActualResult(out.toString(), exitCode);
 		}
 	}
 
@@ -1025,7 +1025,7 @@ public final class AwkTestSupport {
 				exitCode = ex.getCode();
 			}
 			return new ActualResult(
-					outBytes.toString(StandardCharsets.UTF_8.name()).replace("\r\n", "\n"),
+					outBytes.toString(StandardCharsets.UTF_8.name()),
 					exitCode);
 		}
 	}

@@ -131,7 +131,7 @@ public class JRTTest {
 		AwkTestSupport
 				.awkTest("more process")
 				.script("BEGIN { print \"Hello\" | \"more\"; close(\"more\") }")
-				.expect("Hello\n\n")
+				.expectLines("Hello", "")
 				.runAndAssert();
 	}
 
@@ -151,7 +151,7 @@ public class JRTTest {
 		AwkTestSupport
 				.awkTest("system pipe windows")
 				.script("BEGIN { print(system(\"echo test|findstr test\")) }")
-				.expect("test\n0\n")
+				.expectLines("test", "0")
 				.runAndAssert();
 	}
 

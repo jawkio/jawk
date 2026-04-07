@@ -52,7 +52,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import io.jawk.ext.JawkExtension;
 import io.jawk.jrt.InputSource;
-import io.jawk.util.AwkSettings;
 
 /**
  * Reusable helpers for building and executing Jawk tests. This consolidates the
@@ -355,9 +354,6 @@ public final class AwkTestSupport {
 
 		/**
 		 * Supplies an {@link Awk} instance to use when invoking the script.
-		 * The instance must have been created with mutable
-		 * {@link AwkSettings} so that the test framework can configure
-		 * pre-assigned variables before execution.
 		 *
 		 * @param awkEngine the engine to execute the script with
 		 * @return this builder for method chaining
@@ -952,33 +948,13 @@ public final class AwkTestSupport {
 
 		@Override
 		protected ActualResult execute(ExecutionEnvironment env) throws Exception {
-			Awk awk;
-			Map<String, Object> originalVars = null;
-			if (customAwk != null) {
-				awk = customAwk;
-				AwkSettings awkSettings = awk.getSettings();
-				// Save original variables so we can restore them after execution,
-				// preventing configuration leaks across invocations.
-				originalVars = new LinkedHashMap<>(awkSettings.getVariables());
-				for (Map.Entry<String, Object> entry : preAssignments.entrySet()) {
-					awkSettings.putVariable(entry.getKey(), entry.getValue());
-				}
-			} else if (!extensions.isEmpty()) {
-				AwkSettings settings = new AwkSettings();
-				for (Map.Entry<String, Object> entry : preAssignments.entrySet()) {
-					settings.putVariable(entry.getKey(), entry.getValue());
-				}
-				awk = new Awk(extensions, settings);
-			} else {
-				AwkSettings settings = new AwkSettings();
-				for (Map.Entry<String, Object> entry : preAssignments.entrySet()) {
-					settings.putVariable(entry.getKey(), entry.getValue());
-				}
-				awk = new Awk(settings);
-			}
+			Awk awk = customAwk != null ? customAwk : new Awk(extensions);
 			StringBuilder out = new StringBuilder();
 			AwkProgram program = awk.compile(resolvedScript(env));
-			Awk.AwkRunBuilder builder = awk.script(program).arguments(resolvedOperands(env));
+			Awk.AwkRunBuilder builder = awk
+					.script(program)
+					.arguments(resolvedOperands(env))
+					.variables(preAssignments);
 			if (inputSource != null) {
 				builder.input(inputSource);
 			} else {
@@ -992,10 +968,6 @@ public final class AwkTestSupport {
 				builder.execute(out);
 			} catch (ExitException ex) {
 				exitCode = ex.getCode();
-			} finally {
-				if (customAwk != null) {
-					customAwk.getSettings().setVariables(originalVars);
-				}
 			}
 			return new ActualResult(out.toString().replace("\r\n", "\n"), exitCode);
 		}

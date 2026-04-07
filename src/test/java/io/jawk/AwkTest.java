@@ -26,7 +26,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeFalse;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -1222,19 +1221,15 @@ public class AwkTest {
 
 	@Test
 	public void systemStderrMergesIntoOutputByDefault() throws Exception {
-		assumeNotWindows();
-		Awk awk = new Awk();
-		String output = awk.script("BEGIN { system(\"echo stderrText >&2\") }").execute();
+		String output = new Awk().script("BEGIN { system(\"echo stderrText >&2\") }").execute();
 		assertTrue("subprocess stderr should be merged into main output", output.contains("stderrText"));
 	}
 
 	@Test
 	public void systemStderrGoesToExplicitErrorStream() throws Exception {
-		assumeNotWindows();
 		ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
 		PrintStream errStream = new PrintStream(errBytes, true, StandardCharsets.UTF_8.name());
-		Awk awk = new Awk();
-		String output = awk
+		String output = new Awk()
 				.script("BEGIN { system(\"echo stderrText >&2\") }")
 				.errorStream(errStream)
 				.execute();
@@ -1242,9 +1237,5 @@ public class AwkTest {
 		assertTrue(
 				"subprocess stderr should appear in error stream",
 				errBytes.toString(StandardCharsets.UTF_8.name()).contains("stderrText"));
-	}
-
-	private static void assumeNotWindows() {
-		assumeFalse("Requires POSIX shell", IS_WINDOWS);
 	}
 }

@@ -168,7 +168,6 @@ public class JRTTest {
 	public void testSplitSetsFieldZero() {
 		AssocArray aa = AssocArray.createHash();
 		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
-		jrt.setCONVFMT("%.6g");
 		int n = jrt.split(aa, "a b");
 		assertEquals(2, n);
 		assertEquals(2L, aa.get(0L));
@@ -178,7 +177,6 @@ public class JRTTest {
 	public void testSplitUsesLongIndexesForPlainMap() {
 		Map<Object, Object> map = new LinkedHashMap<>();
 		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
-		jrt.setCONVFMT("%.6g");
 		int n = jrt.split(map, "a b");
 		assertEquals(2, n);
 		assertEquals(2L, map.get(0L));
@@ -191,7 +189,6 @@ public class JRTTest {
 	public void testSplitRegexWhitespace() {
 		AssocArray aa = AssocArray.createHash();
 		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
-		jrt.setCONVFMT("%.6g");
 		int n = jrt.split("[ \t]+", aa, " 9853   shen");
 		assertEquals(3, n);
 		assertEquals("", aa.get(1));

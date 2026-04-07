@@ -22,7 +22,6 @@ package io.jawk;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
@@ -849,25 +848,18 @@ public class AwkTest {
 		String script = "{ print $0 }";
 		AwkProgram program = AWK.compile(script);
 
-		AwkSettings settings = new AwkSettings();
-		settings.setDefaultRS("\n");
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-
-		new Awk(settings)
+		String result = new Awk()
 				.script(program)
-				.input(new ByteArrayInputStream("foo\nbar\n".getBytes(StandardCharsets.UTF_8)))
-				.variable("ORS", "\n")
-				.execute(out);
+				.input("foo\nbar\n")
+				.execute();
 
-		assertEquals("foo\nbar\n", out.toString(StandardCharsets.UTF_8.name()));
+		assertEquals("foo\nbar\n", result);
 	}
 
 	@Test
 	public void captureCollectsOutput() throws Exception {
-		Awk awk = new Awk();
-		String result = awk
+		String result = new Awk()
 				.script("BEGIN { print \"alpha\"; printf(\"beta\") }")
-				.variable("ORS", "\n")
 				.execute();
 
 		assertEquals("alpha\nbeta", result);
@@ -878,10 +870,8 @@ public class AwkTest {
 		AwkSettings settings = new AwkSettings();
 		settings.setLocale(java.util.Locale.FRANCE);
 
-		Awk awk = new Awk(settings);
-		String result = awk
+		String result = new Awk(settings)
 				.script("BEGIN { print 1.5 }")
-				.variable("ORS", "\n")
 				.execute();
 
 		assertEquals("1,5\n", result);
@@ -913,7 +903,6 @@ public class AwkTest {
 
 		new Awk()
 				.script("BEGIN { print \"alpha\" }")
-				.variable("ORS", "\n")
 				.execute(output);
 
 		assertEquals("alpha\n", output.toString(StandardCharsets.UTF_8.name()));
@@ -925,7 +914,6 @@ public class AwkTest {
 
 		new Awk()
 				.script("BEGIN { print \"alpha\" }")
-				.variable("ORS", "\n")
 				.execute(output);
 
 		assertEquals("alpha\n", output.toString());
@@ -934,11 +922,9 @@ public class AwkTest {
 	@Test
 	public void perExecutionSinkOverridesDefault() throws Exception {
 		StringBuilder perCallOutput = new StringBuilder();
-		Awk awk = new Awk();
 
-		awk
+		new Awk()
 				.script("BEGIN { print \"alpha\" }")
-				.variable("ORS", "\n")
 				.execute(new AppendableAwkSink(perCallOutput, java.util.Locale.US));
 
 		assertEquals("alpha\n", perCallOutput.toString());
@@ -964,24 +950,20 @@ public class AwkTest {
 
 	@Test
 	public void executeToOutputStreamUsesPosixOrs() throws Exception {
-		ByteArrayOutputStream output = new ByteArrayOutputStream();
-
-		new Awk()
+		String result = new Awk()
 				.script("BEGIN { print \"alpha\" }")
-				.execute(output);
+				.execute();
 
-		assertEquals("alpha\n", output.toString(StandardCharsets.UTF_8.name()));
+		assertEquals("alpha\n", result);
 	}
 
 	@Test
 	public void publicRunSuppressesZeroExitCode() throws Exception {
-		ByteArrayOutputStream output = new ByteArrayOutputStream();
-
-		new Awk()
+		String result = new Awk()
 				.script("BEGIN { print \"alpha\"; exit 0 }")
-				.execute(output);
+				.execute();
 
-		assertEquals("alpha\n", output.toString(StandardCharsets.UTF_8.name()));
+		assertEquals("alpha\n", result);
 	}
 
 	@Test
@@ -1014,15 +996,9 @@ public class AwkTest {
 		StringBuilder secondOutput = new StringBuilder();
 		try (AVM avm = awk.createAvm()) {
 			avm.setAwkSink(new AppendableAwkSink(firstOutput, java.util.Locale.US));
-			Map<String, Object> orsOverride = Collections.<String, Object>singletonMap("ORS", "\n");
-			avm
-					.execute(
-							program,
-							emptyInput,
-							Collections.<String>emptyList(),
-							orsOverride);
+			avm.execute(program, emptyInput, Collections.<String>emptyList(), null);
 			avm.setAwkSink(new AppendableAwkSink(secondOutput, java.util.Locale.US));
-			avm.execute(program, emptyInput, Collections.<String>emptyList(), orsOverride);
+			avm.execute(program, emptyInput, Collections.<String>emptyList(), null);
 		}
 
 		assertEquals("value\n", firstOutput.toString());
@@ -1038,17 +1014,12 @@ public class AwkTest {
 		String script = "{ print $0 }";
 		AwkProgram program = AWK.compile(new StringReader(script));
 
-		AwkSettings settings = new AwkSettings();
-		settings.setDefaultRS("\n");
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-
-		new Awk(settings)
+		String result = new Awk()
 				.script(program)
-				.input(new ByteArrayInputStream("one\n".getBytes(StandardCharsets.UTF_8)))
-				.variable("ORS", "\n")
-				.execute(out);
+				.input("one\n")
+				.execute();
 
-		assertEquals("one\n", out.toString(StandardCharsets.UTF_8.name()));
+		assertEquals("one\n", result);
 	}
 
 	/**
@@ -1060,17 +1031,12 @@ public class AwkTest {
 		String script = "{ print $0 }";
 		AwkProgram program = AWK.compile(script);
 
-		AwkSettings settings = new AwkSettings();
-		settings.setDefaultRS("\n");
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-
-		new Awk(settings)
+		String result = new Awk()
 				.script(program)
-				.input(new ByteArrayInputStream("value\n".getBytes(StandardCharsets.UTF_8)))
-				.variable("ORS", "\n")
-				.execute(out);
+				.input("value\n")
+				.execute();
 
-		assertEquals("value\n", out.toString(StandardCharsets.UTF_8.name()));
+		assertEquals("value\n", result);
 	}
 
 	/**
@@ -1088,17 +1054,13 @@ public class AwkTest {
 		}
 
 		Cli cli = Cli.parseCommandLineArguments(new String[] { "-L", tmp.getAbsolutePath() });
-		AwkSettings settings = cli.getSettings();
-		settings.setDefaultRS("\n");
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
 
-		new Awk(settings)
+		String result = new Awk()
 				.script(cli.getPrecompiledProgram())
-				.input(new ByteArrayInputStream("abc\n".getBytes(StandardCharsets.UTF_8)))
-				.variable("ORS", "\n")
-				.execute(out);
+				.input("abc\n")
+				.execute();
 
-		assertEquals("ABC\n", out.toString(StandardCharsets.UTF_8.name()));
+		assertEquals("ABC\n", result);
 	}
 
 	/**
@@ -1111,17 +1073,13 @@ public class AwkTest {
 		Cli.main(new String[] { "-K", tmp.getAbsolutePath(), "{ print toupper($0) }" });
 
 		Cli cli = Cli.parseCommandLineArguments(new String[] { "-L", tmp.getAbsolutePath() });
-		AwkSettings settings = cli.getSettings();
-		settings.setDefaultRS("\n");
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
 
-		new Awk(settings)
+		String result = new Awk()
 				.script(cli.getPrecompiledProgram())
-				.input(new ByteArrayInputStream("abc\n".getBytes(StandardCharsets.UTF_8)))
-				.variable("ORS", "\n")
-				.execute(out);
+				.input("abc\n")
+				.execute();
 
-		assertEquals("ABC\n", out.toString(StandardCharsets.UTF_8.name()));
+		assertEquals("ABC\n", result);
 	}
 
 	/**
@@ -1178,22 +1136,14 @@ public class AwkTest {
 
 	@Test
 	public void sandboxRejectsRedirectionAtRuntime() throws Exception {
-		Awk nonSandboxAwk = new Awk();
-		AwkProgram program = nonSandboxAwk.compile("BEGIN { print \"hi\" > \"sandbox_out.txt\" } ");
+		AwkProgram program = AWK.compile("BEGIN { print \"hi\" > \"sandbox_out.txt\" } ");
 
-		AwkSettings settings = new AwkSettings();
-		settings.setDefaultRS("\n");
-
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-
-		Awk sandboxAwk = new SandboxedAwk(settings);
+		Awk sandboxAwk = new SandboxedAwk();
 		assertThrows(
 				AwkSandboxException.class,
 				() -> sandboxAwk
 						.script(program)
-						.variable("ORS", "\n")
-						.input(new ByteArrayInputStream(new byte[0]))
-						.execute(out));
+						.execute());
 	}
 
 	@Test

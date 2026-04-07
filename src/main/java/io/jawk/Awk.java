@@ -949,6 +949,8 @@ public class Awk {
 					if (e.getCode() != 0) {
 						throw e;
 					}
+				} finally {
+					sink.flush();
 				}
 			}
 		}

@@ -22,11 +22,9 @@ package io.jawk.jrt;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-// There must be NO imports to io.jawk.*,
-// other than io.jawk.jrt which occurs by
-// default. We wish to house all
-// required runtime classes in jrt.jar,
-// not have to refer to jawk.jar!
+// NOTE: This class imports io.jawk.Awk for POSIX default constants
+// and io.jawk.intermediate.UninitializedObject for field placeholders.
+// All other JRT runtime classes live in io.jawk.jrt.
 
 import java.io.FileOutputStream;
 import java.io.FileInputStream;

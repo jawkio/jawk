@@ -123,7 +123,9 @@ public abstract class AwkSink {
 	 * A shared no-op sink that silently discards all output.
 	 * <p>
 	 * This singleton is safe to share across all JRT/AVM instances because
-	 * every method (including {@code close}) is a no-op.
+	 * its {@link #print(String, String, String, Object...)},
+	 * {@link #printf(String, String, String, String, Object...)}, and
+	 * {@link #flush()} operations are all no-ops.
 	 */
 	public static final AwkSink NOP_SINK = new NoOpAwkSink();
 

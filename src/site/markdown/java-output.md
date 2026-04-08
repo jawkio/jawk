@@ -105,7 +105,9 @@ public final class CollectingSink extends AwkSink {
 
 ### getPrintStream
 
-`getPrintStream()` provides the `PrintStream` used by AWK output redirection (`print > "file"`, `print | "cmd"`). Implementations typically return `System.out` or a custom stream. If your sink does not support redirection, return a no-op stream.
+`getPrintStream()` provides the `PrintStream` used for pumping the stdout of spawned processes (`system("...")` and pipe output from `print ... | "cmd"`) back into the host output. File redirection (`print > "file"`) does _not_ use this stream — it creates its own file-backed sink internally.
+
+The default implementation returns a no-op stream that silently discards output. Override this method in sinks that need to capture subprocess output. Implementations typically return `System.out` or a custom stream.
 
 ### Using a Custom Sink
 
@@ -180,14 +182,18 @@ public class MySink extends AwkSink {
 | Capture to `Appendable` | `execute(Appendable)` | `awk.script(s).execute(sb)` |
 | Structured collection | `execute(AwkSink)` | `awk.script(s).execute(mySink)` |
 
-## Subprocess Error Output
+## Subprocess Output
 
 When AWK runs an external command via `system("...")` or a pipe (`print ... | "cmd"`),
-the command's **stdout** goes to the main output sink, and its **stderr** is merged
-into the main output by default. This means `execute()` captures both stdout and
-stderr of subprocesses.
+the command's **stdout** is pumped into the sink's `PrintStream` returned by
+`getPrintStream()`. The built-in `OutputStreamAwkSink` and `AppendableAwkSink` both
+override this method, so subprocess stdout is captured alongside normal output. For a
+custom `AwkSink` that does _not_ override `getPrintStream()`, subprocess stdout is
+silently discarded (the default no-op stream); override `getPrintStream()` or call
+`errorStream(...)` / provide a sink that returns a real stream to capture it.
 
-To send subprocess stderr to a separate stream, use `errorStream(PrintStream)`:
+Subprocess **stderr** defaults to the sink's `PrintStream` as well. To redirect it to
+a separate stream, use `errorStream(PrintStream)`:
 
 ```java
 awk.script("BEGIN { system(\"mycommand\") }")

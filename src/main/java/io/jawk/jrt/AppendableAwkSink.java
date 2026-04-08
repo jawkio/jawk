@@ -34,10 +34,17 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 /**
  * Text {@link AwkSink} backed by an {@link Appendable}.
+ * <p>
+ * All writes to the underlying {@link Appendable} are synchronized on a shared
+ * lock so that concurrent access from the main AWK thread ({@code print}/
+ * {@code printf}) and background {@link io.jawk.jrt.DataPump} threads
+ * ({@link #getPrintStream()}) cannot corrupt the output.
+ * </p>
  */
 public final class AppendableAwkSink extends AwkSink {
 
 	private final Appendable appendable;
+	private final Object lock = new Object();
 	private final PrintStream printStream;
 
 	/**
@@ -60,7 +67,7 @@ public final class AppendableAwkSink extends AwkSink {
 		this.appendable = Objects.requireNonNull(appendableParam, "appendable");
 		try {
 			this.printStream = new PrintStream(
-					new AppendableOutputStream(appendable),
+					new AppendableOutputStream(appendable, lock),
 					false,
 					StandardCharsets.UTF_8.name());
 		} catch (java.io.UnsupportedEncodingException e) {
@@ -70,26 +77,32 @@ public final class AppendableAwkSink extends AwkSink {
 
 	@Override
 	public void print(String ofs, String ors, String ofmt, Object... values) throws IOException {
-		for (int i = 0; i < values.length; i++) {
-			appendable.append(formatPrintArgument(values[i], ofmt));
-			if (i < values.length - 1) {
-				appendable.append(ofs);
+		synchronized (lock) {
+			for (int i = 0; i < values.length; i++) {
+				appendable.append(formatPrintArgument(values[i], ofmt));
+				if (i < values.length - 1) {
+					appendable.append(ofs);
+				}
 			}
+			appendable.append(ors);
 		}
-		appendable.append(ors);
 	}
 
 	@Override
 	public void printf(String ofs, String ors, String ofmt, String format, Object... values)
 			throws IOException {
-		appendable.append(formatPrintfResult(format, values));
+		synchronized (lock) {
+			appendable.append(formatPrintfResult(format, values));
+		}
 	}
 
 	@Override
 	public void flush() throws IOException {
-		printStream.flush();
-		if (appendable instanceof Flushable) {
-			((Flushable) appendable).flush();
+		synchronized (lock) {
+			printStream.flush();
+			if (appendable instanceof Flushable) {
+				((Flushable) appendable).flush();
+			}
 		}
 	}
 
@@ -102,27 +115,35 @@ public final class AppendableAwkSink extends AwkSink {
 	private static final class AppendableOutputStream extends OutputStream {
 
 		private final Appendable appendable;
+		private final Object lock;
 		private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 
-		private AppendableOutputStream(Appendable appendableParam) {
+		private AppendableOutputStream(Appendable appendableParam, Object lockParam) {
 			this.appendable = appendableParam;
+			this.lock = lockParam;
 		}
 
 		@Override
 		public void write(int value) {
-			buffer.write(value);
+			synchronized (lock) {
+				buffer.write(value);
+			}
 		}
 
 		@Override
 		public void write(byte[] bytes, int off, int len) {
-			buffer.write(bytes, off, len);
+			synchronized (lock) {
+				buffer.write(bytes, off, len);
+			}
 		}
 
 		@Override
 		public void flush() throws IOException {
-			if (buffer.size() > 0) {
-				appendable.append(buffer.toString(StandardCharsets.UTF_8.name()));
-				buffer.reset();
+			synchronized (lock) {
+				if (buffer.size() > 0) {
+					appendable.append(buffer.toString(StandardCharsets.UTF_8.name()));
+					buffer.reset();
+				}
 			}
 		}
 

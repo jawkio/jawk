@@ -834,8 +834,17 @@ public class AwkTest {
 
 	@Test
 	public void compileRejectsEmptyParenthesizedPrintStatements() {
-		assertThrows(ParserException.class, () -> AWK.compile("BEGIN { print() }"));
-		assertThrows(ParserException.class, () -> AWK.compile("BEGIN { printf() }"));
+		RuntimeException printEx = assertThrows(RuntimeException.class, () -> AWK.compile("BEGIN { print() }"));
+		assertTrue(printEx.getMessage(), printEx.getMessage().contains("print() requires at least 1 argument"));
+
+		RuntimeException printfEx = assertThrows(RuntimeException.class, () -> AWK.compile("BEGIN { printf() }"));
+		assertTrue(printfEx.getMessage(), printfEx.getMessage().contains("printf requires at least 1 argument"));
+	}
+
+	@Test
+	public void compileRejectsPrintfWithoutArguments() {
+		RuntimeException ex = assertThrows(RuntimeException.class, () -> AWK.compile("BEGIN { printf }"));
+		assertTrue(ex.getMessage(), ex.getMessage().contains("printf requires at least 1 argument"));
 	}
 
 	/**

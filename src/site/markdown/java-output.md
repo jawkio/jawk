@@ -5,7 +5,7 @@ description: Control where Jawk sends output, from simple streams to fully custo
 
 <!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
 
-Output is specified per-call on the builder, not in `AwkSettings`. Every `execute(...)` overload lets you direct output to a stream, an `Appendable`, a custom [`AwkSink`](apidocs/io/jawk/jrt/AwkSink.html), or back as a `String`.
+Output is specified per-call on the builder, to capture `print()` and `printf(...)` output in a stream, an `Appendable`, a custom [`AwkSink`](apidocs/io/jawk/jrt/AwkSink.html), or simply as a `String`.
 
 ## Capture as a String
 
@@ -19,7 +19,7 @@ String result = awk.script("BEGIN { print \"hello\" }").execute();
 
 ## Redirect to a Stream
 
-Pass an `OutputStream` to `execute(...)`:
+Pass an `OutputStream` or `PrintStream` to `execute(...)`:
 
 ```java
 Awk awk = new Awk();
@@ -41,25 +41,6 @@ Awk awk = new Awk();
 StringBuilder output = new StringBuilder();
 awk.script("BEGIN { print \"captured\" }").execute(output);
 // output.toString() == "captured\n"
-```
-
-## Per-Call Output
-
-Each builder invocation specifies its own output destination. This lets you direct different executions of the same program to different targets without any shared mutable state:
-
-```java
-Awk awk = new Awk();
-AwkProgram program = awk.compile("{ print $1 }");
-
-StringBuilder first = new StringBuilder();
-awk.script(program)
-        .input("alpha beta\n")
-        .execute(first);
-
-StringBuilder second = new StringBuilder();
-awk.script(program)
-        .input("gamma delta\n")
-        .execute(second);
 ```
 
 ## Custom Output with AwkSink
@@ -100,7 +81,7 @@ public final class CollectingSink extends AwkSink {
 }
 ```
 
-### Sink Parameters
+### Sink `print` and `printf` Parameters
 
 > [!TABS]
 > * `print(...)`
@@ -145,15 +126,48 @@ awk.script("{ print $1, $2 }")
 
 Jawk provides two built-in `AwkSink` implementations:
 
-- **`AwkSink.from(PrintStream, Locale)`** creates a sink that renders output to a `PrintStream`. This is the default behavior.
-- **`AppendableAwkSink`** renders output to any `Appendable` such as `StringBuilder` or `StringWriter`.
+- **`AwkSink.from(PrintStream)`** / **`AwkSink.from(PrintStream, Locale)`** creates a sink that renders output to a `PrintStream`. This is the default behavior.
+- **`AwkSink.from(Appendable)`** / **`AwkSink.from(Appendable, Locale)`** renders output to any `Appendable` such as `StringBuilder` or `StringWriter`.
 
-### Locale in AwkSink
+The overloads without a `Locale` parameter default to `Locale.US`.
 
-The numeric locale is fixed when you construct the sink. It controls how AWK formats numbers in `print` and `printf` output. Pass the locale to the `AwkSink` constructor:
+## Numeric Locale
+
+The locale controls how AWK formats numbers in `print` and `printf` output (e.g. decimal separator). The default is `Locale.US`.
+
+### With the Builder
+
+When you use the `AwkRunBuilder` methods (`execute()`, `execute(OutputStream)`, `execute(Appendable)`),
+the locale is taken automatically from `AwkSettings`. Set it once on the `Awk` instance:
+
+```java
+Awk awk = new Awk();
+awk.getSettings().setLocale(Locale.FRANCE);
+
+// All execute() variants use the French locale for number formatting
+String result = awk.script("BEGIN { print 3.14 }").execute();
+// result == "3,14\n"
+```
+
+### With a Custom AwkSink
+
+When you pass an `AwkSink` to `execute(AwkSink)`, the sink carries its own locale — `AwkSettings` is not involved.
+Specify the locale when constructing the sink:
 
 ```java
 AwkSink frenchSink = AwkSink.from(System.out, Locale.FRANCE);
+awk.script("BEGIN { print 3.14 }").execute(frenchSink);
+```
+
+When extending `AwkSink` directly, pass the locale to the `super(...)` constructor:
+
+```java
+public class MySink extends AwkSink {
+    public MySink(Locale locale) {
+        super(locale);
+    }
+    // ...
+}
 ```
 
 ## Choosing the Right Output Strategy

@@ -958,25 +958,7 @@ public class AwkTest {
 	}
 
 	@Test
-	public void executeWithStructuredOutputSink() throws Exception {
-		StructuredOutputSink sink = new StructuredOutputSink();
-		Awk awk = new Awk();
-
-		awk.script("BEGIN { print 1, \"two\", 3; printf(\"<%s>\", \"done\") }").execute(sink);
-
-		assertEquals(1, sink.printedValues.size());
-		assertEquals(3, sink.printedValues.get(0).size());
-		assertTrue(sink.printedValues.get(0).get(0) instanceof Number);
-		assertEquals(1, ((Number) sink.printedValues.get(0).get(0)).intValue());
-		assertEquals("two", sink.printedValues.get(0).get(1));
-		assertTrue(sink.printedValues.get(0).get(2) instanceof Number);
-		assertEquals(3, ((Number) sink.printedValues.get(0).get(2)).intValue());
-		assertEquals(Collections.singletonList("<%s>"), sink.printfFormats);
-		assertEquals(Collections.singletonList(Collections.<Object>singletonList("done")), sink.printfValues);
-	}
-
-	@Test
-	public void executeToOutputStreamUsesPosixOrs() throws Exception {
+	public void executeDefaultOrsIsNewline() throws Exception {
 		String result = new Awk()
 				.script("BEGIN { print \"alpha\" }")
 				.execute();

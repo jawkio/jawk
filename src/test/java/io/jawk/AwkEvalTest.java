@@ -438,7 +438,7 @@ public class AwkEvalTest {
 			assertEquals(1, avm.eval(expression, new SingleRecordInputSource("a")));
 			assertEquals(2, avm.getPrepareForExecutionCount());
 		}
-		assertEquals(3, avm.getCloseAllCount());
+		assertEquals(5, avm.getCloseAllCount());
 	}
 
 	@Test
@@ -452,7 +452,7 @@ public class AwkEvalTest {
 			assertEquals("2:right", avm.eval(expression, new SingleRecordInputSource("left right")));
 			assertEquals(2, avm.getPrepareForExecutionCount());
 		}
-		assertEquals(3, avm.getCloseAllCount());
+		assertEquals(5, avm.getCloseAllCount());
 	}
 
 	@Test

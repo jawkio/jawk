@@ -302,6 +302,9 @@ public class JRT {
 	 * @param defaultRs default record separator
 	 */
 	public void prepareForExecution(String defaultFs, String defaultRs) {
+		// Close any previously opened IO resources before resetting state.
+		jrtCloseAll();
+
 		// Clear per-execution state (IO handles, counters, input state).
 		ioState = null;
 		inputLine = null;

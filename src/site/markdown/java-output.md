@@ -189,11 +189,12 @@ the command's **stdout** is pumped into the sink's `PrintStream` returned by
 `getPrintStream()`. The built-in `OutputStreamAwkSink` and `AppendableAwkSink` both
 override this method, so subprocess stdout is captured alongside normal output. For a
 custom `AwkSink` that does _not_ override `getPrintStream()`, subprocess stdout is
-silently discarded (the default no-op stream); override `getPrintStream()` or call
-`errorStream(...)` / provide a sink that returns a real stream to capture it.
+silently discarded (the default no-op stream). To capture subprocess stdout, override
+`getPrintStream()` in your sink so it returns a real stream.
 
 Subprocess **stderr** defaults to the sink's `PrintStream` as well. To redirect it to
-a separate stream, use `errorStream(PrintStream)`:
+a separate stream, use `errorStream(PrintStream)` (this only affects **stderr**, not
+stdout):
 
 ```java
 awk.script("BEGIN { system(\"mycommand\") }")

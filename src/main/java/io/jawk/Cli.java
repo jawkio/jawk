@@ -102,7 +102,7 @@ public final class Cli {
 	public Cli(InputStream in, PrintStream out, PrintStream err) {
 		this.out = out;
 		this.inputStream = in;
-		this.err = err;
+		this.err = err != null ? err : System.err;
 	}
 
 	/**

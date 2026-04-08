@@ -98,9 +98,9 @@ public final class AppendableAwkSink extends AwkSink {
 
 	@Override
 	public void flush() throws IOException {
-		synchronized (lock) {
-			printStream.flush();
-			if (appendable instanceof Flushable) {
+		printStream.flush();
+		if (appendable instanceof Flushable) {
+			synchronized (lock) {
 				((Flushable) appendable).flush();
 			}
 		}

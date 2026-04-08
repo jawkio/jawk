@@ -11,7 +11,7 @@ Jawk separates compilation from execution. That gives you a small convenience AP
 | --- | --- | --- |
 | One expression, one call | `eval(String...)` | Smallest API surface |
 | One expression, many records | `AwkExpression` + `eval(...)` | Pay the compile cost once |
-| One full script, many runs | `AwkProgram` + `run(...)` | Reuse the compiled program |
+| One full script, many runs | `AwkProgram` + `script(program).execute(...)` | Reuse the compiled program |
 | One record, many expressions | `AVM.prepareForEval(...)` + `eval(...)` | Bind the record once |
 
 ## Simple Expression Evaluation
@@ -70,7 +70,7 @@ This keeps compilation and execution separate, which is useful when the same AWK
 
 - Use `eval(String...)` when the expression is cheap and called only occasionally.
 - Use `AwkExpression` plus `eval(...)` when one expression is reused across many records.
-- Use `AwkProgram` plus `run(program).execute()` when a whole AWK program is reused.
+- Use `AwkProgram` plus `script(program).execute(...)` when a whole AWK program is reused.
 - Use `AVM` when you want to keep one runtime alive across several calls. See the [Advanced Runtime](java-advanced.html) guide for AVM-level reuse patterns.
 
 ## See Also

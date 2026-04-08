@@ -68,6 +68,7 @@ public final class Cli {
 
 	private final AwkSettings settings = new AwkSettings();
 	private final PrintStream out;
+	private final PrintStream err;
 	private final InputStream inputStream;
 	private final List<String> nameValueOrFileNames = new ArrayList<String>();
 
@@ -91,17 +92,17 @@ public final class Cli {
 	}
 
 	/**
-	 * Creates a CLI instance using the supplied streams. The error stream is
-	 * currently unused but kept for API symmetry with typical Java main methods.
+	 * Creates a CLI instance using the supplied streams.
 	 *
 	 * @param in stream from which program input is read
 	 * @param out stream where program output is written
 	 * @param err stream where error messages could be written
 	 */
 	@SuppressFBWarnings("EI_EXPOSE_REP2")
-	public Cli(InputStream in, PrintStream out, @SuppressWarnings("unused") PrintStream err) {
+	public Cli(InputStream in, PrintStream out, PrintStream err) {
 		this.out = out;
 		this.inputStream = in;
+		this.err = err;
 	}
 
 	/**
@@ -388,7 +389,7 @@ public final class Cli {
 			return;
 		}
 		// Finally run the compiled program with the input and arguments.
-		awk.script(program).input(inputStream).arguments(nameValueOrFileNames).errorStream(System.err).execute(out);
+		awk.script(program).input(inputStream).arguments(nameValueOrFileNames).errorStream(err).execute(out);
 	}
 
 	/**
@@ -404,14 +405,13 @@ public final class Cli {
 								JAR_NAME +
 								" [-F fs_val]" +
 								" [-f script-filename]" +
-								" [-L tuples-filename]" +
-								" [-K tuples-filename]" +
+								" [-L program-filename]" +
+								" [-K program-filename]" +
 								" [-o output-filename]" +
 								" [-S|--sandbox]" +
 								" [--dump-syntax]" +
 								" [--dump-intermediate]" +
 								" [-s|--no-optimize]" +
-								" [-r]" +
 								" [--locale locale]" +
 								" [-t]" +
 								" [-l extension]..." +
@@ -423,14 +423,14 @@ public final class Cli {
 		dest.println();
 		dest.println(" -F fs_val = Use fs_val for FS.");
 		dest.println(" -f filename = Use contents of filename for script.");
-		dest.println(" -L filename = Load precompiled tuples from filename.");
+		dest.println(" -L filename = Load precompiled program from filename.");
 		dest.println(" -l extension = Load an extension by extension name or class name.");
 		dest.println(" --load extension = Same as -l.");
 		dest.println("                      Extensions must already be on the class path before loading them.");
 		dest.println(" -v name=val = Initial awk variable assignments.");
 		dest.println();
 		dest.println(" -t = (extension) Maintain array keys in sorted order.");
-		dest.println(" -K filename = Compile to tuples file and halt.");
+		dest.println(" -K filename = Compile to program file and halt.");
 		dest.println(" -o = (extension) Specify output file.");
 		dest
 				.println(
@@ -438,7 +438,7 @@ public final class Cli {
 								+ " dynamic extensions).");
 		dest.println(" --dump-syntax = Print the syntax tree.");
 		dest.println(" --dump-intermediate = Print the intermediate code.");
-		dest.println(" -s, --no-optimize = (extension) Disable tuple queue optimizations during compilation.");
+		dest.println(" -s, --no-optimize = (extension) Disable optimizations during compilation.");
 		dest.println(" --locale Locale = (extension) Specify a locale to be used instead of US-English");
 		dest.println(" --list-ext = (extension) List available extensions.");
 		dest.println();

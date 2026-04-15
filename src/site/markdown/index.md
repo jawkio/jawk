@@ -47,7 +47,7 @@ Jawk fits well when you want AWK's text-processing model but need it to live ins
 - If you need dependencies or the standalone jar, go to the [installation guide](install.html).
 - If you want to control where output goes, see [custom output](java-output.html).
 - If you want extension loading or authoring, use [loading extensions](extensions.html) and [writing extensions](extensions-writing.html).
-- If you need tuple reuse, expression evaluation, or structured input, continue with [structured input and variables](java-input.html), [compile, eval, and reuse](java-compile.html), and [advanced runtime](java-advanced.html).
+- If you need tuple reuse, expression evaluation, or structured input, continue with [variables and arguments](java-variables.html), [structured input](java-input.html), [compile, eval, and reuse](java-compile.html), and [advanced runtime](java-advanced.html).
 - If you are comparing Jawk with other AWKs, see [compatibility and differences](compatibility.html).
 
 ## Key Capabilities
@@ -73,6 +73,7 @@ Likewise, `SandboxedAwk` and the CLI `-S` option deliberately restrict dangerous
 - [Install Jawk](install.html)
 - [Learn the CLI](cli.html)
 - [Embed Jawk in Java](java.html)
-- [Work with structured input and variables](java-input.html)
+- [Work with variables and arguments](java-variables.html)
+- [Work with structured input](java-input.html)
 - [Compile, evaluate, and reuse tuples](java-compile.html)
 - [Load or write extensions](extensions.html)

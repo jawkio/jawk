@@ -76,7 +76,8 @@ This keeps compilation and execution separate, which is useful when the same AWK
 ## See Also
 
 - [Java Quickstart](java.html)
-- [Structured Input and Variables](java-input.html)
+- [Variables and Arguments](java-variables.html)
+- [Structured Input](java-input.html)
 - [Custom Output](java-output.html)
 - [Advanced Runtime](java-advanced.html)
 

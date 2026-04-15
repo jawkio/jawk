@@ -139,6 +139,7 @@ The compiled `AwkProgram` is shared safely because it is immutable; each thread 
 
 - [Java Quickstart](java.html)
 - [Custom Output](java-output.html)
-- [Structured Input and Variables](java-input.html)
+- [Variables and Arguments](java-variables.html)
+- [Structured Input](java-input.html)
 - [Compile, Eval, and Reuse](java-compile.html)
 

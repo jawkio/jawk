@@ -58,17 +58,18 @@
 			<item name="Installation" href="install.html" />
 		</menu>
 
-		<menu name="CLI">
-			<item name="CLI Basics" href="cli.html" />
-			<item name="CLI Reference" href="cli-reference.html" />
-		</menu>
-
-		<menu name="Java">
+		<menu name="Jawk Java API">
 			<item name="Jawk Quickstart" href="java.html" />
+			<item name="Structured Input" href="java-input.html" />
+			<item name="Variables and Arguments" href="java-variables.html" />
 			<item name="Custom Output" href="java-output.html" />
-			<item name="Structured Input and Variables" href="java-input.html" />
 			<item name="Compile, Eval, and Reuse" href="java-compile.html" />
 			<item name="Advanced Runtime" href="java-advanced.html" />
+		</menu>
+
+		<menu name="Jawk CLI">
+			<item name="CLI Basics" href="cli.html" />
+			<item name="CLI Reference" href="cli-reference.html" />
 		</menu>
 
 		<menu name="Extensions">

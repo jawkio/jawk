@@ -5,19 +5,29 @@ description: Install Jawk from Maven Central or run the standalone jar.
 
 Jawk can be added as a normal Maven dependency or used as a standalone jar for CLI execution.
 
-## Maven Dependency
+## Project Dependency
 
 Add Jawk to your project:
 
-```xml
-<dependency>
-  <groupId>jawk.io</groupId>
-  <artifactId>jawk</artifactId>
-  <version>${project.version}</version>
-</dependency>
-```
+> [!TABS]
+> * Maven
+>   ```xml
+>   <dependency>
+>     <groupId>jawk.io</groupId>
+>     <artifactId>jawk</artifactId>
+>     <version>${project.version}</version>
+>   </dependency>
+>   ```
+> * Gradle (Groovy)
+>   ```groovy
+>   implementation 'jawk.io:jawk:${project.version}'
+>   ```
+> * Gradle (Kotlin)
+>   ```kotlin
+>   implementation("jawk.io:jawk:${project.version}")
+>   ```
 
-Jawk artifacts are published on Maven Central, so standard Maven and Gradle builds can resolve them automatically.
+Jawk artifacts are published on Maven Central, so standard Maven and Gradle builds can resolve them automatically. For other build tools (Ivy, SBT, Leiningen, etc.), see the [dependency information](dependency-info.html) page.
 
 ## Standalone Jar
 

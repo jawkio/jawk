@@ -208,6 +208,7 @@ console rather than mixing with normal output.
 ## See Also
 
 - [Java Quickstart](java.html)
-- [Structured Input and Variables](java-input.html)
+- [Variables and Arguments](java-variables.html)
+- [Structured Input](java-input.html)
 - [Advanced Runtime](java-advanced.html)
 - [AwkSink Javadoc](apidocs/io/jawk/jrt/AwkSink.html)

@@ -28,6 +28,20 @@ settings.setFieldSeparator(",");
 Awk awk = new Awk(settings);
 ```
 
+### AwkSettings Reference
+
+| Setter | Default | Description |
+| --- | --- | --- |
+| `setFieldSeparator(String)` | `null` (default AWK FS) | The initial value of `FS`, the field separator |
+| `setLocale(Locale)` | `Locale.US` | Locale for numeric output formatting |
+| `setDefaultRS(String)` | Platform line separator | Default value for `RS`, the record separator  |
+| `setUseSortedArrayKeys(boolean)` | `false` | Whether to keep associative array keys in sorted order |
+| `putVariable(String, Object)` | Empty map | Pre-set variables available before `BEGIN` |
+
+Output destination is specified per-call on the builder (`execute()`, `execute(PrintStream)`, `execute(OutputStream)`, `execute(Appendable)`, or `execute(AwkSink)`). See the [Custom Output](java-output.html) guide for details.
+
+For more on passing variables to scripts, see [Variables and Arguments](java-variables.html).
+
 Construct it with extension instances when you want those functions available to the script:
 
 ```java
@@ -146,15 +160,15 @@ public class JawkDemo {
 ## See Also
 
 - [Custom Output](java-output.html)
-- [Structured Input and Variables](java-input.html)
+- [Variables and Arguments](java-variables.html)
+- [Structured Input](java-input.html)
 - [Compile, Eval, and Reuse](java-compile.html)
 - [Advanced Runtime](java-advanced.html)
 - [Using Extensions](extensions.html)
 
 ## Next Steps
 
-- [Structured input and variables](java-input.html)
+- [Variables and arguments](java-variables.html)
+- [Structured input](java-input.html)
 - [Compile, eval, and reuse](java-compile.html)
 - [Advanced runtime, AVM, sandboxing, and JSR 223](java-advanced.html)
-
-

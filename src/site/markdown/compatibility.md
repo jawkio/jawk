@@ -32,6 +32,7 @@ This maintained fork diverges from the original project in several practical way
 - the Maven coordinates are `jawk.io:jawk` and the package root is `io.jawk`
 - gawk and bwk compatibility test suites have been added
 - the Maven artifact is published under the LGPL
+- operator precedence is fixed and follows POSIX specifications
 
 ## Java Regular Expressions
 
@@ -42,18 +43,6 @@ In practice, this usually means:
 - some AWK regex edge cases behave differently
 - Java regex features may be available where traditional AWK would differ
 - portability between Jawk and non-Java AWKs should be tested when regex behavior is critical
-
-## printf and java.util.Formatter
-
-`printf` and `sprintf` rely on `java.util.Formatter`, not the C formatter used by traditional AWK implementations.
-
-This matters because:
-
-- format handling follows Java rules
-- Java does not automatically coerce every value the same way C does
-- incompatible format/value combinations can raise `IllegalFormatException`
-
-The CLI `-r` option disables Jawk's default trapping of those format exceptions.
 
 ## Compile-Time Function Resolution
 

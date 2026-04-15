@@ -23,7 +23,6 @@ package io.jawk;
  */
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -31,6 +30,7 @@ import java.io.PrintStream;
 import java.io.Reader;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -45,8 +45,10 @@ import io.jawk.ext.ExtensionRegistry;
 import io.jawk.ext.JawkExtension;
 import io.jawk.frontend.AwkParser;
 import io.jawk.frontend.AstNode;
-import io.jawk.intermediate.AwkTuples;
+import io.jawk.jrt.AppendableAwkSink;
+import io.jawk.jrt.AwkSink;
 import io.jawk.jrt.InputSource;
+import io.jawk.jrt.OutputStreamAwkSink;
 import io.jawk.jrt.StreamInputSource;
 import io.jawk.util.AwkSettings;
 import io.jawk.util.ScriptSource;
@@ -80,6 +82,27 @@ import io.jawk.util.ScriptSource;
  * @author Danny Daglas
  */
 public class Awk {
+
+	/** POSIX default field separator ({@code " "}). */
+	public static final String DEFAULT_FS = " ";
+
+	/** POSIX default record separator ({@code "\n"}). */
+	public static final String DEFAULT_RS = "\n";
+
+	/** POSIX default output field separator ({@code " "}). */
+	public static final String DEFAULT_OFS = " ";
+
+	/** POSIX default output record separator ({@code "\n"}). */
+	public static final String DEFAULT_ORS = "\n";
+
+	/** POSIX default number-to-string conversion format ({@code "%.6g"}). */
+	public static final String DEFAULT_CONVFMT = "%.6g";
+
+	/** POSIX default output number format ({@code "%.6g"}). */
+	public static final String DEFAULT_OFMT = "%.6g";
+
+	/** POSIX default subscript separator ({@code "\034"}). */
+	public static final String DEFAULT_SUBSEP = String.valueOf((char) 28);
 
 	private final Map<String, ExtensionFunction> extensionFunctions;
 
@@ -238,7 +261,7 @@ public class Awk {
 	}
 
 	/**
-	 * Returns the last parsed AST produced by {@link #compile(List)}.
+	 * Returns the last parsed AST produced by the most recent program compilation.
 	 *
 	 * @return the last {@link AstNode}, or {@code null} if no compilation occurred
 	 */
@@ -257,265 +280,130 @@ public class Awk {
 	protected final void finalize() { /* no-op */ }
 
 	/**
-	 * Compiles and invokes a single {@link ScriptSource} using the given
-	 * {@link InputSource}.
+	 * Compiles a full AWK program.
 	 *
-	 * @param script script source to compile and run
-	 * @param inputSource the input source providing records
-	 * @throws IOException if an I/O error occurs during compilation or
-	 *         execution
-	 * @throws ClassNotFoundException if intermediate code cannot be loaded
-	 * @throws ExitException if the script terminates with a non-zero exit code
+	 * @param script AWK program source
+	 * @return compiled immutable program
+	 * @throws IOException if compilation fails
 	 */
-	public void invoke(ScriptSource script, InputSource inputSource)
-			throws IOException,
-			ClassNotFoundException,
-			ExitException {
-		AwkTuples tuples = compile(Collections.singletonList(script));
-		invoke(tuples, inputSource, Collections.emptyList(), null);
-	}
-
-	/**
-	 * Compiles and invokes a single {@link ScriptSource} reading input from the
-	 * supplied {@link InputStream}.
-	 *
-	 * @param script script source to compile and run
-	 * @param inputStream the input stream to read from
-	 * @throws IOException if an I/O error occurs during compilation or execution
-	 * @throws ClassNotFoundException if intermediate code cannot be loaded
-	 * @throws ExitException if the script terminates with a non-zero exit code
-	 */
-	public void invoke(ScriptSource script, InputStream inputStream)
-			throws IOException,
-			ClassNotFoundException,
-			ExitException {
-		AwkTuples tuples = compile(Collections.singletonList(script));
-		invoke(tuples, inputStream, Collections.emptyList(), null);
-	}
-
-	/**
-	 * Interprets precompiled {@link AwkTuples} using the supplied
-	 * {@link InputSource}, command-line arguments, and per-call variable
-	 * overrides.
-	 *
-	 * @param tuples precompiled tuples to interpret
-	 * @param inputSource the input source providing records
-	 * @param arguments name=value or filename entries (ARGV)
-	 * @param variableOverrides additional variable assignments applied on top of
-	 *        the settings-level variables (may be {@code null})
-	 * @throws IOException upon an IO error
-	 * @throws ExitException if the script terminates with a non-zero exit code
-	 */
-	public void invoke(
-			AwkTuples tuples,
-			InputSource inputSource,
-			List<String> arguments,
-			Map<String, Object> variableOverrides)
-			throws IOException,
-			ExitException {
-		if (tuples == null) {
-			return;
-		}
-		Objects.requireNonNull(inputSource, "inputSource");
-
-		try (AVM avm = createAvm()) {
-			avm.interpret(tuples, inputSource, arguments, variableOverrides);
-		}
-	}
-
-	/**
-	 * Interprets precompiled {@link AwkTuples} reading input from the supplied
-	 * {@link InputStream}. The stream is automatically wrapped in a
-	 * {@link StreamInputSource} that provides standard AWK file-list traversal.
-	 *
-	 * @param tuples precompiled tuples to interpret
-	 * @param inputStream the input stream to read from
-	 * @param arguments name=value or filename entries (ARGV)
-	 * @throws IOException upon an IO error
-	 * @throws ExitException if the script terminates with a non-zero exit code
-	 */
-	public void invoke(AwkTuples tuples, InputStream inputStream, List<String> arguments)
-			throws IOException,
-			ExitException {
-		invoke(tuples, inputStream, arguments, null);
-	}
-
-	/**
-	 * Interprets precompiled {@link AwkTuples} reading input from the supplied
-	 * {@link InputStream}, with per-call variable overrides. The stream is
-	 * automatically wrapped in a {@link StreamInputSource} that provides
-	 * standard AWK file-list traversal.
-	 *
-	 * @param tuples precompiled tuples to interpret
-	 * @param inputStream the input stream to read from (must not be {@code null};
-	 *        pass {@code System.in} for standard input or
-	 *        {@code new ByteArrayInputStream(new byte[0])} for no input)
-	 * @param arguments name=value or filename entries (ARGV)
-	 * @param variableOverrides additional variable assignments (may be {@code null})
-	 * @throws IOException upon an IO error
-	 * @throws ExitException if the script terminates with a non-zero exit code
-	 */
-	public void invoke(
-			AwkTuples tuples,
-			InputStream inputStream,
-			List<String> arguments,
-			Map<String, Object> variableOverrides)
-			throws IOException,
-			ExitException {
-		if (tuples == null) {
-			return;
-		}
-
-		Objects.requireNonNull(inputStream, "inputStream");
-
-		try (AVM avm = createAvm()) {
-			InputSource source = new StreamInputSource(inputStream, avm, avm.getJrt());
-			avm.interpret(tuples, source, arguments, variableOverrides);
-		}
-	}
-
-	/**
-	 * Executes the specified AWK script against the given input and returns the
-	 * printed output as a {@link String}.
-	 *
-	 * @param script AWK script to execute
-	 * @param input text to process
-	 * @return result of the execution as a String
-	 * @throws IOException if an I/O error occurs
-	 * @throws ClassNotFoundException if intermediate code cannot be loaded
-	 * @throws ExitException if the script terminates with a non-zero exit code
-	 */
-	public String run(String script, String input)
-			throws IOException,
-			ClassNotFoundException,
-			ExitException {
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		run(script, input, out);
-		return out.toString(StandardCharsets.UTF_8.name());
-	}
-
-	/**
-	 * Executes the specified AWK script against the given input and writes the
-	 * result to the provided {@link OutputStream}.
-	 *
-	 * @param script AWK script to execute
-	 * @param input text to process
-	 * @param output destination for the printed output
-	 * @throws IOException if an I/O error occurs
-	 * @throws ClassNotFoundException if intermediate code cannot be loaded
-	 * @throws ExitException if the script terminates with a non-zero exit code
-	 */
-	public void run(String script, String input, OutputStream output)
-			throws IOException,
-			ClassNotFoundException,
-			ExitException {
-		run(new StringReader(script), toInputStream(input), output, true);
-	}
-
-	/**
-	 * Executes the specified AWK script against the provided input stream and
-	 * returns the printed output as a {@link String}.
-	 *
-	 * @param script AWK script to execute
-	 * @param input stream to process
-	 * @return result of the execution as a String
-	 * @throws IOException if an I/O error occurs
-	 * @throws ClassNotFoundException if intermediate code cannot be loaded
-	 * @throws ExitException if the script terminates with a non-zero exit code
-	 */
-	public String run(String script, InputStream input)
-			throws IOException,
-			ClassNotFoundException,
-			ExitException {
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		run(script, input, out);
-		return out.toString(StandardCharsets.UTF_8.name());
-	}
-
-	/**
-	 * Executes the specified AWK script against the provided input stream and
-	 * writes the result to the given {@link OutputStream}.
-	 *
-	 * @param script AWK script to execute
-	 * @param input stream to process
-	 * @param output destination for the printed output
-	 * @throws IOException if an I/O error occurs
-	 * @throws ClassNotFoundException if intermediate code cannot be loaded
-	 * @throws ExitException if the script terminates with a non-zero exit code
-	 */
-	public void run(String script, InputStream input, OutputStream output)
-			throws IOException,
-			ClassNotFoundException,
-			ExitException {
-		run(new StringReader(script), input, output, false);
-	}
-
-	/**
-	 * Internal method that creates an input source from the stream and executes
-	 * the AWK script.
-	 */
-	private void run(
-			Reader scriptReader,
-			InputStream inputStream,
-			OutputStream outputStream,
-			boolean textInput)
-			throws IOException,
-			ClassNotFoundException,
-			ExitException {
-
-		InputStream effectiveInput = inputStream != null ? inputStream : new ByteArrayInputStream(new byte[0]);
-
-		AwkSettings runSettings = new AwkSettings();
-		if (textInput) {
-			runSettings.setDefaultRS("\n");
-			runSettings.setDefaultORS("\n");
-		}
-		runSettings
-				.setOutputStream(
-						new PrintStream(
-								outputStream,
-								false,
-								StandardCharsets.UTF_8.name()));
-
-		ScriptSource script = new ScriptSource(
-				ScriptSource.DESCRIPTION_COMMAND_LINE_SCRIPT,
-				scriptReader);
-
-		// Use a temporary Awk instance with the run-specific settings
-		// while keeping the same extensions
-		Awk runAwk = new Awk(new ExtensionSetup(this.extensionFunctions, this.extensionInstances), runSettings);
-		AwkTuples tuples = runAwk.compile(Collections.singletonList(script));
-		try {
-			runAwk.invoke(tuples, effectiveInput, Collections.emptyList());
-		} catch (ExitException e) {
-			if (e.getCode() != 0) {
-				throw e;
-			}
-		}
-	}
-
-	/**
-	 * Compiles the specified AWK script and returns the intermediate representation
-	 * as {@link AwkTuples}.
-	 *
-	 * @param script AWK script to compile
-	 * @return compiled {@link AwkTuples}
-	 * @throws IOException if an I/O error occurs during compilation
-	 */
-	public AwkTuples compile(String script) throws IOException {
+	public AwkProgram compile(String script) throws IOException {
 		return compile(script, false);
 	}
 
 	/**
-	 * Compiles the specified AWK script and returns the intermediate representation
-	 * as {@link AwkTuples}.
+	 * Compiles a full AWK program.
+	 *
+	 * @param script AWK program source
+	 * @return compiled immutable program
+	 * @throws IOException if compilation fails
+	 */
+	public AwkProgram compile(Reader script) throws IOException {
+		return compile(script, false);
+	}
+
+	/**
+	 * Creates a reusable runtime backed by one {@link AVM} instance.
+	 *
+	 * @return reusable AVM
+	 */
+	public AVM createAvm() {
+		return createAvm(this.settings);
+	}
+
+	/**
+	 * Starts building a run request for a compiled AWK program.
+	 * <p>
+	 * Use the returned {@link AwkRunBuilder} to configure input, arguments,
+	 * variables, and output, then call one of the terminal methods to execute.
+	 * </p>
+	 *
+	 * <pre>{@code
+	 * awk.script(program).input(stream).execute(mySink);
+	 * String out = awk.script(program).input("hello").execute();
+	 * }</pre>
+	 *
+	 * @param program compiled program to execute
+	 * @return a builder for configuring and executing the run
+	 */
+	public AwkRunBuilder script(AwkProgram program) {
+		return new AwkRunBuilder(Objects.requireNonNull(program, "program"));
+	}
+
+	/**
+	 * Starts building a run request from an AWK script string.
+	 * <p>
+	 * The script is compiled and executed when a terminal method is called.
+	 * Additional scripts can be appended by calling {@link AwkRunBuilder#script(String)}
+	 * on the returned builder.
+	 * </p>
+	 *
+	 * <pre>{@code
+	 * String result = awk.script("{ print toupper($0) }").input("hello").execute();
+	 * }</pre>
+	 *
+	 * @param scriptText AWK program source
+	 * @return a builder for configuring and executing the run
+	 */
+	public AwkRunBuilder script(String scriptText) {
+		return new AwkRunBuilder().script(Objects.requireNonNull(scriptText, "script"));
+	}
+
+	/**
+	 * Evaluates a compiled expression using a fresh isolated runtime.
+	 *
+	 * @param expression compiled expression
+	 * @return evaluated value
+	 * @throws IOException if evaluation fails
+	 */
+	public Object eval(AwkExpression expression) throws IOException {
+		AwkExpression compiledExpression = Objects.requireNonNull(expression, "expression");
+		try (AVM activeEvalAvm = createAvm(settings)) {
+			return activeEvalAvm.eval(compiledExpression, new SingleRecordInputSource(null));
+		}
+	}
+
+	/**
+	 * Evaluates a compiled expression against one text record using a fresh
+	 * isolated runtime.
+	 *
+	 * @param expression compiled expression
+	 * @param input record exposed as {@code $0}
+	 * @return evaluated value
+	 * @throws IOException if evaluation fails
+	 */
+	public Object eval(AwkExpression expression, String input) throws IOException {
+		AwkExpression compiledExpression = Objects.requireNonNull(expression, "expression");
+		try (AVM activeEvalAvm = createAvm(settings)) {
+			return activeEvalAvm.eval(compiledExpression, new SingleRecordInputSource(input));
+		}
+	}
+
+	/**
+	 * Evaluates a compiled expression against one structured record source using a
+	 * fresh isolated runtime.
+	 *
+	 * @param expression compiled expression
+	 * @param source structured record source
+	 * @return evaluated value
+	 * @throws IOException if evaluation fails
+	 */
+	public Object eval(AwkExpression expression, InputSource source) throws IOException {
+		AwkExpression compiledExpression = Objects.requireNonNull(expression, "expression");
+		InputSource resolvedSource = Objects.requireNonNull(source, "source");
+		try (AVM activeEvalAvm = createAvm(settings)) {
+			return activeEvalAvm.eval(compiledExpression, resolvedSource);
+		}
+	}
+
+	/**
+	 * Compiles the specified AWK script and returns an immutable AWK program.
 	 *
 	 * @param script AWK script to compile
 	 * @param disableOptimizeParam {@code true} to skip tuple optimization
-	 * @return compiled {@link AwkTuples}
+	 * @return compiled immutable program
 	 * @throws IOException if an I/O error occurs during compilation
 	 */
-	AwkTuples compile(String script, boolean disableOptimizeParam) throws IOException {
+	AwkProgram compile(String script, boolean disableOptimizeParam) throws IOException {
 		ScriptSource source = new ScriptSource(
 				ScriptSource.DESCRIPTION_COMMAND_LINE_SCRIPT,
 				new StringReader(script));
@@ -523,27 +411,14 @@ public class Awk {
 	}
 
 	/**
-	 * Compiles the specified AWK script and returns the intermediate representation
-	 * as {@link AwkTuples}.
-	 *
-	 * @param script AWK script to compile (as a {@link Reader})
-	 * @return compiled {@link AwkTuples}
-	 * @throws IOException if an I/O error occurs during compilation
-	 */
-	public AwkTuples compile(Reader script) throws IOException {
-		return compile(script, false);
-	}
-
-	/**
-	 * Compiles the specified AWK script and returns the intermediate representation
-	 * as {@link AwkTuples}.
+	 * Compiles the specified AWK script and returns an immutable AWK program.
 	 *
 	 * @param script AWK script to compile (as a {@link Reader})
 	 * @param disableOptimizeParam {@code true} to skip tuple optimization
-	 * @return compiled {@link AwkTuples}
+	 * @return compiled immutable program
 	 * @throws IOException if an I/O error occurs during compilation
 	 */
-	AwkTuples compile(Reader script, boolean disableOptimizeParam) throws IOException {
+	AwkProgram compile(Reader script, boolean disableOptimizeParam) throws IOException {
 		ScriptSource source = new ScriptSource(
 				ScriptSource.DESCRIPTION_COMMAND_LINE_SCRIPT,
 				script);
@@ -551,34 +426,50 @@ public class Awk {
 	}
 
 	/**
-	 * Compiles a list of script sources into {@link AwkTuples} that can be
-	 * interpreted by the {@link AVM} runtime.
+	 * Compiles a list of script sources into an immutable AWK program that can be
+	 * executed by the {@link AVM} runtime.
 	 *
 	 * @param scripts script sources to compile
-	 * @return compiled {@link AwkTuples}
+	 * @return compiled immutable program
 	 * @throws IOException if an I/O error occurs while reading the
 	 *         scripts
 	 */
-	public AwkTuples compile(List<ScriptSource> scripts)
+	public AwkProgram compile(List<ScriptSource> scripts)
 			throws IOException {
 		return compile(scripts, false);
 	}
 
 	/**
-	 * Compiles a list of script sources into {@link AwkTuples} that can be
-	 * interpreted by the {@link AVM} runtime.
+	 * Compiles a list of script sources into an immutable AWK program that can be
+	 * executed by the {@link AVM} runtime.
 	 *
 	 * @param scripts script sources to compile
 	 * @param disableOptimizeParam {@code true} to skip tuple optimization
-	 * @return compiled {@link AwkTuples}
+	 * @return compiled immutable program
 	 * @throws IOException if an I/O error occurs while reading the
 	 *         scripts
 	 */
-	AwkTuples compile(List<ScriptSource> scripts, boolean disableOptimizeParam)
+	public AwkProgram compile(List<ScriptSource> scripts, boolean disableOptimizeParam)
 			throws IOException {
+		return compileProgram(scripts, disableOptimizeParam, new AwkProgram());
+	}
 
+	/**
+	 * Compiles a full AWK program into the supplied tuple implementation.
+	 *
+	 * @param scripts script sources to compile
+	 * @param disableOptimizeParam {@code true} to skip tuple optimization
+	 * @param tuples destination tuple implementation
+	 * @param <T> concrete tuple type to populate
+	 * @return the populated compiled program
+	 * @throws IOException if reading script sources fails
+	 */
+	protected final <T extends AwkProgram> T compileProgram(
+			List<ScriptSource> scripts,
+			boolean disableOptimizeParam,
+			T tuples)
+			throws IOException {
 		lastAst = null;
-		AwkTuples tuples = createTuples();
 		if (!scripts.isEmpty()) {
 			// Parse all script sources into a single AST
 			AwkParser parser = new AwkParser(this.extensionFunctions);
@@ -607,24 +498,41 @@ public class Awk {
 	/**
 	 * Compile an expression to evaluate (not a full script).
 	 *
-	 * @param expression AWK expression to compile to AwkTuples
-	 * @return AwkTuples to be interpreted by AVM
+	 * @param expression AWK expression to compile
+	 * @return compiled immutable expression
 	 * @throws IOException if anything goes wrong with the compilation
 	 */
-	public AwkTuples compileForEval(String expression) throws IOException {
-		return compileForEval(expression, false);
+	public AwkExpression compileExpression(String expression) throws IOException {
+		return compileExpression(expression, false);
 	}
 
 	/**
 	 * Compile an expression to evaluate (not a full script).
 	 *
-	 * @param expression AWK expression to compile to AwkTuples
+	 * @param expression AWK expression to compile
 	 * @param disableOptimizeParam {@code true} to skip tuple optimization
-	 * @return AwkTuples to be interpreted by AVM
+	 * @return compiled immutable expression
 	 * @throws IOException if anything goes wrong with the compilation
 	 */
-	public AwkTuples compileForEval(String expression, boolean disableOptimizeParam) throws IOException {
+	public AwkExpression compileExpression(String expression, boolean disableOptimizeParam) throws IOException {
+		return compileExpression(expression, disableOptimizeParam, new AwkExpression());
+	}
 
+	/**
+	 * Compiles an AWK expression into the supplied tuple implementation.
+	 *
+	 * @param expression expression source to compile
+	 * @param disableOptimizeParam {@code true} to skip tuple optimization
+	 * @param tuples destination tuple implementation
+	 * @param <T> concrete tuple type to populate
+	 * @return the populated compiled expression
+	 * @throws IOException if reading the expression fails
+	 */
+	protected final <T extends AwkExpression> T compileExpression(
+			String expression,
+			boolean disableOptimizeParam,
+			T tuples)
+			throws IOException {
 		// Create a ScriptSource
 		ScriptSource expressionSource = new ScriptSource(
 				ScriptSource.DESCRIPTION_COMMAND_LINE_SCRIPT,
@@ -633,9 +541,6 @@ public class Awk {
 		// Parse the expression
 		AwkParser parser = new AwkParser(this.extensionFunctions);
 		AstNode ast = parser.parseExpression(expressionSource);
-
-		// Create the tuples that we will return
-		AwkTuples tuples = createTuples();
 
 		// Attempt to traverse the syntax tree and build
 		// the intermediate code
@@ -669,7 +574,7 @@ public class Awk {
 	 * @throws IOException if anything goes wrong with the evaluation
 	 */
 	public Object eval(String expression) throws IOException {
-		return eval(compileForEval(expression));
+		return eval(compileExpression(expression));
 	}
 
 	/**
@@ -682,7 +587,7 @@ public class Awk {
 	 * @throws IOException if anything goes wrong with the evaluation
 	 */
 	public Object eval(String expression, String input) throws IOException {
-		return eval(compileForEval(expression), input);
+		return eval(compileExpression(expression), input);
 	}
 
 	/**
@@ -695,60 +600,7 @@ public class Awk {
 	 * @throws IOException if anything goes wrong with the evaluation
 	 */
 	public Object eval(String expression, InputSource source) throws IOException {
-		return eval(compileForEval(expression), source);
-	}
-
-	/**
-	 * Evaluates pre-compiled tuples without input.
-	 *
-	 * @param tuples tuples returned by {@link Awk#compileForEval(String)}
-	 * @return the value of the specified expression
-	 * @throws IOException if anything goes wrong with the evaluation
-	 */
-	public Object eval(AwkTuples tuples) throws IOException {
-		return eval(tuples, (String) null);
-	}
-
-	/**
-	 * Evaluates pre-compiled tuples using a text input value exposed as {@code $0}.
-	 * <p>
-	 * Each invocation creates, prepares, and closes a fresh runtime so the
-	 * evaluation is isolated from previous calls.
-	 * </p>
-	 *
-	 * @param tuples Tuples returned by {@link Awk#compileForEval(String)}
-	 * @param input Optional text input (that will be available as $0, and tokenized
-	 *        as $1, $2, etc.)
-	 * @return the value of the specified expression
-	 * @throws IOException if anything goes wrong with the evaluation
-	 */
-	public Object eval(AwkTuples tuples, String input) throws IOException {
-		AwkTuples compiledTuples = Objects.requireNonNull(tuples, "tuples");
-		try (AVM activeEvalAvm = createAvm(settings)) {
-			InputSource source = new SingleRecordInputSource(input);
-			return activeEvalAvm.eval(compiledTuples, source);
-		}
-	}
-
-	/**
-	 * Evaluates pre-compiled tuples using a structured {@link InputSource} to
-	 * populate {@code $0}, {@code $1}, etc.
-	 * <p>
-	 * Each invocation creates, prepares, and closes a fresh runtime so the
-	 * evaluation is isolated from previous calls.
-	 * </p>
-	 *
-	 * @param tuples Tuples returned by {@link Awk#compileForEval(String)}
-	 * @param source structured input source providing the current record
-	 * @return the value of the specified expression
-	 * @throws IOException if anything goes wrong with the evaluation
-	 */
-	public Object eval(AwkTuples tuples, InputSource source) throws IOException {
-		AwkTuples compiledTuples = Objects.requireNonNull(tuples, "tuples");
-		InputSource resolvedSource = Objects.requireNonNull(source, "source");
-		try (AVM activeEvalAvm = createAvm(settings)) {
-			return activeEvalAvm.eval(compiledTuples, resolvedSource);
-		}
+		return eval(compileExpression(expression), source);
 	}
 
 	/**
@@ -758,15 +610,15 @@ public class Awk {
 	 * The returned {@link AVM} is created using the current runtime
 	 * configuration of this {@link Awk} instance and binds the provided record
 	 * once. Later calls to
-	 * {@link AVM#eval(AwkTuples)} reuse the same AVM state without resetting it
+	 * {@link AVM#eval(AwkExpression)} reuse the same AVM state without resetting it
 	 * between expressions, so mutations intentionally leak across evaluations.
 	 * This is the high-level convenience wrapper around direct
-	 * {@link AVM#prepareForEval(String)} and {@link AVM#eval(AwkTuples)} usage.
+	 * {@link AVM#prepareForEval(String)} and {@link AVM#eval(AwkExpression)} usage.
 	 * </p>
 	 *
 	 * @param input non-null text record to expose as {@code $0}
 	 *        Call {@link AVM#close()} when you are done with the returned interpreter.
-	 * @return prepared AVM ready for repeated {@link AVM#eval(AwkTuples)} calls
+	 * @return prepared AVM ready for repeated {@link AVM#eval(AwkExpression)} calls
 	 * @throws IOException if binding the record fails
 	 */
 	public AVM prepareEval(String input) throws IOException {
@@ -793,14 +645,14 @@ public class Awk {
 	 * The returned AVM remains attached to the provided source, so later
 	 * {@code getline} operations and repeated {@link AVM#prepareForEval(InputSource)}
 	 * calls continue from that source's current position. Later
-	 * {@link AVM#eval(AwkTuples)} calls reuse the same AVM state without
+	 * {@link AVM#eval(AwkExpression)} calls reuse the same AVM state without
 	 * resetting it between expressions, so mutations intentionally leak across
 	 * evaluations. Close the returned AVM when you are done with it to release
 	 * any bound input or runtime I/O resources.
 	 * </p>
 	 *
 	 * @param source structured source providing the record to bind
-	 * @return prepared AVM ready for repeated {@link AVM#eval(AwkTuples)} calls
+	 * @return prepared AVM ready for repeated {@link AVM#eval(AwkExpression)} calls
 	 * @throws IOException if reading the record fails or the source is exhausted
 	 */
 	public AVM prepareEval(InputSource source) throws IOException {
@@ -821,14 +673,12 @@ public class Awk {
 		}
 	}
 
-	protected AwkTuples createTuples() {
-		return new AwkTuples();
-	}
-
-	protected AVM createAvm() {
-		return createAvm(this.settings);
-	}
-
+	/**
+	 * Creates an {@link AVM} using the provided runtime settings.
+	 *
+	 * @param settingsParam runtime settings to apply
+	 * @return reusable AVM
+	 */
 	protected AVM createAvm(AwkSettings settingsParam) {
 		return new AVM(settingsParam, this.extensionInstances);
 	}
@@ -841,6 +691,302 @@ public class Awk {
 			return new ByteArrayInputStream(new byte[0]);
 		}
 		return new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8));
+	}
+
+	/**
+	 * Fluent builder for configuring and executing an AWK script or program.
+	 * <p>
+	 * Obtain an instance through {@link Awk#script(String)} or
+	 * {@link Awk#script(AwkProgram)}, configure input, arguments, and
+	 * variables, then call one of the terminal methods to execute.
+	 * </p>
+	 *
+	 * <pre>{@code
+	 * // Execute and capture printed output as a String
+	 * String result = awk.script("{ print toupper($0) }").input("hello").execute();
+	 *
+	 * // Execute to a specific stream
+	 * awk.script(program).input(stream).execute(outputStream);
+	 *
+	 * // Execute with a custom sink
+	 * awk.script("{ print $1 }").input(source).execute(mySink);
+	 *
+	 * // Execute to an appendable
+	 * awk.script("{ print $1 }").input(source).execute(appendable);
+	 * }</pre>
+	 */
+	public final class AwkRunBuilder {
+
+		private AwkProgram compiledProgram;
+		private List<String> scripts;
+		private InputStream inputStream;
+		private InputSource inputSource;
+		private List<String> arguments;
+		private Map<String, Object> variableOverrides;
+		private PrintStream errorStream;
+
+		AwkRunBuilder() {}
+
+		AwkRunBuilder(AwkProgram program) {
+			this.compiledProgram = program;
+		}
+
+		/**
+		 * Appends an additional AWK script to compile and execute.
+		 * Multiple scripts are concatenated, like multiple {@code -f} options
+		 * in the CLI.
+		 *
+		 * @param scriptText AWK program source
+		 * @return this builder
+		 * @throws IllegalStateException if a precompiled program was already set
+		 */
+		public AwkRunBuilder script(String scriptText) {
+			if (compiledProgram != null) {
+				throw new IllegalStateException("Cannot add scripts when a precompiled program is set");
+			}
+			if (scripts == null) {
+				scripts = new ArrayList<String>();
+			}
+			scripts.add(Objects.requireNonNull(scriptText, "script"));
+			return this;
+		}
+
+		/**
+		 * Sets the text input to process.
+		 *
+		 * @param input text input (encoded as UTF-8 internally)
+		 * @return this builder
+		 */
+		public AwkRunBuilder input(String input) {
+			this.inputStream = toInputStream(input);
+			return this;
+		}
+
+		/**
+		 * Sets the byte-stream input to process.
+		 *
+		 * @param input byte stream, or {@code null} for no input
+		 * @return this builder
+		 */
+		public AwkRunBuilder input(InputStream input) {
+			this.inputStream = input;
+			return this;
+		}
+
+		/**
+		 * Sets a structured {@link InputSource} to process.
+		 *
+		 * @param source structured record source
+		 * @return this builder
+		 */
+		public AwkRunBuilder input(InputSource source) {
+			this.inputSource = source;
+			return this;
+		}
+
+		/**
+		 * Sets runtime arguments visible through {@code ARGC}/{@code ARGV}.
+		 *
+		 * @param args runtime arguments
+		 * @return this builder
+		 */
+		@SuppressFBWarnings("EI_EXPOSE_REP2")
+		public AwkRunBuilder arguments(List<String> args) {
+			this.arguments = args;
+			return this;
+		}
+
+		/**
+		 * Sets runtime arguments visible through {@code ARGC}/{@code ARGV}.
+		 *
+		 * @param args runtime arguments
+		 * @return this builder
+		 */
+		public AwkRunBuilder arguments(String... args) {
+			this.arguments = Arrays.asList(args);
+			return this;
+		}
+
+		/**
+		 * Adds a single runtime argument visible through {@code ARGC}/{@code ARGV}.
+		 *
+		 * @param arg runtime argument
+		 * @return this builder
+		 */
+		public AwkRunBuilder argument(String arg) {
+			if (this.arguments == null) {
+				this.arguments = new ArrayList<String>();
+			}
+			this.arguments.add(Objects.requireNonNull(arg, "arg"));
+			return this;
+		}
+
+		/**
+		 * Sets the stream used for the stderr output of spawned processes
+		 * (e.g.&nbsp;{@code system("...")}).
+		 * <p>
+		 * When not set, process stderr is merged into the main output sink.
+		 * The CLI sets this explicitly to {@code System.err} so that command
+		 * errors appear on the console rather than being mixed with normal output.
+		 *
+		 * @param stream stream to receive process stderr
+		 * @return this builder
+		 */
+		public AwkRunBuilder errorStream(PrintStream stream) {
+			this.errorStream = Objects.requireNonNull(stream, "errorStream");
+			return this;
+		}
+
+		/**
+		 * Sets per-call variable overrides applied on top of the settings-level
+		 * variables.
+		 *
+		 * @param overrides variable assignments (may be {@code null})
+		 * @return this builder
+		 */
+		@SuppressFBWarnings("EI_EXPOSE_REP2")
+		public AwkRunBuilder variables(Map<String, Object> overrides) {
+			this.variableOverrides = overrides;
+			return this;
+		}
+
+		/**
+		 * Sets a single per-call variable override.
+		 *
+		 * @param name variable name
+		 * @param value variable value
+		 * @return this builder
+		 */
+		public AwkRunBuilder variable(String name, Object value) {
+			if (this.variableOverrides == null) {
+				this.variableOverrides = new LinkedHashMap<String, Object>();
+			}
+			this.variableOverrides
+					.put(
+							Objects.requireNonNull(name, "name"),
+							value);
+			return this;
+		}
+
+		/**
+		 * Executes the script and returns the printed output as a {@link String}.
+		 *
+		 * @return printed output
+		 * @throws IOException if compilation or execution fails
+		 * @throws ExitException if the script terminates with a non-zero exit code
+		 */
+		public String execute() throws IOException, ExitException {
+			StringBuilder output = new StringBuilder();
+			doExecute(new AppendableAwkSink(output, settings.getLocale()));
+			return output.toString();
+		}
+
+		/**
+		 * Executes the script, sending output to the specified {@link AwkSink}.
+		 *
+		 * @param sink output sink
+		 * @throws IOException if compilation or execution fails
+		 * @throws ExitException if the script terminates with a non-zero exit code
+		 */
+		public void execute(AwkSink sink) throws IOException, ExitException {
+			doExecute(Objects.requireNonNull(sink, "sink"));
+		}
+
+		/**
+		 * Executes the script, sending output to the specified {@link PrintStream}.
+		 *
+		 * @param out print stream (e.g. {@code System.out})
+		 * @throws IOException if compilation or execution fails
+		 * @throws ExitException if the script terminates with a non-zero exit code
+		 */
+		public void execute(PrintStream out) throws IOException, ExitException {
+			Objects.requireNonNull(out, "out");
+			doExecute(new OutputStreamAwkSink(out, settings.getLocale()));
+		}
+
+		/**
+		 * Executes the script, sending output to the specified {@link OutputStream}.
+		 *
+		 * @param out output stream
+		 * @throws IOException if compilation or execution fails
+		 * @throws ExitException if the script terminates with a non-zero exit code
+		 */
+		public void execute(OutputStream out) throws IOException, ExitException {
+			doExecute(new OutputStreamAwkSink(toPrintStream(out), settings.getLocale()));
+		}
+
+		/**
+		 * Executes the script, sending output to the specified {@link Appendable}
+		 * (such as {@link StringBuilder} or {@link java.io.StringWriter}).
+		 *
+		 * @param appendable output destination
+		 * @throws IOException if compilation or execution fails
+		 * @throws ExitException if the script terminates with a non-zero exit code
+		 */
+		public void execute(Appendable appendable) throws IOException, ExitException {
+			doExecute(
+					new AppendableAwkSink(
+							Objects.requireNonNull(appendable, "appendable"),
+							settings.getLocale()));
+		}
+
+		private void doExecute(AwkSink sink) throws IOException, ExitException {
+			AwkProgram program = resolveProgram();
+			List<String> resolvedArguments = arguments == null ? Collections.<String>emptyList() : arguments;
+			try (AVM avm = createAvm(settings)) {
+				avm.setAwkSink(sink);
+				avm.setErrorStream(errorStream != null ? errorStream : sink.getPrintStream());
+				try {
+					InputSource resolvedSource;
+					if (inputSource != null) {
+						resolvedSource = inputSource;
+					} else {
+						InputStream in = inputStream != null ? inputStream : new ByteArrayInputStream(new byte[0]);
+						resolvedSource = new StreamInputSource(in, avm, avm.getJrt());
+					}
+					avm.execute(program, resolvedSource, resolvedArguments, variableOverrides);
+				} catch (ExitException e) {
+					if (e.getCode() != 0) {
+						throw e;
+					}
+				} finally {
+					sink.flush();
+				}
+			}
+		}
+
+		private AwkProgram resolveProgram() throws IOException {
+			if (compiledProgram != null) {
+				return compiledProgram;
+			}
+			if (scripts == null || scripts.isEmpty()) {
+				throw new IllegalStateException("No script or program specified");
+			}
+			if (scripts.size() == 1) {
+				return compile(scripts.get(0));
+			}
+			List<ScriptSource> sources = new ArrayList<ScriptSource>(scripts.size());
+			for (int i = 0; i < scripts.size(); i++) {
+				sources
+						.add(
+								new ScriptSource(
+										ScriptSource.DESCRIPTION_COMMAND_LINE_SCRIPT,
+										new StringReader(scripts.get(i))));
+			}
+			return compile(sources);
+		}
+	}
+
+	private static PrintStream toPrintStream(OutputStream out) {
+		Objects.requireNonNull(out, "outputStream");
+		if (out instanceof PrintStream) {
+			return (PrintStream) out;
+		}
+		try {
+			return new PrintStream(out, false, "UTF-8");
+		} catch (java.io.UnsupportedEncodingException e) {
+			throw new IllegalStateException(e);
+		}
 	}
 
 	/**

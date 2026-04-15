@@ -1,5 +1,27 @@
 package io.jawk;
 
+/*-
+ * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
+ * Jawk
+ * ჻჻჻჻჻჻
+ * Copyright (C) 2006 - 2026 MetricsHub
+ * ჻჻჻჻჻჻
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Lesser Public License for more details.
+ *
+ * You should have received a copy of the GNU General Lesser Public
+ * License along with this program.  If not, see
+ * <http://www.gnu.org/licenses/lgpl-3.0.html>.
+ * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
+ */
+
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assume.assumeTrue;
@@ -29,10 +51,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import io.jawk.ext.JawkExtension;
-import io.jawk.intermediate.AwkTuples;
 import io.jawk.jrt.InputSource;
-import io.jawk.util.AwkSettings;
-import io.jawk.util.ScriptSource;
 
 /**
  * Reusable helpers for building and executing Jawk tests. This consolidates the
@@ -335,9 +354,6 @@ public final class AwkTestSupport {
 
 		/**
 		 * Supplies an {@link Awk} instance to use when invoking the script.
-		 * The instance must have been created with mutable
-		 * {@link AwkSettings} so that the test framework can configure the
-		 * output stream and pre-assigned variables before execution.
 		 *
 		 * @param awkEngine the engine to execute the script with
 		 * @return this builder for method chaining
@@ -875,7 +891,7 @@ public final class AwkTestSupport {
 
 				if (entry.getValue() != null) {
 					try (BufferedWriter writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
-						writer.write(entry.getValue().replace("\n", System.lineSeparator()));
+						writer.write(entry.getValue());
 					}
 				}
 				placeholders.put(entry.getKey(), path);
@@ -932,63 +948,28 @@ public final class AwkTestSupport {
 
 		@Override
 		protected ActualResult execute(ExecutionEnvironment env) throws Exception {
-			AwkSettings settings = new AwkSettings();
-			for (Map.Entry<String, Object> entry : preAssignments.entrySet()) {
-				settings.putVariable(entry.getKey(), entry.getValue());
-			}
-			InputStream stdinStream;
-			String stdin = resolvedStdin(env);
-			if (stdin != null) {
-				stdinStream = new ByteArrayInputStream(
-						stdin.replace("\n", System.lineSeparator()).getBytes(StandardCharsets.UTF_8));
+			Awk awk = customAwk != null ? customAwk : new Awk(extensions);
+			StringBuilder out = new StringBuilder();
+			AwkProgram program = awk.compile(resolvedScript(env));
+			Awk.AwkRunBuilder builder = awk
+					.script(program)
+					.arguments(resolvedOperands(env))
+					.variables(preAssignments);
+			if (inputSource != null) {
+				builder.input(inputSource);
 			} else {
-				stdinStream = new ByteArrayInputStream(new byte[0]);
-			}
-			ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
-			settings.setOutputStream(new PrintStream(outBytes, true, StandardCharsets.UTF_8.name()));
-			List<String> operands = resolvedOperands(env);
-			Awk awk;
-			PrintStream originalOutputStream = null;
-			Map<String, Object> originalVars = null;
-			if (customAwk != null) {
-				awk = customAwk;
-				AwkSettings awkSettings = awk.getSettings();
-				// Save original state so we can restore it after execution,
-				// preventing configuration leaks across invocations.
-				originalOutputStream = awkSettings.getOutputStream();
-				originalVars = new LinkedHashMap<>(awkSettings.getVariables());
-				for (Map.Entry<String, Object> entry : preAssignments.entrySet()) {
-					awkSettings.putVariable(entry.getKey(), entry.getValue());
+				String stdin = resolvedStdin(env);
+				if (stdin != null) {
+					builder.input(stdin);
 				}
-				awkSettings.setOutputStream(settings.getOutputStream());
-			} else if (!extensions.isEmpty()) {
-				awk = new Awk(extensions, settings);
-			} else {
-				awk = new Awk(settings);
 			}
 			int exitCode = 0;
 			try {
-				String resolvedScript = resolvedScript(env);
-				ScriptSource scriptSource = new ScriptSource(description(), new StringReader(resolvedScript));
-				AwkTuples tuples = awk.compile(Collections.singletonList(scriptSource));
-				if (inputSource != null) {
-					awk.invoke(tuples, inputSource, operands, null);
-				} else {
-					awk.invoke(tuples, stdinStream, operands);
-				}
+				builder.execute(out);
 			} catch (ExitException ex) {
 				exitCode = ex.getCode();
-			} finally {
-				// Restore original settings when a custom Awk instance was used
-				if (customAwk != null) {
-					AwkSettings awkSettings = customAwk.getSettings();
-					awkSettings.setOutputStream(originalOutputStream);
-					awkSettings.setVariables(originalVars);
-				}
 			}
-			return new ActualResult(
-					outBytes.toString(StandardCharsets.UTF_8.name()).replace(System.lineSeparator(), "\n"),
-					exitCode);
+			return new ActualResult(out.toString(), exitCode);
 		}
 	}
 
@@ -1013,7 +994,7 @@ public final class AwkTestSupport {
 		protected ActualResult execute(ExecutionEnvironment env) throws Exception {
 			String stdin = resolvedStdin(env);
 			InputStream in = stdin != null ?
-					new ByteArrayInputStream(stdin.replace("\n", System.lineSeparator()).getBytes(StandardCharsets.UTF_8)) :
+					new ByteArrayInputStream(stdin.getBytes(StandardCharsets.UTF_8)) :
 					new ByteArrayInputStream(new byte[0]);
 			ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
 			ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
@@ -1044,7 +1025,7 @@ public final class AwkTestSupport {
 				exitCode = ex.getCode();
 			}
 			return new ActualResult(
-					outBytes.toString(StandardCharsets.UTF_8.name()).replace(System.lineSeparator(), "\n"),
+					outBytes.toString(StandardCharsets.UTF_8.name()),
 					exitCode);
 		}
 	}

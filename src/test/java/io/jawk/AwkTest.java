@@ -1,7 +1,29 @@
 package io.jawk;
 
-import static org.junit.Assert.assertArrayEquals;
+/*-
+ * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
+ * Jawk
+ * ჻჻჻჻჻჻
+ * Copyright (C) 2006 - 2026 MetricsHub
+ * ჻჻჻჻჻჻
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Lesser Public License for more details.
+ *
+ * You should have received a copy of the GNU General Lesser Public
+ * License along with this program.  If not, see
+ * <http://www.gnu.org/licenses/lgpl-3.0.html>.
+ * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
+ */
+
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -19,13 +41,18 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.junit.Test;
+import io.jawk.backend.AVM;
 import io.jawk.frontend.ast.ParserException;
-import io.jawk.intermediate.AwkTuples;
+import io.jawk.jrt.AppendableAwkSink;
+import io.jawk.jrt.AwkSink;
 import io.jawk.jrt.InputSource;
+import io.jawk.jrt.OutputStreamAwkSink;
 import io.jawk.util.AwkSettings;
 import io.jawk.Cli;
 import io.jawk.AwkSandboxException;
@@ -805,28 +832,195 @@ public class AwkTest {
 		assertThrows(ParserException.class, () -> AWK.eval("BEGIN { print 5 }", (String) null));
 	}
 
+	@Test
+	public void compileRejectsEmptyParenthesizedPrintStatements() {
+		RuntimeException printEx = assertThrows(RuntimeException.class, () -> AWK.compile("BEGIN { print() }"));
+		assertTrue(printEx.getMessage(), printEx.getMessage().contains("print() requires at least 1 argument"));
+
+		RuntimeException printfEx = assertThrows(RuntimeException.class, () -> AWK.compile("BEGIN { printf() }"));
+		assertTrue(printfEx.getMessage(), printfEx.getMessage().contains("printf requires at least 1 argument"));
+	}
+
+	@Test
+	public void compileRejectsPrintfWithoutArguments() {
+		RuntimeException ex = assertThrows(RuntimeException.class, () -> AWK.compile("BEGIN { printf }"));
+		assertTrue(ex.getMessage(), ex.getMessage().contains("printf requires at least 1 argument"));
+	}
+
 	/**
-	 * Verifies that a script provided as a {@link String} can be compiled to
-	 * {@link AwkTuples} and executed.
+	 * Verifies that a script provided as a {@link String} can be compiled to an
+	 * {@link AwkProgram} and executed.
 	 */
 	@Test
 	public void compileFromString() throws Exception {
 		String script = "{ print $0 }";
-		AwkTuples tuples = AWK.compile(script);
+		AwkProgram program = AWK.compile(script);
 
+		String result = new Awk()
+				.script(program)
+				.input("foo\nbar\n")
+				.execute();
+
+		assertEquals("foo\nbar\n", result);
+	}
+
+	@Test
+	public void captureCollectsOutput() throws Exception {
+		String result = new Awk()
+				.script("BEGIN { print \"alpha\"; printf(\"beta\") }")
+				.execute();
+
+		assertEquals("alpha\nbeta", result);
+	}
+
+	@Test
+	public void localeAffectsCapturedOutput() throws Exception {
 		AwkSettings settings = new AwkSettings();
-		settings.setDefaultRS("\n");
-		settings.setDefaultORS("\n");
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
+		settings.setLocale(java.util.Locale.FRANCE);
 
-		new Awk(settings)
-				.invoke(
-						tuples,
-						new ByteArrayInputStream("foo\nbar\n".getBytes(StandardCharsets.UTF_8)),
-						Collections.emptyList());
+		String result = new Awk(settings)
+				.script("BEGIN { print 1.5 }")
+				.execute();
 
-		assertEquals("foo\nbar\n", out.toString(StandardCharsets.UTF_8.name()));
+		assertEquals("1,5\n", result);
+	}
+
+	@Test
+	public void executeWithSinkCapturesStructuredPrintArguments() throws Exception {
+		StructuredOutputSink sink = new StructuredOutputSink();
+		Awk awk = new Awk();
+
+		awk
+				.script("BEGIN { print 1, \"two\", 3; printf(\"<%s>\", \"done\") }")
+				.execute(sink);
+
+		assertEquals(1, sink.printedValues.size());
+		assertEquals(3, sink.printedValues.get(0).size());
+		assertTrue(sink.printedValues.get(0).get(0) instanceof Number);
+		assertEquals(1, ((Number) sink.printedValues.get(0).get(0)).intValue());
+		assertEquals("two", sink.printedValues.get(0).get(1));
+		assertTrue(sink.printedValues.get(0).get(2) instanceof Number);
+		assertEquals(3, ((Number) sink.printedValues.get(0).get(2)).intValue());
+		assertEquals(Collections.singletonList("<%s>"), sink.printfFormats);
+		assertEquals(Collections.singletonList(Collections.<Object>singletonList("done")), sink.printfValues);
+	}
+
+	@Test
+	public void executeToOutputStream() throws Exception {
+		ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+		new Awk()
+				.script("BEGIN { print \"alpha\" }")
+				.execute(output);
+
+		assertEquals("alpha\n", output.toString(StandardCharsets.UTF_8.name()));
+	}
+
+	@Test
+	public void executeToAppendable() throws Exception {
+		StringBuilder output = new StringBuilder();
+
+		new Awk()
+				.script("BEGIN { print \"alpha\" }")
+				.execute(output);
+
+		assertEquals("alpha\n", output.toString());
+	}
+
+	@Test
+	public void perExecutionSinkOverridesDefault() throws Exception {
+		StringBuilder perCallOutput = new StringBuilder();
+
+		new Awk()
+				.script("BEGIN { print \"alpha\" }")
+				.execute(new AppendableAwkSink(perCallOutput, java.util.Locale.US));
+
+		assertEquals("alpha\n", perCallOutput.toString());
+	}
+
+	@Test
+	public void appendableSinkHandlesSplitMultiByteUtf8() throws Exception {
+		StringBuilder output = new StringBuilder();
+		AppendableAwkSink sink = new AppendableAwkSink(output);
+		PrintStream ps = sink.getPrintStream();
+
+		// "café" in UTF-8: 63 61 66 C3 A9
+		byte[] utf8 = "café".getBytes(StandardCharsets.UTF_8);
+		// Write bytes one-by-one to force a split inside the 2-byte é sequence
+		for (byte b : utf8) {
+			ps.write(new byte[] { b }, 0, 1);
+		}
+		ps.flush();
+
+		assertEquals("café", output.toString());
+	}
+
+	@Test
+	public void crlfInputFileProducesCleanRecords() throws Exception {
+		AwkTestSupport
+				.awkTest("CRLF input produces clean records")
+				.script("{ print $0 }")
+				.file("input.txt", "alpha\r\nbeta\r\ngamma\r\n")
+				.operand("{{input.txt}}")
+				.expectLines("alpha", "beta", "gamma")
+				.runAndAssert();
+	}
+
+	@Test
+	public void executeDefaultOrsIsNewline() throws Exception {
+		String result = new Awk()
+				.script("BEGIN { print \"alpha\" }")
+				.execute();
+
+		assertEquals("alpha\n", result);
+	}
+
+	@Test
+	public void publicRunSuppressesZeroExitCode() throws Exception {
+		String result = new Awk()
+				.script("BEGIN { print \"alpha\"; exit 0 }")
+				.execute();
+
+		assertEquals("alpha\n", result);
+	}
+
+	@Test
+	public void avmCanReuseSameRuntimeAcrossProgramRunsWithPerExecutionOutput() throws Exception {
+		Awk awk = new Awk();
+		AwkProgram program = awk.compile("BEGIN { print \"value\" }");
+		InputSource emptyInput = new InputSource() {
+			@Override
+			public boolean nextRecord() {
+				return false;
+			}
+
+			@Override
+			public String getRecordText() {
+				return null;
+			}
+
+			@Override
+			public List<String> getFields() {
+				return null;
+			}
+
+			@Override
+			public boolean isFromFilenameList() {
+				return false;
+			}
+		};
+
+		StringBuilder firstOutput = new StringBuilder();
+		StringBuilder secondOutput = new StringBuilder();
+		try (AVM avm = awk.createAvm()) {
+			avm.setAwkSink(new AppendableAwkSink(firstOutput, java.util.Locale.US));
+			avm.execute(program, emptyInput, Collections.<String>emptyList(), null);
+			avm.setAwkSink(new AppendableAwkSink(secondOutput, java.util.Locale.US));
+			avm.execute(program, emptyInput, Collections.<String>emptyList(), null);
+		}
+
+		assertEquals("value\n", firstOutput.toString());
+		assertEquals("value\n", secondOutput.toString());
 	}
 
 	/**
@@ -836,21 +1030,14 @@ public class AwkTest {
 	@Test
 	public void compileFromReader() throws Exception {
 		String script = "{ print $0 }";
-		AwkTuples tuples = AWK.compile(new StringReader(script));
+		AwkProgram program = AWK.compile(new StringReader(script));
 
-		AwkSettings settings = new AwkSettings();
-		settings.setDefaultRS("\n");
-		settings.setDefaultORS("\n");
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
+		String result = new Awk()
+				.script(program)
+				.input("one\n")
+				.execute();
 
-		new Awk(settings)
-				.invoke(
-						tuples,
-						new ByteArrayInputStream("one\n".getBytes(StandardCharsets.UTF_8)),
-						Collections.emptyList());
-
-		assertEquals("one\n", out.toString(StandardCharsets.UTF_8.name()));
+		assertEquals("one\n", result);
 	}
 
 	/**
@@ -860,51 +1047,38 @@ public class AwkTest {
 	@Test
 	public void invokeWithExplicitExtensions() throws Exception {
 		String script = "{ print $0 }";
-		AwkTuples tuples = AWK.compile(script);
+		AwkProgram program = AWK.compile(script);
 
-		AwkSettings settings = new AwkSettings();
-		settings.setDefaultRS("\n");
-		settings.setDefaultORS("\n");
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
+		String result = new Awk()
+				.script(program)
+				.input("value\n")
+				.execute();
 
-		new Awk(settings)
-				.invoke(
-						tuples,
-						new ByteArrayInputStream("value\n".getBytes(StandardCharsets.UTF_8)),
-						Collections.emptyList());
-
-		assertEquals("value\n", out.toString(StandardCharsets.UTF_8.name()));
+		assertEquals("value\n", result);
 	}
 
 	/**
-	 * Loads precompiled tuples from disk via the <code>-L</code> option and executes
-	 * them through the CLI.
+	 * Loads a precompiled program from disk via the <code>-L</code> option and
+	 * executes it through the CLI.
 	 */
 	@Test
-	public void loadSerializedTuples() throws Exception {
+	public void loadSerializedProgram() throws Exception {
 		String script = "{ print toupper($0) }";
-		AwkTuples tuples = AWK.compile(script);
+		AwkProgram program = AWK.compile(script);
 
 		File tmp = File.createTempFile("jawk", ".tpl");
 		try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(tmp))) {
-			oos.writeObject(tuples);
+			oos.writeObject(program);
 		}
 
 		Cli cli = Cli.parseCommandLineArguments(new String[] { "-L", tmp.getAbsolutePath() });
-		AwkSettings settings = cli.getSettings();
-		settings.setDefaultRS("\n");
-		settings.setDefaultORS("\n");
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
-		new Awk(settings)
-				.invoke(
-						cli.getPrecompiledTuples(),
-						new ByteArrayInputStream("abc\n".getBytes(StandardCharsets.UTF_8)),
-						Collections.emptyList());
+		String result = new Awk()
+				.script(cli.getPrecompiledProgram())
+				.input("abc\n")
+				.execute();
 
-		assertEquals("ABC\n", out.toString(StandardCharsets.UTF_8.name()));
+		assertEquals("ABC\n", result);
 	}
 
 	/**
@@ -917,19 +1091,13 @@ public class AwkTest {
 		Cli.main(new String[] { "-K", tmp.getAbsolutePath(), "{ print toupper($0) }" });
 
 		Cli cli = Cli.parseCommandLineArguments(new String[] { "-L", tmp.getAbsolutePath() });
-		AwkSettings settings = cli.getSettings();
-		settings.setDefaultRS("\n");
-		settings.setDefaultORS("\n");
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
 
-		new Awk(settings)
-				.invoke(
-						cli.getPrecompiledTuples(),
-						new ByteArrayInputStream("abc\n".getBytes(StandardCharsets.UTF_8)),
-						Collections.emptyList());
+		String result = new Awk()
+				.script(cli.getPrecompiledProgram())
+				.input("abc\n")
+				.execute();
 
-		assertEquals("ABC\n", out.toString(StandardCharsets.UTF_8.name()));
+		assertEquals("ABC\n", result);
 	}
 
 	/**
@@ -986,23 +1154,14 @@ public class AwkTest {
 
 	@Test
 	public void sandboxRejectsRedirectionAtRuntime() throws Exception {
-		Awk nonSandboxAwk = new Awk();
-		AwkTuples tuples = nonSandboxAwk.compile("BEGIN { print \"hi\" > \"sandbox_out.txt\" } ");
+		AwkProgram program = AWK.compile("BEGIN { print \"hi\" > \"sandbox_out.txt\" } ");
 
-		AwkSettings settings = new AwkSettings();
-		settings.setDefaultRS("\n");
-		settings.setDefaultORS("\n");
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		settings.setOutputStream(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
-
-		Awk sandboxAwk = new SandboxedAwk(settings);
+		Awk sandboxAwk = new SandboxedAwk();
 		assertThrows(
 				AwkSandboxException.class,
 				() -> sandboxAwk
-						.invoke(
-								tuples,
-								new ByteArrayInputStream(new byte[0]),
-								Collections.emptyList()));
+						.script(program)
+						.execute());
 	}
 
 	@Test
@@ -1043,6 +1202,31 @@ public class AwkTest {
 				.runAndAssert();
 	}
 
+	private static final class StructuredOutputSink extends AwkSink {
+
+		private final List<List<Object>> printedValues = new ArrayList<>();
+		private final List<String> printfFormats = new ArrayList<>();
+		private final List<List<Object>> printfValues = new ArrayList<>();
+		private final ByteArrayOutputStream rawOutput = new ByteArrayOutputStream();
+		private final PrintStream printStream = new PrintStream(rawOutput, true);
+
+		@Override
+		public void print(String ofs, String ors, String ofmt, Object... values) {
+			printedValues.add(Arrays.asList(Arrays.copyOf(values, values.length)));
+		}
+
+		@Override
+		public void printf(String ofs, String ors, String ofmt, String format, Object... values) {
+			printfFormats.add(format);
+			printfValues.add(Arrays.asList(Arrays.copyOf(values, values.length)));
+		}
+
+		@Override
+		public PrintStream getPrintStream() {
+			return printStream;
+		}
+	}
+
 	@Test
 	public void sandboxSkipsArgcAndArgvOffsetsWhenUnreferenced() throws Exception {
 		AwkTestSupport
@@ -1052,5 +1236,25 @@ public class AwkTest {
 				.stdin("hello\n")
 				.expect("got:hello\n")
 				.runAndAssert();
+	}
+
+	@Test
+	public void systemStderrMergesIntoOutputByDefault() throws Exception {
+		String output = new Awk().script("BEGIN { system(\"echo stderrText >&2\") }").execute();
+		assertTrue("subprocess stderr should be merged into main output", output.contains("stderrText"));
+	}
+
+	@Test
+	public void systemStderrGoesToExplicitErrorStream() throws Exception {
+		ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
+		PrintStream errStream = new PrintStream(errBytes, true, StandardCharsets.UTF_8.name());
+		String output = new Awk()
+				.script("BEGIN { system(\"echo stderrText >&2\") }")
+				.errorStream(errStream)
+				.execute();
+		assertFalse("subprocess stderr should not appear in main output", output.contains("stderrText"));
+		assertTrue(
+				"subprocess stderr should appear in error stream",
+				errBytes.toString(StandardCharsets.UTF_8.name()).contains("stderrText"));
 	}
 }

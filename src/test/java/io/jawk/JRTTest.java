@@ -1,5 +1,27 @@
 package io.jawk;
 
+/*-
+ * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
+ * Jawk
+ * ჻჻჻჻჻჻
+ * Copyright (C) 2006 - 2026 MetricsHub
+ * ჻჻჻჻჻჻
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Lesser Public License for more details.
+ *
+ * You should have received a copy of the GNU General Lesser Public
+ * License along with this program.  If not, see
+ * <http://www.gnu.org/licenses/lgpl-3.0.html>.
+ * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
+ */
+
 import static org.junit.Assert.*;
 
 import java.util.LinkedHashMap;
@@ -9,6 +31,7 @@ import org.junit.Assume;
 import org.junit.Test;
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.jrt.AssocArray;
+import io.jawk.jrt.AwkSink;
 import io.jawk.jrt.JRT;
 
 public class JRTTest {
@@ -108,7 +131,7 @@ public class JRTTest {
 		AwkTestSupport
 				.awkTest("more process")
 				.script("BEGIN { print \"Hello\" | \"more\"; close(\"more\") }")
-				.expect("Hello\n\n")
+				.expectLines("Hello", "")
 				.runAndAssert();
 	}
 
@@ -128,7 +151,7 @@ public class JRTTest {
 		AwkTestSupport
 				.awkTest("system pipe windows")
 				.script("BEGIN { print(system(\"echo test|findstr test\")) }")
-				.expect("test\n0\n")
+				.expectLines("test", "0")
 				.runAndAssert();
 	}
 
@@ -144,8 +167,7 @@ public class JRTTest {
 	@Test
 	public void testSplitSetsFieldZero() {
 		AssocArray aa = AssocArray.createHash();
-		JRT jrt = new JRT(null, Locale.US);
-		jrt.setCONVFMT("%.6g");
+		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
 		int n = jrt.split(aa, "a b");
 		assertEquals(2, n);
 		assertEquals(2L, aa.get(0L));
@@ -154,8 +176,7 @@ public class JRTTest {
 	@Test
 	public void testSplitUsesLongIndexesForPlainMap() {
 		Map<Object, Object> map = new LinkedHashMap<>();
-		JRT jrt = new JRT(null, Locale.US);
-		jrt.setCONVFMT("%.6g");
+		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
 		int n = jrt.split(map, "a b");
 		assertEquals(2, n);
 		assertEquals(2L, map.get(0L));
@@ -167,8 +188,7 @@ public class JRTTest {
 	@Test
 	public void testSplitRegexWhitespace() {
 		AssocArray aa = AssocArray.createHash();
-		JRT jrt = new JRT(null, Locale.US);
-		jrt.setCONVFMT("%.6g");
+		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
 		int n = jrt.split("[ \t]+", aa, " 9853   shen");
 		assertEquals(3, n);
 		assertEquals("", aa.get(1));

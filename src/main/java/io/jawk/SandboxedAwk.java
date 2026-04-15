@@ -23,12 +23,12 @@ package io.jawk;
  */
 
 import java.util.Collection;
+import java.util.List;
 import io.jawk.backend.AVM;
 import io.jawk.backend.SandboxedAVM;
 import io.jawk.ext.JawkExtension;
-import io.jawk.intermediate.AwkTuples;
-import io.jawk.intermediate.SandboxedAwkTuples;
 import io.jawk.util.AwkSettings;
+import io.jawk.util.ScriptSource;
 
 /**
  * {@link Awk} variant that enforces sandbox restrictions by delegating to the
@@ -82,17 +82,142 @@ public final class SandboxedAwk extends Awk {
 	}
 
 	@Override
-	protected AwkTuples createTuples() {
-		return new SandboxedAwkTuples();
+	public AwkProgram compile(List<ScriptSource> scripts, boolean disableOptimizeParam) throws java.io.IOException {
+		return compileProgram(scripts, disableOptimizeParam, new SandboxedCompiledAwkProgram());
 	}
 
 	@Override
-	protected AVM createAvm() {
+	public AwkExpression compileExpression(String expression, boolean disableOptimizeParam) throws java.io.IOException {
+		return compileExpression(expression, disableOptimizeParam, new SandboxedCompiledAwkExpression());
+	}
+
+	@Override
+	public AVM createAvm() {
 		return createAvm(getSettings());
 	}
 
 	@Override
 	protected AVM createAvm(AwkSettings settingsParam) {
 		return new SandboxedAVM(settingsParam, getExtensionInstances());
+	}
+}
+
+final class SandboxedCompiledAwkProgram extends AwkProgram {
+	private static final long serialVersionUID = 1L;
+
+	@Override
+	public void printToFile(int numExprs, boolean append) {
+		deny("Output redirection is disabled in sandbox mode");
+	}
+
+	@Override
+	public void printToPipe(int numExprs) {
+		deny("Command execution through pipelines is disabled in sandbox mode");
+	}
+
+	@Override
+	public void printfToFile(int numExprs, boolean append) {
+		deny("Output redirection is disabled in sandbox mode");
+	}
+
+	@Override
+	public void printfToPipe(int numExprs) {
+		deny("Command execution through pipelines is disabled in sandbox mode");
+	}
+
+	@Override
+	public void system() {
+		deny("system() is disabled in sandbox mode");
+	}
+
+	@Override
+	public void useAsCommandInput() {
+		deny("Command execution through pipelines is disabled in sandbox mode");
+	}
+
+	@Override
+	public void useAsFileInput() {
+		deny("Input redirection is disabled in sandbox mode");
+	}
+
+	@Override
+	public void assignARGC() {
+		deny("Assigning to ARGC is disabled in sandbox mode");
+	}
+
+	@Override
+	public void argcOffset(int offset) {
+		// no-op: keep argcOffset at NULL_OFFSET; AVM.getARGC() returns the
+		// command-line argument count when ARGC is not materialized.
+	}
+
+	@Override
+	public void argvOffset(int offset) {
+		// no-op: keep argvOffset at NULL_OFFSET; AVM.getARGV() returns a
+		// synthetic AssocArray when ARGV is not materialized.
+	}
+
+	private static void deny(String message) {
+		throw new AwkSandboxException(message);
+	}
+}
+
+final class SandboxedCompiledAwkExpression extends AwkExpression {
+	private static final long serialVersionUID = 1L;
+
+	@Override
+	public void printToFile(int numExprs, boolean append) {
+		deny("Output redirection is disabled in sandbox mode");
+	}
+
+	@Override
+	public void printToPipe(int numExprs) {
+		deny("Command execution through pipelines is disabled in sandbox mode");
+	}
+
+	@Override
+	public void printfToFile(int numExprs, boolean append) {
+		deny("Output redirection is disabled in sandbox mode");
+	}
+
+	@Override
+	public void printfToPipe(int numExprs) {
+		deny("Command execution through pipelines is disabled in sandbox mode");
+	}
+
+	@Override
+	public void system() {
+		deny("system() is disabled in sandbox mode");
+	}
+
+	@Override
+	public void useAsCommandInput() {
+		deny("Command execution through pipelines is disabled in sandbox mode");
+	}
+
+	@Override
+	public void useAsFileInput() {
+		deny("Input redirection is disabled in sandbox mode");
+	}
+
+	@Override
+	public void assignARGC() {
+		deny("Assigning to ARGC is disabled in sandbox mode");
+	}
+
+	@Override
+	public void argcOffset(int offset) {
+		// no-op: keep argcOffset at NULL_OFFSET; AVM.getARGC() returns the
+		// command-line argument count when ARGC is not materialized.
+	}
+
+	@Override
+	public void argvOffset(int offset) {
+		// no-op: keep argvOffset at NULL_OFFSET; AVM.getARGV() returns a
+		// synthetic AssocArray when ARGV is not materialized.
+	}
+
+	private static void deny(String message) {
+		throw new AwkSandboxException(message);
 	}
 }

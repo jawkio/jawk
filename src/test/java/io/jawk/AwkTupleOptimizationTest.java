@@ -1,5 +1,27 @@
 package io.jawk;
 
+/*-
+ * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
+ * Jawk
+ * ჻჻჻჻჻჻
+ * Copyright (C) 2006 - 2026 MetricsHub
+ * ჻჻჻჻჻჻
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Lesser Public License for more details.
+ *
+ * You should have received a copy of the GNU General Lesser Public
+ * License along with this program.  If not, see
+ * <http://www.gnu.org/licenses/lgpl-3.0.html>.
+ * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
+ */
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -30,7 +52,7 @@ public class AwkTupleOptimizationTest {
 				.expect("hello\n")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
 		assertFalse("Tuple list should not be empty", opcodes.isEmpty());
 		assertNotEquals("Optimizer should remove trailing NOP", Opcode.NOP, opcodes.get(opcodes.size() - 1));
@@ -45,7 +67,7 @@ public class AwkTupleOptimizationTest {
 				.expect("3\n")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
 		assertFalse("Binary literal should eliminate ADD tuple", opcodes.contains(Opcode.ADD));
 		assertTrue("Expected folded literal push of 3", hasLiteralPush(tuples, Long.valueOf(3)));
@@ -60,7 +82,7 @@ public class AwkTupleOptimizationTest {
 				.expect("-5\n")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
 		assertFalse("Unary literal should eliminate NEGATE tuple", opcodes.contains(Opcode.NEGATE));
 		assertFalse("Unary literal should eliminate SUBTRACT tuple", opcodes.contains(Opcode.SUBTRACT));
@@ -76,7 +98,7 @@ public class AwkTupleOptimizationTest {
 				.expect("1\n")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
 		assertFalse("Literal comparison should eliminate CMP_LT tuple", opcodes.contains(Opcode.CMP_LT));
 		assertTrue("Expected folded literal push of 1", hasLiteralPush(tuples, Long.valueOf(1)));
@@ -91,7 +113,7 @@ public class AwkTupleOptimizationTest {
 				.expect("6\n")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
 		assertFalse("Nested literals should eliminate ADD tuples", opcodes.contains(Opcode.ADD));
 		assertTrue("Expected folded literal push of 6", hasLiteralPush(tuples, Long.valueOf(6)));
@@ -106,7 +128,7 @@ public class AwkTupleOptimizationTest {
 				.expect("foobar\n")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
 		assertFalse("Literal concatenation should eliminate CONCAT tuple", opcodes.contains(Opcode.CONCAT));
 		assertTrue("Expected folded literal push of foobar", hasLiteralPush(tuples, "foobar"));
@@ -115,7 +137,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void compilesGetlineIntoVariableWithDedicatedTargetOpcode() throws Exception {
 		String script = "{ getline line; print line; exit }\n";
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
 		assertTrue("getline target should use dedicated opcode", opcodes.contains(Opcode.GETLINE_INPUT_TO_TARGET));
 	}
@@ -129,7 +151,7 @@ public class AwkTupleOptimizationTest {
 				.expect("1x\n")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
 		assertTrue("Numeric literal concatenation should preserve CONCAT tuple", opcodes.contains(Opcode.CONCAT));
 		assertFalse("Optimizer should not fold numeric/string concatenation", hasLiteralPush(tuples, "1x"));
@@ -144,7 +166,7 @@ public class AwkTupleOptimizationTest {
 				.expect("before\ndone\n")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		String dump = dumpTuples(tuples);
 		assertFalse("Optimizer should remove unreachable print after exit", dump.contains("\"after\""));
 	}
@@ -159,7 +181,7 @@ public class AwkTupleOptimizationTest {
 				.expectLines("value")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
 
 		assertFalse("Tuple list should not be empty", opcodes.isEmpty());
@@ -179,11 +201,11 @@ public class AwkTupleOptimizationTest {
 				.expect("120\n")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
 		Set<Integer> callTargets = new HashSet<>();
 
-		PositionTracker tracker = tuples.top();
+		PositionTracker tracker = rawTuples(tuples).top();
 		while (!tracker.isEOF()) {
 			if (tracker.opcode() == Opcode.CALL_FUNCTION) {
 				Address address = tracker.addressArg();
@@ -204,7 +226,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void skipsOptimizationWhenDisabled() throws Exception {
 		String script = "BEGIN { print \"before\"; exit; print \"after\" }\n";
-		AwkTuples tuples = new Awk().compile(script, true);
+		AwkProgram tuples = new Awk().compile(script, true);
 		String dump = dumpTuples(tuples);
 
 		assertTrue("Unreachable code should remain when optimization disabled", dump.contains("\"after\""));
@@ -213,7 +235,8 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void optimizeSkipsPostProcessingWhenPointersPersist() throws Exception {
 		String script = "BEGIN { print \"hello\" }\n";
-		AwkTuples tuples = new Awk().compile(script, true);
+		AwkProgram program = new Awk().compile(script, true);
+		AwkTuples tuples = rawTuples(program);
 
 		Field postProcessedField = AwkTuples.class.getDeclaredField("postProcessed");
 		postProcessedField.setAccessible(true);
@@ -258,7 +281,7 @@ public class AwkTupleOptimizationTest {
 				.expectLines("b", "c")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		String dump = dumpTuples(tuples);
 		assertTrue("Expected folded field access for $1", dump.contains("GET_INPUT_FIELD_CONST, 1"));
 		assertTrue("Expected folded field access for $2", dump.contains("GET_INPUT_FIELD_CONST, 2"));
@@ -278,7 +301,7 @@ public class AwkTupleOptimizationTest {
 				.expectLines("3", "9")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		String dump = dumpTuples(tuples);
 		assertTrue("Expected folded then-branch literal", dump.contains("PUSH_LONG, 3"));
 		assertTrue("Expected folded else-branch literal", dump.contains("PUSH_LONG, 9"));
@@ -298,10 +321,10 @@ public class AwkTupleOptimizationTest {
 				.expectLines("beta")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		Set<Integer> branchTargets = new HashSet<>();
 
-		PositionTracker tracker = tuples.top();
+		PositionTracker tracker = rawTuples(tuples).top();
 		while (!tracker.isEOF()) {
 			if (usesAddress(tracker.opcode())) {
 				branchTargets.add(Integer.valueOf(tracker.addressArg().index()));
@@ -326,7 +349,7 @@ public class AwkTupleOptimizationTest {
 				.expect("42\n")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
 		for (int i = 0; i < opcodes.size() - 1; i++) {
 			assertFalse(
@@ -347,7 +370,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void preservesRuntimeFailureForFoldedNegativeFieldInScriptBranch() throws Exception {
 		String script = "{ print ($1 == \"x\" ? $2 : $-1) }\n";
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		String dump = dumpTuples(tuples);
 
 		assertTrue("Expected folded negative field access in tuple dump", dump.contains("GET_INPUT_FIELD_CONST, -1"));
@@ -370,7 +393,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void emitsArgcOffsetButNotArgvOffsetWhenUnreferenced() throws Exception {
 		String script = "{ print $0 }\n";
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
 		assertTrue("ARGC offset should always be emitted", opcodes.contains(Opcode.ARGC_OFFSET));
 		assertFalse("ARGV offset should not be emitted when ARGV is unreferenced", opcodes.contains(Opcode.ARGV_OFFSET));
@@ -385,7 +408,7 @@ public class AwkTupleOptimizationTest {
 				.expect("1\n")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
 		assertTrue("ARGC offset should be emitted when ARGC is referenced", opcodes.contains(Opcode.ARGC_OFFSET));
 		assertFalse("ARGV offset should not be emitted when ARGV is unreferenced", opcodes.contains(Opcode.ARGV_OFFSET));
@@ -400,7 +423,7 @@ public class AwkTupleOptimizationTest {
 				.expect("jawk\n")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
 		assertTrue("ARGC offset should be emitted when ARGV is referenced", opcodes.contains(Opcode.ARGC_OFFSET));
 		assertTrue("ARGV offset should be emitted when ARGV is referenced", opcodes.contains(Opcode.ARGV_OFFSET));
@@ -418,7 +441,7 @@ public class AwkTupleOptimizationTest {
 				.expectLines("{{file1}}:a", "{{file2}}:b")
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
 		assertTrue("ARGC offset should always be emitted", opcodes.contains(Opcode.ARGC_OFFSET));
 		assertFalse("ARGV offset should not be emitted when ARGV is unreferenced", opcodes.contains(Opcode.ARGV_OFFSET));
@@ -434,9 +457,9 @@ public class AwkTupleOptimizationTest {
 				.runAndAssert();
 	}
 
-	private static List<Opcode> collectOpcodes(AwkTuples tuples) {
+	private static List<Opcode> collectOpcodes(AwkProgram tuples) {
 		List<Opcode> opcodes = new ArrayList<>();
-		PositionTracker tracker = tuples.top();
+		PositionTracker tracker = rawTuples(tuples).top();
 		while (!tracker.isEOF()) {
 			opcodes.add(tracker.opcode());
 			tracker.next();
@@ -444,10 +467,10 @@ public class AwkTupleOptimizationTest {
 		return opcodes;
 	}
 
-	private static String dumpTuples(AwkTuples tuples) throws Exception {
+	private static String dumpTuples(AwkProgram tuples) throws Exception {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		try (PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8.name())) {
-			tuples.dump(ps);
+			rawTuples(tuples).dump(ps);
 		}
 		return out.toString(StandardCharsets.UTF_8.name());
 	}
@@ -465,7 +488,7 @@ public class AwkTupleOptimizationTest {
 				.expectLines(expectedLines)
 				.runAndAssert();
 
-		AwkTuples tuples = new Awk().compile(script);
+		AwkProgram tuples = new Awk().compile(script);
 		String dump = dumpTuples(tuples);
 		assertTrue(
 				"Expected GET_INPUT_FIELD_CONST in tuple dump",
@@ -475,8 +498,8 @@ public class AwkTupleOptimizationTest {
 				dump.contains("PUSH_LONG, " + fieldIndex));
 	}
 
-	private static boolean hasLiteralPush(AwkTuples tuples, Object expected) {
-		PositionTracker tracker = tuples.top();
+	private static boolean hasLiteralPush(AwkProgram tuples, Object expected) {
+		PositionTracker tracker = rawTuples(tuples).top();
 		while (!tracker.isEOF()) {
 			Opcode opcode = tracker.opcode();
 			if (opcode == Opcode.PUSH_LONG
@@ -514,8 +537,8 @@ public class AwkTupleOptimizationTest {
 		}
 	}
 
-	private static Opcode opcodeAt(AwkTuples tuples, int index) {
-		PositionTracker tracker = tuples.top();
+	private static Opcode opcodeAt(AwkProgram tuples, int index) {
+		PositionTracker tracker = rawTuples(tuples).top();
 		while (!tracker.isEOF()) {
 			if (tracker.current() == index) {
 				return tracker.opcode();
@@ -523,5 +546,9 @@ public class AwkTupleOptimizationTest {
 			tracker.next();
 		}
 		throw new AssertionError("No tuple at index " + index);
+	}
+
+	private static AwkTuples rawTuples(AwkProgram program) {
+		return (AwkTuples) program;
 	}
 }

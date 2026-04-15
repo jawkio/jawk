@@ -79,11 +79,11 @@
 
 	<dependencies>
 
-               <dependency>
-                       <groupId>org.metricshub</groupId>
-                       <artifactId>printf4j</artifactId>
-                       <version>0.9.08</version>
-               </dependency>
+		<dependency>
+			<groupId>org.metricshub</groupId>
+			<artifactId>printf4j</artifactId>
+			<version>0.9.08</version>
+		</dependency>
 
 		<dependency>
 			<groupId>com.github.stefanbirkner</groupId>
@@ -141,6 +141,10 @@
 				<version>2.7.1</version>
 				<configuration>
 					<licenseName>lgpl_v3</licenseName>
+					<includes>
+						<include>main/java/**/*.java</include>
+						<include>test/java/**/*.java</include>
+					</includes>
 				</configuration>
 			</plugin>
 
@@ -318,26 +322,6 @@
 			<!-- Default project-info-reports -->
 			<plugin>
 				<artifactId>maven-project-info-reports-plugin</artifactId>
-				<reportSets>
-					<reportSet>
-						<reports>
-							<report>ci-management</report>
-							<report>dependencies</report>
-							<report>dependency-info</report>
-							<report>dependency-management</report>
-							<report>distribution-management</report>
-							<report>issue-management</report>
-							<report>licenses</report>
-							<report>mailing-lists</report>
-							<report>modules</report>
-							<report>plugin-management</report>
-							<report>plugins</report>
-							<report>scm</report>
-							<report>summary</report>
-							<report>team</report>
-						</reports>
-					</reportSet>
-				</reportSets>
 			</plugin>
 
 			<!-- surefire report -->

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<site name="Jawk Documentation" xmlns="http://maven.apache.org/SITE/2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<site name="Jawk" xmlns="http://maven.apache.org/SITE/2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/SITE/2.0.0 https://maven.apache.org/xsd/site-2.0.0.xsd">
 
 	<skin>
@@ -45,29 +45,28 @@
 	<body>
 
 		<links>
-			<item name="The GNU Awk User's Guide" href="https://www.gnu.org/software/gawk/manual/gawk.html" />
-			<item name="Jawk on GitHub" href="https://github.com/jawkio/jawk" />
+			<item name="GitHub" href="https://github.com/jawkio/jawk" />
+			<item name="Download" href="https://github.com/jawkio/jawk/releases/latest" />
+			<item name="gawk" href="https://www.gnu.org/software/gawk/manual/gawk.html" />
 		</links>
-
-		<breadcrumbs>
-			<item name="Jawk" href="https://jawk.io" />
-		</breadcrumbs>
 
 		<menu name="Getting Started">
 			<item name="Overview" href="index.html" />
 			<item name="Installation" href="install.html" />
 		</menu>
 
-		<menu name="CLI">
-			<item name="CLI Basics" href="cli.html" />
-			<item name="CLI Reference" href="cli-reference.html" />
-		</menu>
-
-		<menu name="Java">
+		<menu name="Jawk Java API">
 			<item name="Jawk Quickstart" href="java.html" />
-			<item name="Structured Input and Variables" href="java-input.html" />
+			<item name="Structured Input" href="java-input.html" />
+			<item name="Variables and Arguments" href="java-variables.html" />
+			<item name="Custom Output" href="java-output.html" />
 			<item name="Compile, Eval, and Reuse" href="java-compile.html" />
 			<item name="Advanced Runtime" href="java-advanced.html" />
+		</menu>
+
+		<menu name="Jawk CLI">
+			<item name="CLI Basics" href="cli.html" />
+			<item name="CLI Reference" href="cli-reference.html" />
 		</menu>
 
 		<menu name="Extensions">
@@ -77,6 +76,7 @@
 
 		<menu name="Reference">
 			<item name="Compatibility and Differences" href="compatibility.html" />
+			<item name="Javadoc (API)" href="apidocs/index.html" />
 		</menu>
 
 		<menu ref="reports" />

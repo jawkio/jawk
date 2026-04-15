@@ -31,7 +31,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.junit.Test;
-import io.jawk.intermediate.AwkTuples;
 import io.jawk.jrt.InputSource;
 import io.jawk.util.AwkSettings;
 
@@ -564,8 +563,8 @@ public class InputSourceTest {
 	public void testEvalWithPrecompiledTuplesAndInputSource() throws Exception {
 		InputSource source = new TableInputSource(
 				Collections.singletonList(Arrays.asList("10", "20", "30")));
-		AwkTuples tuples = AWK.compileForEval("$1 + $2 + $3");
-		assertEquals(60, ((Number) AWK.eval(tuples, source)).intValue());
+		AwkExpression expression = AWK.compileExpression("$1 + $2 + $3");
+		assertEquals(60, ((Number) AWK.eval(expression, source)).intValue());
 	}
 
 	@Test

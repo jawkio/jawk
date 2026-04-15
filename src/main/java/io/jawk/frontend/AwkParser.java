@@ -1890,7 +1890,7 @@ public class AwkParser {
 	private AST parseParenthesizedPrintArguments() throws IOException {
 		lexer(); // consume '('
 		if (token == Token.CLOSE_PAREN) {
-			lexer(Token.CLOSE_PAREN);
+			lexer(); // consume ')'
 			return null;
 		}
 
@@ -1934,7 +1934,8 @@ public class AwkParser {
 		return new PrintAst(
 				params,
 				parsedPrintStatement.getOutputToken(),
-				parsedPrintStatement.getOutputExpr());
+				parsedPrintStatement.getOutputExpr(),
+				parsedPrintStatement.isParenthesized());
 	}
 
 	AST PRINTF_STATEMENT() throws IOException {
@@ -4605,10 +4606,12 @@ public class AwkParser {
 	private final class PrintAst extends ScalarExpressionAst {
 
 		private Token outputToken;
+		private boolean parenthesized;
 
-		private PrintAst(AST exprList, Token outToken, AST outputExpr) {
+		private PrintAst(AST exprList, Token outToken, AST outputExpr, boolean parenthesized) {
 			super(exprList, outputExpr);
 			this.outputToken = outToken;
+			this.parenthesized = parenthesized;
 		}
 
 		@Override
@@ -4617,6 +4620,9 @@ public class AwkParser {
 
 			int paramCount;
 			if (getAst1() == null) {
+				if (parenthesized) {
+					throw new SemanticException("print() requires at least 1 argument");
+				}
 				paramCount = 0;
 			} else {
 				paramCount = getAst1().populateTuples(tuples);
@@ -4751,7 +4757,7 @@ public class AwkParser {
 
 			int paramCount;
 			if (getAst1() == null) {
-				paramCount = 0;
+				throw new SemanticException("printf requires at least 1 argument");
 			} else {
 				paramCount = getAst1().populateTuples(tuples);
 				if (paramCount == 0) {

@@ -22,23 +22,28 @@ package io.jawk.util;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import java.io.PrintStream;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
+import io.jawk.Awk;
 
 /**
  * Reusable behavioral configuration for the Jawk engine.
  * <p>
  * Instances hold settings that control how the AWK interpreter behaves
- * (field separator, locale, output stream, etc.) but do <em>not</em> carry
- * per-execution state such as input sources or filename arguments. This
+ * (field separator, locale, sorted keys, initial variables, and default
+ * record separator) but do <em>not</em> carry per-execution state such as
+ * input sources, filename arguments, or output destinations. This
  * separation allows a single {@code AwkSettings} object to be shared
- * across many invocations of {@link io.jawk.Awk#eval} or
- * {@link io.jawk.Awk#invoke}.
+ * across many invocations of {@link io.jawk.Awk#eval},
+ * {@link io.jawk.Awk#script}, or {@link io.jawk.Awk#createAvm()}.
+ * </p>
+ * <p>
+ * Output is configured on the execution builder returned by
+ * {@link io.jawk.Awk#script(String)} or {@link io.jawk.Awk#script(io.jawk.AwkProgram)}
+ * and is therefore always per-execution.
  * </p>
  *
  * @author Danny Daglas
@@ -80,34 +85,17 @@ public class AwkSettings {
 	private volatile boolean useSortedArrayKeys = false;
 
 	/**
-	 * Whether to trap <code>IllegalFormatExceptions</code>
-	 * for <code>[s]printf</code>;
-	 * <code>true</code> by default.
-	 */
-	private volatile boolean catchIllegalFormatExceptions = true;
-
-	/**
-	 * Output stream;
-	 * <code>System.out</code> by default,
-	 * which means we will print to stdout by default
-	 */
-	private volatile PrintStream outputStream = System.out;
-
-	/**
 	 * Locale for the output of numbers
 	 * <code>US-English</code> by default.
 	 */
 	private volatile Locale locale = Locale.US;
 
 	/**
-	 * Default value for RS, when not set specifically by the AWK script
+	 * Default value for RS, when not set specifically by the AWK script.
+	 * Defaults to {@link Awk#DEFAULT_RS} per POSIX. Platform-specific
+	 * end-of-line handling is the responsibility of the input source.
 	 */
-	private volatile String defaultRS = System.getProperty("line.separator", "\n");
-
-	/**
-	 * Default value for ORS, when not set specifically by the AWK script
-	 */
-	private volatile String defaultORS = System.getProperty("line.separator", "\n");
+	private volatile String defaultRS = Awk.DEFAULT_RS;
 
 	/**
 	 * Monotonically increasing counter incremented whenever the settings change.
@@ -131,8 +119,6 @@ public class AwkSettings {
 		desc.append("variables = ").append(getVariables()).append(newLine);
 		desc.append("fieldSeparator = ").append(getFieldSeparator()).append(newLine);
 		desc.append("useSortedArrayKeys = ").append(isUseSortedArrayKeys()).append(newLine);
-		desc.append("catchIllegalFormatExceptions = ").append(isCatchIllegalFormatExceptions()).append(newLine);
-
 		return desc.toString();
 	}
 
@@ -149,9 +135,6 @@ public class AwkSettings {
 
 		if (isUseSortedArrayKeys()) {
 			extensions.append(", associative array keys are sorted");
-		}
-		if (isCatchIllegalFormatExceptions()) {
-			extensions.append(", IllegalFormatExceptions NOT trapped");
 		}
 		if (extensions.length() > 0) {
 			return "{extensions: " + extensions.substring(2) + "}";
@@ -285,51 +268,6 @@ public class AwkSettings {
 	}
 
 	/**
-	 * Output stream;
-	 * <code>System.out</code> by default,
-	 * which means we will print to stdout by default
-	 *
-	 * @return the output stream
-	 */
-	@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "OutputStream reference is intentionally shared so callers can control output.")
-	public PrintStream getOutputStream() {
-		return outputStream;
-	}
-
-	/**
-	 * Sets the OutputStream to print to (instead of System.out by default)
-	 *
-	 * @param pOutputStream OutputStream to use for print statements
-	 */
-	public void setOutputStream(PrintStream pOutputStream) {
-		outputStream = Objects.requireNonNull(pOutputStream, "outputStream");
-		markModified();
-	}
-
-	/**
-	 * Whether to trap <code>IllegalFormatExceptions</code>
-	 * for <code>[s]printf</code>;
-	 * <code>true</code> by default.
-	 *
-	 * @return the catchIllegalFormatExceptions
-	 */
-	public boolean isCatchIllegalFormatExceptions() {
-		return catchIllegalFormatExceptions;
-	}
-
-	/**
-	 * Whether to trap <code>IllegalFormatExceptions</code>
-	 * for <code>[s]printf</code>;
-	 * <code>true</code> by default.
-	 *
-	 * @param catchIllegalFormatExceptions the catchIllegalFormatExceptions to set
-	 */
-	public void setCatchIllegalFormatExceptions(boolean catchIllegalFormatExceptions) {
-		this.catchIllegalFormatExceptions = catchIllegalFormatExceptions;
-		markModified();
-	}
-
-	/**
 	 * <p>
 	 * Getter for the field <code>locale</code>.
 	 * </p>
@@ -341,12 +279,12 @@ public class AwkSettings {
 	}
 
 	/**
-	 * Sets the Locale for outputting numbers
+	 * Sets the Locale for outputting numbers.
 	 *
 	 * @param pLocale The locale to be used (e.g.: <code>Locale.US</code>)
 	 */
 	public void setLocale(Locale pLocale) {
-		locale = pLocale;
+		locale = pLocale == null ? Locale.US : pLocale;
 		markModified();
 	}
 
@@ -368,27 +306,6 @@ public class AwkSettings {
 	 */
 	public void setDefaultRS(String rs) {
 		defaultRS = Objects.requireNonNull(rs, "defaultRS");
-		markModified();
-	}
-
-	/**
-	 * <p>
-	 * Getter for the field <code>defaultORS</code>.
-	 * </p>
-	 *
-	 * @return the default ORS, when not set by the AWK script
-	 */
-	public String getDefaultORS() {
-		return defaultORS;
-	}
-
-	/**
-	 * Sets the default ORS, when not set by the AWK script
-	 *
-	 * @param ors The string that separates output records (with the print statement)
-	 */
-	public void setDefaultORS(String ors) {
-		defaultORS = Objects.requireNonNull(ors, "defaultORS");
 		markModified();
 	}
 
@@ -423,27 +340,12 @@ public class AwkSettings {
 		}
 
 		@Override
-		public void setOutputStream(PrintStream pOutputStream) {
-			throw unsupported();
-		}
-
-		@Override
-		public void setCatchIllegalFormatExceptions(boolean catchIllegalFormatExceptions) {
-			throw unsupported();
-		}
-
-		@Override
 		public void setLocale(Locale pLocale) {
 			throw unsupported();
 		}
 
 		@Override
 		public void setDefaultRS(String rs) {
-			throw unsupported();
-		}
-
-		@Override
-		public void setDefaultORS(String ors) {
 			throw unsupported();
 		}
 

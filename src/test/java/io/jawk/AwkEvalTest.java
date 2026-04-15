@@ -1,11 +1,11 @@
 package io.jawk;
 
 /*-
- * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
+ * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
- * ••••••
+ * ჻჻჻჻჻჻
  * Copyright (C) 2006 - 2026 MetricsHub
- * ••••••
+ * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3 of the
@@ -19,7 +19,7 @@ package io.jawk;
  * You should have received a copy of the GNU General Lesser Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/lgpl-3.0.html>.
- * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
+ * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
 import static org.junit.Assert.assertEquals;
@@ -36,10 +36,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 import io.jawk.backend.AVM;
 import io.jawk.intermediate.AwkTuples;
+import io.jawk.jrt.AwkSink;
 import io.jawk.jrt.AwkRuntimeException;
 import io.jawk.jrt.InputSource;
 import io.jawk.jrt.JRT;
@@ -53,88 +55,88 @@ public class AwkEvalTest {
 	@Test
 	public void testReusableEvalResetsStructuredInputStateBetweenRuns() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples tuples = awk.compileForEval("NR \":\" NF \":\" $1");
+		AwkExpression expression = awk.compileExpression("NR \":\" NF \":\" $1");
 
 		assertEquals(
 				"1:2:alpha",
-				awk.eval(tuples, new TableInputSource(Collections.singletonList(Arrays.asList("alpha", "beta")))));
+				awk.eval(expression, new TableInputSource(Collections.singletonList(Arrays.asList("alpha", "beta")))));
 		assertEquals(
 				"1:3:x",
-				awk.eval(tuples, new TableInputSource(Collections.singletonList(Arrays.asList("x", "y", "z")))));
+				awk.eval(expression, new TableInputSource(Collections.singletonList(Arrays.asList("x", "y", "z")))));
 	}
 
 	@Test
 	public void testReusableEvalResetsStringInputStateBetweenRuns() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples tuples = awk.compileForEval("NF \":\" $2");
+		AwkExpression expression = awk.compileExpression("NF \":\" $2");
 
-		assertEquals("3:b", awk.eval(tuples, "a b c"));
-		assertEquals("2:right", awk.eval(tuples, "left right"));
+		assertEquals("3:b", awk.eval(expression, "a b c"));
+		assertEquals("2:right", awk.eval(expression, "left right"));
 	}
 
 	@Test
-	public void testCompileForEvalOmitsSetNumGlobalsForFieldOnlyExpression() throws Exception {
+	public void testCompileExpressionOmitsSetNumGlobalsForFieldOnlyExpression() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples tuples = awk.compileForEval("NF \":\" $2");
-		String dump = dumpTuples(tuples);
+		AwkExpression expression = awk.compileExpression("NF \":\" $2");
+		String dump = dumpTuples(expression);
 
 		assertFalse(startsWithGoto(dump));
 		assertFalse(dump.contains("SET_NUM_GLOBALS"));
-		assertEquals("3:b", awk.eval(tuples, "a b c"));
+		assertEquals("3:b", awk.eval(expression, "a b c"));
 	}
 
 	@Test
-	public void testCompileForEvalSimpleFieldExpressionFoldsToConstFieldAccess() throws Exception {
+	public void testCompileExpressionSimpleFieldExpressionFoldsToConstFieldAccess() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples tuples = awk.compileForEval("$2");
-		String dump = dumpTuples(tuples);
+		AwkExpression expression = awk.compileExpression("$2");
+		String dump = dumpTuples(expression);
 
 		assertFalse(startsWithGoto(dump));
 		assertTrue(dump.contains("GET_INPUT_FIELD_CONST, 2"));
 		assertFalse(dump.contains("PUSH_LONG, 2"));
-		assertEquals("beta", awk.eval(tuples, "alpha beta"));
+		assertEquals("beta", awk.eval(expression, "alpha beta"));
 	}
 
 	@Test
-	public void testCompileForEvalNegativeFieldBranchStillFailsOnlyAtRuntime() throws Exception {
+	public void testCompileExpressionNegativeFieldBranchStillFailsOnlyAtRuntime() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples tuples = awk.compileForEval("$1 == \"x\" ? $2 : $-1");
-		String dump = dumpTuples(tuples);
+		AwkExpression expression = awk.compileExpression("$1 == \"x\" ? $2 : $-1");
+		String dump = dumpTuples(expression);
 
 		assertTrue(dump.contains("GET_INPUT_FIELD_CONST, -1"));
-		assertEquals("b", awk.eval(tuples, "x b c"));
+		assertEquals("b", awk.eval(expression, "x b c"));
 
-		AwkRuntimeException thrown = assertThrows(AwkRuntimeException.class, () -> awk.eval(tuples, "y b c"));
+		AwkRuntimeException thrown = assertThrows(AwkRuntimeException.class, () -> awk.eval(expression, "y b c"));
 		assertEquals("Field $(-1) is incorrect.", thrown.getMessage());
 	}
 
 	@Test
-	public void testCompileForEvalKeepsSetNumGlobalsWhenGlobalMetadataIsNeeded() throws Exception {
+	public void testCompileExpressionKeepsSetNumGlobalsWhenGlobalMetadataIsNeeded() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples tuples = awk.compileForEval("match($0, /a/)");
-		String dump = dumpTuples(tuples);
+		AwkExpression expression = awk.compileExpression("match($0, /a/)");
+		String dump = dumpTuples(expression);
 
 		assertFalse(startsWithGoto(dump));
 		assertTrue(dump.contains("SET_NUM_GLOBALS"));
-		assertEquals(1, awk.eval(tuples, "a"));
+		assertEquals(1, awk.eval(expression, "a"));
 	}
 
 	@Test
-	public void testCompileForEvalStatefulGlobalExpressionStartsWithoutGoto() throws Exception {
+	public void testCompileExpressionStatefulGlobalExpressionStartsWithoutGoto() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples tuples = awk.compileForEval("a++");
-		String dump = dumpTuples(tuples);
+		AwkExpression expression = awk.compileExpression("a++");
+		String dump = dumpTuples(expression);
 
 		assertFalse(startsWithGoto(dump));
 		assertTrue(dump.contains("SET_NUM_GLOBALS"));
-		assertEquals(0.0, JRT.toDouble(awk.eval(tuples, "alpha")), 0.0);
+		assertEquals(0.0, JRT.toDouble(awk.eval(expression, "alpha")), 0.0);
 	}
 
 	@Test
-	public void testCompileForEvalTernaryFoldsAllLiteralFieldAccessesIncludingLabeledEntries() throws Exception {
+	public void testCompileExpressionTernaryFoldsAllLiteralFieldAccessesIncludingLabeledEntries() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples tuples = awk.compileForEval("$1 == \"x\" ? $2 : $3");
-		String dump = dumpTuples(tuples);
+		AwkExpression expression = awk.compileExpression("$1 == \"x\" ? $2 : $3");
+		String dump = dumpTuples(expression);
 
 		assertFalse(startsWithGoto(dump));
 		assertTrue(dump.contains("GET_INPUT_FIELD_CONST, 1"));
@@ -143,15 +145,15 @@ public class AwkEvalTest {
 		assertFalse(dump.contains("PUSH_LONG, 1"));
 		assertFalse(dump.contains("PUSH_LONG, 2"));
 		assertFalse(dump.contains("PUSH_LONG, 3"));
-		assertEquals("b", awk.eval(tuples, "x b c"));
-		assertEquals("c", awk.eval(tuples, "y b c"));
+		assertEquals("b", awk.eval(expression, "x b c"));
+		assertEquals("c", awk.eval(expression, "y b c"));
 	}
 
 	@Test
-	public void testCompileForEvalTernaryFoldsLabeledBinaryLiteralBranch() throws Exception {
+	public void testCompileExpressionTernaryFoldsLabeledBinaryLiteralBranch() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples tuples = awk.compileForEval("$1 == \"x\" ? (1 + 2) : (4 + 5)");
-		String dump = dumpTuples(tuples);
+		AwkExpression expression = awk.compileExpression("$1 == \"x\" ? (1 + 2) : (4 + 5)");
+		String dump = dumpTuples(expression);
 
 		assertFalse(startsWithGoto(dump));
 		assertTrue(dump.contains("PUSH_LONG, 3"));
@@ -160,49 +162,49 @@ public class AwkEvalTest {
 		assertFalse(dump.contains("PUSH_LONG, 2"));
 		assertFalse(dump.contains("PUSH_LONG, 4"));
 		assertFalse(dump.contains("PUSH_LONG, 5"));
-		assertEquals(3.0, JRT.toDouble(awk.eval(tuples, "x b c")), 0.0);
-		assertEquals(9.0, JRT.toDouble(awk.eval(tuples, "y b c")), 0.0);
+		assertEquals(3.0, JRT.toDouble(awk.eval(expression, "x b c")), 0.0);
+		assertEquals(9.0, JRT.toDouble(awk.eval(expression, "y b c")), 0.0);
 	}
 
 	@Test
-	public void testCompileForEvalTernaryExpressionStartsWithoutGoto() throws Exception {
+	public void testCompileExpressionTernaryExpressionStartsWithoutGoto() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples tuples = awk.compileForEval("($1 + 0) ? $2 : $3");
-		String dump = dumpTuples(tuples);
+		AwkExpression expression = awk.compileExpression("($1 + 0) ? $2 : $3");
+		String dump = dumpTuples(expression);
 
 		assertFalse(startsWithGoto(dump));
-		assertEquals("b", awk.eval(tuples, "1 b c"));
-		assertEquals("c", awk.eval(tuples, "0 b c"));
+		assertEquals("b", awk.eval(expression, "1 b c"));
+		assertEquals("c", awk.eval(expression, "0 b c"));
 	}
 
 	@Test
-	public void testCompileForEvalUnoptimizedTernaryExpressionResolvesBranchTargets() throws Exception {
+	public void testCompileExpressionUnoptimizedTernaryExpressionResolvesBranchTargets() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples tuples = awk.compileForEval("($1 + 0) ? $2 : $3", true);
-		String dump = dumpTuples(tuples);
+		AwkExpression expression = awk.compileExpression("($1 + 0) ? $2 : $3", true);
+		String dump = dumpTuples(expression);
 
 		assertFalse(startsWithGoto(dump));
-		assertEquals("b", awk.eval(tuples, "1 b c"));
-		assertEquals("c", awk.eval(tuples, "0 b c"));
+		assertEquals("b", awk.eval(expression, "1 b c"));
+		assertEquals("c", awk.eval(expression, "0 b c"));
 	}
 
 	@Test
 	public void testFieldOnlyEvalUsesFreshAvmPerInvocation() throws Exception {
 		CountingAwk awk = new CountingAwk();
-		AwkTuples tuples = awk.compileForEval("NF \":\" $2");
+		AwkExpression expression = awk.compileExpression("NF \":\" $2");
 
-		assertEquals("3:b", awk.eval(tuples, "a b c"));
-		assertEquals("2:right", awk.eval(tuples, "left right"));
+		assertEquals("3:b", awk.eval(expression, "a b c"));
+		assertEquals("2:right", awk.eval(expression, "left right"));
 		assertEquals(2, awk.getCreateAvmCount());
 	}
 
 	@Test
 	public void testStatefulEvalUsesFreshAvmPerInvocation() throws Exception {
 		CountingAwk awk = new CountingAwk();
-		AwkTuples tuples = awk.compileForEval("match($0, /a/)");
+		AwkExpression expression = awk.compileExpression("match($0, /a/)");
 
-		assertEquals(1, awk.eval(tuples, "a"));
-		assertEquals(1, awk.eval(tuples, "a"));
+		assertEquals(1, awk.eval(expression, "a"));
+		assertEquals(1, awk.eval(expression, "a"));
 		assertEquals(2, awk.getCreateAvmCount());
 	}
 
@@ -210,13 +212,13 @@ public class AwkEvalTest {
 	public void testEvalHonorsSettingsChangesBetweenCalls() throws Exception {
 		AwkSettings settings = new AwkSettings();
 		Awk awk = new Awk(settings);
-		AwkTuples tuples = awk.compileForEval("$2");
+		AwkExpression expression = awk.compileExpression("$2");
 
 		settings.setFieldSeparator(",");
-		assertEquals("beta", awk.eval(tuples, "alpha,beta"));
+		assertEquals("beta", awk.eval(expression, "alpha,beta"));
 
 		settings.setFieldSeparator(":");
-		assertEquals("right", awk.eval(tuples, "left:right"));
+		assertEquals("right", awk.eval(expression, "left:right"));
 	}
 
 	@Test
@@ -237,8 +239,8 @@ public class AwkEvalTest {
 	@Test
 	public void testPrepareEvalReusesOneStringRecordAcrossSeveralExpressions() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples secondField = awk.compileForEval("$2");
-		AwkTuples sizeAndLastField = awk.compileForEval("NF \":\" $NF");
+		AwkExpression secondField = awk.compileExpression("$2");
+		AwkExpression sizeAndLastField = awk.compileExpression("NF \":\" $NF");
 
 		try (AVM prepared = awk.prepareEval("alpha beta gamma")) {
 			assertEquals("beta", prepared.eval(secondField));
@@ -249,8 +251,8 @@ public class AwkEvalTest {
 	@Test
 	public void testPrepareEvalReusesOneStructuredRecordAcrossSeveralExpressions() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples secondField = awk.compileForEval("$2");
-		AwkTuples sizeAndLastField = awk.compileForEval("NF \":\" $NF");
+		AwkExpression secondField = awk.compileExpression("$2");
+		AwkExpression sizeAndLastField = awk.compileExpression("NF \":\" $NF");
 
 		try (
 				AVM prepared = awk
@@ -264,8 +266,8 @@ public class AwkEvalTest {
 	@Test
 	public void testPrepareEvalIntentionallyCarriesJrtStateAcrossExpressions() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples matcher = awk.compileForEval("match($0, /alpha/)");
-		AwkTuples startAndLength = awk.compileForEval("RSTART \":\" RLENGTH");
+		AwkExpression matcher = awk.compileExpression("match($0, /alpha/)");
+		AwkExpression startAndLength = awk.compileExpression("RSTART \":\" RLENGTH");
 
 		try (AVM prepared = awk.prepareEval("alpha beta")) {
 			assertEquals(1, prepared.eval(matcher));
@@ -276,7 +278,7 @@ public class AwkEvalTest {
 	@Test
 	public void testPrepareEvalIntentionallyCarriesStateAcrossRepeatedTupleRuns() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples increment = awk.compileForEval("a++");
+		AwkExpression increment = awk.compileExpression("a++");
 
 		try (AVM prepared = awk.prepareEval("alpha beta")) {
 			assertEquals(0.0, JRT.toDouble(prepared.eval(increment)), 0.0);
@@ -285,30 +287,17 @@ public class AwkEvalTest {
 	}
 
 	@Test
-	public void testEvalRejectsExitOpcodeWithoutPoisoningPreparedAvm() throws Exception {
-		Awk awk = new Awk();
-		AwkTuples invalidEvalTuples = awk.compile("BEGIN { exit 7 }");
-		AwkTuples safeExpression = awk.compileForEval("1 + 1");
-
-		try (AVM prepared = awk.prepareEval("alpha beta")) {
-			IllegalStateException thrown = assertThrows(IllegalStateException.class, () -> prepared.eval(invalidEvalTuples));
-			assertEquals("eval(AwkTuples) cannot execute EXIT opcodes.", thrown.getMessage());
-			assertEquals(2.0, JRT.toDouble(prepared.eval(safeExpression)), 0.0);
-		}
-	}
-
-	@Test
 	public void testPrepareForEvalCanAdvanceAcrossRecordsOnSameSource() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples tuples = awk.compileForEval("NF \":\" $2");
+		AwkExpression expression = awk.compileExpression("NF \":\" $2");
 		TableInputSource source = new TableInputSource(
 				Arrays.asList(Arrays.asList("a", "b", "c"), Arrays.asList("left", "right")));
 
 		try (AVM avm = new AVM(new AwkSettings(), Collections.emptyMap())) {
 			assertTrue(avm.prepareForEval(source));
-			assertEquals("3:b", avm.eval(tuples));
+			assertEquals("3:b", avm.eval(expression));
 			assertTrue(avm.prepareForEval(source));
-			assertEquals("2:right", avm.eval(tuples));
+			assertEquals("2:right", avm.eval(expression));
 			assertFalse(avm.prepareForEval(source));
 		}
 	}
@@ -316,8 +305,8 @@ public class AwkEvalTest {
 	@Test
 	public void testPrepareEvalRejectsDifferentStatefulTupleLayoutsWithoutReprepare() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples firstIncrement = awk.compileForEval("a++");
-		AwkTuples secondIncrement = awk.compileForEval("b++");
+		AwkExpression firstIncrement = awk.compileExpression("a++");
+		AwkExpression secondIncrement = awk.compileExpression("b++");
 
 		try (AVM prepared = awk.prepareEval("alpha beta")) {
 			assertEquals(0.0, JRT.toDouble(prepared.eval(firstIncrement)), 0.0);
@@ -353,7 +342,7 @@ public class AwkEvalTest {
 	@Test
 	public void testPreparedAvmCanCloseBoundInputSource() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples secondField = awk.compileForEval("$2");
+		AwkExpression secondField = awk.compileExpression("$2");
 		CloseTrackingInputSource source = new CloseTrackingInputSource(
 				Collections.singletonList(Arrays.asList("left", "right")));
 
@@ -367,7 +356,7 @@ public class AwkEvalTest {
 	@Test
 	public void testDirectAvmEvalLeavesBoundInputSourceOpenUntilClose() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples secondField = awk.compileForEval("$2");
+		AwkExpression secondField = awk.compileExpression("$2");
 		CloseTrackingInputSource source = new CloseTrackingInputSource(
 				Collections.singletonList(Arrays.asList("left", "right")));
 
@@ -382,7 +371,7 @@ public class AwkEvalTest {
 	@Test
 	public void testAwkEvalClosesStructuredInputSourceAfterOneShotEval() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples secondField = awk.compileForEval("$2");
+		AwkExpression secondField = awk.compileExpression("$2");
 		CloseTrackingInputSource source = new CloseTrackingInputSource(
 				Collections.singletonList(Arrays.asList("left", "right")));
 
@@ -409,16 +398,15 @@ public class AwkEvalTest {
 	@Test
 	public void testInterpretClosesPreviousCloseableInputSourceWhenRebinding() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples tuples = awk.compile("{ }");
+		AwkProgram program = awk.compile("{ }");
 		CloseTrackingInputSource first = new CloseTrackingInputSource(Collections.singletonList(Arrays.asList("a", "b")));
 		CloseTrackingInputSource second = new CloseTrackingInputSource(Collections.singletonList(Arrays.asList("x", "y")));
 		AwkSettings settings = new AwkSettings();
-		settings.setOutputStream(new PrintStream(new ByteArrayOutputStream(), false, StandardCharsets.UTF_8.name()));
 
 		try (AVM avm = new AVM(settings, Collections.emptyMap())) {
-			avm.interpret(tuples, first);
+			avm.execute(program, first);
 			assertFalse(first.isClosed());
-			avm.interpret(tuples, second);
+			avm.execute(program, second);
 			assertTrue(first.isClosed());
 			assertFalse(second.isClosed());
 		}
@@ -428,60 +416,59 @@ public class AwkEvalTest {
 
 	@Test
 	public void testOptimizeRemainsIdempotentForEvalTuples() throws Exception {
-		AwkTuples tuples = new Awk().compileForEval("$2 + $3");
+		AwkExpression expression = new Awk().compileExpression("$2 + $3");
+		AwkTuples tuples = rawTuples(expression);
 		String before = dumpTuples(tuples);
 
 		tuples.optimize();
 		String after = dumpTuples(tuples);
 
 		assertEquals(before, after);
-		assertEquals(5.0, JRT.toDouble(new Awk().eval(tuples, "x 2 3")), 0.0);
+		assertEquals(5.0, JRT.toDouble(new Awk().eval(expression, "x 2 3")), 0.0);
 	}
 
 	@Test
 	public void testReusedAvmPreparesStatefulExecutionOnEachRun() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples tuples = awk.compileForEval("match($0, /a/)");
+		AwkExpression expression = awk.compileExpression("match($0, /a/)");
 		TrackingAVM avm = new TrackingAVM(new AwkSettings());
 
 		try (TrackingAVM ignored = avm) {
-			assertEquals(1, avm.eval(tuples, new SingleRecordInputSource("a")));
-			assertEquals(1, avm.eval(tuples, new SingleRecordInputSource("a")));
+			assertEquals(1, avm.eval(expression, new SingleRecordInputSource("a")));
+			assertEquals(1, avm.eval(expression, new SingleRecordInputSource("a")));
 			assertEquals(2, avm.getPrepareForExecutionCount());
-			assertEquals(0, avm.getLegacyInitializationCount());
 		}
-		assertEquals(3, avm.getCloseAllCount());
+		assertEquals(5, avm.getCloseAllCount());
 	}
 
 	@Test
 	public void testReusedAvmEvalUsesPreparedRuntimeSetup() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples tuples = awk.compileForEval("NF \":\" $2");
+		AwkExpression expression = awk.compileExpression("NF \":\" $2");
 		TrackingAVM avm = new TrackingAVM(new AwkSettings());
 
 		try (TrackingAVM ignored = avm) {
-			assertEquals("3:b", avm.eval(tuples, new SingleRecordInputSource("a b c")));
-			assertEquals("2:right", avm.eval(tuples, new SingleRecordInputSource("left right")));
+			assertEquals("3:b", avm.eval(expression, new SingleRecordInputSource("a b c")));
+			assertEquals("2:right", avm.eval(expression, new SingleRecordInputSource("left right")));
 			assertEquals(2, avm.getPrepareForExecutionCount());
-			assertEquals(0, avm.getLegacyInitializationCount());
 		}
-		assertEquals(3, avm.getCloseAllCount());
+		assertEquals(5, avm.getCloseAllCount());
 	}
 
 	@Test
 	public void testVariableOverridesDoNotLeakAcrossReusedAvmEvalCalls() throws Exception {
 		Awk awk = new Awk();
-		AwkTuples tuples = awk.compileForEval("x == \"\"");
+		AwkExpression expression = awk.compileExpression("x == \"\"");
 		AVM avm = new AVM(new AwkSettings(), Collections.emptyMap());
 
 		assertEquals(
 				0,
 				avm
 						.eval(
-								tuples,
+								expression,
 								new SingleRecordInputSource((String) null),
 								Collections.<String, Object>singletonMap("x", "set")));
-		assertEquals(1, avm.eval(tuples, new SingleRecordInputSource((String) null)));
+		assertEquals(1, avm.eval(expression, new SingleRecordInputSource((String) null)));
 	}
 
 	private static final class TableInputSource implements InputSource {
@@ -531,6 +518,14 @@ public class AwkEvalTest {
 			tuples.dump(ps);
 		}
 		return out.toString(StandardCharsets.UTF_8.name());
+	}
+
+	private static String dumpTuples(AwkExpression expression) throws IOException {
+		return dumpTuples(rawTuples(expression));
+	}
+
+	private static AwkTuples rawTuples(AwkExpression expression) {
+		return expression;
 	}
 
 	private static boolean startsWithGoto(String dump) {
@@ -625,16 +620,13 @@ public class AwkEvalTest {
 
 		@Override
 		protected JRT createJrt() {
-			trackingJrt = new TrackingJRT(this);
+			AwkSettings s = getSettings();
+			trackingJrt = new TrackingJRT(this, s.getLocale(), AwkSink.from(System.out, s.getLocale()));
 			return trackingJrt;
 		}
 
 		private int getPrepareForExecutionCount() {
 			return trackingJrt.getPrepareForExecutionCount();
-		}
-
-		private int getLegacyInitializationCount() {
-			return trackingJrt.getLegacyInitializationCount();
 		}
 
 		private int getCloseAllCount() {
@@ -645,29 +637,16 @@ public class AwkEvalTest {
 	private static final class TrackingJRT extends JRT {
 
 		private int prepareForExecutionCount;
-		private int legacyInitializationCount;
 		private int closeAllCount;
 
-		private TrackingJRT(AVM avm) {
-			super(avm);
+		private TrackingJRT(AVM avm, Locale locale, AwkSink awkSink) {
+			super(avm, locale, awkSink, System.err);
 		}
 
 		@Override
-		public void prepareForExecution(String initialFsValue, String defaultRs, String defaultOrs) {
+		public void prepareForExecution(String defaultFs, String defaultRs) {
 			prepareForExecutionCount++;
-			super.prepareForExecution(initialFsValue, defaultRs, defaultOrs);
-		}
-
-		@Override
-		public void initializeRuntimeState(String initialFsValue, String defaultRs, String defaultOrs) {
-			legacyInitializationCount++;
-			super.initializeRuntimeState(initialFsValue, defaultRs, defaultOrs);
-		}
-
-		@Override
-		public void initializeFreshRuntimeState(String initialFsValue, String defaultRs, String defaultOrs) {
-			legacyInitializationCount++;
-			super.initializeFreshRuntimeState(initialFsValue, defaultRs, defaultOrs);
+			super.prepareForExecution(defaultFs, defaultRs);
 		}
 
 		@Override
@@ -678,10 +657,6 @@ public class AwkEvalTest {
 
 		private int getPrepareForExecutionCount() {
 			return prepareForExecutionCount;
-		}
-
-		private int getLegacyInitializationCount() {
-			return legacyInitializationCount;
 		}
 
 		private int getCloseAllCount() {

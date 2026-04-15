@@ -80,6 +80,8 @@ Sandboxing and extensions are separate concerns:
 
 If you need a sandboxed Java embedding, construct `SandboxedAwk` with the extension instances you want to allow. If you need a sandboxed CLI run, combine `-S` with the `-l` options you want to preload.
 
-## Next Step
+## See Also
 
-If you need to author your own extension, continue with [Writing Extensions](extensions-writing.html).
+- [Writing Extensions](extensions-writing.html)
+- [Java Quickstart](java.html)
+- [CLI Basics](cli.html)

@@ -36,11 +36,21 @@ Awk awk = new Awk(settings);
 | `setLocale(Locale)` | `Locale.US` | Locale for numeric output formatting |
 | `setDefaultRS(String)` | Platform line separator | Default value for `RS`, the record separator  |
 | `setUseSortedArrayKeys(boolean)` | `false` | Whether to keep associative array keys in sorted order |
+| `setAllowArraysOfArrays(boolean)` | `true` | Whether the compiler accepts gawk-style nested array syntax such as `a[i][j]` |
 | `putVariable(String, Object)` | Empty map | Pre-set variables available before `BEGIN` |
 
 Output destination is specified per-call on the builder (`execute()`, `execute(PrintStream)`, `execute(OutputStream)`, `execute(Appendable)`, or `execute(AwkSink)`). See the [Custom Output](java-output.html) guide for details.
 
 For more on passing variables to scripts, see [Variables and Arguments](java-variables.html).
+
+By default, Jawk accepts both classic multi-dimensional array syntax (`a[i, j]`) and gawk-style arrays of arrays (`a[i][j]`). Disable the gawk-style parser mode when you need strict classic AWK parsing:
+
+```java
+AwkSettings settings = new AwkSettings();
+settings.setAllowArraysOfArrays(false);
+
+Awk awk = new Awk(settings);
+```
 
 Construct it with extension instances when you want those functions available to the script:
 

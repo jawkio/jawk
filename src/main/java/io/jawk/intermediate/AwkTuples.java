@@ -328,6 +328,13 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
+	 * Assigns a value to a stack-provided associative-array element.
+	 */
+	public void assignMapElement() {
+		queue.add(new Tuple(Opcode.ASSIGN_MAP_ELEMENT));
+	}
+
+	/**
 	 * <p>
 	 * assignAsInput.
 	 * </p>
@@ -452,6 +459,13 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
+	 * Applies {@code +=} to a stack-provided associative-array element.
+	 */
+	public void plusEqMapElement() {
+		queue.add(new Tuple(Opcode.PLUS_EQ_MAP_ELEMENT));
+	}
+
+	/**
 	 * <p>
 	 * minusEqArray.
 	 * </p>
@@ -461,6 +475,13 @@ public class AwkTuples implements Serializable {
 	 */
 	public void minusEqArray(int offset, boolean isGlobal) {
 		queue.add(new Tuple(Opcode.MINUS_EQ_ARRAY, offset, isGlobal));
+	}
+
+	/**
+	 * Applies {@code -=} to a stack-provided associative-array element.
+	 */
+	public void minusEqMapElement() {
+		queue.add(new Tuple(Opcode.MINUS_EQ_MAP_ELEMENT));
 	}
 
 	/**
@@ -476,6 +497,13 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
+	 * Applies {@code *=} to a stack-provided associative-array element.
+	 */
+	public void multEqMapElement() {
+		queue.add(new Tuple(Opcode.MULT_EQ_MAP_ELEMENT));
+	}
+
+	/**
 	 * <p>
 	 * divEqArray.
 	 * </p>
@@ -485,6 +513,13 @@ public class AwkTuples implements Serializable {
 	 */
 	public void divEqArray(int offset, boolean isGlobal) {
 		queue.add(new Tuple(Opcode.DIV_EQ_ARRAY, offset, isGlobal));
+	}
+
+	/**
+	 * Applies {@code /=} to a stack-provided associative-array element.
+	 */
+	public void divEqMapElement() {
+		queue.add(new Tuple(Opcode.DIV_EQ_MAP_ELEMENT));
 	}
 
 	/**
@@ -500,6 +535,13 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
+	 * Applies {@code %=} to a stack-provided associative-array element.
+	 */
+	public void modEqMapElement() {
+		queue.add(new Tuple(Opcode.MOD_EQ_MAP_ELEMENT));
+	}
+
+	/**
 	 * <p>
 	 * powEqArray.
 	 * </p>
@@ -509,6 +551,14 @@ public class AwkTuples implements Serializable {
 	 */
 	public void powEqArray(int offset, boolean isGlobal) {
 		queue.add(new Tuple(Opcode.POW_EQ_ARRAY, offset, isGlobal));
+	}
+
+	/**
+	 * Applies exponentiation assignment to a stack-provided associative-array
+	 * element.
+	 */
+	public void powEqMapElement() {
+		queue.add(new Tuple(Opcode.POW_EQ_MAP_ELEMENT));
 	}
 
 	/**
@@ -715,6 +765,16 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
+	 * Applies {@code sub}/{@code gsub} to a stack-provided associative-array
+	 * element.
+	 *
+	 * @param isGsub {@code true} for {@code gsub}, {@code false} for {@code sub}
+	 */
+	public void subForMapReference(boolean isGsub) {
+		queue.add(new Tuple(Opcode.SUB_FOR_MAP_REFERENCE, isGsub));
+	}
+
+	/**
 	 * <p>
 	 * split.
 	 * </p>
@@ -887,6 +947,13 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
+	 * Increments a stack-provided associative-array element reference.
+	 */
+	public void incMapRef() {
+		queue.add(new Tuple(Opcode.INC_MAP_REF));
+	}
+
+	/**
 	 * <p>
 	 * decArrayRef.
 	 * </p>
@@ -896,6 +963,13 @@ public class AwkTuples implements Serializable {
 	 */
 	public void decArrayRef(int offset, boolean isGlobal) {
 		queue.add(new Tuple(Opcode.DEC_ARRAY_REF, offset, isGlobal));
+	}
+
+	/**
+	 * Decrements a stack-provided associative-array element reference.
+	 */
+	public void decMapRef() {
+		queue.add(new Tuple(Opcode.DEC_MAP_REF));
 	}
 
 	/**
@@ -995,6 +1069,14 @@ public class AwkTuples implements Serializable {
 	 */
 	public void dereferenceArray() {
 		queue.add(new Tuple(Opcode.DEREF_ARRAY));
+	}
+
+	/**
+	 * Dereferences an associative-array element as a nested array, creating it if
+	 * needed.
+	 */
+	public void ensureArrayElement() {
+		queue.add(new Tuple(Opcode.ENSURE_ARRAY_ELEMENT));
 	}
 
 	/**
@@ -1524,6 +1606,13 @@ public class AwkTuples implements Serializable {
 	 */
 	public void deleteArrayElement(int offset, boolean isGlobal) {
 		queue.add(new Tuple(Opcode.DELETE_ARRAY_ELEMENT, offset, isGlobal));
+	}
+
+	/**
+	 * Deletes a stack-provided associative-array element.
+	 */
+	public void deleteMapElement() {
+		queue.add(new Tuple(Opcode.DELETE_MAP_ELEMENT));
 	}
 
 	/**

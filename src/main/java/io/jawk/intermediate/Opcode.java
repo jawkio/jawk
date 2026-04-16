@@ -218,6 +218,14 @@ public enum Opcode {
 	 */
 	ASSIGN_ARRAY,
 	/**
+	 * Assigns an item to an element of the associative array currently on the stack.
+	 * The item remains on the stack.
+	 * <p>
+	 * Stack before: associative-array array-index item ...<br/>
+	 * Stack after: item ...
+	 */
+	ASSIGN_MAP_ELEMENT,
+	/**
 	 * Assigns the top-of-stack to $0. The contents of the stack are unaffected.
 	 * Upon assignment, individual field variables are recalculated.
 	 * <p>
@@ -392,6 +400,60 @@ public enum Opcode {
 	 * Stack after: x^n ...
 	 */
 	POW_EQ_ARRAY,
+	/**
+	 * Increase the contents of a stack-provided associative-array element by an
+	 * adjustment value; assigns the result to the array and pushes the result onto
+	 * the stack.
+	 * <p>
+	 * Stack before: associative-array array-idx n ...<br/>
+	 * Stack after: x+n ...
+	 */
+	PLUS_EQ_MAP_ELEMENT,
+	/**
+	 * Decreases the contents of a stack-provided associative-array element by an
+	 * adjustment value; assigns the result to the array and pushes the result onto
+	 * the stack.
+	 * <p>
+	 * Stack before: associative-array array-idx n ...<br/>
+	 * Stack after: x-n ...
+	 */
+	MINUS_EQ_MAP_ELEMENT,
+	/**
+	 * Multiplies the contents of a stack-provided associative-array element by an
+	 * adjustment value; assigns the result to the array and pushes the result onto
+	 * the stack.
+	 * <p>
+	 * Stack before: associative-array array-idx n ...<br/>
+	 * Stack after: x*n ...
+	 */
+	MULT_EQ_MAP_ELEMENT,
+	/**
+	 * Divides the contents of a stack-provided associative-array element by an
+	 * adjustment value; assigns the result to the array and pushes the result onto
+	 * the stack.
+	 * <p>
+	 * Stack before: associative-array array-idx n ...<br/>
+	 * Stack after: x/n ...
+	 */
+	DIV_EQ_MAP_ELEMENT,
+	/**
+	 * Takes the modulus of the contents of a stack-provided associative-array
+	 * element by an adjustment value; assigns the result to the array and pushes the
+	 * result onto the stack.
+	 * <p>
+	 * Stack before: associative-array array-idx n ...<br/>
+	 * Stack after: x%n ...
+	 */
+	MOD_EQ_MAP_ELEMENT,
+	/**
+	 * Raises the contents of a stack-provided associative-array element to the
+	 * power of an adjustment value; assigns the result to the array and pushes the
+	 * result onto the stack.
+	 * <p>
+	 * Stack before: associative-array array-idx n ...<br/>
+	 * Stack after: x^n ...
+	 */
+	POW_EQ_MAP_ELEMENT,
 	/**
 	 * Increases the contents of an input field by an adjustment value;
 	 * assigns the result to the input field and pushes the result onto the stack.
@@ -593,6 +655,16 @@ public enum Opcode {
 	 */
 	SUB_FOR_ARRAY_REFERENCE,
 	/**
+	 * Built-in function that substitutes an occurrence (or all occurrences) of a
+	 * string in a particular stack-provided array cell and replaces it with another.
+	 * <p>
+	 * Argument 1: is global sub
+	 * <p>
+	 * Stack before: associative-array array-index regexp replacement-string orig-string ...<br/>
+	 * Stack after: ...
+	 */
+	SUB_FOR_MAP_REFERENCE,
+	/**
 	 * Built-in function to split a string by a regexp and put the
 	 * components into an array.
 	 * <p>
@@ -758,6 +830,20 @@ public enum Opcode {
 	 */
 	DEC_ARRAY_REF,
 	/**
+	 * Increases the stack-provided array element reference by one.
+	 * <p>
+	 * Stack before: associative-array array-idx ...<br/>
+	 * Stack after: x+1 ...
+	 */
+	INC_MAP_REF,
+	/**
+	 * Decreases the stack-provided array element reference by one.
+	 * <p>
+	 * Stack before: associative-array array-idx ...<br/>
+	 * Stack after: x-1 ...
+	 */
+	DEC_MAP_REF,
+	/**
 	 * Increases the input field variable by one; pushes the result
 	 * onto the stack.
 	 * <p>
@@ -830,6 +916,14 @@ public enum Opcode {
 
 	/** Constant <code>DEREF_ARRAY=336</code> */
 	DEREF_ARRAY,
+	/**
+	 * Dereferences an associative-array element as an array, creating a nested
+	 * array when the element is currently blank or uninitialized.
+	 * <p>
+	 * Stack before: associative-array array-index ...<br/>
+	 * Stack after: nested-associative-array ...
+	 */
+	ENSURE_ARRAY_ELEMENT,
 
 	// for (x in y) {keyset} support
 	/**
@@ -1148,6 +1242,13 @@ public enum Opcode {
 	 * Stack after: ...
 	 */
 	DELETE_ARRAY_ELEMENT,
+	/**
+	 * Deletes an entry in a stack-provided associative array.
+	 * <p>
+	 * Stack before: associative-array array-index <br/>
+	 * Stack after: ...
+	 */
+	DELETE_MAP_ELEMENT,
 
 	/**
 	 * Internal.

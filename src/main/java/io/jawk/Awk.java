@@ -472,7 +472,7 @@ public class Awk {
 		lastAst = null;
 		if (!scripts.isEmpty()) {
 			// Parse all script sources into a single AST
-			AwkParser parser = new AwkParser(this.extensionFunctions);
+			AwkParser parser = new AwkParser(this.extensionFunctions, settings.isAllowArraysOfArrays());
 			AstNode ast = parser.parse(scripts);
 			lastAst = ast;
 			if (ast != null) {
@@ -539,7 +539,7 @@ public class Awk {
 				new StringReader(expression));
 
 		// Parse the expression
-		AwkParser parser = new AwkParser(this.extensionFunctions);
+		AwkParser parser = new AwkParser(this.extensionFunctions, settings.isAllowArraysOfArrays());
 		AstNode ast = parser.parseExpression(expressionSource);
 
 		// Attempt to traverse the syntax tree and build

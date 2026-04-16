@@ -66,6 +66,16 @@ awk.script(program)
 
 This keeps compilation and execution separate, which is useful when the same AWK program is reused across multiple inputs.
 
+Compilation settings matter here. For example, gawk-style arrays of arrays (`a[i][j]`) are accepted by default, but you can disable that syntax before compiling:
+
+```java
+AwkSettings settings = new AwkSettings();
+settings.setAllowArraysOfArrays(false);
+
+Awk awk = new Awk(settings);
+AwkProgram program = awk.compile("{ print a[1,2] }");
+```
+
 ## Choosing the Right Reuse Strategy
 
 - Use `eval(String...)` when the expression is cheap and called only occasionally.

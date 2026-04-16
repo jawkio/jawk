@@ -28,6 +28,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import org.junit.Test;
 import io.jawk.frontend.ast.LexerException;
+import io.jawk.frontend.ast.ParserException;
+import io.jawk.util.AwkSettings;
 
 public class AwkParserTest {
 
@@ -189,6 +191,15 @@ public class AwkParserTest {
 				.script("BEGIN { n = 2; n **= 2; print n }")
 				.expectLines("4")
 				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysCanBeDisabled() {
+		AwkSettings settings = new AwkSettings();
+		settings.setAllowArraysOfArrays(false);
+		Awk awk = new Awk(settings);
+
+		assertThrows(ParserException.class, () -> awk.compile("BEGIN { a[1][2] = 42 }"));
 	}
 
 	@Test

@@ -14,6 +14,7 @@ Jawk keeps the AWK language model while adding JVM-oriented capabilities:
 - it runs entirely in Java and can be embedded directly in applications
 - it exposes a serializable tuple representation for compilation and reuse
 - it can maintain associative array keys in sorted order
+- it supports gawk-style arrays of arrays (`a[i][j]`) in addition to classic AWK multi-dimensional subscripts (`a[i, j]`)
 - it supports explicit extensions
 - it offers a sandboxed compiler and runtime
 

@@ -7,7 +7,7 @@
 		<version>4</version>
 	</parent>
 
-	<groupId>jawk.io</groupId>
+	<groupId>io.jawk</groupId>
 	<artifactId>jawk</artifactId>
 	<version>5.0.01-SNAPSHOT</version>
 

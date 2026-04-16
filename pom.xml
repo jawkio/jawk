@@ -9,7 +9,7 @@
 
 	<groupId>io.jawk</groupId>
 	<artifactId>jawk</artifactId>
-	<version>6.0.00</version>
+	<version>6.1.00-SNAPSHOT</version>
 
 	<name>Jawk</name>
 	<description>Java AWK interpreter, allowing Java to call and execute AWK scripts in the JVM.</description>
@@ -42,7 +42,7 @@
 	<scm>
 		<connection>scm:git:https://github.com/jawkio/jawk.git</connection>
 		<url>https://github.com/jawkio/jawk</url>
-		<tag>v6.0.00</tag>
+		<tag>HEAD</tag>
 	</scm>
 
 	<developers>
@@ -74,7 +74,7 @@
 
 		<!-- Reproducible Build -->
 		<!-- See https://maven.apache.org/guides/mini/guide-reproducible-builds.html -->
-		<project.build.outputTimestamp>2026-04-16T13:12:18Z</project.build.outputTimestamp>
+		<project.build.outputTimestamp>2026-04-16T13:13:49Z</project.build.outputTimestamp>
 	</properties>
 
 	<dependencies>

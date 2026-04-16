@@ -2069,6 +2069,9 @@ public class AwkParser {
 			return;
 		}
 		if (arrayAst instanceof ArrayReferenceAst) {
+			if (!allowArraysOfArrays) {
+				arrayAst.throwSemanticException(errorMessage);
+			}
 			((ArrayReferenceAst) arrayAst).populateArrayValueTuples(tuples, createIfMissing);
 			return;
 		}
@@ -2088,7 +2091,7 @@ public class AwkParser {
 					params.getAst1(),
 					tuples,
 					true,
-					"Parameter position " + parameterIndex + " must be an array or subarray.");
+					"Parameter position " + (parameterIndex + 1) + " must be an array or subarray.");
 		} else {
 			params.getAst1().populateTuples(tuples);
 		}
@@ -4393,8 +4396,8 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			// get the array var
-			getAst1().populateTuples(tuples);
+			// get the containing array, autovivifying missing parent subarrays
+			populateContainerTuples(tuples);
 			// get the index
 			getAst2().populateTuples(tuples);
 			tuples.dereferenceArray();

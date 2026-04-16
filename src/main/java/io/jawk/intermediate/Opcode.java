@@ -221,7 +221,7 @@ public enum Opcode {
 	 * Assigns an item to an element of the associative array currently on the stack.
 	 * The item remains on the stack.
 	 * <p>
-	 * Stack before: associative-array array-index item ...<br/>
+	 * Stack before: array-index associative-array item ...<br/>
 	 * Stack after: item ...
 	 */
 	ASSIGN_MAP_ELEMENT,
@@ -405,7 +405,7 @@ public enum Opcode {
 	 * adjustment value; assigns the result to the array and pushes the result onto
 	 * the stack.
 	 * <p>
-	 * Stack before: associative-array array-idx n ...<br/>
+	 * Stack before: array-idx associative-array n ...<br/>
 	 * Stack after: x+n ...
 	 */
 	PLUS_EQ_MAP_ELEMENT,
@@ -414,7 +414,7 @@ public enum Opcode {
 	 * adjustment value; assigns the result to the array and pushes the result onto
 	 * the stack.
 	 * <p>
-	 * Stack before: associative-array array-idx n ...<br/>
+	 * Stack before: array-idx associative-array n ...<br/>
 	 * Stack after: x-n ...
 	 */
 	MINUS_EQ_MAP_ELEMENT,
@@ -423,7 +423,7 @@ public enum Opcode {
 	 * adjustment value; assigns the result to the array and pushes the result onto
 	 * the stack.
 	 * <p>
-	 * Stack before: associative-array array-idx n ...<br/>
+	 * Stack before: array-idx associative-array n ...<br/>
 	 * Stack after: x*n ...
 	 */
 	MULT_EQ_MAP_ELEMENT,
@@ -432,7 +432,7 @@ public enum Opcode {
 	 * adjustment value; assigns the result to the array and pushes the result onto
 	 * the stack.
 	 * <p>
-	 * Stack before: associative-array array-idx n ...<br/>
+	 * Stack before: array-idx associative-array n ...<br/>
 	 * Stack after: x/n ...
 	 */
 	DIV_EQ_MAP_ELEMENT,
@@ -441,7 +441,7 @@ public enum Opcode {
 	 * element by an adjustment value; assigns the result to the array and pushes the
 	 * result onto the stack.
 	 * <p>
-	 * Stack before: associative-array array-idx n ...<br/>
+	 * Stack before: array-idx associative-array n ...<br/>
 	 * Stack after: x%n ...
 	 */
 	MOD_EQ_MAP_ELEMENT,
@@ -450,7 +450,7 @@ public enum Opcode {
 	 * power of an adjustment value; assigns the result to the array and pushes the
 	 * result onto the stack.
 	 * <p>
-	 * Stack before: associative-array array-idx n ...<br/>
+	 * Stack before: array-idx associative-array n ...<br/>
 	 * Stack after: x^n ...
 	 */
 	POW_EQ_MAP_ELEMENT,
@@ -660,7 +660,7 @@ public enum Opcode {
 	 * <p>
 	 * Argument 1: is global sub
 	 * <p>
-	 * Stack before: associative-array array-index regexp replacement-string orig-string ...<br/>
+	 * Stack before: array-index associative-array orig-string replacement-string regexp ...<br/>
 	 * Stack after: ...
 	 */
 	SUB_FOR_MAP_REFERENCE,
@@ -832,14 +832,14 @@ public enum Opcode {
 	/**
 	 * Increases the stack-provided array element reference by one.
 	 * <p>
-	 * Stack before: associative-array array-idx ...<br/>
+	 * Stack before: array-idx associative-array ...<br/>
 	 * Stack after: x+1 ...
 	 */
 	INC_MAP_REF,
 	/**
 	 * Decreases the stack-provided array element reference by one.
 	 * <p>
-	 * Stack before: associative-array array-idx ...<br/>
+	 * Stack before: array-idx associative-array ...<br/>
 	 * Stack after: x-1 ...
 	 */
 	DEC_MAP_REF,
@@ -920,7 +920,7 @@ public enum Opcode {
 	 * Dereferences an associative-array element as an array, creating a nested
 	 * array when the element is currently blank or uninitialized.
 	 * <p>
-	 * Stack before: associative-array array-index ...<br/>
+	 * Stack before: array-index associative-array ...<br/>
 	 * Stack after: nested-associative-array ...
 	 */
 	ENSURE_ARRAY_ELEMENT,
@@ -1245,7 +1245,7 @@ public enum Opcode {
 	/**
 	 * Deletes an entry in a stack-provided associative array.
 	 * <p>
-	 * Stack before: associative-array array-index <br/>
+	 * Stack before: array-index associative-array <br/>
 	 * Stack after: ...
 	 */
 	DELETE_MAP_ELEMENT,

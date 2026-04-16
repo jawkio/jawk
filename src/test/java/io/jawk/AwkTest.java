@@ -822,6 +822,16 @@ public class AwkTest {
 	}
 
 	@Test
+	public void testArraysOfArraysReadAutovivifiesMissingParentSubarray() throws Exception {
+		AwkTestSupport
+				.awkTest("arrays of arrays read autovivifies missing parent subarray")
+				.script(
+						"BEGIN { print \"[\" a[1][2] \"]\"; print (((1 in a) ? \"yes\" : \"no\") \" \" ((2 in a[1]) ? \"yes\" : \"no\")) }")
+				.expectLines("[]", "yes yes")
+				.runAndAssert();
+	}
+
+	@Test
 	public void testArraysOfArraysMembershipDeleteAndIteration() throws Exception {
 		AwkSettings settings = new AwkSettings();
 		settings.setUseSortedArrayKeys(true);

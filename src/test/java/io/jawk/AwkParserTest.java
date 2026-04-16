@@ -200,6 +200,7 @@ public class AwkParserTest {
 		Awk awk = new Awk(settings);
 
 		assertThrows(ParserException.class, () -> awk.compile("BEGIN { a[1][2] = 42 }"));
+		assertThrows(RuntimeException.class, () -> awk.compile("BEGIN { print ((\"x\" in a[1]) ? 1 : 0) }"));
 	}
 
 	@Test

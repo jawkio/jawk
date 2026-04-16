@@ -13,18 +13,18 @@ Add Jawk to your project:
 > * Maven
 >   ```xml
 >   <dependency>
->     <groupId>jawk.io</groupId>
+>     <groupId>io.jawk</groupId>
 >     <artifactId>jawk</artifactId>
 >     <version>${project.version}</version>
 >   </dependency>
 >   ```
 > * Gradle (Groovy)
 >   ```groovy
->   implementation 'jawk.io:jawk:${project.version}'
+>   implementation 'io.jawk:jawk:${project.version}'
 >   ```
 > * Gradle (Kotlin)
 >   ```kotlin
->   implementation("jawk.io:jawk:${project.version}")
+>   implementation("io.jawk:jawk:${project.version}")
 >   ```
 
 Jawk artifacts are published on Maven Central, so standard Maven and Gradle builds can resolve them automatically. For other build tools (Ivy, SBT, Leiningen, etc.), see the [dependency information](dependency-info.html) page.

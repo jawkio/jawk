@@ -1,0 +1,32 @@
+name: Deploy Pages (from existing run artifact)
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Workflow run id that contains the uploaded pages artifact"
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+
+    steps:
+      # Download the artifact from the *previous* workflow run
+      - name: Download Pages artifact from run
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          run-id: ${{ inputs.run_id }}
+          path: .
+
+      # Deploy it
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

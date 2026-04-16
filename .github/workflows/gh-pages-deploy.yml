@@ -35,8 +35,14 @@ jobs:
         with:
           name: github-pages
           run-id: ${{ steps.extract.outputs.run_id }}
-          path: .
+          path: _site # Download into a specific folder
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Upload the artifact to the *current* workflow run so deploy-pages can find it
+      - name: Upload artifact for Pages
+        uses: actions/upload-pages-artifact@v3 # Use v3 to match current standard versions
+        with:
+          path: _site
 
       # Deploy it
       - name: Deploy to GitHub Pages

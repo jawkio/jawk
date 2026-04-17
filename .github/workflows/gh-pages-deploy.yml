@@ -31,7 +31,7 @@ jobs:
 
       # Download the artifact from the *previous* workflow run
       - name: Download Pages artifact from run
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: github-pages
           run-id: ${{ steps.extract.outputs.run_id }}

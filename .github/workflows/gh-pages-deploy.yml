@@ -40,7 +40,7 @@ jobs:
 
       # Upload the artifact to the *current* workflow run so deploy-pages can find it
       - name: Upload artifact for Pages
-        uses: actions/upload-pages-artifact@v3 # Use v3 to match current standard versions
+        uses: actions/upload-pages-artifact@v5 # Use v3 to match current standard versions
         with:
           path: _site
 

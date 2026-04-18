@@ -376,6 +376,16 @@ public class AwkParser {
 	}
 
 	/**
+	 * Returns the current 1-based source line number to stamp onto AST nodes that
+	 * will later emit tuple line markers for runtime error reporting.
+	 *
+	 * @return current source line number using 1-based counting
+	 */
+	private int currentSourceLineNumber() {
+		return reader.getLineNumber() + 1;
+	}
+
+	/**
 	 * Reads the string and handle all escape codes.
 	 *
 	 * @throws IOException
@@ -1553,7 +1563,7 @@ public class AwkParser {
 			}
 		}
 		if (token == Token.OPEN_BRACKET) {
-			int arrayReferenceLineNo = reader.getLineNumber() + 1;
+			int arrayReferenceLineNo = currentSourceLineNumber();
 			lexer();
 			AST idxAst = ARRAY_INDEX(true, allowInKeyword);
 			lexer(Token.CLOSE_BRACKET);
@@ -1562,7 +1572,7 @@ public class AwkParser {
 				throw parserException("Use [a,b,c,...] instead of [a][b][c]... for multi-dimensional arrays.");
 			}
 			while (allowArraysOfArrays && token == Token.OPEN_BRACKET) {
-				int nestedArrayReferenceLineNo = reader.getLineNumber() + 1;
+				int nestedArrayReferenceLineNo = currentSourceLineNumber();
 				lexer();
 				idxAst = ARRAY_INDEX(true, allowInKeyword);
 				lexer(Token.CLOSE_BRACKET);
@@ -2128,6 +2138,8 @@ public class AwkParser {
 	private abstract class AST extends AstNode {
 
 		private final String sourceDescription = scriptSources.get(scriptSourcesCurrentIndex).getDescription();
+		// PositionTracker consumes these tuple-emitted source lines at runtime, but
+		// AST nodes have to capture them here during parsing before tuples exist.
 		private final int lineNo;
 		private AST parent;
 		private AST ast1, ast2, ast3, ast4;
@@ -2214,7 +2226,7 @@ public class AwkParser {
 		}
 
 		protected AST() {
-			this(reader.getLineNumber() + 1);
+			this(currentSourceLineNumber());
 		}
 
 		protected AST(int lineNo) {
@@ -2222,7 +2234,7 @@ public class AwkParser {
 		}
 
 		protected AST(AST ast1) {
-			this(reader.getLineNumber() + 1, ast1);
+			this(currentSourceLineNumber(), ast1);
 		}
 
 		protected AST(int lineNo, AST ast1) {
@@ -2235,7 +2247,7 @@ public class AwkParser {
 		}
 
 		protected AST(AST ast1, AST ast2) {
-			this(reader.getLineNumber() + 1, ast1, ast2);
+			this(currentSourceLineNumber(), ast1, ast2);
 		}
 
 		protected AST(int lineNo, AST ast1, AST ast2) {
@@ -2252,7 +2264,7 @@ public class AwkParser {
 		}
 
 		protected AST(AST ast1, AST ast2, AST ast3) {
-			this(reader.getLineNumber() + 1, ast1, ast2, ast3);
+			this(currentSourceLineNumber(), ast1, ast2, ast3);
 		}
 
 		protected AST(int lineNo, AST ast1, AST ast2, AST ast3) {
@@ -2273,7 +2285,7 @@ public class AwkParser {
 		}
 
 		protected AST(AST ast1, AST ast2, AST ast3, AST ast4) {
-			this(reader.getLineNumber() + 1, ast1, ast2, ast3, ast4);
+			this(currentSourceLineNumber(), ast1, ast2, ast3, ast4);
 		}
 
 		protected AST(int lineNo, AST ast1, AST ast2, AST ast3, AST ast4) {

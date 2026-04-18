@@ -52,6 +52,7 @@ import io.jawk.intermediate.Address;
 import io.jawk.intermediate.Opcode;
 import io.jawk.intermediate.PositionTracker;
 import io.jawk.intermediate.UninitializedObject;
+import io.jawk.jrt.AssocArray;
 import io.jawk.jrt.AwkRuntimeException;
 import io.jawk.jrt.AwkSink;
 import io.jawk.jrt.BlockManager;
@@ -649,7 +650,12 @@ public class AVM implements VariableManager, Closeable {
 						// display $0
 						push(jrt.jrtGetInputField(0).toString().length());
 					} else {
-						push(pop().toString().length());
+						Object value = pop();
+						if (value instanceof Map) {
+							push((long) ((Map<?, ?>) value).size());
+						} else {
+							push(jrt.toAwkString(value).length());
+						}
 					}
 					position.next();
 					break;
@@ -804,6 +810,20 @@ public class AVM implements VariableManager, Closeable {
 					position.next();
 					break;
 				}
+				case ASSIGN_MAP_ELEMENT: {
+					// stack[0] = array index
+					// stack[1] = associative array
+					// stack[2] = value
+					Object arrIdx = pop();
+					Map<Object, Object> array = toMap(pop());
+					Object rhs = pop();
+					if (rhs == null) {
+						rhs = BLANK;
+					}
+					assignMapElement(array, arrIdx, rhs);
+					position.next();
+					break;
+				}
 				case PLUS_EQ_ARRAY:
 				case MINUS_EQ_ARRAY:
 				case MULT_EQ_ARRAY:
@@ -825,6 +845,7 @@ public class AVM implements VariableManager, Closeable {
 					double val = JRT.toDouble(rhs);
 
 					Map<Object, Object> array = ensureMapVariable(offset, isGlobal);
+					checkScalar(arrIdx);
 					Object o = array.get(arrIdx);
 					double origVal = JRT.toDouble(o);
 
@@ -857,6 +878,59 @@ public class AVM implements VariableManager, Closeable {
 						assignArray(offset, arrIdx, (long) Math.rint(newVal), isGlobal);
 					} else {
 						assignArray(offset, arrIdx, newVal, isGlobal);
+					}
+					position.next();
+					break;
+				}
+				case PLUS_EQ_MAP_ELEMENT:
+				case MINUS_EQ_MAP_ELEMENT:
+				case MULT_EQ_MAP_ELEMENT:
+				case DIV_EQ_MAP_ELEMENT:
+				case MOD_EQ_MAP_ELEMENT:
+				case POW_EQ_MAP_ELEMENT: {
+					// stack[0] = array index
+					// stack[1] = associative array
+					// stack[2] = value
+					Object arrIdx = pop();
+					Map<Object, Object> array = toMap(pop());
+					Object rhs = pop();
+					if (rhs == null) {
+						rhs = BLANK;
+					}
+
+					double val = JRT.toDouble(rhs);
+					checkScalar(arrIdx);
+					Object o = array.get(arrIdx);
+					double origVal = JRT.toDouble(o);
+					double newVal;
+
+					switch (opcode) {
+					case PLUS_EQ_MAP_ELEMENT:
+						newVal = origVal + val;
+						break;
+					case MINUS_EQ_MAP_ELEMENT:
+						newVal = origVal - val;
+						break;
+					case MULT_EQ_MAP_ELEMENT:
+						newVal = origVal * val;
+						break;
+					case DIV_EQ_MAP_ELEMENT:
+						newVal = origVal / val;
+						break;
+					case MOD_EQ_MAP_ELEMENT:
+						newVal = origVal % val;
+						break;
+					case POW_EQ_MAP_ELEMENT:
+						newVal = Math.pow(origVal, val);
+						break;
+					default:
+						throw new Error("Invalid op code here: " + opcode);
+					}
+
+					if (JRT.isActuallyLong(newVal)) {
+						assignMapElement(array, arrIdx, (long) Math.rint(newVal));
+					} else {
+						assignMapElement(array, arrIdx, newVal);
 					}
 					position.next();
 					break;
@@ -1020,6 +1094,7 @@ public class AVM implements VariableManager, Closeable {
 					boolean isGlobal = position.boolArg(1);
 					Map<Object, Object> aa = ensureMapVariable(position.intArg(0), isGlobal);
 					Object key = pop();
+					checkScalar(key);
 					Object o = aa.get(key);
 					double ans = JRT.toDouble(o) + 1;
 					if (JRT.isActuallyLong(ans)) {
@@ -1037,6 +1112,39 @@ public class AVM implements VariableManager, Closeable {
 					boolean isGlobal = position.boolArg(1);
 					Map<Object, Object> aa = ensureMapVariable(position.intArg(0), isGlobal);
 					Object key = pop();
+					checkScalar(key);
+					Object o = aa.get(key);
+					double ans = JRT.toDouble(o) - 1;
+					if (JRT.isActuallyLong(ans)) {
+						aa.put(key, (long) Math.rint(ans));
+					} else {
+						aa.put(key, ans);
+					}
+					position.next();
+					break;
+				}
+				case INC_MAP_REF: {
+					// stack[0] = array index
+					// stack[1] = associative array
+					Object key = pop();
+					checkScalar(key);
+					Map<Object, Object> aa = toMap(pop());
+					Object o = aa.get(key);
+					double ans = JRT.toDouble(o) + 1;
+					if (JRT.isActuallyLong(ans)) {
+						aa.put(key, (long) Math.rint(ans));
+					} else {
+						aa.put(key, ans);
+					}
+					position.next();
+					break;
+				}
+				case DEC_MAP_REF: {
+					// stack[0] = array index
+					// stack[1] = associative array
+					Object key = pop();
+					checkScalar(key);
+					Map<Object, Object> aa = toMap(pop());
 					Object o = aa.get(key);
 					double ans = JRT.toDouble(o) - 1;
 					if (JRT.isActuallyLong(ans)) {
@@ -1105,14 +1213,33 @@ public class AVM implements VariableManager, Closeable {
 				case DEREF_ARRAY: {
 					// stack[0] = array index
 					Object idx = pop(); // idx
-					Object array = pop(); // map
-					if (!(array instanceof Map)) {
-						throw new AwkRuntimeException("Attempting to index a non-associative-array.");
-					}
-					@SuppressWarnings("unchecked")
-					Map<Object, Object> map = (Map<Object, Object>) array;
+					checkScalar(idx);
+					Map<Object, Object> map = toMap(pop());
 					Object o = JRT.getAwkValue(map, idx);
 					push(o);
+					position.next();
+					break;
+				}
+				case ENSURE_ARRAY_ELEMENT: {
+					// stack[0] = array index
+					// stack[1] = associative array
+					Object idx = pop();
+					Map<Object, Object> map = toMap(pop());
+					push(ensureArrayInArray(map, idx));
+					position.next();
+					break;
+				}
+				case PEEK_ARRAY_ELEMENT: {
+					// stack[0] = array index
+					Object idx = pop();
+					checkScalar(idx);
+					Map<Object, Object> map = toMap(pop());
+					if (map instanceof AssocArray && !JRT.containsAwkKey(map, idx)) {
+						push(BLANK);
+					} else {
+						Object value = map.get(idx);
+						push(value != null ? value : BLANK);
+					}
 					position.next();
 					break;
 				}
@@ -1318,6 +1445,21 @@ public class AVM implements VariableManager, Closeable {
 					String newString = execSubOrGSub(position, 2);
 					// assign it to "offset/arrIdx/global"
 					assignArray(offset, arrIdx, newString, isGlobal);
+					pop();
+					position.next();
+					break;
+				}
+				case SUB_FOR_MAP_REFERENCE: {
+					// arg[0] = isGsub
+					// stack[0] = array index
+					// stack[1] = associative array
+					// stack[2] = original variable value
+					// stack[3] = replacement string
+					// stack[4] = ere
+					Object arrIdx = pop();
+					Map<Object, Object> array = toMap(pop());
+					String newString = execSubOrGSub(position, 0);
+					assignMapElement(array, arrIdx, newString);
 					pop();
 					position.next();
 					break;
@@ -1582,6 +1724,11 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case KEYLIST: {
 					Object o = pop();
+					if (o == null || o instanceof UninitializedObject) {
+						push(new ArrayDeque<>());
+						position.next();
+						break;
+					}
 					if (!(o instanceof Map)) {
 						throw new AwkRuntimeException(
 								position.lineNumber(),
@@ -1849,14 +1996,20 @@ public class AVM implements VariableManager, Closeable {
 					long count = position.intArg(0);
 					// String s;
 					if (count == 1) {
-						push(jrt.toAwkString(pop()));
+						Object value = pop();
+						checkScalar(value);
+						push(jrt.toAwkString(value));
 					} else {
 						StringBuilder sb = new StringBuilder();
-						sb.append(jrt.toAwkString(pop()));
+						Object value = pop();
+						checkScalar(value);
+						sb.append(jrt.toAwkString(value));
 						String subsep = jrt.toAwkString(jrt.getSUBSEPVar());
 						for (int i = 1; i < count; i++) {
 							sb.insert(0, subsep);
-							sb.insert(0, jrt.toAwkString(pop()));
+							value = pop();
+							checkScalar(value);
+							sb.insert(0, jrt.toAwkString(value));
 						}
 						push(sb.toString());
 					}
@@ -1871,9 +2024,20 @@ public class AVM implements VariableManager, Closeable {
 					boolean isGlobal = position.boolArg(1);
 					Map<Object, Object> aa = getMapVariable(offset, isGlobal);
 					Object key = pop();
+					checkScalar(key);
 					if (aa != null) {
 						aa.remove(key);
 					}
+					position.next();
+					break;
+				}
+				case DELETE_MAP_ELEMENT: {
+					// stack[0] = array index
+					// stack[1] = associative array
+					Object key = pop();
+					checkScalar(key);
+					Map<Object, Object> aa = toMap(pop());
+					aa.remove(key);
 					position.next();
 					break;
 				}
@@ -1954,6 +2118,12 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = key to check
 					Object arr = pop();
 					Object arg = pop();
+					checkScalar(arg);
+					if (arr == null || arr instanceof UninitializedObject) {
+						push(ZERO);
+						position.next();
+						break;
+					}
 					if (!(arr instanceof Map)) {
 						throw new AwkRuntimeException("Attempting to test membership on a non-associative-array.");
 					}
@@ -2378,7 +2548,11 @@ public class AVM implements VariableManager, Closeable {
 	 * Awk array element assignment functionality.
 	 */
 	private void assignArray(long offset, Object arrIdx, Object rhs, boolean isGlobal) {
-		Map<Object, Object> array = ensureMapVariable(offset, isGlobal);
+		assignMapElement(ensureMapVariable(offset, isGlobal), arrIdx, rhs);
+	}
+
+	private void assignMapElement(Map<Object, Object> array, Object arrIdx, Object rhs) {
+		checkScalar(arrIdx);
 		array.put(arrIdx, rhs);
 		push(rhs);
 	}
@@ -2616,6 +2790,13 @@ public class AVM implements VariableManager, Closeable {
 		return toMap(value);
 	}
 
+	/**
+	 * Casts an AWK value to an associative array.
+	 *
+	 * @param value value to validate
+	 * @return the associative array value
+	 * @throws AwkRuntimeException when {@code value} is scalar
+	 */
 	private Map<Object, Object> toMap(Object value) {
 		if (!(value instanceof Map)) {
 			throw new AwkRuntimeException("Attempting to treat a scalar as an array.");
@@ -2623,6 +2804,45 @@ public class AVM implements VariableManager, Closeable {
 		@SuppressWarnings("unchecked")
 		Map<Object, Object> map = (Map<Object, Object>) value;
 		return map;
+	}
+
+	/**
+	 * Ensures a value is scalar before using it in a scalar-only context such as
+	 * a subscript component.
+	 *
+	 * @param value value to validate
+	 * @throws AwkRuntimeException when {@code value} is an array
+	 */
+	private void checkScalar(Object value) {
+		if (value instanceof Map) {
+			throw new AwkRuntimeException("Attempting to use an array in a scalar context.");
+		}
+	}
+
+	/**
+	 * Returns the nested associative array stored in {@code map[key]}, creating it
+	 * when the key is undefined.
+	 *
+	 * @param map containing array
+	 * @param key nested-array key
+	 * @return the nested associative array stored at {@code key}
+	 * @throws AwkRuntimeException when {@code key} is scalar-incompatible or when
+	 *         the existing slot contains a scalar
+	 */
+	private Map<Object, Object> ensureArrayInArray(Map<Object, Object> map, Object key) {
+		checkScalar(key);
+		Object value = JRT.getAwkValue(map, key);
+		if (value == null || value.equals(BLANK) || value instanceof UninitializedObject) {
+			Map<Object, Object> nested = newAwkArray();
+			map.put(key, nested);
+			return nested;
+		}
+		if (!(value instanceof Map)) {
+			throw new AwkRuntimeException("Attempting to use a scalar as an array.");
+		}
+		@SuppressWarnings("unchecked")
+		Map<Object, Object> nested = (Map<Object, Object>) value;
+		return nested;
 	}
 
 	private static final UninitializedObject BLANK = new UninitializedObject();

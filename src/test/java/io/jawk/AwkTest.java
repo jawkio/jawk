@@ -49,6 +49,7 @@ import java.util.Map;
 import org.junit.Test;
 import io.jawk.backend.AVM;
 import io.jawk.frontend.ast.ParserException;
+import io.jawk.jrt.AwkRuntimeException;
 import io.jawk.jrt.AppendableAwkSink;
 import io.jawk.jrt.AwkSink;
 import io.jawk.jrt.InputSource;
@@ -795,6 +796,187 @@ public class AwkTest {
 	}
 
 	@Test
+	public void testArraysOfArraysAssignmentAndLookup() throws Exception {
+		AwkTestSupport
+				.awkTest("arrays of arrays assignment and lookup")
+				.script("BEGIN { a[1][2] = 42; print a[1][2] }")
+				.expect("42\n")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysSupportsMixedCommaSubscripts() throws Exception {
+		AwkTestSupport
+				.awkTest("arrays of arrays mixed with comma subscripts")
+				.script("BEGIN { SUBSEP = \"@\"; a[1][2,3] = 42; print a[1][2 SUBSEP 3]; print a[1][2,3] }")
+				.expect("42\n42\n")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysRejectScalarAsArray() throws Exception {
+		AwkTestSupport
+				.awkTest("arrays of arrays reject scalar as array")
+				.script("BEGIN { a[1] = 5; print a[1][2] }")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysReportLineNumberWhenScalarUsedAsArray() throws Exception {
+		assertRuntimeExceptionLineNumber(
+				"arrays of arrays scalar used as array line number",
+				3,
+				"Attempting to use a scalar as an array.",
+				"BEGIN {", // 1
+				"  a[1] = 5", // 2
+				"  print a[1][2]", // 3
+				"}"); // 4
+	}
+
+	@Test
+	public void testArraysOfArraysReportLineNumberWhenArrayUsedAsScalarSubscript() throws Exception {
+		assertRuntimeExceptionLineNumber(
+				"arrays of arrays array used as scalar subscript line number",
+				5,
+				"Attempting to use an array in a scalar context.",
+				"BEGIN {", // 1
+				"  a[1][1] = 1", // 2
+				"", // 3
+				"  b[1][1] = 2", // 4
+				"  print b[a[1]]", // 5
+				"}"); // 6
+	}
+
+	@Test
+	public void testArraysOfArraysReadAutovivifiesMissingParentSubarray() throws Exception {
+		AwkTestSupport
+				.awkTest("arrays of arrays read autovivifies missing parent subarray")
+				.script(
+						"BEGIN { print \"[\" a[1][2] \"]\"; print (((1 in a) ? \"yes\" : \"no\") \" \" ((2 in a[1]) ? \"yes\" : \"no\")) }")
+				.expectLines("[]", "yes yes")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysMembershipDeleteAndIteration() throws Exception {
+		AwkSettings settings = new AwkSettings();
+		settings.setUseSortedArrayKeys(true);
+
+		AwkTestSupport
+				.awkTest("arrays of arrays membership delete and iteration")
+				.withAwk(new Awk(settings))
+				.script(
+						"BEGIN { a[1][\"x\"] = 1; a[1][\"y\"] = 2; print ((\"x\" in a[1]) ? \"yes\" : \"no\"); delete a[1][\"x\"]; print ((\"x\" in a[1]) ? \"yes\" : \"no\"); for (k in a[1]) print k \":\" a[1][k] }")
+				.expectLines("yes", "no", "y:2")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysInDoesNotAutovivifyMissingSubarray() throws Exception {
+		AwkTestSupport
+				.awkTest("arrays of arrays in does not autovivify missing subarray")
+				.script("BEGIN { print ((\"x\" in a[1]) ? \"yes\" : \"no\"); print ((1 in a) ? \"yes\" : \"no\") }")
+				.expectLines("no", "no")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysForInDoesNotAutovivifyMissingSubarray() throws Exception {
+		AwkTestSupport
+				.awkTest("arrays of arrays for-in does not autovivify missing subarray")
+				.script("BEGIN { for (k in a[1]) print k; print ((1 in a) ? \"yes\" : \"no\") }")
+				.expectLines("no")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysSupportsNestedIncrement() throws Exception {
+		AwkTestSupport
+				.awkTest("arrays of arrays nested increment")
+				.script("BEGIN { old = a[1][2]++; print old, a[1][2]; ++a[1][2]; print a[1][2] }")
+				.expectLines("0 1", "2")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysPostfixOperatorsUseNumericOldValue() throws Exception {
+		AwkTestSupport
+				.awkTest("arrays of arrays postfix operators use numeric old value")
+				.script(
+						"BEGIN { a[1][1] = \"abc\"; oldInc = a[1][1]++; a[1][2] = \"abc\"; oldDec = a[1][2]--; print oldInc, a[1][1]; print oldDec, a[1][2] }")
+				.expectLines("0 1", "0 -1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysSupportsSplitIntoSubarray() throws Exception {
+		AwkTestSupport
+				.awkTest("split into subarray")
+				.script("BEGIN { print split(\"x y\", a[1]), a[1][1], a[1][2] }")
+				.expectLines("2 x y")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysSupportsGetlineIntoSubarray() throws Exception {
+		AwkTestSupport
+				.awkTest("getline into subarray")
+				.script("BEGIN { getline a[1][2]; print a[1][2] }")
+				.stdin("hello\n")
+				.expect("hello\n")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysSupportsSubOnNestedElement() throws Exception {
+		AwkTestSupport
+				.awkTest("sub on nested array element")
+				.script("BEGIN { a[1][2] = \"abc\"; print sub(/b/, \"x\", a[1][2]), a[1][2] }")
+				.expectLines("1 axc")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysSupportsFunctionArrayParameters() throws Exception {
+		AwkTestSupport
+				.awkTest("subarray passed as array parameter")
+				.script("function fill(arr) { arr[\"key\"] = \"value\" } BEGIN { fill(a[1]); print a[1][\"key\"] }")
+				.expectLines("value")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysSupportsDeletingPassedSubarrays() throws Exception {
+		AwkTestSupport
+				.awkTest("delete passed subarray")
+				.script(
+						"function f(c, b) { delete b; b[1] = 1; print c[1][1], b[1]; delete c[2] } BEGIN { a[1][1] = 11; a[1][2] = 12; a[2] = 2; delete a[1][1]; f(a, a[1]); print a[1][1]; print length(a), length(a[1]); delete a; print length(a), length(a[1]), length(a); a[1][1] = 11 }")
+				.expectLines("1 1", "1", "1 1", "0 0 1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysRejectArrayAsScalarSubscript() throws Exception {
+		AwkTestSupport
+				.awkTest("array value cannot be used as scalar subscript")
+				.script(
+						"function f(arr, s) { delete arr[s[1]][1] } BEGIN { a[1][1] = 1; b[1][1] = 11; f(b, a) }")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysHandlesNestedLengthIterationAndMutation() throws Exception {
+		AwkTestSupport
+				.awkTest("gawk-style arrays of arrays flow")
+				.script(
+						"function f(x, i) { for (i = 1; i <= length(x); i++) print x[i]; x[1] = 1001 } BEGIN { a[1][1] = 10; a[1][2] = 20; a[1][3] = 30; a[2] = \"hello world! we have multi-dimensional array\"; a[3, \"X\"] = \"Y\"; print length(a), length(a[1]); delete a[2]; delete a[3, \"X\"]; a[2][1] = 100; a[2][2] = 200; a[2][3] = 300; for (i in a) { sum[i] = 0; for (j in a[i]) sum[i] += a[i][j] } print sum[1], sum[2]; f(a[1]); print a[1][1] }")
+				.expectLines("3 3", "60 600", "10", "20", "30", "1001")
+				.runAndAssert();
+	}
+
+	@Test
 	public void testGetlineDefaultVariable() throws Exception {
 		String script = "BEGIN { while (getline && n++ < 2) print; exit }";
 		AwkTestSupport
@@ -803,6 +985,23 @@ public class AwkTest {
 				.stdin("a\nb\nc\n")
 				.expect("a\nb\n")
 				.runAndAssert();
+	}
+
+	private void assertRuntimeExceptionLineNumber(
+			String description,
+			int expectedLineNumber,
+			String expectedMessage,
+			String... scriptLines)
+			throws Exception {
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.awkTest(description)
+				.script(String.join("\n", scriptLines))
+				.expectThrow(AwkRuntimeException.class)
+				.run();
+		result.assertExpected();
+		AwkRuntimeException ex = (AwkRuntimeException) result.thrownException();
+		assertEquals(expectedLineNumber, ex.getLineNumber());
+		assertTrue(ex.getMessage(), ex.getMessage().contains(expectedMessage));
 	}
 
 	@Test

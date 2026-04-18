@@ -85,6 +85,13 @@ public class AwkSettings {
 	private volatile boolean useSortedArrayKeys = false;
 
 	/**
+	 * Whether to accept gawk-style arrays of arrays syntax such as {@code a[i][j]}
+	 * and subarray operands in array-only positions such as {@code split(..., a[i])}.
+	 * <code>true</code> by default.
+	 */
+	private volatile boolean allowArraysOfArrays = true;
+
+	/**
 	 * Locale for the output of numbers
 	 * <code>US-English</code> by default.
 	 */
@@ -119,6 +126,7 @@ public class AwkSettings {
 		desc.append("variables = ").append(getVariables()).append(newLine);
 		desc.append("fieldSeparator = ").append(getFieldSeparator()).append(newLine);
 		desc.append("useSortedArrayKeys = ").append(isUseSortedArrayKeys()).append(newLine);
+		desc.append("allowArraysOfArrays = ").append(isAllowArraysOfArrays()).append(newLine);
 		return desc.toString();
 	}
 
@@ -135,6 +143,9 @@ public class AwkSettings {
 
 		if (isUseSortedArrayKeys()) {
 			extensions.append(", associative array keys are sorted");
+		}
+		if (isAllowArraysOfArrays()) {
+			extensions.append(", arrays of arrays");
 		}
 		if (extensions.length() > 0) {
 			return "{extensions: " + extensions.substring(2) + "}";
@@ -268,6 +279,28 @@ public class AwkSettings {
 	}
 
 	/**
+	 * Whether to accept gawk-style arrays of arrays syntax such as {@code a[i][j]}
+	 * and subarray operands in array-only positions such as {@code split(..., a[i])}.
+	 *
+	 * @return {@code true} when arrays of arrays are enabled at compile time
+	 */
+	public boolean isAllowArraysOfArrays() {
+		return allowArraysOfArrays;
+	}
+
+	/**
+	 * Enables or disables gawk-style arrays of arrays syntax such as
+	 * {@code a[i][j]} and subarray operands in array-only positions such as
+	 * {@code split(..., a[i])} or {@code for (k in a[i])}.
+	 *
+	 * @param allowArraysOfArrays {@code true} to accept arrays-of-arrays features
+	 */
+	public void setAllowArraysOfArrays(boolean allowArraysOfArrays) {
+		this.allowArraysOfArrays = allowArraysOfArrays;
+		markModified();
+	}
+
+	/**
 	 * <p>
 	 * Getter for the field <code>locale</code>.
 	 * </p>
@@ -336,6 +369,11 @@ public class AwkSettings {
 
 		@Override
 		public void setUseSortedArrayKeys(boolean useSortedArrayKeys) {
+			throw unsupported();
+		}
+
+		@Override
+		public void setAllowArraysOfArrays(boolean allowArraysOfArrays) {
 			throw unsupported();
 		}
 

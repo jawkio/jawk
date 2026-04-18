@@ -267,6 +267,7 @@ public class AwkParser {
 	private final AwkSymbolTableImpl symbolTable = new AwkSymbolTableImpl();
 
 	private final Map<String, ExtensionFunction> extensions;
+	private final boolean allowArraysOfArrays;
 
 	/**
 	 * <p>
@@ -275,8 +276,9 @@ public class AwkParser {
 	 *
 	 * @param extensions a {@link java.util.Map} object
 	 */
-	public AwkParser(Map<String, ExtensionFunction> extensions) {
+	public AwkParser(Map<String, ExtensionFunction> extensions, boolean allowArraysOfArrays) {
 		this.extensions = extensions == null ? Collections.emptyMap() : new HashMap<>(extensions);
+		this.allowArraysOfArrays = allowArraysOfArrays;
 	}
 
 	private List<ScriptSource> scriptSources;
@@ -371,6 +373,16 @@ public class AwkParser {
 				msg,
 				scriptSources.get(scriptSourcesCurrentIndex).getDescription(),
 				reader.getLineNumber());
+	}
+
+	/**
+	 * Returns the current 1-based source line number to stamp onto AST nodes that
+	 * will later emit tuple line markers for runtime error reporting.
+	 *
+	 * @return current source line number using 1-based counting
+	 */
+	private int currentSourceLineNumber() {
+		return reader.getLineNumber() + 1;
 	}
 
 	/**
@@ -1551,13 +1563,22 @@ public class AwkParser {
 			}
 		}
 		if (token == Token.OPEN_BRACKET) {
+			int arrayReferenceLineNo = currentSourceLineNumber();
 			lexer();
 			AST idxAst = ARRAY_INDEX(true, allowInKeyword);
 			lexer(Token.CLOSE_BRACKET);
-			if (token == Token.OPEN_BRACKET) {
+			AST arrayReference = symbolTable.addArrayReference(id, idxAst, arrayReferenceLineNo);
+			if (!allowArraysOfArrays && token == Token.OPEN_BRACKET) {
 				throw parserException("Use [a,b,c,...] instead of [a][b][c]... for multi-dimensional arrays.");
 			}
-			return symbolTable.addArrayReference(id, idxAst);
+			while (allowArraysOfArrays && token == Token.OPEN_BRACKET) {
+				int nestedArrayReferenceLineNo = currentSourceLineNumber();
+				lexer();
+				idxAst = ARRAY_INDEX(true, allowInKeyword);
+				lexer(Token.CLOSE_BRACKET);
+				arrayReference = new ArrayReferenceAst(nestedArrayReferenceLineNo, arrayReference, idxAst);
+			}
+			return arrayReference;
 		}
 		return symbolTable.addID(id);
 	}
@@ -1747,21 +1768,15 @@ public class AwkParser {
 			}
 			// in
 			lexer();
-			// id
 			if (token != Token.ID) {
 				throw parserException(
-						"Expecting an ARRAY Token.ID for 'in' statement. Got " + token.name() + ": " + text);
+						"Expecting an array or subarray for 'in' statement. Got " + token.name() + ": " + text);
 			}
-			String arrId = text.toString();
-
-			// not an indexed array reference!
-			AST arrayIdAst = symbolTable.addArrayID(arrId);
-
-			lexer();
+			AST arrayAst = SYMBOL(true, true);
 			// close paren ...
 			lexer(Token.CLOSE_PAREN);
 			AST block = BLOCK_OR_STMT();
-			return new ForInStatementAst(expr1, arrayIdAst, block);
+			return new ForInStatementAst(expr1, arrayAst, block);
 		}
 
 		if (token == Token.SEMICOLON) {
@@ -2051,13 +2066,81 @@ public class AwkParser {
 		}
 	}
 
+	private void populateArrayOperandTuples(
+			AST arrayAst,
+			AwkTuples tuples,
+			boolean createIfMissing,
+			String errorMessage) {
+		if (arrayAst instanceof IDAst) {
+			IDAst idAst = (IDAst) arrayAst;
+			if (idAst.isScalar()) {
+				arrayAst.throwSemanticException(errorMessage);
+			}
+			idAst.setArray(true);
+			idAst.populateTuples(tuples);
+			return;
+		}
+		if (arrayAst instanceof ArrayReferenceAst) {
+			if (!allowArraysOfArrays) {
+				arrayAst.throwSemanticException(errorMessage);
+			}
+			((ArrayReferenceAst) arrayAst).populateArrayValueTuples(tuples, createIfMissing);
+			return;
+		}
+		arrayAst.throwSemanticException(errorMessage);
+	}
+
+	private int populateActualParameters(
+			AwkTuples tuples,
+			FunctionCallParamListAst params,
+			Set<Integer> arrayParameterIndexes,
+			int parameterIndex) {
+		if (params == null) {
+			return 0;
+		}
+		if (arrayParameterIndexes.contains(Integer.valueOf(parameterIndex))) {
+			populateArrayOperandTuples(
+					params.getAst1(),
+					tuples,
+					true,
+					"Parameter position " + (parameterIndex + 1) + " must be an array or subarray.");
+		} else {
+			params.getAst1().populateTuples(tuples);
+		}
+		if (params.getAst2() == null) {
+			return 1;
+		}
+		return 1 + populateActualParameters(
+				tuples,
+				(FunctionCallParamListAst) params.getAst2(),
+				arrayParameterIndexes,
+				parameterIndex + 1);
+	}
+
+	private Set<Integer> collectArrayParameterIndexes(FunctionDefAst functionDefAst) {
+		Set<Integer> arrayIndexes = new HashSet<Integer>();
+		FunctionDefParamListAst fPtr = (FunctionDefParamListAst) functionDefAst.getAst1();
+		int index = 0;
+		while (fPtr != null) {
+			IDAst fparam = symbolTable.getFunctionParameterIDAST(functionDefAst.id, fPtr.id);
+			if (fparam.isArray()) {
+				arrayIndexes.add(Integer.valueOf(index));
+			}
+			fPtr = (FunctionDefParamListAst) fPtr.getAst1();
+			index++;
+		}
+		return arrayIndexes;
+	}
+
 	// parser
 	// ===============================================================================
 	// AST class defs
 	private abstract class AST extends AstNode {
 
 		private final String sourceDescription = scriptSources.get(scriptSourcesCurrentIndex).getDescription();
-		private final int lineNo = reader.getLineNumber() + 1;
+		// PositionTracker consumes these tuple-emitted source lines at runtime, but
+		// AST nodes have to capture them here during parsing before tuples exist.
+		private final int lineNo;
 		private AST parent;
 		private AST ast1, ast2, ast3, ast4;
 		private final EnumSet<AstFlag> flags = EnumSet.noneOf(AstFlag.class);
@@ -2142,9 +2225,20 @@ public class AwkParser {
 			return null;
 		}
 
-		protected AST() {}
+		protected AST() {
+			this(currentSourceLineNumber());
+		}
+
+		protected AST(int lineNo) {
+			this.lineNo = lineNo;
+		}
 
 		protected AST(AST ast1) {
+			this(currentSourceLineNumber(), ast1);
+		}
+
+		protected AST(int lineNo, AST ast1) {
+			this(lineNo);
 			this.ast1 = ast1;
 
 			if (ast1 != null) {
@@ -2153,6 +2247,11 @@ public class AwkParser {
 		}
 
 		protected AST(AST ast1, AST ast2) {
+			this(currentSourceLineNumber(), ast1, ast2);
+		}
+
+		protected AST(int lineNo, AST ast1, AST ast2) {
+			this(lineNo);
 			this.ast1 = ast1;
 			this.ast2 = ast2;
 
@@ -2165,6 +2264,11 @@ public class AwkParser {
 		}
 
 		protected AST(AST ast1, AST ast2, AST ast3) {
+			this(currentSourceLineNumber(), ast1, ast2, ast3);
+		}
+
+		protected AST(int lineNo, AST ast1, AST ast2, AST ast3) {
+			this(lineNo);
 			this.ast1 = ast1;
 			this.ast2 = ast2;
 			this.ast3 = ast3;
@@ -2181,6 +2285,11 @@ public class AwkParser {
 		}
 
 		protected AST(AST ast1, AST ast2, AST ast3, AST ast4) {
+			this(currentSourceLineNumber(), ast1, ast2, ast3, ast4);
+		}
+
+		protected AST(int lineNo, AST ast1, AST ast2, AST ast3, AST ast4) {
+			this(lineNo);
 			this.ast1 = ast1;
 			this.ast2 = ast2;
 			this.ast3 = ast3;
@@ -2406,16 +2515,32 @@ public class AwkParser {
 			super();
 		}
 
+		protected ScalarExpressionAst(int lineNo) {
+			super(lineNo);
+		}
+
 		protected ScalarExpressionAst(AST a1) {
 			super(a1);
+		}
+
+		protected ScalarExpressionAst(int lineNo, AST a1) {
+			super(lineNo, a1);
 		}
 
 		protected ScalarExpressionAst(AST a1, AST a2) {
 			super(a1, a2);
 		}
 
+		protected ScalarExpressionAst(int lineNo, AST a1, AST a2) {
+			super(lineNo, a1, a2);
+		}
+
 		protected ScalarExpressionAst(AST a1, AST a2, AST a3) {
 			super(a1, a2, a3);
+		}
+
+		protected ScalarExpressionAst(int lineNo, AST a1, AST a2, AST a3) {
+			super(lineNo, a1, a2, a3);
 		}
 
 		@Override
@@ -2996,15 +3121,9 @@ public class AwkParser {
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 
-			IDAst arrayIdAst = (IDAst) getAst2();
-			if (arrayIdAst.isScalar()) {
-				throw new SemanticException(arrayIdAst + " is not an array");
-			}
-			arrayIdAst.setArray(true);
-
 			breakAddress = tuples.createAddress("breakAddress");
 
-			getAst2().populateTuples(tuples);
+			populateArrayOperandTuples(getAst2(), tuples, false, getAst2() + " is not an array");
 			// pops the array and pushes the keyset
 			tuples.keylist();
 
@@ -3182,27 +3301,28 @@ public class AwkParser {
 				}
 			} else if (getAst1() instanceof ArrayReferenceAst) {
 				ArrayReferenceAst arr = (ArrayReferenceAst) getAst1();
-				// push the index
-				arr.getAst2().populateTuples(tuples); // push the array ref itself
-				IDAst idAst = (IDAst) arr.getAst1();
-				if (idAst.isScalar()) {
-					throw new SemanticException("Cannot use " + idAst + " as an array. It is a scalar.");
+				if (arr.getAst1() instanceof IDAst) {
+					IDAst idAst = (IDAst) arr.getAst1();
+					if (idAst.isScalar()) {
+						throw new SemanticException("Cannot use " + idAst + " as an array. It is a scalar.");
+					}
+					idAst.setArray(true);
 				}
-				idAst.setArray(true);
+				arr.populateTargetReferenceTuples(tuples);
 				if (op == Token.EQUALS) {
-					tuples.assignArray(idAst.offset, idAst.isGlobal);
+					tuples.assignMapElement();
 				} else if (op == Token.PLUS_EQ) {
-					tuples.plusEqArray(idAst.offset, idAst.isGlobal);
+					tuples.plusEqMapElement();
 				} else if (op == Token.MINUS_EQ) {
-					tuples.minusEqArray(idAst.offset, idAst.isGlobal);
+					tuples.minusEqMapElement();
 				} else if (op == Token.MULT_EQ) {
-					tuples.multEqArray(idAst.offset, idAst.isGlobal);
+					tuples.multEqMapElement();
 				} else if (op == Token.DIV_EQ) {
-					tuples.divEqArray(idAst.offset, idAst.isGlobal);
+					tuples.divEqMapElement();
 				} else if (op == Token.MOD_EQ) {
-					tuples.modEqArray(idAst.offset, idAst.isGlobal);
+					tuples.modEqMapElement();
 				} else if (op == Token.POW_EQ) {
-					tuples.powEqArray(idAst.offset, idAst.isGlobal);
+					tuples.powEqMapElement();
 				} else {
 					throw new NotImplementedError("Unhandled op: " + op + " / " + text + " for arrays.");
 				}
@@ -3343,17 +3463,12 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (!(getAst2() instanceof IDAst)) {
+			if (!(getAst2() instanceof IDAst) && !(getAst2() instanceof ArrayReferenceAst)) {
 				throw new SemanticException("Expecting an array for rhs of IN. Got an expression.");
 			}
-			IDAst arrAst = (IDAst) getAst2();
-			if (arrAst.isScalar()) {
-				throw new SemanticException("Expecting an array for rhs of IN. Got a scalar.");
-			}
-			arrAst.setArray(true);
 
 			getAst1().populateTuples(tuples);
-			arrAst.populateTuples(tuples);
+			populateArrayOperandTuples(getAst2(), tuples, false, "Expecting an array for rhs of IN. Got a scalar.");
 			tuples.isIn();
 
 			popSourceLineNumber(tuples);
@@ -3722,26 +3837,30 @@ public class AwkParser {
 				// formal function parameter
 				AST fparam = symbolTable.getFunctionParameterIDAST(id, fPtr.id);
 
-				if (aparam.isArray() && fparam.isScalar()) {
-					aparam
-							.throwSemanticException(
-									id + ": Actual parameter (" + aparam + ") is an array, but formal parameter is used like a scalar.");
-				}
-				if (aparam.isScalar() && fparam.isArray()) {
-					aparam
-							.throwSemanticException(
-									id + ": Actual parameter (" + aparam + ") is a scalar, but formal parameter is used like an array.");
-				}
-				// condition parameters appropriately
-				// (based on function parameter semantics)
-				if (aparam instanceof IDAst) {
-					IDAst aparamIdAst = (IDAst) aparam;
-					if (fparam.isScalar()) {
-						aparamIdAst.setScalar(true);
-					}
-					if (fparam.isArray()) {
+				if (fparam.isArray()) {
+					if (aparam instanceof IDAst) {
+						IDAst aparamIdAst = (IDAst) aparam;
+						if (aparamIdAst.isScalar()) {
+							aparam
+									.throwSemanticException(
+											id + ": Actual parameter (" + aparam
+													+ ") is a scalar, but formal parameter is used like an array.");
+						}
 						aparamIdAst.setArray(true);
+					} else if (!(aparam instanceof ArrayReferenceAst)) {
+						aparam
+								.throwSemanticException(
+										id + ": Actual parameter (" + aparam + ") is not an array or subarray reference.");
 					}
+				} else if (fparam.isScalar() && aparam instanceof IDAst) {
+					IDAst aparamIdAst = (IDAst) aparam;
+					if (aparamIdAst.isArray()) {
+						aparam
+								.throwSemanticException(
+										id + ": Actual parameter (" + aparam
+												+ ") is an array, but formal parameter is used like a scalar.");
+					}
+					aparamIdAst.setScalar(true);
 				}
 				// next
 				aPtr = aPtr.getAst2();
@@ -3819,7 +3938,11 @@ public class AwkParser {
 			if (getAst1() == null) {
 				actualParamCountLocal = 0;
 			} else {
-				actualParamCountLocal = getAst1().populateTuples(tuples);
+				actualParamCountLocal = populateActualParameters(
+						tuples,
+						(FunctionCallParamListAst) getAst1(),
+						collectArrayParameterIndexes(functionProxy.functionDefAst),
+						0);
 			}
 			int formalParamCount = functionProxy.getFunctionParamCount();
 			if (formalParamCount < actualParamCountLocal) {
@@ -3994,8 +4117,24 @@ public class AwkParser {
 					throw new SemanticException("sub needs at least 2 arguments");
 				}
 				boolean isGsub = fIdx == BUILTIN_FUNC_NAMES.get("gsub");
+				int numargs = 0;
+				for (AST paramPtr = getAst1(); paramPtr != null; paramPtr = paramPtr.getAst2()) {
+					numargs++;
+				}
+				if (numargs != 2 && numargs != 3) {
+					throw new SemanticException("sub requires 2 or 3 arguments, not " + numargs);
+				}
 
-				int numargs = getAst1().populateTuples(tuples);
+				getAst1().getAst1().populateTuples(tuples);
+				getAst1().getAst2().getAst1().populateTuples(tuples);
+				if (numargs == 3) {
+					AST targetAst = getAst1().getAst2().getAst2().getAst1();
+					if (targetAst instanceof ArrayReferenceAst) {
+						((ArrayReferenceAst) targetAst).populateTargetValueTuples(tuples);
+					} else {
+						targetAst.populateTuples(tuples);
+					}
+				}
 
 				// stack contains arg1,arg2[,arg3] - in that pop() order
 
@@ -4012,13 +4151,15 @@ public class AwkParser {
 						tuples.subForVariable(idAst.offset, idAst.isGlobal, isGsub);
 					} else if (ptr instanceof ArrayReferenceAst) {
 						ArrayReferenceAst arrAst = (ArrayReferenceAst) ptr;
-						// push the index
-						arrAst.getAst2().populateTuples(tuples);
-						IDAst idAst = (IDAst) arrAst.getAst1();
-						if (idAst.isScalar()) {
-							throw new SemanticException("Cannot use " + idAst + " as an array.");
+						if (arrAst.getAst1() instanceof IDAst) {
+							IDAst idAst = (IDAst) arrAst.getAst1();
+							if (idAst.isScalar()) {
+								throw new SemanticException("Cannot use " + idAst + " as an array.");
+							}
+							idAst.setArray(true);
 						}
-						tuples.subForArrayReference(idAst.offset, idAst.isGlobal, isGsub);
+						arrAst.populateTargetReferenceTuples(tuples);
+						tuples.subForMapReference(isGsub);
 					} else if (ptr instanceof DollarExpressionAst) {
 						// push the field ref
 						DollarExpressionAst dollarExpr = (DollarExpressionAst) ptr;
@@ -4041,18 +4182,33 @@ public class AwkParser {
 					throw new SemanticException("split needs at least 2 arguments");
 				}
 				AST ptr = getAst1().getAst2().getAst1();
-				if (!(ptr instanceof IDAst)) {
-					throw new SemanticException("split needs an array name as its 2nd argument");
+				if (!(ptr instanceof IDAst) && !(ptr instanceof ArrayReferenceAst)) {
+					throw new SemanticException("split needs an array or subarray reference as its 2nd argument");
 				}
-				IDAst arrAst = (IDAst) ptr;
-				if (arrAst.isScalar()) {
-					throw new SemanticException("split's 2nd arg cannot be a scalar");
+				if (ptr instanceof IDAst) {
+					IDAst arrAst = (IDAst) ptr;
+					if (arrAst.isScalar()) {
+						throw new SemanticException("split's 2nd arg cannot be a scalar");
+					}
+					arrAst.setArray(true);
 				}
-				arrAst.setArray(true);
 
-				int ast1Result = getAst1().populateTuples(tuples);
+				int ast1Result = 0;
+				for (AST paramPtr = getAst1(); paramPtr != null; paramPtr = paramPtr.getAst2()) {
+					ast1Result++;
+				}
 				if (ast1Result != 2 && ast1Result != 3) {
 					throw new SemanticException("split requires 2 or 3 arguments, not " + ast1Result);
+				}
+
+				getAst1().getAst1().populateTuples(tuples);
+				populateArrayOperandTuples(
+						ptr,
+						tuples,
+						true,
+						"split's 2nd arg must be an array or subarray reference");
+				if (ast1Result == 3) {
+					getAst1().getAst2().getAst2().getAst1().populateTuples(tuples);
 				}
 				tuples.split(ast1Result);
 				popSourceLineNumber(tuples);
@@ -4288,6 +4444,10 @@ public class AwkParser {
 			super(idAst, idxAst);
 		}
 
+		private ArrayReferenceAst(int lineNo, AST idAst, AST idxAst) {
+			super(lineNo, idAst, idxAst);
+		}
+
 		@Override
 		public String toString() {
 			return super.toString() + " (" + getAst1() + " [...])";
@@ -4296,13 +4456,48 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			// get the array var
-			getAst1().populateTuples(tuples);
+			// get the containing array, autovivifying missing parent subarrays
+			populateContainerTuples(tuples);
 			// get the index
 			getAst2().populateTuples(tuples);
 			tuples.dereferenceArray();
 			popSourceLineNumber(tuples);
 			return 1;
+		}
+
+		private void populateTargetReferenceTuples(AwkTuples tuples) {
+			pushSourceLineNumber(tuples);
+			populateContainerTuples(tuples);
+			getAst2().populateTuples(tuples);
+			popSourceLineNumber(tuples);
+		}
+
+		private void populateArrayValueTuples(AwkTuples tuples, boolean createIfMissing) {
+			pushSourceLineNumber(tuples);
+			populateContainerTuples(tuples);
+			getAst2().populateTuples(tuples);
+			if (createIfMissing) {
+				tuples.ensureArrayElement();
+			} else {
+				tuples.peekArrayElement();
+			}
+			popSourceLineNumber(tuples);
+		}
+
+		private void populateTargetValueTuples(AwkTuples tuples) {
+			pushSourceLineNumber(tuples);
+			populateContainerTuples(tuples);
+			getAst2().populateTuples(tuples);
+			tuples.dereferenceArray();
+			popSourceLineNumber(tuples);
+		}
+
+		private void populateContainerTuples(AwkTuples tuples) {
+			if (getAst1() instanceof ArrayReferenceAst) {
+				((ArrayReferenceAst) getAst1()).populateArrayValueTuples(tuples, true);
+			} else {
+				getAst1().populateTuples(tuples);
+			}
 		}
 	}
 
@@ -4473,9 +4668,15 @@ public class AwkParser {
 				tuples.inc(idAst.offset, idAst.isGlobal);
 			} else if (getAst1() instanceof ArrayReferenceAst) {
 				ArrayReferenceAst arrAst = (ArrayReferenceAst) getAst1();
-				IDAst idAst = (IDAst) arrAst.getAst1();
-				arrAst.getAst2().populateTuples(tuples);
-				tuples.incArrayRef(idAst.offset, idAst.isGlobal);
+				if (arrAst.getAst1() instanceof IDAst) {
+					IDAst idAst = (IDAst) arrAst.getAst1();
+					if (idAst.isScalar()) {
+						throw new SemanticException("Cannot use " + idAst + " as an array.");
+					}
+					idAst.setArray(true);
+				}
+				arrAst.populateTargetReferenceTuples(tuples);
+				tuples.incMapRef();
 			} else if (getAst1() instanceof DollarExpressionAst) {
 				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
 				dollarExpr.getAst1().populateTuples(tuples); // OPTIMIATION: duplicate the x in $x here
@@ -4515,9 +4716,15 @@ public class AwkParser {
 				tuples.dec(idAst.offset, idAst.isGlobal);
 			} else if (getAst1() instanceof ArrayReferenceAst) {
 				ArrayReferenceAst arrAst = (ArrayReferenceAst) getAst1();
-				IDAst idAst = (IDAst) arrAst.getAst1();
-				arrAst.getAst2().populateTuples(tuples);
-				tuples.decArrayRef(idAst.offset, idAst.isGlobal);
+				if (arrAst.getAst1() instanceof IDAst) {
+					IDAst idAst = (IDAst) arrAst.getAst1();
+					if (idAst.isScalar()) {
+						throw new SemanticException("Cannot use " + idAst + " as an array.");
+					}
+					idAst.setArray(true);
+				}
+				arrAst.populateTargetReferenceTuples(tuples);
+				tuples.decMapRef();
 			} else if (getAst1() instanceof DollarExpressionAst) {
 				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
 				dollarExpr.getAst1().populateTuples(tuples); // OPTIMIATION: duplicate the x in $x here
@@ -4555,15 +4762,26 @@ public class AwkParser {
 				dollarExpr.getAst1().populateTuples(tuples);
 				tuples.incDollarRef();
 			} else {
-				getAst1().populateTuples(tuples);
+				if (getAst1() instanceof ArrayReferenceAst) {
+					((ArrayReferenceAst) getAst1()).populateTargetValueTuples(tuples);
+					tuples.unaryPlus();
+				} else {
+					getAst1().populateTuples(tuples);
+				}
 				if (getAst1() instanceof IDAst) {
 					IDAst idAst = (IDAst) getAst1();
 					tuples.postInc(idAst.offset, idAst.isGlobal);
 				} else if (getAst1() instanceof ArrayReferenceAst) {
 					ArrayReferenceAst arrAst = (ArrayReferenceAst) getAst1();
-					IDAst idAst = (IDAst) arrAst.getAst1();
-					arrAst.getAst2().populateTuples(tuples);
-					tuples.incArrayRef(idAst.offset, idAst.isGlobal);
+					if (arrAst.getAst1() instanceof IDAst) {
+						IDAst idAst = (IDAst) arrAst.getAst1();
+						if (idAst.isScalar()) {
+							throw new SemanticException("Cannot use " + idAst + " as an array.");
+						}
+						idAst.setArray(true);
+					}
+					arrAst.populateTargetReferenceTuples(tuples);
+					tuples.incMapRef();
 				} else {
 					throw new NotImplementedError("unhandled postinc for " + getAst1());
 				}
@@ -4582,15 +4800,26 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			getAst1().populateTuples(tuples);
+			if (getAst1() instanceof ArrayReferenceAst) {
+				((ArrayReferenceAst) getAst1()).populateTargetValueTuples(tuples);
+				tuples.unaryPlus();
+			} else {
+				getAst1().populateTuples(tuples);
+			}
 			if (getAst1() instanceof IDAst) {
 				IDAst idAst = (IDAst) getAst1();
 				tuples.postDec(idAst.offset, idAst.isGlobal);
 			} else if (getAst1() instanceof ArrayReferenceAst) {
 				ArrayReferenceAst arrAst = (ArrayReferenceAst) getAst1();
-				IDAst idAst = (IDAst) arrAst.getAst1();
-				arrAst.getAst2().populateTuples(tuples);
-				tuples.decArrayRef(idAst.offset, idAst.isGlobal);
+				if (arrAst.getAst1() instanceof IDAst) {
+					IDAst idAst = (IDAst) arrAst.getAst1();
+					if (idAst.isScalar()) {
+						throw new SemanticException("Cannot use " + idAst + " as an array.");
+					}
+					idAst.setArray(true);
+				}
+				arrAst.populateTargetReferenceTuples(tuples);
+				tuples.decMapRef();
 			} else if (getAst1() instanceof DollarExpressionAst) {
 				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
 				dollarExpr.getAst1().populateTuples(tuples);
@@ -4676,13 +4905,11 @@ public class AwkParser {
 			if (getAst1() == null) {
 				paramCount = 0;
 			} else {
+				Set<Integer> arrayIndexes = new HashSet<Integer>();
 				for (int idx : reqArrayIdxs) {
-					AST paramAst = getParamAst((FunctionCallParamListAst) getAst1(), idx);
-					// if the parameter is an IDAst...
-					if (paramAst.getAst1() instanceof IDAst) {
-						// then force it to be an array,
-						// or complain if it is already tagged as a scalar
-						IDAst idAst = (IDAst) paramAst.getAst1();
+					AST paramAst = getParamAst((FunctionCallParamListAst) getAst1(), idx).getAst1();
+					if (paramAst instanceof IDAst) {
+						IDAst idAst = (IDAst) paramAst;
 						if (idAst.isScalar()) {
 							throw new SemanticException(
 									"Extension '"
@@ -4692,10 +4919,17 @@ public class AwkParser {
 											+ " be an associative array, not a scalar.");
 						}
 						idAst.setArray(true);
+						arrayIndexes.add(Integer.valueOf(idx));
+					} else if (paramAst instanceof ArrayReferenceAst) {
+						arrayIndexes.add(Integer.valueOf(idx));
 					}
 				}
 
-				paramCount = getAst1().populateTuples(tuples);
+				paramCount = populateActualParameters(
+						tuples,
+						(FunctionCallParamListAst) getAst1(),
+						arrayIndexes,
+						0);
 			}
 			// isInitial == true ::
 			// retval of this extension is not a function parameter
@@ -4823,10 +5057,15 @@ public class AwkParser {
 				}
 			} else if (getAst2() instanceof ArrayReferenceAst) {
 				ArrayReferenceAst arr = (ArrayReferenceAst) getAst2();
-				// push the index
-				arr.getAst2().populateTuples(tuples); // push the array ref itself
-				IDAst idAst = (IDAst) arr.getAst1();
-				tuples.assignArray(idAst.offset, idAst.isGlobal);
+				if (arr.getAst1() instanceof IDAst) {
+					IDAst idAst = (IDAst) arr.getAst1();
+					if (idAst.isScalar()) {
+						throw new SemanticException("Cannot use " + idAst + " as an array.");
+					}
+					idAst.setArray(true);
+				}
+				arr.populateTargetReferenceTuples(tuples);
+				tuples.assignMapElement();
 			} else if (getAst2() instanceof DollarExpressionAst) {
 				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst2();
 				if (dollarExpr.getAst2() != null) {
@@ -4899,13 +5138,16 @@ public class AwkParser {
 			pushSourceLineNumber(tuples);
 
 			if (getAst1() instanceof ArrayReferenceAst) {
-				IDAst idAst = (IDAst) getAst1().getAst1();
-				if (idAst.isScalar()) {
-					throw new SemanticException("delete: Cannot use a scalar as an array.");
+				ArrayReferenceAst arrAst = (ArrayReferenceAst) getAst1();
+				if (arrAst.getAst1() instanceof IDAst) {
+					IDAst idAst = (IDAst) arrAst.getAst1();
+					if (idAst.isScalar()) {
+						throw new SemanticException("delete: Cannot use a scalar as an array.");
+					}
+					idAst.setArray(true);
 				}
-				idAst.setArray(true);
-				getAst1().getAst2().populateTuples(tuples); // idx on the stack
-				tuples.deleteArrayElement(idAst.offset, idAst.isGlobal);
+				arrAst.populateTargetReferenceTuples(tuples);
+				tuples.deleteMapElement();
 			} else if (getAst1() instanceof IDAst) {
 				IDAst idAst = (IDAst) getAst1();
 				if (idAst.isScalar()) {
@@ -5194,8 +5436,8 @@ public class AwkParser {
 			return new FunctionCallAst(functionProxy, paramList);
 		}
 
-		AST addArrayReference(String id, AST idxAst) throws ParserException {
-			return new ArrayReferenceAst(addArrayID(id), idxAst);
+		AST addArrayReference(String id, AST idxAst, int lineNo) throws ParserException {
+			return new ArrayReferenceAst(lineNo, addArrayID(id), idxAst);
 		}
 
 		// constants are no longer cached/hashed so that individual ASTs

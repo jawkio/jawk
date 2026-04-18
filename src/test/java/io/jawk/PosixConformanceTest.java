@@ -556,7 +556,6 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix85ForInDeleteAll() throws Exception {
-		Assume.assumeTrue("length(array) is not supported", false);
 		AwkTestSupport
 				.awkTest("POSIX 8.5 for in delete all elements")
 				.script("BEGIN{ split(\"a b c\", a, \" \" ); for (i in a) delete a[i]; print length(a) }")
@@ -744,7 +743,6 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix104LengthOfArray() throws Exception {
-		Assume.assumeTrue("length(array) is not supported", false);
 		AwkTestSupport
 				.awkTest("POSIX 10.4 length of array")
 				.script("BEGIN{ split(\"a b c\", A, \" \" ); print length(A) }")
@@ -881,7 +879,6 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix113DeleteArrayClearsAll() throws Exception {
-		Assume.assumeTrue("length(array) is not supported", false);
 		AwkTestSupport
 				.awkTest("POSIX 11.3 delete array clears elements")
 				.script("BEGIN{ split(\"a b\", A, \" \" ); delete A; print length(A) }")

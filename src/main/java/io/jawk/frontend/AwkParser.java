@@ -1553,18 +1553,20 @@ public class AwkParser {
 			}
 		}
 		if (token == Token.OPEN_BRACKET) {
+			int arrayReferenceLineNo = reader.getLineNumber() + 1;
 			lexer();
 			AST idxAst = ARRAY_INDEX(true, allowInKeyword);
 			lexer(Token.CLOSE_BRACKET);
-			AST arrayReference = symbolTable.addArrayReference(id, idxAst);
+			AST arrayReference = symbolTable.addArrayReference(id, idxAst, arrayReferenceLineNo);
 			if (!allowArraysOfArrays && token == Token.OPEN_BRACKET) {
 				throw parserException("Use [a,b,c,...] instead of [a][b][c]... for multi-dimensional arrays.");
 			}
 			while (allowArraysOfArrays && token == Token.OPEN_BRACKET) {
+				int nestedArrayReferenceLineNo = reader.getLineNumber() + 1;
 				lexer();
 				idxAst = ARRAY_INDEX(true, allowInKeyword);
 				lexer(Token.CLOSE_BRACKET);
-				arrayReference = new ArrayReferenceAst(arrayReference, idxAst);
+				arrayReference = new ArrayReferenceAst(nestedArrayReferenceLineNo, arrayReference, idxAst);
 			}
 			return arrayReference;
 		}
@@ -2126,7 +2128,7 @@ public class AwkParser {
 	private abstract class AST extends AstNode {
 
 		private final String sourceDescription = scriptSources.get(scriptSourcesCurrentIndex).getDescription();
-		private final int lineNo = reader.getLineNumber() + 1;
+		private final int lineNo;
 		private AST parent;
 		private AST ast1, ast2, ast3, ast4;
 		private final EnumSet<AstFlag> flags = EnumSet.noneOf(AstFlag.class);
@@ -2211,9 +2213,20 @@ public class AwkParser {
 			return null;
 		}
 
-		protected AST() {}
+		protected AST() {
+			this(reader.getLineNumber() + 1);
+		}
+
+		protected AST(int lineNo) {
+			this.lineNo = lineNo;
+		}
 
 		protected AST(AST ast1) {
+			this(reader.getLineNumber() + 1, ast1);
+		}
+
+		protected AST(int lineNo, AST ast1) {
+			this(lineNo);
 			this.ast1 = ast1;
 
 			if (ast1 != null) {
@@ -2222,6 +2235,11 @@ public class AwkParser {
 		}
 
 		protected AST(AST ast1, AST ast2) {
+			this(reader.getLineNumber() + 1, ast1, ast2);
+		}
+
+		protected AST(int lineNo, AST ast1, AST ast2) {
+			this(lineNo);
 			this.ast1 = ast1;
 			this.ast2 = ast2;
 
@@ -2234,6 +2252,11 @@ public class AwkParser {
 		}
 
 		protected AST(AST ast1, AST ast2, AST ast3) {
+			this(reader.getLineNumber() + 1, ast1, ast2, ast3);
+		}
+
+		protected AST(int lineNo, AST ast1, AST ast2, AST ast3) {
+			this(lineNo);
 			this.ast1 = ast1;
 			this.ast2 = ast2;
 			this.ast3 = ast3;
@@ -2250,6 +2273,11 @@ public class AwkParser {
 		}
 
 		protected AST(AST ast1, AST ast2, AST ast3, AST ast4) {
+			this(reader.getLineNumber() + 1, ast1, ast2, ast3, ast4);
+		}
+
+		protected AST(int lineNo, AST ast1, AST ast2, AST ast3, AST ast4) {
+			this(lineNo);
 			this.ast1 = ast1;
 			this.ast2 = ast2;
 			this.ast3 = ast3;
@@ -2475,16 +2503,32 @@ public class AwkParser {
 			super();
 		}
 
+		protected ScalarExpressionAst(int lineNo) {
+			super(lineNo);
+		}
+
 		protected ScalarExpressionAst(AST a1) {
 			super(a1);
+		}
+
+		protected ScalarExpressionAst(int lineNo, AST a1) {
+			super(lineNo, a1);
 		}
 
 		protected ScalarExpressionAst(AST a1, AST a2) {
 			super(a1, a2);
 		}
 
+		protected ScalarExpressionAst(int lineNo, AST a1, AST a2) {
+			super(lineNo, a1, a2);
+		}
+
 		protected ScalarExpressionAst(AST a1, AST a2, AST a3) {
 			super(a1, a2, a3);
+		}
+
+		protected ScalarExpressionAst(int lineNo, AST a1, AST a2, AST a3) {
+			super(lineNo, a1, a2, a3);
 		}
 
 		@Override
@@ -4388,6 +4432,10 @@ public class AwkParser {
 			super(idAst, idxAst);
 		}
 
+		private ArrayReferenceAst(int lineNo, AST idAst, AST idxAst) {
+			super(lineNo, idAst, idxAst);
+		}
+
 		@Override
 		public String toString() {
 			return super.toString() + " (" + getAst1() + " [...])";
@@ -5376,8 +5424,8 @@ public class AwkParser {
 			return new FunctionCallAst(functionProxy, paramList);
 		}
 
-		AST addArrayReference(String id, AST idxAst) throws ParserException {
-			return new ArrayReferenceAst(addArrayID(id), idxAst);
+		AST addArrayReference(String id, AST idxAst, int lineNo) throws ParserException {
+			return new ArrayReferenceAst(lineNo, addArrayID(id), idxAst);
 		}
 
 		// constants are no longer cached/hashed so that individual ASTs

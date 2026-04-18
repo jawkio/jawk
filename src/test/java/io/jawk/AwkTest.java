@@ -824,28 +824,28 @@ public class AwkTest {
 
 	@Test
 	public void testArraysOfArraysReportLineNumberWhenScalarUsedAsArray() throws Exception {
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.awkTest("arrays of arrays scalar used as array line number")
-				.script("BEGIN {\n  a[1] = 5\n  print a[1][2]\n}")
-				.expectThrow(AwkRuntimeException.class)
-				.run();
-		result.assertExpected();
-		AwkRuntimeException ex = (AwkRuntimeException) result.thrownException();
-		assertEquals(3, ex.getLineNumber());
-		assertTrue(ex.getMessage(), ex.getMessage().contains("Attempting to use a scalar as an array."));
+		assertRuntimeExceptionLineNumber(
+				"arrays of arrays scalar used as array line number",
+				3,
+				"Attempting to use a scalar as an array.",
+				"BEGIN {", // 1
+				"  a[1] = 5", // 2
+				"  print a[1][2]", // 3
+				"}"); // 4
 	}
 
 	@Test
 	public void testArraysOfArraysReportLineNumberWhenArrayUsedAsScalarSubscript() throws Exception {
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.awkTest("arrays of arrays array used as scalar subscript line number")
-				.script("BEGIN {\n  a[1][1] = 1\n  b[1][1] = 2\n  print b[a[1]]\n}")
-				.expectThrow(AwkRuntimeException.class)
-				.run();
-		result.assertExpected();
-		AwkRuntimeException ex = (AwkRuntimeException) result.thrownException();
-		assertEquals(5, ex.getLineNumber());
-		assertTrue(ex.getMessage(), ex.getMessage().contains("Attempting to use an array in a scalar context."));
+		assertRuntimeExceptionLineNumber(
+				"arrays of arrays array used as scalar subscript line number",
+				5,
+				"Attempting to use an array in a scalar context.",
+				"BEGIN {", // 1
+				"  a[1][1] = 1", // 2
+				"", // 3
+				"  b[1][1] = 2", // 4
+				"  print b[a[1]]", // 5
+				"}"); // 6
 	}
 
 	@Test
@@ -957,6 +957,23 @@ public class AwkTest {
 				.stdin("a\nb\nc\n")
 				.expect("a\nb\n")
 				.runAndAssert();
+	}
+
+	private void assertRuntimeExceptionLineNumber(
+			String description,
+			int expectedLineNumber,
+			String expectedMessage,
+			String... scriptLines)
+			throws Exception {
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.awkTest(description)
+				.script(String.join("\n", scriptLines))
+				.expectThrow(AwkRuntimeException.class)
+				.run();
+		result.assertExpected();
+		AwkRuntimeException ex = (AwkRuntimeException) result.thrownException();
+		assertEquals(expectedLineNumber, ex.getLineNumber());
+		assertTrue(ex.getMessage(), ex.getMessage().contains(expectedMessage));
 	}
 
 	@Test

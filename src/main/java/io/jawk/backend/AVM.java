@@ -709,6 +709,16 @@ public class AVM implements VariableManager, Closeable {
 					position.next();
 					break;
 				}
+				case BLANK_TO_ZERO: {
+					Object value = pop();
+					if (value == null || value instanceof UninitializedObject) {
+						push(ZERO);
+					} else {
+						push(value);
+					}
+					position.next();
+					break;
+				}
 				case IFTRUE: {
 					// arg[0] = address to jump to if top of stack is true
 					// stack[0] = item to check

@@ -75,6 +75,14 @@ public enum Opcode {
 	 */
 	TO_NUMBER,
 	/**
+	 * Replaces a blank or uninitialized top-of-stack value with numeric zero.
+	 * Non-blank values remain unchanged.
+	 * <p>
+	 * Stack before: x ...<br/>
+	 * Stack after: x (or 0 when blank) ...
+	 */
+	BLANK_TO_ZERO,
+	/**
 	 * Pops and evaluates the top-of-stack; if
 	 * true, it jumps to a specified address.
 	 * <p>

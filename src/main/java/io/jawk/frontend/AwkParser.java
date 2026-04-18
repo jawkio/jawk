@@ -4704,6 +4704,7 @@ public class AwkParser {
 			} else {
 				if (getAst1() instanceof ArrayReferenceAst) {
 					((ArrayReferenceAst) getAst1()).populateTargetValueTuples(tuples);
+					tuples.blankToZero();
 				} else {
 					getAst1().populateTuples(tuples);
 				}
@@ -4741,6 +4742,7 @@ public class AwkParser {
 			pushSourceLineNumber(tuples);
 			if (getAst1() instanceof ArrayReferenceAst) {
 				((ArrayReferenceAst) getAst1()).populateTargetValueTuples(tuples);
+				tuples.blankToZero();
 			} else {
 				getAst1().populateTuples(tuples);
 			}

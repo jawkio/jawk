@@ -149,6 +149,13 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
+	 * Replaces a blank or uninitialized top-of-stack value with numeric zero.
+	 */
+	public void blankToZero() {
+		queue.add(new Tuple(Opcode.BLANK_TO_ZERO));
+	}
+
+	/**
 	 * <p>
 	 * ifTrue.
 	 * </p>

@@ -49,6 +49,7 @@ import java.util.Map;
 import org.junit.Test;
 import io.jawk.backend.AVM;
 import io.jawk.frontend.ast.ParserException;
+import io.jawk.jrt.AwkRuntimeException;
 import io.jawk.jrt.AppendableAwkSink;
 import io.jawk.jrt.AwkSink;
 import io.jawk.jrt.InputSource;
@@ -822,6 +823,32 @@ public class AwkTest {
 	}
 
 	@Test
+	public void testArraysOfArraysReportLineNumberWhenScalarUsedAsArray() throws Exception {
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.awkTest("arrays of arrays scalar used as array line number")
+				.script("BEGIN {\n  a[1] = 5\n  print a[1][2]\n}")
+				.expectThrow(AwkRuntimeException.class)
+				.run();
+		result.assertExpected();
+		AwkRuntimeException ex = (AwkRuntimeException) result.thrownException();
+		assertEquals(3, ex.getLineNumber());
+		assertTrue(ex.getMessage(), ex.getMessage().contains("Attempting to use a scalar as an array."));
+	}
+
+	@Test
+	public void testArraysOfArraysReportLineNumberWhenArrayUsedAsScalarSubscript() throws Exception {
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.awkTest("arrays of arrays array used as scalar subscript line number")
+				.script("BEGIN {\n  a[1][1] = 1\n  b[1][1] = 2\n  print b[a[1]]\n}")
+				.expectThrow(AwkRuntimeException.class)
+				.run();
+		result.assertExpected();
+		AwkRuntimeException ex = (AwkRuntimeException) result.thrownException();
+		assertEquals(5, ex.getLineNumber());
+		assertTrue(ex.getMessage(), ex.getMessage().contains("Attempting to use an array in a scalar context."));
+	}
+
+	@Test
 	public void testArraysOfArraysReadAutovivifiesMissingParentSubarray() throws Exception {
 		AwkTestSupport
 				.awkTest("arrays of arrays read autovivifies missing parent subarray")
@@ -850,7 +877,7 @@ public class AwkTest {
 		AwkTestSupport
 				.awkTest("arrays of arrays nested increment")
 				.script("BEGIN { old = a[1][2]++; print old, a[1][2]; ++a[1][2]; print a[1][2] }")
-				.expectLines(" 1", "2")
+				.expectLines("0 1", "2")
 				.runAndAssert();
 	}
 

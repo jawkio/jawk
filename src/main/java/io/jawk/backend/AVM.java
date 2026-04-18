@@ -52,6 +52,7 @@ import io.jawk.intermediate.Address;
 import io.jawk.intermediate.Opcode;
 import io.jawk.intermediate.PositionTracker;
 import io.jawk.intermediate.UninitializedObject;
+import io.jawk.jrt.AssocArray;
 import io.jawk.jrt.AwkRuntimeException;
 import io.jawk.jrt.AwkSink;
 import io.jawk.jrt.BlockManager;
@@ -709,16 +710,6 @@ public class AVM implements VariableManager, Closeable {
 					position.next();
 					break;
 				}
-				case BLANK_TO_ZERO: {
-					Object value = pop();
-					if (value == null || value instanceof UninitializedObject) {
-						push(ZERO);
-					} else {
-						push(value);
-					}
-					position.next();
-					break;
-				}
 				case IFTRUE: {
 					// arg[0] = address to jump to if top of stack is true
 					// stack[0] = item to check
@@ -1238,6 +1229,20 @@ public class AVM implements VariableManager, Closeable {
 					position.next();
 					break;
 				}
+				case PEEK_ARRAY_ELEMENT: {
+					// stack[0] = array index
+					Object idx = pop();
+					checkScalar(idx);
+					Map<Object, Object> map = toMap(pop());
+					if (map instanceof AssocArray && !JRT.containsAwkKey(map, idx)) {
+						push(BLANK);
+					} else {
+						Object value = map.get(idx);
+						push(value != null ? value : BLANK);
+					}
+					position.next();
+					break;
+				}
 				case SRAND: {
 					// arg[0] = numArgs (where 0 = no args, anything else = one argument)
 					// stack[0] = seed (only if numArgs != 0)
@@ -1719,6 +1724,11 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case KEYLIST: {
 					Object o = pop();
+					if (o == null || o instanceof UninitializedObject) {
+						push(new ArrayDeque<>());
+						position.next();
+						break;
+					}
 					if (!(o instanceof Map)) {
 						throw new AwkRuntimeException(
 								position.lineNumber(),
@@ -2109,6 +2119,11 @@ public class AVM implements VariableManager, Closeable {
 					Object arr = pop();
 					Object arg = pop();
 					checkScalar(arg);
+					if (arr == null || arr instanceof UninitializedObject) {
+						push(ZERO);
+						position.next();
+						break;
+					}
 					if (!(arr instanceof Map)) {
 						throw new AwkRuntimeException("Attempting to test membership on a non-associative-array.");
 					}

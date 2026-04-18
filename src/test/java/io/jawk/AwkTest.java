@@ -873,11 +873,39 @@ public class AwkTest {
 	}
 
 	@Test
+	public void testArraysOfArraysInDoesNotAutovivifyMissingSubarray() throws Exception {
+		AwkTestSupport
+				.awkTest("arrays of arrays in does not autovivify missing subarray")
+				.script("BEGIN { print ((\"x\" in a[1]) ? \"yes\" : \"no\"); print ((1 in a) ? \"yes\" : \"no\") }")
+				.expectLines("no", "no")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysForInDoesNotAutovivifyMissingSubarray() throws Exception {
+		AwkTestSupport
+				.awkTest("arrays of arrays for-in does not autovivify missing subarray")
+				.script("BEGIN { for (k in a[1]) print k; print ((1 in a) ? \"yes\" : \"no\") }")
+				.expectLines("no")
+				.runAndAssert();
+	}
+
+	@Test
 	public void testArraysOfArraysSupportsNestedIncrement() throws Exception {
 		AwkTestSupport
 				.awkTest("arrays of arrays nested increment")
 				.script("BEGIN { old = a[1][2]++; print old, a[1][2]; ++a[1][2]; print a[1][2] }")
 				.expectLines("0 1", "2")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArraysOfArraysPostfixOperatorsUseNumericOldValue() throws Exception {
+		AwkTestSupport
+				.awkTest("arrays of arrays postfix operators use numeric old value")
+				.script(
+						"BEGIN { a[1][1] = \"abc\"; oldInc = a[1][1]++; a[1][2] = \"abc\"; oldDec = a[1][2]--; print oldInc, a[1][1]; print oldDec, a[1][2] }")
+				.expectLines("0 1", "0 -1")
 				.runAndAssert();
 	}
 

@@ -85,7 +85,8 @@ public class AwkSettings {
 	private volatile boolean useSortedArrayKeys = false;
 
 	/**
-	 * Whether to accept gawk-style arrays of arrays syntax such as {@code a[i][j]}.
+	 * Whether to accept gawk-style arrays of arrays syntax such as {@code a[i][j]}
+	 * and subarray operands in array-only positions such as {@code split(..., a[i])}.
 	 * <code>true</code> by default.
 	 */
 	private volatile boolean allowArraysOfArrays = true;
@@ -278,7 +279,8 @@ public class AwkSettings {
 	}
 
 	/**
-	 * Whether to accept gawk-style arrays of arrays syntax such as {@code a[i][j]}.
+	 * Whether to accept gawk-style arrays of arrays syntax such as {@code a[i][j]}
+	 * and subarray operands in array-only positions such as {@code split(..., a[i])}.
 	 *
 	 * @return {@code true} when arrays of arrays are enabled at compile time
 	 */
@@ -288,9 +290,10 @@ public class AwkSettings {
 
 	/**
 	 * Enables or disables gawk-style arrays of arrays syntax such as
-	 * {@code a[i][j]}.
+	 * {@code a[i][j]} and subarray operands in array-only positions such as
+	 * {@code split(..., a[i])} or {@code for (k in a[i])}.
 	 *
-	 * @param allowArraysOfArrays {@code true} to accept arrays-of-arrays syntax
+	 * @param allowArraysOfArrays {@code true} to accept arrays-of-arrays features
 	 */
 	public void setAllowArraysOfArrays(boolean allowArraysOfArrays) {
 		this.allowArraysOfArrays = allowArraysOfArrays;

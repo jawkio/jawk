@@ -149,13 +149,6 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
-	 * Replaces a blank or uninitialized top-of-stack value with numeric zero.
-	 */
-	public void blankToZero() {
-		queue.add(new Tuple(Opcode.BLANK_TO_ZERO));
-	}
-
-	/**
 	 * <p>
 	 * ifTrue.
 	 * </p>
@@ -1076,6 +1069,14 @@ public class AwkTuples implements Serializable {
 	 */
 	public void dereferenceArray() {
 		queue.add(new Tuple(Opcode.DEREF_ARRAY));
+	}
+
+	/**
+	 * Looks up an associative-array element without creating a blank entry when
+	 * the key is missing.
+	 */
+	public void peekArrayElement() {
+		queue.add(new Tuple(Opcode.PEEK_ARRAY_ELEMENT));
 	}
 
 	/**

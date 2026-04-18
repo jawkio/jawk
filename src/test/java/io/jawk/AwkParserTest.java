@@ -201,6 +201,7 @@ public class AwkParserTest {
 
 		assertThrows(ParserException.class, () -> awk.compile("BEGIN { a[1][2] = 42 }"));
 		assertThrows(RuntimeException.class, () -> awk.compile("BEGIN { print ((\"x\" in a[1]) ? 1 : 0) }"));
+		assertThrows(RuntimeException.class, () -> awk.compile("BEGIN { for (k in a[1]) print k }"));
 	}
 
 	@Test

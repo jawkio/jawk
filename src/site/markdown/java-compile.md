@@ -66,7 +66,7 @@ awk.script(program)
 
 This keeps compilation and execution separate, which is useful when the same AWK program is reused across multiple inputs.
 
-Compilation settings matter here. For example, gawk-style arrays of arrays (`a[i][j]`) are accepted by default, but you can disable that syntax before compiling:
+Compilation settings matter here. For example, gawk-style arrays of arrays (`a[i][j]`) are accepted by default, but you can disable that compile-time mode before compiling. When disabled, Jawk also rejects subarray operands in array-only positions such as `split(..., a[i])` or `for (k in a[i])`:
 
 ```java
 AwkSettings settings = new AwkSettings();

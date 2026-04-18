@@ -3123,7 +3123,7 @@ public class AwkParser {
 
 			breakAddress = tuples.createAddress("breakAddress");
 
-			populateArrayOperandTuples(getAst2(), tuples, true, getAst2() + " is not an array");
+			populateArrayOperandTuples(getAst2(), tuples, false, getAst2() + " is not an array");
 			// pops the array and pushes the keyset
 			tuples.keylist();
 
@@ -3468,7 +3468,7 @@ public class AwkParser {
 			}
 
 			getAst1().populateTuples(tuples);
-			populateArrayOperandTuples(getAst2(), tuples, true, "Expecting an array for rhs of IN. Got a scalar.");
+			populateArrayOperandTuples(getAst2(), tuples, false, "Expecting an array for rhs of IN. Got a scalar.");
 			tuples.isIn();
 
 			popSourceLineNumber(tuples);
@@ -4479,7 +4479,7 @@ public class AwkParser {
 			if (createIfMissing) {
 				tuples.ensureArrayElement();
 			} else {
-				tuples.dereferenceArray();
+				tuples.peekArrayElement();
 			}
 			popSourceLineNumber(tuples);
 		}
@@ -4764,7 +4764,7 @@ public class AwkParser {
 			} else {
 				if (getAst1() instanceof ArrayReferenceAst) {
 					((ArrayReferenceAst) getAst1()).populateTargetValueTuples(tuples);
-					tuples.blankToZero();
+					tuples.unaryPlus();
 				} else {
 					getAst1().populateTuples(tuples);
 				}
@@ -4802,7 +4802,7 @@ public class AwkParser {
 			pushSourceLineNumber(tuples);
 			if (getAst1() instanceof ArrayReferenceAst) {
 				((ArrayReferenceAst) getAst1()).populateTargetValueTuples(tuples);
-				tuples.blankToZero();
+				tuples.unaryPlus();
 			} else {
 				getAst1().populateTuples(tuples);
 			}

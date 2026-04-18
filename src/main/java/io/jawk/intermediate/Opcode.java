@@ -75,14 +75,6 @@ public enum Opcode {
 	 */
 	TO_NUMBER,
 	/**
-	 * Replaces a blank or uninitialized top-of-stack value with numeric zero.
-	 * Non-blank values remain unchanged.
-	 * <p>
-	 * Stack before: x ...<br/>
-	 * Stack after: x (or 0 when blank) ...
-	 */
-	BLANK_TO_ZERO,
-	/**
 	 * Pops and evaluates the top-of-stack; if
 	 * true, it jumps to a specified address.
 	 * <p>
@@ -924,14 +916,6 @@ public enum Opcode {
 
 	/** Constant <code>DEREF_ARRAY=336</code> */
 	DEREF_ARRAY,
-	/**
-	 * Dereferences an associative-array element as an array, creating a nested
-	 * array when the element is currently blank or uninitialized.
-	 * <p>
-	 * Stack before: array-index associative-array ...<br/>
-	 * Stack after: nested-associative-array ...
-	 */
-	ENSURE_ARRAY_ELEMENT,
 
 	// for (x in y) {keyset} support
 	/**
@@ -1451,7 +1435,25 @@ public enum Opcode {
 	 * Stack before: ...<br/>
 	 * Stack after: x ... or 0 if uninitialized
 	 */
-	POSTDEC;
+	POSTDEC,
+
+	/**
+	 * Dereferences an associative-array element as an array, creating a nested
+	 * array when the element is currently blank or uninitialized.
+	 * <p>
+	 * Stack before: array-index associative-array ...<br/>
+	 * Stack after: nested-associative-array ...
+	 */
+	ENSURE_ARRAY_ELEMENT,
+
+	/**
+	 * Looks up an associative-array element without creating a blank entry when
+	 * the key is missing.
+	 * <p>
+	 * Stack before: array-index associative-array ...<br/>
+	 * Stack after: item ...
+	 */
+	PEEK_ARRAY_ELEMENT;
 
 	private static final Opcode[] VALUES = values();
 

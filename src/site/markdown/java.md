@@ -36,14 +36,14 @@ Awk awk = new Awk(settings);
 | `setLocale(Locale)` | `Locale.US` | Locale for numeric output formatting |
 | `setDefaultRS(String)` | Platform line separator | Default value for `RS`, the record separator  |
 | `setUseSortedArrayKeys(boolean)` | `false` | Whether to keep associative array keys in sorted order |
-| `setAllowArraysOfArrays(boolean)` | `true` | Whether the compiler accepts gawk-style nested array syntax such as `a[i][j]` |
+| `setAllowArraysOfArrays(boolean)` | `true` | Whether the compiler accepts gawk-style nested array features such as `a[i][j]` and `split(..., a[i])` |
 | `putVariable(String, Object)` | Empty map | Pre-set variables available before `BEGIN` |
 
 Output destination is specified per-call on the builder (`execute()`, `execute(PrintStream)`, `execute(OutputStream)`, `execute(Appendable)`, or `execute(AwkSink)`). See the [Custom Output](java-output.html) guide for details.
 
 For more on passing variables to scripts, see [Variables and Arguments](java-variables.html).
 
-By default, Jawk accepts both classic multi-dimensional array syntax (`a[i, j]`) and gawk-style arrays of arrays (`a[i][j]`). Disable the gawk-style parser mode when you need strict classic AWK parsing:
+By default, Jawk accepts both classic multi-dimensional array syntax (`a[i, j]`) and gawk-style arrays of arrays (`a[i][j]`). Disable this compile-time mode when you need strict classic AWK parsing; doing so also rejects subarray operands in array-only positions such as `split(..., a[i])`, `for (k in a[i])`, and `"x" in a[i]`:
 
 ```java
 AwkSettings settings = new AwkSettings();

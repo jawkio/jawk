@@ -23,6 +23,7 @@ package io.jawk;
  */
 
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -31,6 +32,7 @@ import java.io.ObjectOutputStream;
 import org.junit.Test;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
+import io.jawk.frontend.ast.ParserException;
 
 public class CliOptionTest {
 
@@ -51,6 +53,34 @@ public class CliOptionTest {
 		cli.parse(new String[] { "--no-optimize", "{ print 1 }" });
 
 		assertTrue(cli.isDisableOptimize());
+	}
+
+	@Test
+	public void posixOptionDisablesArraysOfArrays() {
+		Cli cli = new Cli();
+		cli.parse(new String[] { "--posix", "{ print 1 }" });
+
+		assertFalse(cli.getSettings().isAllowArraysOfArrays());
+	}
+
+	@Test
+	public void posixOptionRejectsNestedArrays() throws Exception {
+		AwkTestSupport
+				.cliTest("CLI --posix rejects nested arrays")
+				.argument("--posix")
+				.script("BEGIN { a[1][2] = 42 }")
+				.expectThrow(ParserException.class)
+				.runAndAssert();
+	}
+
+	@Test
+	public void posixOptionStillAllowsClassicMultidimensionalSubscripts() throws Exception {
+		AwkTestSupport
+				.cliTest("CLI --posix still allows classic multidimensional subscripts")
+				.argument("--posix")
+				.script("BEGIN { a[1,2] = 42; print a[1,2] }")
+				.expectLines("42")
+				.runAndAssert();
 	}
 
 	@Test

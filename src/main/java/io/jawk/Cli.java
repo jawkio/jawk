@@ -225,6 +225,9 @@ public final class Cli {
 			} else if (arg.equals("-S") || arg.equals("--sandbox")) {
 // -S/--sandbox : enable sandbox mode
 				sandbox = true;
+			} else if (arg.equals("--posix")) {
+				// --posix : enforce POSIX-compatible compile-time behavior
+				settings.setAllowArraysOfArrays(false);
 			} else if (arg.equals("--dump-syntax")) {
 // --dump-syntax : dump syntax tree to file
 				dumpSyntaxTree = true;
@@ -409,6 +412,7 @@ public final class Cli {
 								" [-K program-filename]" +
 								" [-o output-filename]" +
 								" [-S|--sandbox]" +
+								" [--posix]" +
 								" [--dump-syntax]" +
 								" [--dump-intermediate]" +
 								" [-s|--no-optimize]" +
@@ -436,6 +440,7 @@ public final class Cli {
 				.println(
 						" -S, --sandbox = (extension) Enable sandbox mode (no system(), redirection, pipelines, or"
 								+ " dynamic extensions).");
+		dest.println(" --posix = Enforce POSIX-compatible behavior such as disabling nested arrays.");
 		dest.println(" --dump-syntax = Print the syntax tree.");
 		dest.println(" --dump-intermediate = Print the intermediate code.");
 		dest.println(" -s, --no-optimize = (extension) Disable optimizations during compilation.");

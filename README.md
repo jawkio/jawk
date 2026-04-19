@@ -8,8 +8,6 @@
 
 Jawk is a pure Java implementation of [AWK](https://en.wikipedia.org/wiki/AWK). You can run it as a CLI, embed it directly in Java applications, compile scripts to reusable tuples, evaluate AWK expressions, feed it structured input, load extensions explicitly, and enable a sandboxed runtime when you need tighter execution constraints.
 
-For POSIX-oriented CLI compilation, use `--posix`. It disables gawk-style nested arrays during source compilation, and it is intentionally rejected together with `-L` because precompiled tuples are already compiled before loading.
-
 ## CLI Example
 
 ```shell

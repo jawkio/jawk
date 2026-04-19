@@ -49,7 +49,6 @@ java -jar jawk-${project.version}-standalone.jar --list-ext
 >   - `--locale <locale>` sets the locale through `Locale.forLanguageTag(...)`.
 >   - `-t` keeps associative array keys sorted.
 >   - `--posix` enforces POSIX-oriented compile-time behavior such as disabling gawk-style nested arrays.
->   - `--posix` cannot be combined with `-L` because `-L` executes an already compiled tuples file.
 >
 > - Extensions and sandbox
 >

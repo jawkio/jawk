@@ -168,6 +168,7 @@ public final class Cli {
 
 		// Parse the arguments
 		int argIdx = 0;
+		boolean posixRequested = false;
 		while (argIdx < args.length) {
 			String arg = args[argIdx];
 			if (arg.length() == 0) {
@@ -190,6 +191,10 @@ public final class Cli {
 				scriptSources.add(new ScriptFileSource(args[++argIdx]));
 			} else if (arg.equals("-L")) {
 				// -L filename : load precompiled program
+				if (posixRequested) {
+					throw new IllegalArgumentException(
+							"--posix cannot be combined with -L because -L loads a precompiled program.");
+				}
 				checkParameterHasArgument(args, argIdx);
 				String file = args[++argIdx];
 				try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
@@ -227,6 +232,11 @@ public final class Cli {
 				sandbox = true;
 			} else if (arg.equals("--posix")) {
 				// --posix : enforce POSIX-compatible compile-time behavior
+				if (precompiledProgram != null) {
+					throw new IllegalArgumentException(
+							"--posix cannot be combined with -L because -L loads a precompiled program.");
+				}
+				posixRequested = true;
 				settings.setAllowArraysOfArrays(false);
 			} else if (arg.equals("--dump-syntax")) {
 // --dump-syntax : dump syntax tree to file
@@ -410,7 +420,6 @@ public final class Cli {
 								" [-f script-filename]" +
 								" [-L program-filename]" +
 								" [-K program-filename]" +
-								" [-o output-filename]" +
 								" [-S|--sandbox]" +
 								" [--posix]" +
 								" [--dump-syntax]" +
@@ -435,7 +444,6 @@ public final class Cli {
 		dest.println();
 		dest.println(" -t = (extension) Maintain array keys in sorted order.");
 		dest.println(" -K filename = Compile to program file and halt.");
-		dest.println(" -o = (extension) Specify output file.");
 		dest
 				.println(
 						" -S, --sandbox = (extension) Enable sandbox mode (no system(), redirection, pipelines, or"

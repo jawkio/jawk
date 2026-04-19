@@ -84,6 +84,37 @@ public class CliOptionTest {
 	}
 
 	@Test
+	public void posixOptionRejectsPrecompiledProgramsInEitherOrder() throws Exception {
+		File compiled = tempFolder.newFile("program.ser");
+		writeProgram(compiled, "BEGIN { print 1 }");
+
+		AwkTestSupport.TestResult posixThenLoad = AwkTestSupport
+				.cliTest("CLI rejects --posix before -L")
+				.argument("--posix", "-L", compiled.getAbsolutePath())
+				.expectThrow(IllegalArgumentException.class)
+				.run();
+		assertTrue(posixThenLoad.thrownException().getMessage().contains("--posix cannot be combined with -L"));
+
+		AwkTestSupport.TestResult loadThenPosix = AwkTestSupport
+				.cliTest("CLI rejects --posix after -L")
+				.argument("-L", compiled.getAbsolutePath(), "--posix")
+				.expectThrow(IllegalArgumentException.class)
+				.run();
+		assertTrue(loadThenPosix.thrownException().getMessage().contains("--posix cannot be combined with -L"));
+	}
+
+	@Test
+	public void helpOutputDoesNotAdvertiseUnsupportedOutputOption() throws Exception {
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.cliTest("CLI help omits unsupported -o option")
+				.argument("-h")
+				.run();
+
+		assertFalse(result.output().contains("[-o output-filename]"));
+		assertFalse(result.output().contains(" -o = "));
+	}
+
+	@Test
 	public void loadOptionWithWrongSerializedTypeThrowsFriendlyError() throws Exception {
 		File bad = tempFolder.newFile("wrong-type.ser");
 		try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(bad))) {
@@ -97,5 +128,11 @@ public class CliOptionTest {
 				{ "-L", bad.getAbsolutePath(), "{ print }" }));
 		assertTrue(ex.getMessage().contains("does not contain a valid precompiled AwkProgram"));
 		assertTrue(ex.getCause() instanceof ClassCastException);
+	}
+
+	private static void writeProgram(File target, String script) throws Exception {
+		try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(target))) {
+			oos.writeObject(new Awk().compile(script));
+		}
 	}
 }

@@ -103,6 +103,8 @@ $ java -jar jawk-${project.version}-standalone.jar --posix 'BEGIN { a[1,2] = 42;
 42
 ```
 
+Because `-L` loads an already compiled tuples file, Jawk rejects `--posix` together with `-L` instead of pretending that it can re-apply compile-time restrictions after the fact.
+
 ## Load Extensions
 
 List the currently registered extension identifiers:

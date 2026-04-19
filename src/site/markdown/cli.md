@@ -96,6 +96,15 @@ Set the field separator with `-F` when you want Jawk to split text records diffe
 $ java -jar jawk-${project.version}-standalone.jar -F : '{ print $1 "," $6 }' /etc/passwd
 ```
 
+Use `--posix` when you want POSIX-oriented compile-time behavior from the CLI. In particular, it disables gawk-style nested arrays, so classic multi-dimensional subscripts such as `a[i, j]` remain valid while `a[i][j]` is rejected:
+
+```shell-session
+$ java -jar jawk-${project.version}-standalone.jar --posix 'BEGIN { a[1,2] = 42; print a[1,2] }'
+42
+```
+
+Because `-L` loads an already compiled tuples file, Jawk rejects `--posix` together with `-L` instead of pretending that it can re-apply compile-time restrictions after the fact.
+
 ## Load Extensions
 
 List the currently registered extension identifiers:

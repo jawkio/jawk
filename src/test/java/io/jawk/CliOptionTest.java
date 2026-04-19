@@ -23,6 +23,7 @@ package io.jawk;
  */
 
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -31,6 +32,7 @@ import java.io.ObjectOutputStream;
 import org.junit.Test;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
+import io.jawk.frontend.ast.ParserException;
 
 public class CliOptionTest {
 
@@ -54,6 +56,79 @@ public class CliOptionTest {
 	}
 
 	@Test
+	public void posixOptionDisablesArraysOfArrays() {
+		Cli cli = new Cli();
+		cli.parse(new String[] { "--posix", "{ print 1 }" });
+
+		assertFalse(cli.getSettings().isAllowArraysOfArrays());
+	}
+
+	@Test
+	public void posixOptionRejectsNestedArrays() throws Exception {
+		AwkTestSupport
+				.cliTest("CLI --posix rejects nested arrays")
+				.argument("--posix")
+				.script("BEGIN { a[1][2] = 42 }")
+				.expectThrow(ParserException.class)
+				.runAndAssert();
+	}
+
+	@Test
+	public void posixOptionStillAllowsClassicMultidimensionalSubscripts() throws Exception {
+		AwkTestSupport
+				.cliTest("CLI --posix still allows classic multidimensional subscripts")
+				.argument("--posix")
+				.script("BEGIN { a[1,2] = 42; print a[1,2] }")
+				.expectLines("42")
+				.runAndAssert();
+	}
+
+	@Test
+	public void posixOptionRejectsPrecompiledProgramsInEitherOrder() throws Exception {
+		File compiled = tempFolder.newFile("program.ser");
+		writeProgram(compiled, "BEGIN { print 1 }");
+
+		AwkTestSupport.TestResult posixThenLoad = AwkTestSupport
+				.cliTest("CLI rejects --posix before -L")
+				.argument("--posix", "-L", compiled.getAbsolutePath())
+				.expectThrow(IllegalArgumentException.class)
+				.run();
+		posixThenLoad.assertExpected();
+		assertTrue(posixThenLoad.thrownException().getMessage().contains("--posix cannot be combined with -L"));
+
+		AwkTestSupport.TestResult loadThenPosix = AwkTestSupport
+				.cliTest("CLI rejects --posix after -L")
+				.argument("-L", compiled.getAbsolutePath(), "--posix")
+				.expectThrow(IllegalArgumentException.class)
+				.run();
+		loadThenPosix.assertExpected();
+		assertTrue(loadThenPosix.thrownException().getMessage().contains("--posix cannot be combined with -L"));
+	}
+
+	@Test
+	public void posixLoadOptionWithoutFilenameReportsMissingArgument() throws Exception {
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.cliTest("CLI reports missing -L argument before --posix incompatibility")
+				.argument("--posix", "-L")
+				.expectThrow(IllegalArgumentException.class)
+				.run();
+
+		result.assertExpected();
+		assertTrue(result.thrownException().getMessage().contains("Need additional argument for -L"));
+	}
+
+	@Test
+	public void helpOutputDoesNotAdvertiseUnsupportedOutputOption() throws Exception {
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.cliTest("CLI help omits unsupported -o option")
+				.argument("-h")
+				.run();
+
+		assertFalse(result.output().contains("[-o output-filename]"));
+		assertFalse(result.output().contains(" -o = "));
+	}
+
+	@Test
 	public void loadOptionWithWrongSerializedTypeThrowsFriendlyError() throws Exception {
 		File bad = tempFolder.newFile("wrong-type.ser");
 		try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(bad))) {
@@ -67,5 +142,11 @@ public class CliOptionTest {
 				{ "-L", bad.getAbsolutePath(), "{ print }" }));
 		assertTrue(ex.getMessage().contains("does not contain a valid precompiled AwkProgram"));
 		assertTrue(ex.getCause() instanceof ClassCastException);
+	}
+
+	private static void writeProgram(File target, String script) throws Exception {
+		try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(target))) {
+			oos.writeObject(new Awk().compile(script));
+		}
 	}
 }

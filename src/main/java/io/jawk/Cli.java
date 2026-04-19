@@ -54,6 +54,7 @@ import io.jawk.util.ScriptSource;
 public final class Cli {
 
 	private static final String JAR_NAME;
+	private static final String POSIX_LOAD_CONFLICT_MESSAGE = "--posix cannot be combined with -L because -L loads a precompiled program.";
 
 	static {
 		String myName;
@@ -168,6 +169,7 @@ public final class Cli {
 
 		// Parse the arguments
 		int argIdx = 0;
+		boolean posixRequested = false;
 		while (argIdx < args.length) {
 			String arg = args[argIdx];
 			if (arg.length() == 0) {
@@ -191,6 +193,9 @@ public final class Cli {
 			} else if (arg.equals("-L")) {
 				// -L filename : load precompiled program
 				checkParameterHasArgument(args, argIdx);
+				if (posixRequested) {
+					throw new IllegalArgumentException(POSIX_LOAD_CONFLICT_MESSAGE);
+				}
 				String file = args[++argIdx];
 				try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
 					precompiledProgram = (AwkProgram) ois.readObject();
@@ -225,6 +230,13 @@ public final class Cli {
 			} else if (arg.equals("-S") || arg.equals("--sandbox")) {
 // -S/--sandbox : enable sandbox mode
 				sandbox = true;
+			} else if (arg.equals("--posix")) {
+				// --posix : enforce POSIX-compatible compile-time behavior
+				if (precompiledProgram != null) {
+					throw new IllegalArgumentException(POSIX_LOAD_CONFLICT_MESSAGE);
+				}
+				posixRequested = true;
+				settings.setAllowArraysOfArrays(false);
 			} else if (arg.equals("--dump-syntax")) {
 // --dump-syntax : dump syntax tree to file
 				dumpSyntaxTree = true;
@@ -407,8 +419,8 @@ public final class Cli {
 								" [-f script-filename]" +
 								" [-L program-filename]" +
 								" [-K program-filename]" +
-								" [-o output-filename]" +
 								" [-S|--sandbox]" +
+								" [--posix]" +
 								" [--dump-syntax]" +
 								" [--dump-intermediate]" +
 								" [-s|--no-optimize]" +
@@ -431,11 +443,11 @@ public final class Cli {
 		dest.println();
 		dest.println(" -t = (extension) Maintain array keys in sorted order.");
 		dest.println(" -K filename = Compile to program file and halt.");
-		dest.println(" -o = (extension) Specify output file.");
 		dest
 				.println(
 						" -S, --sandbox = (extension) Enable sandbox mode (no system(), redirection, pipelines, or"
 								+ " dynamic extensions).");
+		dest.println(" --posix = Enforce POSIX-compatible behavior such as disabling nested arrays.");
 		dest.println(" --dump-syntax = Print the syntax tree.");
 		dest.println(" --dump-intermediate = Print the intermediate code.");
 		dest.println(" -s, --no-optimize = (extension) Disable optimizations during compilation.");

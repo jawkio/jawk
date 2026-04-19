@@ -48,6 +48,7 @@ java -jar jawk-${project.version}-standalone.jar --list-ext
 >   - `-r` disables Jawk's default trapping of `IllegalFormatException` for `printf` and `sprintf`.
 >   - `--locale <locale>` sets the locale through `Locale.forLanguageTag(...)`.
 >   - `-t` keeps associative array keys sorted.
+>   - `--posix` enforces POSIX-oriented compile-time behavior such as disabling gawk-style nested arrays.
 >
 > - Extensions and sandbox
 >
@@ -71,6 +72,8 @@ java -jar jawk-${project.version}-standalone.jar --list-ext
 
 - `--dump-syntax`, `--dump-intermediate`, `-K`, `-h`, `-?`, and `--list-ext` are non-executing modes.
 - `-S` affects compilation and execution, not just runtime behavior.
+- `--posix` currently disables arrays-of-arrays syntax and related subarray-only operands in order to keep CLI compilation aligned with classic POSIX-style AWK expectations.
+- `--posix` is rejected together with `-L`, because loading precompiled tuples bypasses source compilation entirely.
 - `-L` lets you skip source compilation, but the loaded tuples must still be compatible with the current runtime.
 - `-f` and `-L` are distinct paths: source files compile now, tuple files load now.
 

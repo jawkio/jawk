@@ -54,6 +54,7 @@ import io.jawk.util.ScriptSource;
 public final class Cli {
 
 	private static final String JAR_NAME;
+	private static final String POSIX_LOAD_CONFLICT_MESSAGE = "--posix cannot be combined with -L because -L loads a precompiled program.";
 
 	static {
 		String myName;
@@ -191,11 +192,10 @@ public final class Cli {
 				scriptSources.add(new ScriptFileSource(args[++argIdx]));
 			} else if (arg.equals("-L")) {
 				// -L filename : load precompiled program
-				if (posixRequested) {
-					throw new IllegalArgumentException(
-							"--posix cannot be combined with -L because -L loads a precompiled program.");
-				}
 				checkParameterHasArgument(args, argIdx);
+				if (posixRequested) {
+					throw new IllegalArgumentException(POSIX_LOAD_CONFLICT_MESSAGE);
+				}
 				String file = args[++argIdx];
 				try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
 					precompiledProgram = (AwkProgram) ois.readObject();
@@ -233,8 +233,7 @@ public final class Cli {
 			} else if (arg.equals("--posix")) {
 				// --posix : enforce POSIX-compatible compile-time behavior
 				if (precompiledProgram != null) {
-					throw new IllegalArgumentException(
-							"--posix cannot be combined with -L because -L loads a precompiled program.");
+					throw new IllegalArgumentException(POSIX_LOAD_CONFLICT_MESSAGE);
 				}
 				posixRequested = true;
 				settings.setAllowArraysOfArrays(false);

@@ -93,6 +93,7 @@ public class CliOptionTest {
 				.argument("--posix", "-L", compiled.getAbsolutePath())
 				.expectThrow(IllegalArgumentException.class)
 				.run();
+		posixThenLoad.assertExpected();
 		assertTrue(posixThenLoad.thrownException().getMessage().contains("--posix cannot be combined with -L"));
 
 		AwkTestSupport.TestResult loadThenPosix = AwkTestSupport
@@ -100,7 +101,20 @@ public class CliOptionTest {
 				.argument("-L", compiled.getAbsolutePath(), "--posix")
 				.expectThrow(IllegalArgumentException.class)
 				.run();
+		loadThenPosix.assertExpected();
 		assertTrue(loadThenPosix.thrownException().getMessage().contains("--posix cannot be combined with -L"));
+	}
+
+	@Test
+	public void posixLoadOptionWithoutFilenameReportsMissingArgument() throws Exception {
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.cliTest("CLI reports missing -L argument before --posix incompatibility")
+				.argument("--posix", "-L")
+				.expectThrow(IllegalArgumentException.class)
+				.run();
+
+		result.assertExpected();
+		assertTrue(result.thrownException().getMessage().contains("Need additional argument for -L"));
 	}
 
 	@Test

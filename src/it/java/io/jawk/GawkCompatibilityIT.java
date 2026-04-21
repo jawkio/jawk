@@ -62,7 +62,7 @@ public class GawkCompatibilityIT {
 	private static final String SKIP_MANIFEST_FILE = "skips.properties";
 	private static final String EXIT_CODE_PREFIX = "EXIT CODE: ";
 	private static final String ACTUAL_OUTPUT_DIRECTORY = "gawk-actual";
-	private static final String STAGED_DIRECTORY_NAME = "gawk-staged";
+	private static final String STAGED_DIRECTORY_PREFIX = "gawk-staged-";
 	private static final int MAX_CAPTURED_OUTPUT_BYTES = 1024 * 1024;
 	private static final int DIFF_CONTEXT_RADIUS = 80;
 	private static final boolean LOG_PROGRESS = Boolean.getBoolean("jawk.gawk.progress");
@@ -123,7 +123,7 @@ public class GawkCompatibilityIT {
 		for (String flag : gawkCase.runnableFlags()) {
 			builder.argument(flag);
 		}
-		builder.argument("-f", gawkCase.scriptFileName());
+		builder.argument("-f", state.stagedDirectory.resolve(gawkCase.scriptFileName()).toString());
 		if (gawkCase.stdinFileName() != null) {
 			builder.stdin(Files.readAllBytes(state.stagedDirectory.resolve(gawkCase.stdinFileName())));
 		}
@@ -173,33 +173,12 @@ public class GawkCompatibilityIT {
 
 	private static Path stageResourceDirectory(Path sourceDirectory) throws IOException {
 		Path workingDirectory = Paths.get("").toAbsolutePath().normalize();
-		Path stagedDirectory = workingDirectory.resolve(STAGED_DIRECTORY_NAME);
-		deleteRecursively(stagedDirectory);
-		Files.createDirectories(stagedDirectory);
+		Files.createDirectories(workingDirectory);
+		Path stagedDirectory = Files.createTempDirectory(workingDirectory, STAGED_DIRECTORY_PREFIX);
 		try (Stream<Path> paths = Files.walk(sourceDirectory)) {
 			paths.forEach(path -> copyToWorkingDirectory(sourceDirectory, stagedDirectory, path));
 		}
 		return stagedDirectory;
-	}
-
-	private static void deleteRecursively(Path directory) throws IOException {
-		if (!Files.exists(directory)) {
-			return;
-		}
-		try (Stream<Path> paths = Files.walk(directory)) {
-			paths.sorted((left, right) -> Integer.compare(right.getNameCount(), left.getNameCount())).forEach(path -> {
-				try {
-					Files.delete(path);
-				} catch (IOException ex) {
-					throw new IllegalStateException("Failed to delete staged gawk resource " + path, ex);
-				}
-			});
-		} catch (IllegalStateException ex) {
-			if (ex.getCause() instanceof IOException) {
-				throw (IOException) ex.getCause();
-			}
-			throw ex;
-		}
 	}
 
 	private static void copyToWorkingDirectory(Path sourceDirectory, Path workingDirectory, Path sourcePath) {

@@ -73,7 +73,7 @@ public class BwkPIT {
 			throw new IOException("Couldn't find resource " + BWK_P_PATH);
 		}
 		Path bwkPPath = Paths.get(bwkPUrl.toURI());
-		bwkPDirectory = new File(".").getAbsoluteFile().toPath().relativize(bwkPPath);
+		bwkPDirectory = bwkPPath.toAbsolutePath().normalize();
 		if (!bwkPDirectory.toFile().isDirectory()) {
 			throw new IOException(BWK_P_PATH + " is not a directory");
 		}

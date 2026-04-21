@@ -177,6 +177,26 @@ public class GawkMaketestsParserTest {
 		assertFalse(gawkCase.requiresExplicitSkip());
 	}
 
+	/**
+	 * Verifies that unclassified flags are treated as unsupported so the harness
+	 * does not silently run altered semantics.
+	 *
+	 * @throws Exception when parsing the sample metadata fails
+	 */
+	@Test
+	public void parseUnknownFlagsAsUnsupported() throws Exception {
+		GawkMaketestsParser.GawkCase gawkCase = parseSingleCase(
+				"mystery:\n"
+						+ "\t@echo $@\n"
+						+ "\t@-AWKPATH=\"$(srcdir)\" $(AWK) -f $@.awk  --mystery < \"$(srcdir)\"/$@.in >_$@ 2>&1 || echo EXIT CODE: $$? >>_$@\n"
+						+ "\t@-$(CMP) \"$(srcdir)\"/$@.ok _$@ && rm -f _$@\n");
+
+		assertTrue(gawkCase.flags().contains("--mystery"));
+		assertEquals(1, gawkCase.unsupportedFlags().size());
+		assertEquals("--mystery", gawkCase.unsupportedFlags().get(0));
+		assertTrue(gawkCase.requiresExplicitSkip());
+	}
+
 	private static GawkMaketestsParser.GawkCase parseSingleCase(String maketestsSnippet) throws Exception {
 		List<GawkMaketestsParser.GawkCase> cases = GawkMaketestsParser.parse(new StringReader(maketestsSnippet));
 		assertEquals(1, cases.size());

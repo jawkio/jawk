@@ -86,6 +86,8 @@ final class GawkMaketestsParser {
 				continue;
 			} else if (UNSUPPORTED_FLAGS.contains(flag)) {
 				unsupportedFlags.add(flag);
+			} else {
+				unsupportedFlags.add(flag);
 			}
 		}
 		String localeTag = parseLocaleTag(blockText);

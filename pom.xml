@@ -220,9 +220,6 @@
 				</configuration>
 				<executions>
 					<execution>
-						<configuration>
-							<testFailureIgnore>true</testFailureIgnore>
-						</configuration>
 						<goals>
 							<goal>integration-test</goal>
 							<goal>verify</goal>

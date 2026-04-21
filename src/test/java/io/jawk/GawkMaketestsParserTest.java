@@ -24,6 +24,7 @@ package io.jawk;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.StringReader;
@@ -79,6 +80,24 @@ public class GawkMaketestsParserTest {
 		assertEquals(1, gawkCase.runnableFlags().size());
 		assertEquals("--posix", gawkCase.runnableFlags().get(0));
 		assertFalse(gawkCase.requiresExplicitSkip());
+	}
+
+	/**
+	 * Verifies that the POSIX {@code C} locale does not force a JVM locale
+	 * override in the Jawk harness.
+	 *
+	 * @throws Exception when parsing the sample metadata fails
+	 */
+	@Test
+	public void parseCLocaleAsNoOverride() throws Exception {
+		GawkMaketestsParser.GawkCase gawkCase = parseSingleCase(
+				"localecase:\n"
+						+ "\t@echo $@\n"
+						+ "\t@-[ -z \"$$GAWKLOCALE\" ] && GAWKLOCALE=C; export GAWKLOCALE; \\\n"
+						+ "\tAWKPATH=\"$(srcdir)\" $(AWK) -f $@.awk >_$@ 2>&1 || echo EXIT CODE: $$? >>_$@\n"
+						+ "\t@-$(CMP) \"$(srcdir)\"/$@.ok _$@ && rm -f _$@\n");
+
+		assertNull(gawkCase.localeTag());
 	}
 
 	/**

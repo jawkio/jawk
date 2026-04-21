@@ -117,11 +117,7 @@ final class GawkMaketestsParser {
 		LinkedHashSet<String> flags = new LinkedHashSet<>();
 		Matcher matcher = FLAG_PATTERN.matcher(commandLine);
 		while (matcher.find()) {
-			String flag = matcher.group();
-			if ("-f".equals(flag)) {
-				continue;
-			}
-			flags.add(flag);
+			flags.add(matcher.group());
 		}
 		return Collections.unmodifiableList(new ArrayList<>(flags));
 	}
@@ -133,7 +129,7 @@ final class GawkMaketestsParser {
 		}
 		String gawkLocale = matcher.group(1);
 		if ("C".equals(gawkLocale)) {
-			return Locale.US.toLanguageTag();
+			return null;
 		}
 		String[] languageAndCountry = gawkLocale.split("[_.]", 3);
 		if (languageAndCountry.length < 2) {

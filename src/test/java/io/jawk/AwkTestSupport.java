@@ -463,6 +463,7 @@ public final class AwkTestSupport {
 		private boolean emulateCliMain;
 		private boolean mergeStdoutAndStderr;
 		private Integer maxOutputBytes;
+		private byte[] stdinBytes;
 
 		private CliTestBuilder(String description) {
 			super(description);
@@ -490,6 +491,40 @@ public final class AwkTestSupport {
 		 */
 		public CliTestBuilder preassign(String name, Object value) {
 			assignments.put(name, value);
+			return this;
+		}
+
+		/**
+		 * Provides text data that will be delivered on standard input when the
+		 * script runs. Calling this method clears any previously configured raw
+		 * byte stdin for the same builder.
+		 *
+		 * @param stdin the content to stream into standard input
+		 * @return this builder for method chaining
+		 */
+		@Override
+		public CliTestBuilder stdin(String stdin) {
+			stdinBytes = null;
+			return super.stdin(stdin);
+		}
+
+		/**
+		 * Provides raw bytes that will be delivered on standard input when the
+		 * script runs. This preserves fixture bytes exactly as supplied, which is
+		 * useful for compatibility cases whose redirected input is not valid
+		 * UTF-8. Calling this method clears any previously configured text stdin
+		 * for the same builder.
+		 *
+		 * @param stdinParam raw bytes to stream into standard input
+		 * @return this builder for method chaining
+		 * @throws IllegalArgumentException when {@code stdinParam} is {@code null}
+		 */
+		public CliTestBuilder stdin(byte[] stdinParam) {
+			if (stdinParam == null) {
+				throw new IllegalArgumentException("stdinParam must not be null");
+			}
+			stdin = null;
+			stdinBytes = Arrays.copyOf(stdinParam, stdinParam.length);
 			return this;
 		}
 
@@ -554,7 +589,8 @@ public final class AwkTestSupport {
 					assignments,
 					emulateCliMain,
 					mergeStdoutAndStderr,
-					maxOutputBytes);
+					maxOutputBytes,
+					stdinBytes);
 		}
 	}
 
@@ -1054,6 +1090,7 @@ public final class AwkTestSupport {
 		private final boolean emulateCliMain;
 		private final boolean mergeStdoutAndStderr;
 		private final Integer maxOutputBytes;
+		private final byte[] stdinBytes;
 
 		CliTestCase(
 				TestLayout layout,
@@ -1065,21 +1102,25 @@ public final class AwkTestSupport {
 				Map<String, Object> assignments,
 				boolean emulateCliMain,
 				boolean mergeStdoutAndStderr,
-				Integer maxOutputBytes) {
+				Integer maxOutputBytes,
+				byte[] stdinBytes) {
 			super(layout, fileContents, operandSpecs, pathPlaceholders, requiresPosix);
 			this.argumentSpecs = new ArrayList<>(argumentSpecs);
 			this.assignments = new LinkedHashMap<>(assignments);
 			this.emulateCliMain = emulateCliMain;
 			this.mergeStdoutAndStderr = mergeStdoutAndStderr;
 			this.maxOutputBytes = maxOutputBytes;
+			this.stdinBytes = stdinBytes != null ? Arrays.copyOf(stdinBytes, stdinBytes.length) : null;
 		}
 
 		@Override
 		protected ActualResult execute(ExecutionEnvironment env) throws Exception {
 			String stdin = resolvedStdin(env);
-			InputStream in = stdin != null ?
-					new ByteArrayInputStream(stdin.getBytes(StandardCharsets.UTF_8)) :
-					new ByteArrayInputStream(new byte[0]);
+			InputStream in = stdinBytes != null ?
+					new ByteArrayInputStream(Arrays.copyOf(stdinBytes, stdinBytes.length)) :
+					stdin != null ?
+							new ByteArrayInputStream(stdin.getBytes(StandardCharsets.UTF_8)) :
+							new ByteArrayInputStream(new byte[0]);
 			ByteArrayOutputStream outBytes = maxOutputBytes != null ?
 					new LimitedByteArrayOutputStream(maxOutputBytes.intValue()) :
 					new ByteArrayOutputStream();

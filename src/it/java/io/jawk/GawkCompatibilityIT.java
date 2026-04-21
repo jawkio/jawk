@@ -125,7 +125,7 @@ public class GawkCompatibilityIT {
 		}
 		builder.argument("-f", gawkCase.scriptFileName());
 		if (gawkCase.stdinFileName() != null) {
-			builder.stdin(readUtf8(state.stagedDirectory.resolve(gawkCase.stdinFileName())));
+			builder.stdin(Files.readAllBytes(state.stagedDirectory.resolve(gawkCase.stdinFileName())));
 		}
 
 		AwkTestSupport.TestResult result;

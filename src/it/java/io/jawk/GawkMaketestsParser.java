@@ -133,16 +133,18 @@ final class GawkMaketestsParser {
 		if ("C".equals(gawkLocale)) {
 			return null;
 		}
-		String[] languageAndCountry = gawkLocale.split("[_.]", 3);
+		int modifierIndex = gawkLocale.indexOf('@');
+		String localeWithoutModifier = modifierIndex >= 0 ? gawkLocale.substring(0, modifierIndex) : gawkLocale;
+		String[] languageAndCountry = localeWithoutModifier.split("[_.]", 3);
 		if (languageAndCountry.length < 2) {
-			return gawkLocale;
+			return localeWithoutModifier;
 		}
 		return languageAndCountry[0].toLowerCase(Locale.ROOT)
 				+ "-"
 				+ languageAndCountry[1].toUpperCase(Locale.ROOT);
 	}
 
-	static final class GawkCase {
+	static final class GawkCase implements GawkCompatibilityCase {
 		private final String name;
 		private final boolean shellScript;
 		private final List<String> flags;
@@ -171,7 +173,8 @@ final class GawkMaketestsParser {
 			this.localeTag = localeTag;
 		}
 
-		String name() {
+		@Override
+		public String name() {
 			return name;
 		}
 
@@ -199,7 +202,8 @@ final class GawkMaketestsParser {
 			return readsStandardInput;
 		}
 
-		String stdinFileName() {
+		@Override
+		public String stdinFileName() {
 			return readsStandardInput ? name + ".in" : null;
 		}
 
@@ -207,7 +211,8 @@ final class GawkMaketestsParser {
 			return hasMpfrExpectedVariant;
 		}
 
-		String expectedFileName() {
+		@Override
+		public String expectedFileName() {
 			return name + ".ok";
 		}
 
@@ -215,8 +220,30 @@ final class GawkMaketestsParser {
 			return localeTag;
 		}
 
-		boolean requiresExplicitSkip() {
+		@Override
+		public boolean requiresExplicitSkip() {
 			return shellScript || !unsupportedFlags.isEmpty();
+		}
+
+		@Override
+		public List<String> arguments() {
+			List<String> arguments = new ArrayList<>();
+			if (localeTag != null) {
+				arguments.add("--locale");
+				arguments.add(localeTag);
+			}
+			arguments.addAll(runnableFlags);
+			return Collections.unmodifiableList(arguments);
+		}
+
+		@Override
+		public List<String> scriptFileNames() {
+			return Collections.singletonList(scriptFileName());
+		}
+
+		@Override
+		public List<String> operands() {
+			return Collections.emptyList();
 		}
 
 		@Override

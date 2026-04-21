@@ -86,6 +86,7 @@ public class BwkPIT {
 				.stream(scriptsDirectory.toFile().listFiles())
 				.filter(scriptFile -> scriptFile.getName().startsWith("p."))
 				.map(File::getName)
+				.sorted()
 				.collect(Collectors.toList());
 	}
 

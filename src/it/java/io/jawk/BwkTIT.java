@@ -87,6 +87,7 @@ public class BwkTIT {
 				.stream(scriptsDirectory.toFile().listFiles())
 				.filter(scriptFile -> scriptFile.getName().startsWith("t."))
 				.map(File::getName)
+				.sorted()
 				.collect(Collectors.toList());
 	}
 

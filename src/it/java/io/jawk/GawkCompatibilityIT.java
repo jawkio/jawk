@@ -41,6 +41,7 @@ import java.util.Properties;
 import java.util.TreeSet;
 import java.util.stream.Stream;
 import org.junit.Assume;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -49,20 +50,23 @@ import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 
 /**
- * Integration suite derived from gawk's generated {@code Maketests} metadata.
- * The suite stages the vendored gawk snapshot into the Failsafe working
- * directory, parses the portable rules from {@code Maketests}, and executes
- * those rules through {@link AwkTestSupport#cliTest(String)}.
+ * Integration suite derived from vendored gawk metadata. The suite stages the
+ * gawk snapshot into the Failsafe working directory, parses the portable
+ * generated rules from {@code Maketests}, loads a curated manifest of simple
+ * handwritten {@code Makefile.am} rules, and executes those cases through
+ * {@link AwkTestSupport#cliTest(String)}.
  */
 @RunWith(Parameterized.class)
 public class GawkCompatibilityIT {
 
 	private static final String GAWK_RESOURCE_PATH = "/gawk";
 	private static final String MAKETESTS_FILE = "Maketests";
+	private static final String MANUAL_CASES_FILE = "manual-cases.properties";
 	private static final String SKIP_MANIFEST_FILE = "skips.properties";
 	private static final String EXIT_CODE_PREFIX = "EXIT CODE: ";
 	private static final String ACTUAL_OUTPUT_DIRECTORY = "gawk-actual";
 	private static final String STAGED_DIRECTORY_PREFIX = "gawk-staged-";
+	private static final String STAGED_PATH_PREFIX = "@path:";
 	private static final int MAX_CAPTURED_OUTPUT_BYTES = 1024 * 1024;
 	private static final int DIFF_CONTEXT_RADIUS = 80;
 	private static final boolean LOG_PROGRESS = Boolean.getBoolean("jawk.gawk.progress");
@@ -81,20 +85,34 @@ public class GawkCompatibilityIT {
 	}
 
 	/**
+	 * Removes the staged gawk snapshot after the parameterised suite completes.
+	 *
+	 * @throws Exception when cleaning the staged resources fails
+	 */
+	@AfterClass
+	public static void afterAll() throws Exception {
+		if (suiteState == null) {
+			return;
+		}
+		deleteRecursively(suiteState.stagedDirectory);
+		suiteState = null;
+	}
+
+	/**
 	 * Returns every gawk compatibility case discovered from the vendored
-	 * {@code Maketests} snapshot.
+	 * generated and handwritten metadata snapshots.
 	 *
 	 * @return parameter values for the suite
-	 * @throws Exception when loading or validating the Maketests metadata fails
+	 * @throws Exception when loading or validating the gawk metadata fails
 	 */
 	@Parameters(name = "GAWK {0}")
-	public static Iterable<GawkMaketestsParser.GawkCase> parameters() throws Exception {
+	public static Iterable<GawkCompatibilityCase> parameters() throws Exception {
 		return loadSuiteState().cases;
 	}
 
 	/** Gawk compatibility case under test. */
 	@Parameter
-	public GawkMaketestsParser.GawkCase gawkCase;
+	public GawkCompatibilityCase gawkCase;
 
 	/**
 	 * Executes one gawk compatibility case unless the explicit skip manifest marks
@@ -117,13 +135,15 @@ public class GawkCompatibilityIT {
 				.mergeStdoutAndStderr()
 				.maxOutputBytes(MAX_CAPTURED_OUTPUT_BYTES);
 
-		if (gawkCase.localeTag() != null) {
-			builder.argument("--locale", gawkCase.localeTag());
+		for (String argument : gawkCase.arguments()) {
+			builder.argument(resolveStagedPathSpec(state.stagedDirectory, argument));
 		}
-		for (String flag : gawkCase.runnableFlags()) {
-			builder.argument(flag);
+		for (String scriptFileName : gawkCase.scriptFileNames()) {
+			builder.argument("-f", state.stagedDirectory.resolve(scriptFileName).toString());
 		}
-		builder.argument("-f", state.stagedDirectory.resolve(gawkCase.scriptFileName()).toString());
+		for (String operand : gawkCase.operands()) {
+			builder.operand(resolveStagedPathSpec(state.stagedDirectory, operand));
+		}
 		if (gawkCase.stdinFileName() != null) {
 			builder.stdin(Files.readAllBytes(state.stagedDirectory.resolve(gawkCase.stdinFileName())));
 		}
@@ -152,7 +172,9 @@ public class GawkCompatibilityIT {
 		Path resourceDirectory = resolveResourceDirectory();
 		Path stagedDirectory = stageResourceDirectory(resourceDirectory);
 		Path actualOutputDirectory = Files.createDirectories(stagedDirectory.resolve(ACTUAL_OUTPUT_DIRECTORY));
-		List<GawkMaketestsParser.GawkCase> parsedCases = parseCases(resourceDirectory.resolve(MAKETESTS_FILE));
+		List<GawkCompatibilityCase> parsedCases = parseCases(
+				resourceDirectory.resolve(MAKETESTS_FILE),
+				resourceDirectory.resolve(MANUAL_CASES_FILE));
 		Map<String, String> skipReasons = loadSkipReasons(resourceDirectory.resolve(SKIP_MANIFEST_FILE));
 		validateCoverage(parsedCases, skipReasons);
 		suiteState = new SuiteState(stagedDirectory, actualOutputDirectory, parsedCases, skipReasons);
@@ -178,6 +200,7 @@ public class GawkCompatibilityIT {
 		try (Stream<Path> paths = Files.walk(sourceDirectory)) {
 			paths.forEach(path -> copyToWorkingDirectory(sourceDirectory, stagedDirectory, path));
 		}
+		createConfiguredMakefileAlias(stagedDirectory);
 		return stagedDirectory;
 	}
 
@@ -202,10 +225,15 @@ public class GawkCompatibilityIT {
 		}
 	}
 
-	private static List<GawkMaketestsParser.GawkCase> parseCases(Path maketestsPath) throws IOException {
+	private static List<GawkCompatibilityCase> parseCases(Path maketestsPath, Path manualCasesPath) throws IOException {
+		List<GawkCompatibilityCase> cases = new ArrayList<>();
 		try (Reader reader = Files.newBufferedReader(maketestsPath, StandardCharsets.UTF_8)) {
-			return new ArrayList<>(GawkMaketestsParser.parse(reader));
+			cases.addAll(GawkMaketestsParser.parse(reader));
 		}
+		try (Reader reader = Files.newBufferedReader(manualCasesPath, StandardCharsets.UTF_8)) {
+			cases.addAll(GawkManualCasesParser.parse(reader));
+		}
+		return Collections.unmodifiableList(cases);
 	}
 
 	private static Map<String, String> loadSkipReasons(Path manifestPath) throws IOException {
@@ -221,15 +249,21 @@ public class GawkCompatibilityIT {
 	}
 
 	private static void validateCoverage(
-			List<GawkMaketestsParser.GawkCase> parsedCases,
+			List<GawkCompatibilityCase> parsedCases,
 			Map<String, String> skipReasons) {
 		TreeSet<String> parsedNames = new TreeSet<>();
+		TreeSet<String> duplicateNames = new TreeSet<>();
 		TreeSet<String> missingSkipEntries = new TreeSet<>();
-		for (GawkMaketestsParser.GawkCase parsedCase : parsedCases) {
-			parsedNames.add(parsedCase.name());
+		for (GawkCompatibilityCase parsedCase : parsedCases) {
+			if (!parsedNames.add(parsedCase.name())) {
+				duplicateNames.add(parsedCase.name());
+			}
 			if (parsedCase.requiresExplicitSkip() && !skipReasons.containsKey(parsedCase.name())) {
 				missingSkipEntries.add(parsedCase.name());
 			}
+		}
+		if (!duplicateNames.isEmpty()) {
+			throw new IllegalStateException("Duplicate gawk case names discovered: " + String.join(", ", duplicateNames));
 		}
 		if (!missingSkipEntries.isEmpty()) {
 			throw new IllegalStateException("Missing gawk skip manifest entries: " + String.join(", ", missingSkipEntries));
@@ -249,6 +283,41 @@ public class GawkCompatibilityIT {
 			return normalized;
 		}
 		return normalized + EXIT_CODE_PREFIX + exitCode + "\n";
+	}
+
+	private static String resolveStagedPathSpec(Path stagedDirectory, String value) {
+		if (value != null && value.startsWith(STAGED_PATH_PREFIX)) {
+			return stagedDirectory.resolve(value.substring(STAGED_PATH_PREFIX.length())).normalize().toString();
+		}
+		return value;
+	}
+
+	private static void createConfiguredMakefileAlias(Path stagedDirectory) throws IOException {
+		Path makefile = stagedDirectory.resolve("Makefile");
+		Path makefileIn = stagedDirectory.resolve("Makefile.in");
+		if (Files.notExists(makefile) && Files.exists(makefileIn)) {
+			Files.copy(makefileIn, makefile);
+		}
+	}
+
+	private static void deleteRecursively(Path directory) throws IOException {
+		if (directory == null || Files.notExists(directory)) {
+			return;
+		}
+		try (Stream<Path> paths = Files.walk(directory)) {
+			paths.sorted((left, right) -> right.compareTo(left)).forEach(path -> {
+				try {
+					Files.deleteIfExists(path);
+				} catch (IOException ex) {
+					throw new IllegalStateException("Failed to delete staged gawk resource " + path, ex);
+				}
+			});
+		} catch (IllegalStateException ex) {
+			if (ex.getCause() instanceof IOException) {
+				throw (IOException) ex.getCause();
+			}
+			throw ex;
+		}
 	}
 
 	private void assertOutputMatches(SuiteState state, String expected, String actual) throws IOException {
@@ -336,13 +405,13 @@ public class GawkCompatibilityIT {
 	private static final class SuiteState {
 		private final Path stagedDirectory;
 		private final Path actualOutputDirectory;
-		private final List<GawkMaketestsParser.GawkCase> cases;
+		private final List<GawkCompatibilityCase> cases;
 		private final Map<String, String> skipReasons;
 
 		SuiteState(
 				Path stagedDirectory,
 				Path actualOutputDirectory,
-				List<GawkMaketestsParser.GawkCase> cases,
+				List<GawkCompatibilityCase> cases,
 				Map<String, String> skipReasons) {
 			this.stagedDirectory = stagedDirectory;
 			this.actualOutputDirectory = actualOutputDirectory;

@@ -101,6 +101,24 @@ public class GawkMaketestsParserTest {
 	}
 
 	/**
+	 * Verifies that gawk locale modifiers such as {@code @euro} are ignored when
+	 * mapping the locale to a BCP-47 language tag.
+	 *
+	 * @throws Exception when parsing the sample metadata fails
+	 */
+	@Test
+	public void parseLocaleWithModifier() throws Exception {
+		GawkMaketestsParser.GawkCase gawkCase = parseSingleCase(
+				"localemod:\n"
+						+ "\t@echo $@\n"
+						+ "\t@-[ -z \"$$GAWKLOCALE\" ] && GAWKLOCALE=de_DE@euro; export GAWKLOCALE; \\\n"
+						+ "\tAWKPATH=\"$(srcdir)\" $(AWK) -f $@.awk >_$@ 2>&1 || echo EXIT CODE: $$? >>_$@\n"
+						+ "\t@-$(CMP) \"$(srcdir)\"/$@.ok _$@ && rm -f _$@\n");
+
+		assertEquals("de-DE", gawkCase.localeTag());
+	}
+
+	/**
 	 * Verifies that shell-script rules are identified as explicit skips because
 	 * the Jawk harness does not execute external shell scripts in-process.
 	 *

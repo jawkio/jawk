@@ -83,6 +83,7 @@ public class BwkMiscIT {
 				.stream(scriptsDirectory.listFiles())
 				.filter(scriptFile -> scriptFile.getName().endsWith(".awk"))
 				.map(File::getName)
+				.sorted()
 				.collect(Collectors.toList());
 	}
 

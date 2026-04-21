@@ -51,6 +51,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import io.jawk.ext.JawkExtension;
+import io.jawk.jrt.AwkRuntimeException;
 import io.jawk.jrt.InputSource;
 
 /**
@@ -115,6 +116,21 @@ public final class AwkTestSupport {
 	 */
 	public static Path sharedTempDirectory() {
 		return SHARED_TEMP_DIR;
+	}
+
+	static final class OutputLimitExceededException extends RuntimeException {
+		private static final long serialVersionUID = 1L;
+
+		private final int maxBytes;
+
+		OutputLimitExceededException(int maxBytes) {
+			super("Captured output exceeded " + maxBytes + " bytes");
+			this.maxBytes = maxBytes;
+		}
+
+		int maxBytes() {
+			return maxBytes;
+		}
 	}
 
 	/**
@@ -444,6 +460,9 @@ public final class AwkTestSupport {
 	public static final class CliTestBuilder extends BaseTestBuilder<CliTestBuilder> {
 		private final List<String> argumentSpecs = new ArrayList<>();
 		private final Map<String, Object> assignments = new LinkedHashMap<>();
+		private boolean emulateCliMain;
+		private boolean mergeStdoutAndStderr;
+		private Integer maxOutputBytes;
 
 		private CliTestBuilder(String description) {
 			super(description);
@@ -474,6 +493,48 @@ public final class AwkTestSupport {
 			return this;
 		}
 
+		/**
+		 * Captures CLI standard output and standard error through the same
+		 * stream. This mirrors shell invocations that redirect {@code 2>&1},
+		 * allowing tests to compare diagnostics and regular output as a single
+		 * combined result.
+		 *
+		 * @return this builder for method chaining
+		 */
+		public CliTestBuilder mergeStdoutAndStderr() {
+			mergeStdoutAndStderr = true;
+			return this;
+		}
+
+		/**
+		 * Executes the CLI through the same exception handling flow used by
+		 * {@link Cli#main(String[])} so that diagnostics are rendered to the error
+		 * stream and failures become exit codes instead of propagating as Java
+		 * exceptions.
+		 *
+		 * @return this builder for method chaining
+		 */
+		public CliTestBuilder emulateCliMain() {
+			emulateCliMain = true;
+			return this;
+		}
+
+		/**
+		 * Caps the combined captured CLI output. This prevents compatibility
+		 * suites from exhausting heap space when a script emits unbounded output.
+		 *
+		 * @param maxBytes maximum number of UTF-8 bytes to capture
+		 * @return this builder for method chaining
+		 * @throws IllegalArgumentException when {@code maxBytes} is not positive
+		 */
+		public CliTestBuilder maxOutputBytes(int maxBytes) {
+			if (maxBytes <= 0) {
+				throw new IllegalArgumentException("maxBytes must be positive");
+			}
+			maxOutputBytes = maxBytes;
+			return this;
+		}
+
 		@Override
 		protected CliTestCase buildTestCase(
 				TestLayout layout,
@@ -483,7 +544,17 @@ public final class AwkTestSupport {
 			if (useTempDir && !assignments.containsKey("TEMPDIR")) {
 				assignments.put("TEMPDIR", SHARED_TEMP_DIR.toString());
 			}
-			return new CliTestCase(layout, files, operands, placeholders, requiresPosix, argumentSpecs, assignments);
+			return new CliTestCase(
+					layout,
+					files,
+					operands,
+					placeholders,
+					requiresPosix,
+					argumentSpecs,
+					assignments,
+					emulateCliMain,
+					mergeStdoutAndStderr,
+					maxOutputBytes);
 		}
 	}
 
@@ -859,6 +930,10 @@ public final class AwkTestSupport {
 						layout.expectedException,
 						null);
 			} catch (Throwable ex) {
+				OutputLimitExceededException outputLimitException = findOutputLimitExceeded(ex);
+				if (outputLimitException != null) {
+					throw outputLimitException;
+				}
 				if (layout.expectedException != null && layout.expectedException.isInstance(ex)) {
 					return new TestResult(
 							layout.description,
@@ -976,6 +1051,9 @@ public final class AwkTestSupport {
 	private static final class CliTestCase extends BaseTestCase {
 		private final List<String> argumentSpecs;
 		private final Map<String, Object> assignments;
+		private final boolean emulateCliMain;
+		private final boolean mergeStdoutAndStderr;
+		private final Integer maxOutputBytes;
 
 		CliTestCase(
 				TestLayout layout,
@@ -984,10 +1062,16 @@ public final class AwkTestSupport {
 				List<String> pathPlaceholders,
 				boolean requiresPosix,
 				List<String> argumentSpecs,
-				Map<String, Object> assignments) {
+				Map<String, Object> assignments,
+				boolean emulateCliMain,
+				boolean mergeStdoutAndStderr,
+				Integer maxOutputBytes) {
 			super(layout, fileContents, operandSpecs, pathPlaceholders, requiresPosix);
 			this.argumentSpecs = new ArrayList<>(argumentSpecs);
 			this.assignments = new LinkedHashMap<>(assignments);
+			this.emulateCliMain = emulateCliMain;
+			this.mergeStdoutAndStderr = mergeStdoutAndStderr;
+			this.maxOutputBytes = maxOutputBytes;
 		}
 
 		@Override
@@ -996,12 +1080,14 @@ public final class AwkTestSupport {
 			InputStream in = stdin != null ?
 					new ByteArrayInputStream(stdin.getBytes(StandardCharsets.UTF_8)) :
 					new ByteArrayInputStream(new byte[0]);
-			ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
-			ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
-			Cli cli = new Cli(
-					in,
-					new PrintStream(outBytes, true, StandardCharsets.UTF_8.name()),
-					new PrintStream(errBytes, true, StandardCharsets.UTF_8.name()));
+			ByteArrayOutputStream outBytes = maxOutputBytes != null ?
+					new LimitedByteArrayOutputStream(maxOutputBytes.intValue()) :
+					new ByteArrayOutputStream();
+			PrintStream stdout = new PrintStream(outBytes, true, StandardCharsets.UTF_8.name());
+			PrintStream stderr = mergeStdoutAndStderr ?
+					stdout :
+					new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8.name());
+			Cli cli = new Cli(in, stdout, stderr);
 
 			List<String> args = new ArrayList<>();
 			for (Map.Entry<String, Object> entry : assignments.entrySet()) {
@@ -1019,14 +1105,72 @@ public final class AwkTestSupport {
 
 			int exitCode = 0;
 			try {
-				cli.parse(args.toArray(new String[0]));
-				cli.run();
+				if (emulateCliMain) {
+					exitCode = executeLikeCliMain(cli, stderr, args);
+				} else {
+					cli.parse(args.toArray(new String[0]));
+					cli.run();
+				}
 			} catch (ExitException ex) {
 				exitCode = ex.getCode();
 			}
 			return new ActualResult(
 					outBytes.toString(StandardCharsets.UTF_8.name()),
 					exitCode);
+		}
+
+		private static int executeLikeCliMain(Cli cli, PrintStream err, List<String> args) throws Exception {
+			try {
+				cli.parse(args.toArray(new String[0]));
+				cli.run();
+				return 0;
+			} catch (ExitException ex) {
+				return ex.getCode();
+			} catch (AwkRuntimeException ex) {
+				OutputLimitExceededException outputLimitException = findOutputLimitExceeded(ex);
+				if (outputLimitException != null) {
+					throw outputLimitException;
+				}
+				if (ex.getLineNumber() > 0) {
+					err.printf("%s (line %d): %s%n", ex.getClass().getSimpleName(), ex.getLineNumber(), ex.getMessage());
+				} else {
+					err.printf("%s: %s%n", ex.getClass().getSimpleName(), ex.getMessage());
+				}
+				return 1;
+			} catch (IllegalArgumentException ex) {
+				err.println("Failed to parse arguments. Please see the help/usage output (cmd line switch '-h').");
+				ex.printStackTrace(err);
+				return 1;
+			} catch (Exception ex) {
+				err.printf("%s: %s%n", ex.getClass().getSimpleName(), ex.getMessage());
+				return 1;
+			}
+		}
+	}
+
+	private static final class LimitedByteArrayOutputStream extends ByteArrayOutputStream {
+		private final int maxBytes;
+
+		LimitedByteArrayOutputStream(int maxBytes) {
+			this.maxBytes = maxBytes;
+		}
+
+		@Override
+		public synchronized void write(int b) {
+			ensureCapacityFor(1);
+			super.write(b);
+		}
+
+		@Override
+		public synchronized void write(byte[] b, int off, int len) {
+			ensureCapacityFor(len);
+			super.write(b, off, len);
+		}
+
+		private void ensureCapacityFor(int additionalBytes) {
+			if (additionalBytes > 0 && count > maxBytes - additionalBytes) {
+				throw new OutputLimitExceededException(maxBytes);
+			}
 		}
 	}
 
@@ -1120,6 +1264,17 @@ public final class AwkTestSupport {
 				}
 			});
 		}
+	}
+
+	private static OutputLimitExceededException findOutputLimitExceeded(Throwable throwable) {
+		Throwable current = throwable;
+		while (current != null) {
+			if (current instanceof OutputLimitExceededException) {
+				return (OutputLimitExceededException) current;
+			}
+			current = current.getCause();
+		}
+		return null;
 	}
 
 	private static String escapeForAwkString(String value) {

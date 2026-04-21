@@ -110,6 +110,40 @@
 	<build>
 		<plugins>
 
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>build-helper-maven-plugin</artifactId>
+				<version>3.6.0</version>
+				<executions>
+					<execution>
+						<id>add-compatibility-test-source</id>
+						<phase>generate-test-sources</phase>
+						<goals>
+							<goal>add-test-source</goal>
+						</goals>
+						<configuration>
+							<sources>
+								<source>${project.basedir}/src/it/java</source>
+							</sources>
+						</configuration>
+					</execution>
+					<execution>
+						<id>add-compatibility-test-resources</id>
+						<phase>generate-test-resources</phase>
+						<goals>
+							<goal>add-test-resource</goal>
+						</goals>
+						<configuration>
+							<resources>
+								<resource>
+									<directory>${project.basedir}/src/it/resources</directory>
+								</resource>
+							</resources>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
 			<!--formatter -->
 			<plugin>
 				<groupId>net.revelc.code.formatter</groupId>
@@ -127,6 +161,7 @@
 					<directories>
 						<directory>${project.build.sourceDirectory}</directory>
 						<directory>${project.build.testSourceDirectory}</directory>
+						<directory>${project.basedir}/src/it/java</directory>
 					</directories>
 					<includes>
 						<include>**/*.java</include>
@@ -144,6 +179,7 @@
 					<includes>
 						<include>main/java/**/*.java</include>
 						<include>test/java/**/*.java</include>
+						<include>it/java/**/*.java</include>
 					</includes>
 				</configuration>
 			</plugin>
@@ -167,32 +203,26 @@
 			<!-- surefire -->
 			<plugin>
 				<artifactId>maven-surefire-plugin</artifactId>
-                                <configuration>
-                                        <excludes>
-                                                <exclude>**/*GawkTest.java</exclude>
-                                                <exclude>**/BwkPTest.java</exclude>
-                                                <exclude>**/BwkTTest.java</exclude>
-                                                <exclude>**/BwkMiscTest.java</exclude>
-                                        </excludes>
-                                        <workingDirectory>${project.build.directory}/surefire-workingdir</workingDirectory>
-                                </configuration>
+				<configuration>
+					<workingDirectory>${project.build.directory}/surefire-workingdir</workingDirectory>
+				</configuration>
 			</plugin>
 
 			<!-- failsafe for compatibility tests -->
 			<plugin>
 				<artifactId>maven-failsafe-plugin</artifactId>
 				<configuration>
-                                        <includes>
-                                                <include>**/BwkPTest.java</include>
-                                                <include>**/BwkTTest.java</include>
-                                                <include>**/BwkMiscTest.java</include>
-                                                <include>**/GawkTest.java</include>
-                                        </includes>
+					<includes>
+						<include>**/*IT.java</include>
+					</includes>
 					<testFailureIgnore>true</testFailureIgnore>
 					<workingDirectory>${project.build.directory}/failsafe-workingdir</workingDirectory>
 				</configuration>
 				<executions>
 					<execution>
+						<configuration>
+							<testFailureIgnore>true</testFailureIgnore>
+						</configuration>
 						<goals>
 							<goal>integration-test</goal>
 							<goal>verify</goal>

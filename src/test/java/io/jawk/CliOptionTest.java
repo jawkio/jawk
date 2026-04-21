@@ -128,6 +128,15 @@ public class CliOptionTest {
 		assertFalse(result.output().contains(" -o = "));
 	}
 
+	@Test(expected = AwkTestSupport.OutputLimitExceededException.class)
+	public void cliTestBuilderRejectsRunawayOutput() throws Exception {
+		AwkTestSupport
+				.cliTest("CLI output limit")
+				.script("BEGIN { for (i = 0; i < 1000; i++) print \"0123456789\" }")
+				.maxOutputBytes(64)
+				.run();
+	}
+
 	@Test
 	public void loadOptionWithWrongSerializedTypeThrowsFriendlyError() throws Exception {
 		File bad = tempFolder.newFile("wrong-type.ser");

@@ -42,7 +42,6 @@ public class GawkManualIT {
 
 	private static final String GAWK_RESOURCE_PATH = "/gawk";
 	private static final String EXIT_CODE_PREFIX = "EXIT CODE: ";
-	private static final String ACTUAL_OUTPUT_DIRECTORY = "gawk-manual-actual";
 	private static final String STAGED_DIRECTORY_PREFIX = "gawk-manual-";
 	private static final int MAX_CAPTURED_OUTPUT_BYTES = 1024 * 1024;
 	private static final boolean LOG_PROGRESS = Boolean.getBoolean("jawk.gawk.progress");
@@ -208,9 +207,14 @@ public class GawkManualIT {
 				.mergeStdoutAndStderr()
 				.maxOutputBytes(MAX_CAPTURED_OUTPUT_BYTES);
 		configurer.configure(builder, state);
-		AwkTestSupport.TestResult result;
+		AwkTestSupport.ExpectedCliTranscript expected = AwkTestSupport
+				.readExpectedCliTranscript(state.stagedDirectory.resolve(caseName + ".ok"), EXIT_CODE_PREFIX);
+		builder.postProcessWith(AwkTestSupport::normalizeNewlines).expect(expected.output());
+		if (expected.exitCode() != null) {
+			builder.expectExit(expected.exitCode().intValue());
+		}
 		try {
-			result = builder.build().run();
+			builder.build().runAndAssert();
 		} catch (AwkTestSupport.OutputLimitExceededException ex) {
 			fail(
 					"Captured output for GAWK "
@@ -218,16 +222,7 @@ public class GawkManualIT {
 							+ " exceeded "
 							+ ex.maxBytes()
 							+ " bytes. Enable -Djawk.gawk.progress=true to log case execution.");
-			return;
 		}
-		String actual = AwkTestSupport.appendExitCode(result.output(), result.exitCode(), EXIT_CODE_PREFIX);
-		String expected = AwkTestSupport.readUtf8Normalized(state.stagedDirectory.resolve(caseName + ".ok"));
-		AwkTestSupport
-				.assertOutputMatches(
-						"GAWK " + caseName,
-						expected,
-						actual,
-						state.actualOutputDirectory.resolve(caseName + ".actual"));
 	}
 
 	private static synchronized SuiteState loadSuiteState() throws Exception {
@@ -238,8 +233,7 @@ public class GawkManualIT {
 		Path stagedDirectory = null;
 		try {
 			stagedDirectory = AwkTestSupport.stageDirectory(resourceDirectory, STAGED_DIRECTORY_PREFIX);
-			Path actualOutputDirectory = resolveActualOutputDirectory();
-			suiteState = new SuiteState(stagedDirectory, actualOutputDirectory);
+			suiteState = new SuiteState(stagedDirectory);
 			return suiteState;
 		} catch (Exception ex) {
 			AwkTestSupport.deleteRecursively(stagedDirectory);
@@ -259,25 +253,15 @@ public class GawkManualIT {
 		return resourceDirectory;
 	}
 
-	private static Path resolveActualOutputDirectory() throws IOException {
-		Path actualOutputDirectory = AwkTestSupport
-				.buildDirectory(GawkManualIT.class)
-				.resolve("failsafe-reports")
-				.resolve(ACTUAL_OUTPUT_DIRECTORY);
-		return Files.createDirectories(actualOutputDirectory);
-	}
-
 	private interface ManualCaseConfigurer {
 		void configure(AwkTestSupport.CliTestBuilder builder, SuiteState state) throws Exception;
 	}
 
 	private static final class SuiteState {
 		private final Path stagedDirectory;
-		private final Path actualOutputDirectory;
 
-		SuiteState(Path stagedDirectory, Path actualOutputDirectory) {
+		SuiteState(Path stagedDirectory) {
 			this.stagedDirectory = stagedDirectory;
-			this.actualOutputDirectory = actualOutputDirectory;
 		}
 	}
 }

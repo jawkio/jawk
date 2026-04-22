@@ -23,8 +23,7 @@ package io.jawk;
  */
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.assertNull;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -46,44 +45,41 @@ public class AwkTestSupportTest {
 	}
 
 	/**
-	 * Verifies that CLI-style exit-code rendering only appends the synthetic
-	 * footer when execution fails.
+	 * Verifies that CLI transcript parsing splits the synthetic exit-code trailer
+	 * from the expected output content.
 	 */
 	@Test
-	public void appendExitCode() {
-		assertEquals("ok\n", AwkTestSupport.appendExitCode("ok\r\n", 0, "EXIT CODE: "));
-		assertEquals("fail\nEXIT CODE: 2\n", AwkTestSupport.appendExitCode("fail\r\n", 2, "EXIT CODE: "));
+	public void readExpectedCliTranscriptWithExitCode() throws Exception {
+		Path transcript = Files.createTempFile("jawk-support-transcript", ".ok");
+		try {
+			Files.write(transcript, "fail\r\nEXIT CODE: 2\r\n".getBytes(StandardCharsets.UTF_8));
+			AwkTestSupport.ExpectedCliTranscript expected = AwkTestSupport
+					.readExpectedCliTranscript(transcript, "EXIT CODE: ");
+			assertEquals("fail\n", expected.output());
+			assertEquals(Integer.valueOf(2), expected.exitCode());
+		} finally {
+			AwkTestSupport.deleteRecursively(transcript);
+		}
 	}
 
 	/**
-	 * Verifies that mismatch assertions write the actual output artifact and
-	 * report a useful failure message.
+	 * Verifies that CLI transcript parsing leaves the exit code unset when the
+	 * expected file contains only output.
 	 *
-	 * @throws Exception when preparing or cleaning the temporary artifact path
+	 * @throws Exception when preparing or cleaning the temporary transcript path
 	 *         fails
 	 */
 	@Test
-	public void assertOutputMatchesWritesActualArtifact() throws Exception {
-		Path tempDirectory = Files.createTempDirectory("jawk-support-assert");
-		Path actualOutputPath = tempDirectory.resolve("case.actual");
+	public void readExpectedCliTranscriptWithoutExitCode() throws Exception {
+		Path transcript = Files.createTempFile("jawk-support-transcript", ".ok");
 		try {
-			try {
-				AwkTestSupport
-						.assertOutputMatches(
-								"fixture",
-								"abc\n",
-								"adc\n",
-								actualOutputPath,
-								"Expected file: fixture.ok");
-				fail("Expected an AssertionError");
-			} catch (AssertionError ex) {
-				assertTrue(ex.getMessage().contains("Unexpected output for fixture"));
-				assertTrue(ex.getMessage().contains("Expected file: fixture.ok"));
-				assertTrue(ex.getMessage().contains(actualOutputPath.toString()));
-				assertEquals("adc\n", new String(Files.readAllBytes(actualOutputPath), StandardCharsets.UTF_8));
-			}
+			Files.write(transcript, "ok\r\n".getBytes(StandardCharsets.UTF_8));
+			AwkTestSupport.ExpectedCliTranscript expected = AwkTestSupport
+					.readExpectedCliTranscript(transcript, "EXIT CODE: ");
+			assertEquals("ok\n", expected.output());
+			assertNull(expected.exitCode());
 		} finally {
-			AwkTestSupport.deleteRecursively(tempDirectory);
+			AwkTestSupport.deleteRecursively(transcript);
 		}
 	}
 

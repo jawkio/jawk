@@ -39,7 +39,6 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -119,25 +118,8 @@ public final class AwkTestSupport {
 		return SHARED_TEMP_DIR;
 	}
 
-	static Path buildDirectory(Class<?> anchor) throws IOException {
-		try {
-			Path classesDirectory = Paths.get(anchor.getProtectionDomain().getCodeSource().getLocation().toURI());
-			Path buildDirectory = classesDirectory.getParent();
-			if (buildDirectory == null) {
-				throw new IOException("Couldn't determine build directory from " + classesDirectory);
-			}
-			return buildDirectory;
-		} catch (IOException ex) {
-			throw ex;
-		} catch (Exception ex) {
-			throw new IOException("Couldn't resolve Jawk build directory", ex);
-		}
-	}
-
 	static Path stageDirectory(Path sourceDirectory, String prefix) throws IOException {
-		Path workingDirectory = Paths.get("").toAbsolutePath().normalize();
-		Files.createDirectories(workingDirectory);
-		Path stagedDirectory = Files.createTempDirectory(workingDirectory, prefix);
+		Path stagedDirectory = Files.createTempDirectory(prefix);
 		try {
 			copyDirectoryRecursively(sourceDirectory, stagedDirectory);
 			return stagedDirectory;
@@ -165,39 +147,21 @@ public final class AwkTestSupport {
 		return text.replace("\r\n", "\n").replace("\r", "\n");
 	}
 
-	static String appendExitCode(String output, int exitCode, String exitCodePrefix) {
-		String normalized = normalizeNewlines(output);
-		if (exitCode == 0) {
-			return normalized;
+	static ExpectedCliTranscript readExpectedCliTranscript(Path path, String exitCodePrefix) throws IOException {
+		String transcript = readUtf8Normalized(path);
+		int trailerLineStart = transcript.length();
+		while (trailerLineStart > 0 && transcript.charAt(trailerLineStart - 1) == '\n') {
+			trailerLineStart--;
 		}
-		return normalized + exitCodePrefix + exitCode + "\n";
-	}
-
-	static void assertOutputMatches(String description, String expected, String actual, Path actualOutputPath)
-			throws IOException {
-		assertOutputMatches(description, expected, actual, actualOutputPath, null);
-	}
-
-	static void assertOutputMatches(
-			String description,
-			String expected,
-			String actual,
-			Path actualOutputPath,
-			String expectedReference)
-			throws IOException {
-		if (!expected.equals(actual)) {
-			Path parent = actualOutputPath.getParent();
-			if (parent != null) {
-				Files.createDirectories(parent);
-			}
-			Files.write(actualOutputPath, actual.getBytes(StandardCharsets.UTF_8));
+		while (trailerLineStart > 0 && transcript.charAt(trailerLineStart - 1) != '\n') {
+			trailerLineStart--;
 		}
-		StringBuilder message = new StringBuilder("Unexpected output for ").append(description);
-		if (expectedReference != null && !expectedReference.isEmpty()) {
-			message.append(". ").append(expectedReference);
+		String lastLine = transcript.substring(trailerLineStart).trim();
+		if (!lastLine.startsWith(exitCodePrefix)) {
+			return new ExpectedCliTranscript(transcript, null);
 		}
-		message.append(". Actual output written to ").append(actualOutputPath);
-		assertEquals(message.toString(), expected, actual);
+		Integer exitCode = Integer.valueOf(lastLine.substring(exitCodePrefix.length()).trim());
+		return new ExpectedCliTranscript(transcript.substring(0, trailerLineStart), exitCode);
 	}
 
 	static final class OutputLimitExceededException extends RuntimeException {
@@ -212,6 +176,24 @@ public final class AwkTestSupport {
 
 		int maxBytes() {
 			return maxBytes;
+		}
+	}
+
+	static final class ExpectedCliTranscript {
+		private final String output;
+		private final Integer exitCode;
+
+		ExpectedCliTranscript(String output, Integer exitCode) {
+			this.output = output;
+			this.exitCode = exitCode;
+		}
+
+		String output() {
+			return output;
+		}
+
+		Integer exitCode() {
+			return exitCode;
 		}
 	}
 

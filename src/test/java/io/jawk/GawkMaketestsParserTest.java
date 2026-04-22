@@ -215,6 +215,27 @@ public class GawkMaketestsParserTest {
 		assertTrue(gawkCase.requiresExplicitSkip());
 	}
 
+	/**
+	 * Verifies that short gawk options are detected instead of being silently
+	 * ignored when generated metadata grows beyond the current snapshot.
+	 *
+	 * @throws Exception when parsing the sample metadata fails
+	 */
+	@Test
+	public void parseShortFlagsAsUnsupported() throws Exception {
+		GawkMaketestsParser.GawkCase gawkCase = parseSingleCase(
+				"shortopt:\n"
+						+ "\t@echo $@\n"
+						+ "\t@-AWKPATH=\"$(srcdir)\" $(AWK) -v name=value -f $@.awk >_$@ 2>&1 || echo EXIT CODE: $$? >>_$@\n"
+						+ "\t@-$(CMP) \"$(srcdir)\"/$@.ok _$@ && rm -f _$@\n");
+
+		assertTrue(gawkCase.flags().contains("-v"));
+		assertTrue(gawkCase.flags().contains("-f"));
+		assertEquals(1, gawkCase.unsupportedFlags().size());
+		assertEquals("-v", gawkCase.unsupportedFlags().get(0));
+		assertTrue(gawkCase.requiresExplicitSkip());
+	}
+
 	private static GawkMaketestsParser.GawkCase parseSingleCase(String maketestsSnippet) throws Exception {
 		List<GawkMaketestsParser.GawkCase> cases = GawkMaketestsParser.parse(new StringReader(maketestsSnippet));
 		assertEquals(1, cases.size());

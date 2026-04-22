@@ -82,9 +82,13 @@ public class BwkTIT {
 		if (!scriptsDirectory.toFile().isDirectory()) {
 			throw new IOException("scripts is not a directory");
 		}
+		File[] scriptFiles = scriptsDirectory.toFile().listFiles();
+		if (scriptFiles == null) {
+			throw new IOException("Couldn't list files in " + scriptsDirectory);
+		}
 
 		return Arrays
-				.stream(scriptsDirectory.toFile().listFiles())
+				.stream(scriptFiles)
 				.filter(scriptFile -> scriptFile.getName().startsWith("t."))
 				.map(File::getName)
 				.sorted()

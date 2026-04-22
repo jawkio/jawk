@@ -166,7 +166,7 @@ public class GawkCompatibilityIT {
 		}
 		Path resourceDirectory = resolveResourceDirectory();
 		Path stagedDirectory = stageResourceDirectory(resourceDirectory);
-		Path actualOutputDirectory = Files.createDirectories(stagedDirectory.resolve(ACTUAL_OUTPUT_DIRECTORY));
+		Path actualOutputDirectory = resolveActualOutputDirectory();
 		List<GawkMaketestsParser.GawkCase> parsedCases = parseCases(resourceDirectory.resolve(MAKETESTS_FILE));
 		Map<String, String> skipReasons = loadSkipReasons(resourceDirectory.resolve(SKIP_MANIFEST_FILE));
 		validateCoverage(parsedCases, skipReasons);
@@ -270,6 +270,25 @@ public class GawkCompatibilityIT {
 			return normalized;
 		}
 		return normalized + EXIT_CODE_PREFIX + exitCode + "\n";
+	}
+
+	private static Path resolveActualOutputDirectory() throws IOException {
+		Path actualOutputDirectory = resolveBuildDirectory().resolve("failsafe-reports").resolve(ACTUAL_OUTPUT_DIRECTORY);
+		return Files.createDirectories(actualOutputDirectory);
+	}
+
+	private static Path resolveBuildDirectory() throws IOException {
+		try {
+			Path classesDirectory = Paths
+					.get(GawkCompatibilityIT.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+			Path buildDirectory = classesDirectory.getParent();
+			if (buildDirectory == null) {
+				throw new IOException("Couldn't determine build directory from " + classesDirectory);
+			}
+			return buildDirectory;
+		} catch (Exception ex) {
+			throw new IOException("Couldn't resolve Jawk build directory", ex);
+		}
 	}
 
 	private static void deleteRecursively(Path directory) throws IOException {

@@ -38,9 +38,11 @@ import java.util.regex.Pattern;
 final class GawkMaketestsParser {
 
 	private static final String DUMMY_TARGET = "Gt-dummy";
+	private static final String AWK_COMMAND_TOKEN = "$(AWK)";
 	private static final Pattern TARGET_PATTERN = Pattern.compile("^([A-Za-z0-9_.+-]+):\\s*$");
-	private static final Pattern FLAG_PATTERN = Pattern.compile("--[a-z-]+|-M");
 	private static final Pattern LOCALE_PATTERN = Pattern.compile("GAWKLOCALE=([^;\\s]+)");
+	private static final Set<String> SHORT_OPTIONS_WITH_ARGUMENT = new LinkedHashSet<>(
+			Arrays.asList("-E", "-F", "-f", "-i", "-e", "-v"));
 	private static final Set<String> DIRECT_CLI_FLAGS = new LinkedHashSet<>(Arrays.asList("--posix", "--sandbox"));
 	private static final Set<String> NOOP_FLAGS = new LinkedHashSet<>(
 			Arrays.asList("--non-decimal-data", "--re-interval"));
@@ -80,7 +82,9 @@ final class GawkMaketestsParser {
 		List<String> runnableFlags = new ArrayList<>();
 		List<String> unsupportedFlags = new ArrayList<>();
 		for (String flag : flags) {
-			if (DIRECT_CLI_FLAGS.contains(flag)) {
+			if ("-f".equals(flag)) {
+				continue;
+			} else if (DIRECT_CLI_FLAGS.contains(flag)) {
 				runnableFlags.add(flag);
 			} else if (NOOP_FLAGS.contains(flag)) {
 				continue;
@@ -117,11 +121,81 @@ final class GawkMaketestsParser {
 
 	private static List<String> parseFlags(String commandLine) {
 		LinkedHashSet<String> flags = new LinkedHashSet<>();
-		Matcher matcher = FLAG_PATTERN.matcher(commandLine);
-		while (matcher.find()) {
-			flags.add(matcher.group());
+		boolean awkCommandSeen = false;
+		List<String> tokens = tokenizeCommandLine(commandLine);
+		for (int index = 0; index < tokens.size(); index++) {
+			String token = tokens.get(index);
+			if (!awkCommandSeen) {
+				if (AWK_COMMAND_TOKEN.equals(token)) {
+					awkCommandSeen = true;
+				}
+				continue;
+			}
+			if (token.isEmpty() || "--".equals(token) || !token.startsWith("-") || "-".equals(token)) {
+				continue;
+			}
+			if (token.startsWith("--")) {
+				int equalsIndex = token.indexOf('=');
+				flags.add(equalsIndex >= 0 ? token.substring(0, equalsIndex) : token);
+				continue;
+			}
+			for (int flagIndex = 1; flagIndex < token.length(); flagIndex++) {
+				String shortFlag = "-" + token.charAt(flagIndex);
+				flags.add(shortFlag);
+				if (SHORT_OPTIONS_WITH_ARGUMENT.contains(shortFlag)) {
+					if (flagIndex + 1 == token.length()) {
+						index++;
+					}
+					break;
+				}
+			}
 		}
 		return Collections.unmodifiableList(new ArrayList<>(flags));
+	}
+
+	private static List<String> tokenizeCommandLine(String commandLine) {
+		List<String> tokens = new ArrayList<>();
+		StringBuilder current = new StringBuilder();
+		boolean inSingleQuotes = false;
+		boolean inDoubleQuotes = false;
+		boolean escaped = false;
+		for (int index = 0; index < commandLine.length(); index++) {
+			char currentChar = commandLine.charAt(index);
+			if (escaped) {
+				current.append(currentChar);
+				escaped = false;
+				continue;
+			}
+			if (currentChar == '\\' && !inSingleQuotes) {
+				escaped = true;
+				continue;
+			}
+			if (currentChar == '\'' && !inDoubleQuotes) {
+				inSingleQuotes = !inSingleQuotes;
+				continue;
+			}
+			if (currentChar == '"' && !inSingleQuotes) {
+				inDoubleQuotes = !inDoubleQuotes;
+				continue;
+			}
+			if (Character.isWhitespace(currentChar) && !inSingleQuotes && !inDoubleQuotes) {
+				addCurrentToken(tokens, current);
+				continue;
+			}
+			current.append(currentChar);
+		}
+		if (escaped) {
+			current.append('\\');
+		}
+		addCurrentToken(tokens, current);
+		return Collections.unmodifiableList(tokens);
+	}
+
+	private static void addCurrentToken(List<String> tokens, StringBuilder current) {
+		if (current.length() > 0) {
+			tokens.add(current.toString());
+			current.setLength(0);
+		}
 	}
 
 	private static String parseLocaleTag(String blockText) {

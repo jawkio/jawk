@@ -250,7 +250,7 @@ public class GawkManualIT {
 		}
 		Path resourceDirectory = resolveResourceDirectory();
 		Path stagedDirectory = stageResourceDirectory(resourceDirectory);
-		Path actualOutputDirectory = Files.createDirectories(stagedDirectory.resolve(ACTUAL_OUTPUT_DIRECTORY));
+		Path actualOutputDirectory = resolveActualOutputDirectory();
 		suiteState = new SuiteState(stagedDirectory, actualOutputDirectory);
 		return suiteState;
 	}
@@ -409,6 +409,25 @@ public class GawkManualIT {
 			return normalized;
 		}
 		return normalized + EXIT_CODE_PREFIX + exitCode + "\n";
+	}
+
+	private static Path resolveActualOutputDirectory() throws IOException {
+		Path actualOutputDirectory = resolveBuildDirectory().resolve("failsafe-reports").resolve(ACTUAL_OUTPUT_DIRECTORY);
+		return Files.createDirectories(actualOutputDirectory);
+	}
+
+	private static Path resolveBuildDirectory() throws IOException {
+		try {
+			Path classesDirectory = Paths
+					.get(GawkManualIT.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+			Path buildDirectory = classesDirectory.getParent();
+			if (buildDirectory == null) {
+				throw new IOException("Couldn't determine build directory from " + classesDirectory);
+			}
+			return buildDirectory;
+		} catch (Exception ex) {
+			throw new IOException("Couldn't resolve Jawk build directory", ex);
+		}
 	}
 
 	private static String readUtf8(Path path) throws IOException {

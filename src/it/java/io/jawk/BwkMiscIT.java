@@ -78,9 +78,13 @@ public class BwkMiscIT {
 		if (!scriptsDirectory.isDirectory()) {
 			throw new IOException("scripts is not a directory");
 		}
+		File[] scriptFiles = scriptsDirectory.listFiles();
+		if (scriptFiles == null) {
+			throw new IOException("Couldn't list files in " + scriptsDirectory);
+		}
 
 		return Arrays
-				.stream(scriptsDirectory.listFiles())
+				.stream(scriptFiles)
 				.filter(scriptFile -> scriptFile.getName().endsWith(".awk"))
 				.map(File::getName)
 				.sorted()

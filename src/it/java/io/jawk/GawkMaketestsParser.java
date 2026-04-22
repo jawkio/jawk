@@ -75,10 +75,9 @@ final class GawkMaketestsParser {
 		if (target == null || DUMMY_TARGET.equals(target)) {
 			return;
 		}
-		String commandLine = findCommandLine(target, blockLines);
 		String blockText = String.join("\n", blockLines);
-		boolean shellScript = commandLine.contains("$@.sh");
-		List<String> flags = parseFlags(commandLine);
+		boolean shellScript = blockText.contains("$@.sh");
+		List<String> flags = parseFlags(target, blockLines, shellScript);
 		List<String> runnableFlags = new ArrayList<>();
 		List<String> unsupportedFlags = new ArrayList<>();
 		for (String flag : flags) {
@@ -95,7 +94,7 @@ final class GawkMaketestsParser {
 			}
 		}
 		String localeTag = parseLocaleTag(blockText);
-		boolean readsStandardInput = commandLine.contains("< \"$(srcdir)\"/$@.in");
+		boolean readsStandardInput = blockText.contains("< \"$(srcdir)\"/$@.in");
 		boolean hasMpfrExpectedVariant = blockText.contains("$@-mpfr.ok");
 		cases
 				.add(
@@ -110,13 +109,19 @@ final class GawkMaketestsParser {
 								localeTag));
 	}
 
-	private static String findCommandLine(String target, List<String> blockLines) {
+	private static List<String> parseFlags(String target, List<String> blockLines, boolean shellScript) {
+		LinkedHashSet<String> flags = new LinkedHashSet<>();
+		boolean awkCommandFound = false;
 		for (String line : blockLines) {
-			if (line.contains("$(AWK)") || line.contains("$@.sh")) {
-				return line;
+			if (line.contains(AWK_COMMAND_TOKEN)) {
+				awkCommandFound = true;
+				flags.addAll(parseFlags(line));
 			}
 		}
-		throw new IllegalArgumentException("Unable to find AWK command line for Maketests target " + target);
+		if (!awkCommandFound && !shellScript) {
+			throw new IllegalArgumentException("Unable to find AWK command line for Maketests target " + target);
+		}
+		return Collections.unmodifiableList(new ArrayList<>(flags));
 	}
 
 	private static List<String> parseFlags(String commandLine) {

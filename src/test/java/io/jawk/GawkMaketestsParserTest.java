@@ -138,6 +138,24 @@ public class GawkMaketestsParserTest {
 	}
 
 	/**
+	 * Verifies that shell-script rules remain classified as shell-driven even when
+	 * another recipe line mentions {@code $(AWK)} for logging or environment setup.
+	 *
+	 * @throws Exception when parsing the sample metadata fails
+	 */
+	@Test
+	public void parseShellRuleWhenAnotherLineMentionsAwk() throws Exception {
+		GawkMaketestsParser.GawkCase gawkCase = parseSingleCase(
+				"shellmeta:\n"
+						+ "\t@echo using $(AWK)\n"
+						+ "\t@-$(LOCALES) AWK=\"$(AWKPROG)\" \"$(srcdir)\"/$@.sh > _$@ 2>&1 || echo EXIT CODE: $$? >>_$@\n"
+						+ "\t@-$(CMP) \"$(srcdir)\"/$@.ok _$@ && rm -f _$@\n");
+
+		assertEquals("sh", gawkCase.scriptMode());
+		assertTrue(gawkCase.requiresExplicitSkip());
+	}
+
+	/**
 	 * Verifies that unsupported gawk-only CLI flags are surfaced for explicit
 	 * skip coverage.
 	 *
@@ -234,6 +252,27 @@ public class GawkMaketestsParserTest {
 		assertEquals(1, gawkCase.unsupportedFlags().size());
 		assertEquals("-v", gawkCase.unsupportedFlags().get(0));
 		assertTrue(gawkCase.requiresExplicitSkip());
+	}
+
+	/**
+	 * Verifies that flags are collected from every AWK invocation line in the
+	 * recipe block instead of depending on a single matching line.
+	 *
+	 * @throws Exception when parsing the sample metadata fails
+	 */
+	@Test
+	public void parseFlagsAcrossMultipleAwkCommandLines() throws Exception {
+		GawkMaketestsParser.GawkCase gawkCase = parseSingleCase(
+				"multiawk:\n"
+						+ "\t@echo $@\n"
+						+ "\t@-if test -n \"$$GAWK_TEST_ARGS\"; then AWKPATH=\"$(srcdir)\" $(AWK) --posix -f $@.awk >_$@ 2>&1; fi\n"
+						+ "\t@-AWKPATH=\"$(srcdir)\" $(AWK) --sandbox -f $@.awk >_$@ 2>&1 || echo EXIT CODE: $$? >>_$@\n"
+						+ "\t@-$(CMP) \"$(srcdir)\"/$@.ok _$@ && rm -f _$@\n");
+
+		assertTrue(gawkCase.flags().contains("--posix"));
+		assertTrue(gawkCase.flags().contains("--sandbox"));
+		assertEquals(2, gawkCase.runnableFlags().size());
+		assertFalse(gawkCase.requiresExplicitSkip());
 	}
 
 	private static GawkMaketestsParser.GawkCase parseSingleCase(String maketestsSnippet) throws Exception {

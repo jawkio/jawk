@@ -39,6 +39,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -69,6 +70,7 @@ public final class AwkTestSupport {
 			.getProperty("os.name", "")
 			.toLowerCase(Locale.ROOT)
 			.contains("win");
+	private static final int DIFF_CONTEXT_RADIUS = 80;
 
 	private static final Path SHARED_TEMP_DIR;
 
@@ -116,6 +118,85 @@ public final class AwkTestSupport {
 	 */
 	public static Path sharedTempDirectory() {
 		return SHARED_TEMP_DIR;
+	}
+
+	static Path buildDirectory(Class<?> anchor) throws IOException {
+		try {
+			Path classesDirectory = Paths.get(anchor.getProtectionDomain().getCodeSource().getLocation().toURI());
+			Path buildDirectory = classesDirectory.getParent();
+			if (buildDirectory == null) {
+				throw new IOException("Couldn't determine build directory from " + classesDirectory);
+			}
+			return buildDirectory;
+		} catch (IOException ex) {
+			throw ex;
+		} catch (Exception ex) {
+			throw new IOException("Couldn't resolve Jawk build directory", ex);
+		}
+	}
+
+	static Path stageDirectory(Path sourceDirectory, String prefix) throws IOException {
+		Path workingDirectory = Paths.get("").toAbsolutePath().normalize();
+		Files.createDirectories(workingDirectory);
+		Path stagedDirectory = Files.createTempDirectory(workingDirectory, prefix);
+		try {
+			copyDirectoryRecursively(sourceDirectory, stagedDirectory);
+			return stagedDirectory;
+		} catch (IOException | RuntimeException ex) {
+			deleteRecursively(stagedDirectory);
+			throw ex;
+		}
+	}
+
+	static void copyDirectoryRecursively(Path sourceDirectory, Path destinationDirectory) throws IOException {
+		try (Stream<Path> paths = Files.walk(sourceDirectory)) {
+			paths.forEach(path -> copyToDirectory(sourceDirectory, destinationDirectory, path));
+		}
+	}
+
+	static String readUtf8(Path path) throws IOException {
+		return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
+	}
+
+	static String readUtf8Normalized(Path path) throws IOException {
+		return normalizeNewlines(readUtf8(path));
+	}
+
+	static String normalizeNewlines(String text) {
+		return text.replace("\r\n", "\n").replace("\r", "\n");
+	}
+
+	static String appendExitCode(String output, int exitCode, String exitCodePrefix) {
+		String normalized = normalizeNewlines(output);
+		if (exitCode == 0) {
+			return normalized;
+		}
+		return normalized + exitCodePrefix + exitCode + "\n";
+	}
+
+	static void assertOutputMatches(String description, String expected, String actual, Path actualOutputPath)
+			throws IOException {
+		assertOutputMatches(description, expected, actual, actualOutputPath, null);
+	}
+
+	static void assertOutputMatches(
+			String description,
+			String expected,
+			String actual,
+			Path actualOutputPath,
+			String expectedReference)
+			throws IOException {
+		if (expected.equals(actual)) {
+			return;
+		}
+		Path parent = actualOutputPath.getParent();
+		if (parent != null) {
+			Files.createDirectories(parent);
+		}
+		Files.write(actualOutputPath, actual.getBytes(StandardCharsets.UTF_8));
+		int mismatchIndex = firstMismatchIndex(expected, actual);
+		throw new AssertionError(
+				buildMismatchMessage(description, expected, actual, actualOutputPath, mismatchIndex, expectedReference));
 	}
 
 	static final class OutputLimitExceededException extends RuntimeException {
@@ -1292,7 +1373,7 @@ public final class AwkTestSupport {
 		}
 	}
 
-	private static void deleteRecursively(Path root) throws IOException {
+	static void deleteRecursively(Path root) throws IOException {
 		if (root == null || !Files.exists(root)) {
 			return;
 		}
@@ -1316,6 +1397,96 @@ public final class AwkTestSupport {
 			current = current.getCause();
 		}
 		return null;
+	}
+
+	private static void copyToDirectory(Path sourceDirectory, Path destinationDirectory, Path sourcePath) {
+		try {
+			Path relativePath = sourceDirectory.relativize(sourcePath);
+			if (relativePath.toString().isEmpty()) {
+				return;
+			}
+			Path destination = destinationDirectory.resolve(relativePath);
+			if (Files.isDirectory(sourcePath)) {
+				Files.createDirectories(destination);
+			} else {
+				Path parent = destination.getParent();
+				if (parent != null) {
+					Files.createDirectories(parent);
+				}
+				Files.copy(sourcePath, destination);
+			}
+		} catch (IOException ex) {
+			throw new IllegalStateException("Failed to stage test resource " + sourcePath, ex);
+		}
+	}
+
+	private static String buildMismatchMessage(
+			String description,
+			String expected,
+			String actual,
+			Path actualOutputPath,
+			int mismatchIndex,
+			String expectedReference) {
+		StringBuilder message = new StringBuilder();
+		message.append("Unexpected output for ").append(description);
+		if (mismatchIndex >= 0) {
+			message.append(" at char ").append(mismatchIndex);
+		}
+		message
+				.append(" (expected length ")
+				.append(expected.length())
+				.append(", actual length ")
+				.append(actual.length())
+				.append(").");
+		if (mismatchIndex >= 0) {
+			message
+					.append(" Expected snippet: ")
+					.append(snippetAround(expected, mismatchIndex))
+					.append(". Actual snippet: ")
+					.append(snippetAround(actual, mismatchIndex))
+					.append(".");
+		}
+		if (expectedReference != null && !expectedReference.isEmpty()) {
+			message.append(" ").append(expectedReference).append(".");
+		}
+		message.append(" Actual output written to ").append(actualOutputPath);
+		return message.toString();
+	}
+
+	private static int firstMismatchIndex(String expected, String actual) {
+		int commonLength = Math.min(expected.length(), actual.length());
+		for (int index = 0; index < commonLength; index++) {
+			if (expected.charAt(index) != actual.charAt(index)) {
+				return index;
+			}
+		}
+		if (expected.length() != actual.length()) {
+			return commonLength;
+		}
+		return -1;
+	}
+
+	private static String snippetAround(String text, int index) {
+		if (text.isEmpty()) {
+			return "\"\"";
+		}
+		int start = Math.max(0, index - DIFF_CONTEXT_RADIUS);
+		int end = Math.min(text.length(), index + DIFF_CONTEXT_RADIUS);
+		String prefix = start > 0 ? "..." : "";
+		String suffix = end < text.length() ? "..." : "";
+		return "\""
+				+ prefix
+				+ sanitizeSnippet(text.substring(start, end))
+				+ suffix
+				+ "\"";
+	}
+
+	private static String sanitizeSnippet(String text) {
+		return text
+				.replace("\\", "\\\\")
+				.replace("\r", "\\r")
+				.replace("\n", "\\n")
+				.replace("\t", "\\t");
 	}
 
 	private static String escapeForAwkString(String value) {

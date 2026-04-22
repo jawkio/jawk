@@ -77,14 +77,15 @@ Jawk tuples are reusable, but they should be treated as internal artifacts tied 
 Jawk maintains compatibility tests derived from the BWK (One True AWK) and gawk test suites. These run automatically as integration tests during `mvn verify`.
 
 Compatibility suites now live under `src/it/java`, with their vendored inputs under `src/it/resources`.
-The gawk suite is metadata-driven: Jawk vendors gawk's `Makefile.am`, `Gentests`, and generated `Maketests` snapshot, parses the portable `Maketests` rules in JUnit 4, and also loads a small curated manifest of handwritten `Makefile.am` rules that map directly onto `AwkTestSupport`.
+The gawk coverage is split in two parts: Jawk vendors gawk's `Makefile.am`, `Gentests`, and generated `Maketests` snapshot, parses the portable generated `Maketests` rules in JUnit 4, and keeps a separate handwritten `AwkTestSupport` suite for a curated subset of manual `Makefile.am` rules.
 
 | Suite | Coverage |
 | --- | --- |
 | **BwkPIT** | Pattern matching and basic AWK operations from the BWK test collection |
 | **BwkTIT** | Text processing, field splitting, built-in functions, and output formatting |
 | **BwkMiscIT** | Miscellaneous BWK compatibility edge cases |
-| **GawkCompatibilityIT** | Portable gawk compatibility derived from the vendored `Maketests` snapshot plus a curated handwritten-manifest subset, with unsupported shell, debugger, CSV, pretty-print, lint, traditional, and bignum modes skipped explicitly |
+| **GawkCompatibilityIT** | Portable gawk compatibility derived from the vendored `Maketests` snapshot, with unsupported shell, debugger, CSV, pretty-print, lint, traditional, and bignum modes skipped explicitly |
+| **GawkManualIT** | Curated handwritten `Makefile.am` rules expressed directly as `AwkTestSupport` integration tests |
 
 Not all gawk compatibility cases pass, primarily because Jawk uses Java regular expressions and `java.util.Formatter` rather than their C equivalents. Linux CI is the authoritative environment for the full compatibility pass rate. Windows can still run the portable metadata-driven subset without requiring Unix tooling.
 

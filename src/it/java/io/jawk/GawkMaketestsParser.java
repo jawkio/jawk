@@ -144,7 +144,7 @@ final class GawkMaketestsParser {
 				+ languageAndCountry[1].toUpperCase(Locale.ROOT);
 	}
 
-	static final class GawkCase implements GawkCompatibilityCase {
+	static final class GawkCase {
 		private final String name;
 		private final boolean shellScript;
 		private final List<String> flags;
@@ -173,7 +173,6 @@ final class GawkMaketestsParser {
 			this.localeTag = localeTag;
 		}
 
-		@Override
 		public String name() {
 			return name;
 		}
@@ -202,7 +201,6 @@ final class GawkMaketestsParser {
 			return readsStandardInput;
 		}
 
-		@Override
 		public String stdinFileName() {
 			return readsStandardInput ? name + ".in" : null;
 		}
@@ -211,7 +209,6 @@ final class GawkMaketestsParser {
 			return hasMpfrExpectedVariant;
 		}
 
-		@Override
 		public String expectedFileName() {
 			return name + ".ok";
 		}
@@ -220,30 +217,8 @@ final class GawkMaketestsParser {
 			return localeTag;
 		}
 
-		@Override
 		public boolean requiresExplicitSkip() {
 			return shellScript || !unsupportedFlags.isEmpty();
-		}
-
-		@Override
-		public List<String> arguments() {
-			List<String> arguments = new ArrayList<>();
-			if (localeTag != null) {
-				arguments.add("--locale");
-				arguments.add(localeTag);
-			}
-			arguments.addAll(runnableFlags);
-			return Collections.unmodifiableList(arguments);
-		}
-
-		@Override
-		public List<String> scriptFileNames() {
-			return Collections.singletonList(scriptFileName());
-		}
-
-		@Override
-		public List<String> operands() {
-			return Collections.emptyList();
 		}
 
 		@Override

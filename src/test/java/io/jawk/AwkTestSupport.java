@@ -70,7 +70,6 @@ public final class AwkTestSupport {
 			.getProperty("os.name", "")
 			.toLowerCase(Locale.ROOT)
 			.contains("win");
-	private static final int DIFF_CONTEXT_RADIUS = 80;
 
 	private static final Path SHARED_TEMP_DIR;
 
@@ -186,17 +185,19 @@ public final class AwkTestSupport {
 			Path actualOutputPath,
 			String expectedReference)
 			throws IOException {
-		if (expected.equals(actual)) {
-			return;
+		if (!expected.equals(actual)) {
+			Path parent = actualOutputPath.getParent();
+			if (parent != null) {
+				Files.createDirectories(parent);
+			}
+			Files.write(actualOutputPath, actual.getBytes(StandardCharsets.UTF_8));
 		}
-		Path parent = actualOutputPath.getParent();
-		if (parent != null) {
-			Files.createDirectories(parent);
+		StringBuilder message = new StringBuilder("Unexpected output for ").append(description);
+		if (expectedReference != null && !expectedReference.isEmpty()) {
+			message.append(". ").append(expectedReference);
 		}
-		Files.write(actualOutputPath, actual.getBytes(StandardCharsets.UTF_8));
-		int mismatchIndex = firstMismatchIndex(expected, actual);
-		throw new AssertionError(
-				buildMismatchMessage(description, expected, actual, actualOutputPath, mismatchIndex, expectedReference));
+		message.append(". Actual output written to ").append(actualOutputPath);
+		assertEquals(message.toString(), expected, actual);
 	}
 
 	static final class OutputLimitExceededException extends RuntimeException {
@@ -1418,75 +1419,6 @@ public final class AwkTestSupport {
 		} catch (IOException ex) {
 			throw new IllegalStateException("Failed to stage test resource " + sourcePath, ex);
 		}
-	}
-
-	private static String buildMismatchMessage(
-			String description,
-			String expected,
-			String actual,
-			Path actualOutputPath,
-			int mismatchIndex,
-			String expectedReference) {
-		StringBuilder message = new StringBuilder();
-		message.append("Unexpected output for ").append(description);
-		if (mismatchIndex >= 0) {
-			message.append(" at char ").append(mismatchIndex);
-		}
-		message
-				.append(" (expected length ")
-				.append(expected.length())
-				.append(", actual length ")
-				.append(actual.length())
-				.append(").");
-		if (mismatchIndex >= 0) {
-			message
-					.append(" Expected snippet: ")
-					.append(snippetAround(expected, mismatchIndex))
-					.append(". Actual snippet: ")
-					.append(snippetAround(actual, mismatchIndex))
-					.append(".");
-		}
-		if (expectedReference != null && !expectedReference.isEmpty()) {
-			message.append(" ").append(expectedReference).append(".");
-		}
-		message.append(" Actual output written to ").append(actualOutputPath);
-		return message.toString();
-	}
-
-	private static int firstMismatchIndex(String expected, String actual) {
-		int commonLength = Math.min(expected.length(), actual.length());
-		for (int index = 0; index < commonLength; index++) {
-			if (expected.charAt(index) != actual.charAt(index)) {
-				return index;
-			}
-		}
-		if (expected.length() != actual.length()) {
-			return commonLength;
-		}
-		return -1;
-	}
-
-	private static String snippetAround(String text, int index) {
-		if (text.isEmpty()) {
-			return "\"\"";
-		}
-		int start = Math.max(0, index - DIFF_CONTEXT_RADIUS);
-		int end = Math.min(text.length(), index + DIFF_CONTEXT_RADIUS);
-		String prefix = start > 0 ? "..." : "";
-		String suffix = end < text.length() ? "..." : "";
-		return "\""
-				+ prefix
-				+ sanitizeSnippet(text.substring(start, end))
-				+ suffix
-				+ "\"";
-	}
-
-	private static String sanitizeSnippet(String text) {
-		return text
-				.replace("\\", "\\\\")
-				.replace("\r", "\\r")
-				.replace("\n", "\\n")
-				.replace("\t", "\\t");
 	}
 
 	private static String escapeForAwkString(String value) {

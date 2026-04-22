@@ -77,8 +77,9 @@ public class AwkTestSupportTest {
 								"Expected file: fixture.ok");
 				fail("Expected an AssertionError");
 			} catch (AssertionError ex) {
-				assertTrue(ex.getMessage().contains("Unexpected output for fixture at char 1"));
+				assertTrue(ex.getMessage().contains("Unexpected output for fixture"));
 				assertTrue(ex.getMessage().contains("Expected file: fixture.ok"));
+				assertTrue(ex.getMessage().contains(actualOutputPath.toString()));
 				assertEquals("adc\n", new String(Files.readAllBytes(actualOutputPath), StandardCharsets.UTF_8));
 			}
 		} finally {

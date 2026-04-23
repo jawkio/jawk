@@ -1261,6 +1261,21 @@ public class AwkTest {
 	}
 
 	/**
+	 * Ensures that a nullable regular-expression record separator does not loop
+	 * forever and instead falls back to consuming the remaining input as a
+	 * single record.
+	 */
+	@Test
+	public void zeroLengthRegexRecordSeparatorConsumesWholeInput() throws Exception {
+		AwkTestSupport
+				.awkTest("zero-length regex RS")
+				.script("BEGIN { RS = \"()\" }\n{ printf(\"<<%s>>\\n<%s>\\n\", $0, RT) }")
+				.stdin("foo\n")
+				.expect("<<foo\n>>\n<>\n")
+				.runAndAssert();
+	}
+
+	/**
 	 * Ensures that providing explicit extensions to the {@link Awk} constructor
 	 * does not interfere with tuple execution.
 	 */

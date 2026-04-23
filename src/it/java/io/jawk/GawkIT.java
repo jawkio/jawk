@@ -4,7 +4,7 @@ package io.jawk;
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
- * Copyright 2006 - 2026 MetricsHub
+ * Copyright (C) 2006 - 2026 MetricsHub
  * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -22,41 +22,12 @@ package io.jawk;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import static org.junit.Assume.assumeTrue;
-
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import org.junit.Test;
 
 /**
- * Explicit gawk compatibility cases generated from the vendored Maketests
- * snapshot. The checked-in Java source is the source of truth at runtime; the
- * vendored metadata is only used when refreshing this file.
+ * Core gawk compatibility cases mirrored from the basic and Unix test groups in the vendored gawk suite.
  */
-public class GawkIT {
-
-	private static final Path GAWK_DIRECTORY = CompatibilityTestResources.resourceDirectory(GawkIT.class, "gawk");
-	private static final String NON_ZERO_TRANSCRIPT_REASON = "This case compares a non-zero gawk CLI transcript, which is intentionally skipped in the explicit AwkTestSupport.cliTest suite.";
-	private static final String NON_UTF8_STDIN_REASON = "This case redirects stdin that is not valid UTF-8, which is intentionally skipped in the explicit AwkTestSupport.cliTest suite.";
-	private static final String NON_UTF8_EXPECTED_REASON = "This case uses an expected .ok file that is not valid UTF-8, which is intentionally skipped in the explicit AwkTestSupport.cliTest suite.";
-
-	private static Path gawkPath(String fileName) {
-		return GAWK_DIRECTORY.resolve(fileName);
-	}
-
-	private static String gawkFile(String fileName) {
-		return gawkPath(fileName).toString();
-	}
-
-	private static String gawkText(String fileName) throws IOException {
-		return new String(Files.readAllBytes(gawkPath(fileName)), StandardCharsets.UTF_8);
-	}
-
-	private static void skip(String reason) {
-		assumeTrue(reason, false);
-	}
+public class GawkIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_addcomma() throws Exception {
@@ -479,11 +450,6 @@ public class GawkIT {
 	}
 
 	@Test
-	public void test_defref() throws Exception {
-		skip("gawk's --lint diagnostics are not implemented by Jawk.");
-	}
-
-	@Test
 	public void test_delargv() throws Exception {
 		AwkTestSupport
 				.cliTest("GAWK delargv")
@@ -582,18 +548,6 @@ public class GawkIT {
 				.cliTest("GAWK eofsplit")
 				.argument("-f", gawkFile("eofsplit.awk"))
 				.expectLines(gawkPath("eofsplit.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_escapebrace() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK escapebrace")
-				.argument("--posix")
-				.argument("-f", gawkFile("escapebrace.awk"))
-				.stdin(gawkText("escapebrace.in"))
-				.expectLines(gawkPath("escapebrace.ok"))
 				.expectExit(0)
 				.runAndAssert();
 	}
@@ -913,17 +867,6 @@ public class GawkIT {
 	}
 
 	@Test
-	public void test_gsubtst3() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK gsubtst3")
-				.argument("-f", gawkFile("gsubtst3.awk"))
-				.stdin(gawkText("gsubtst3.in"))
-				.expectLines(gawkPath("gsubtst3.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
 	public void test_gsubtst4() throws Exception {
 		AwkTestSupport
 				.cliTest("GAWK gsubtst4")
@@ -1077,11 +1020,6 @@ public class GawkIT {
 				.expectLines(gawkPath("leadnl.ok"))
 				.expectExit(0)
 				.runAndAssert();
-	}
-
-	@Test
-	public void test_litoct() throws Exception {
-		skip("gawk's --traditional mode is not implemented by Jawk.");
 	}
 
 	@Test
@@ -1279,16 +1217,6 @@ public class GawkIT {
 	}
 
 	@Test
-	public void test_noeffect() throws Exception {
-		skip("gawk's --lint diagnostics are not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_nofmtch() throws Exception {
-		skip("gawk's --lint diagnostics are not implemented by Jawk.");
-	}
-
-	@Test
 	public void test_noloop1() throws Exception {
 		AwkTestSupport
 				.cliTest("GAWK noloop1")
@@ -1308,11 +1236,6 @@ public class GawkIT {
 				.expectLines(gawkPath("noloop2.ok"))
 				.expectExit(0)
 				.runAndAssert();
-	}
-
-	@Test
-	public void test_nonl() throws Exception {
-		skip("gawk's --lint diagnostics are not implemented by Jawk.");
 	}
 
 	@Test
@@ -1495,16 +1418,6 @@ public class GawkIT {
 	}
 
 	@Test
-	public void test_paramasfunc1() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_paramasfunc2() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
 	public void test_paramdup() throws Exception {
 		skip(NON_ZERO_TRANSCRIPT_REASON);
 	}
@@ -1572,29 +1485,6 @@ public class GawkIT {
 	}
 
 	@Test
-	public void test_posix2008sub() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK posix2008sub")
-				.argument("--posix")
-				.argument("-f", gawkFile("posix2008sub.awk"))
-				.expectLines(gawkPath("posix2008sub.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_posix_compare() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK posix_compare")
-				.argument("--locale", "en-US")
-				.argument("--posix")
-				.argument("-f", gawkFile("posix_compare.awk"))
-				.expectLines(gawkPath("posix_compare.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
 	public void test_prdupval() throws Exception {
 		AwkTestSupport
 				.cliTest("GAWK prdupval")
@@ -1611,17 +1501,6 @@ public class GawkIT {
 				.cliTest("GAWK prec")
 				.argument("-f", gawkFile("prec.awk"))
 				.expectLines(gawkPath("prec.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_printf0() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK printf0")
-				.argument("--posix")
-				.argument("-f", gawkFile("printf0.awk"))
-				.expectLines(gawkPath("printf0.ok"))
 				.expectExit(0)
 				.runAndAssert();
 	}
@@ -1868,11 +1747,6 @@ public class GawkIT {
 	}
 
 	@Test
-	public void test_rscompat() throws Exception {
-		skip("gawk's --traditional mode is not implemented by Jawk.");
-	}
-
-	@Test
 	public void test_rsnul1nl() throws Exception {
 		AwkTestSupport
 				.cliTest("GAWK rsnul1nl")
@@ -2086,16 +1960,6 @@ public class GawkIT {
 	}
 
 	@Test
-	public void test_status_close() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK status-close")
-				.argument("-f", gawkFile("status-close.awk"))
-				.expectLines(gawkPath("status-close.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
 	public void test_strcat1() throws Exception {
 		AwkTestSupport
 				.cliTest("GAWK strcat1")
@@ -2248,38 +2112,8 @@ public class GawkIT {
 	}
 
 	@Test
-	public void test_tradanch() throws Exception {
-		skip("gawk's --traditional mode is not implemented by Jawk.");
-	}
-
-	@Test
 	public void test_trailbs() throws Exception {
 		skip(NON_UTF8_EXPECTED_REASON);
-	}
-
-	@Test
-	public void test_uninit2() throws Exception {
-		skip("gawk's --lint diagnostics are not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_uninit3() throws Exception {
-		skip("gawk's --lint diagnostics are not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_uninit4() throws Exception {
-		skip("gawk's --lint diagnostics are not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_uninit5() throws Exception {
-		skip("gawk's --lint diagnostics are not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_uninitialized() throws Exception {
-		skip("gawk's --lint diagnostics are not implemented by Jawk.");
 	}
 
 	@Test
@@ -2452,2064 +2286,186 @@ public class GawkIT {
 	}
 
 	@Test
-	public void test_aadelete1() throws Exception {
+	public void test_poundbang() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_messages() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_argarray() throws Exception {
 		AwkTestSupport
-				.cliTest("GAWK aadelete1")
-				.argument("-f", gawkFile("aadelete1.awk"))
-				.expectLines(gawkPath("aadelete1.ok"))
+				.cliTest("GAWK argarray")
+				.argument("-f", gawkFile("argarray.awk"))
+				.stdin("just a test\n")
+				.operand(gawkFile("argarray.in"), "-")
+				.postProcessWith(output -> output.replace(gawkFile("argarray.in"), "./argarray.input"))
+				.expectLines(gawkPath("argarray.ok"))
 				.expectExit(0)
 				.runAndAssert();
 	}
 
 	@Test
-	public void test_aadelete2() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
+	public void test_regtest() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_aarray1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK aarray1")
-				.argument("-f", gawkFile("aarray1.awk"))
-				.expectLines(gawkPath("aarray1.ok"))
-				.expectExit(0)
-				.runAndAssert();
+	public void test_compare() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_aasort() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK aasort")
-				.argument("-f", gawkFile("aasort.awk"))
-				.expectLines(gawkPath("aasort.ok"))
-				.expectExit(0)
-				.runAndAssert();
+	public void test_inftest() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_aasorti() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK aasorti")
-				.argument("-f", gawkFile("aasorti.awk"))
-				.expectLines(gawkPath("aasorti.ok"))
-				.expectExit(0)
-				.runAndAssert();
+	public void test_getline2() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_arraysort() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK arraysort")
-				.argument("-f", gawkFile("arraysort.awk"))
-				.expectLines(gawkPath("arraysort.ok"))
-				.expectExit(0)
-				.runAndAssert();
+	public void test_awkpath() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_arraysort2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK arraysort2")
-				.argument("-f", gawkFile("arraysort2.awk"))
-				.expectLines(gawkPath("arraysort2.ok"))
-				.expectExit(0)
-				.runAndAssert();
+	public void test_tweakfld() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_arraytype() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK arraytype")
-				.argument("-f", gawkFile("arraytype.awk"))
-				.expectLines(gawkPath("arraytype.ok"))
-				.expectExit(0)
-				.runAndAssert();
+	public void test_pid() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_asortbool() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK asortbool")
-				.argument("-f", gawkFile("asortbool.awk"))
-				.expectLines(gawkPath("asortbool.ok"))
-				.expectExit(0)
-				.runAndAssert();
+	public void test_strftlng() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_backw() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK backw")
-				.argument("-f", gawkFile("backw.awk"))
-				.stdin(gawkText("backw.in"))
-				.expectLines(gawkPath("backw.ok"))
-				.expectExit(0)
-				.runAndAssert();
+	public void test_nors() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_asortsymtab() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK asortsymtab")
-				.argument("-f", gawkFile("asortsymtab.awk"))
-				.expectLines(gawkPath("asortsymtab.ok"))
-				.expectExit(0)
-				.runAndAssert();
+	public void test_pipeio1() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_clos1way() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK clos1way")
-				.argument("-f", gawkFile("clos1way.awk"))
-				.expectLines(gawkPath("clos1way.ok"))
-				.expectExit(0)
-				.runAndAssert();
+	public void test_pipeio2() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_clos1way2() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
+	public void test_clobber() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_clos1way3() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
+	public void test_arynocls() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_clos1way4() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
+	public void test_getlnbuf() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_clos1way5() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
+	public void test_inetechu() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_clos1way6() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK clos1way6")
-				.argument("-f", gawkFile("clos1way6.awk"))
-				.expectLines(gawkPath("clos1way6.ok"))
-				.expectExit(0)
-				.runAndAssert();
+	public void test_inetecht() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_commas() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK commas")
-				.argument("--locale", "en-US")
-				.argument("-f", gawkFile("commas.awk"))
-				.expectLines(gawkPath("commas.ok"))
-				.expectExit(0)
-				.runAndAssert();
+	public void test_inetdayu() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_crlf() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK crlf")
-				.argument("-f", gawkFile("crlf.awk"))
-				.expectLines(gawkPath("crlf.ok"))
-				.expectExit(0)
-				.runAndAssert();
+	public void test_inetdayt() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_csv1() throws Exception {
-		skip("gawk's --csv mode is not implemented by Jawk.");
+	public void test_redfilnm() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_csv2() throws Exception {
-		skip("gawk's --csv mode is not implemented by Jawk.");
+	public void test_space() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_csv3() throws Exception {
-		skip("gawk's --csv mode is not implemented by Jawk.");
+	public void test_rsnulbig() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_csvodd() throws Exception {
-		skip("gawk's --csv mode is not implemented by Jawk.");
+	public void test_rsnulbig2() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_dbugeval2() throws Exception {
-		skip("gawk's --debug mode is not implemented by Jawk.");
+	public void test_exitval1() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_dbugeval3() throws Exception {
-		skip("gawk's --debug mode is not implemented by Jawk.");
+	public void test_fsspcoln() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_dbugeval4() throws Exception {
-		skip("gawk's --debug mode is not implemented by Jawk.");
+	public void test_nofile() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_dbugtypedre1() throws Exception {
-		skip("gawk's --debug mode is not implemented by Jawk.");
+	public void test_ignrcas3() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void test_dbugtypedre2() throws Exception {
-		skip("gawk's --debug mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_delsub() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK delsub")
-				.argument("-f", gawkFile("delsub.awk"))
-				.expectLines(gawkPath("delsub.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_dfacheck1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK dfacheck1")
-				.argument("-f", gawkFile("dfacheck1.awk"))
-				.stdin(gawkText("dfacheck1.in"))
-				.expectLines(gawkPath("dfacheck1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_elemnew1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK elemnew1")
-				.argument("-f", gawkFile("elemnew1.awk"))
-				.expectLines(gawkPath("elemnew1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_elemnew2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK elemnew2")
-				.argument("-f", gawkFile("elemnew2.awk"))
-				.expectLines(gawkPath("elemnew2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_elemnew3() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK elemnew3")
-				.argument("-f", gawkFile("elemnew3.awk"))
-				.expectLines(gawkPath("elemnew3.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_exit() throws Exception {
+	public void test_eofsrc1() throws Exception {
 		skip(
-				"Shell-script target generated by Maketests; the in-process Jawk harness does not execute external shell scripts.");
+				"This handwritten case compares gawk parser diagnostics on stderr and is intentionally skipped in the explicit AwkTestSupport.cliTest suite.");
 	}
 
 	@Test
-	public void test_fieldwdth() throws Exception {
+	public void test_longwrds() throws Exception {
 		AwkTestSupport
-				.cliTest("GAWK fieldwdth")
-				.argument("-f", gawkFile("fieldwdth.awk"))
-				.stdin(gawkText("fieldwdth.in"))
-				.expectLines(gawkPath("fieldwdth.ok"))
+				.cliTest("GAWK longwrds")
+				.argument("-v", "SORT=sort")
+				.argument("-f", gawkFile("longwrds.awk"))
+				.stdin(gawkText("longwrds.in"))
+				.expectLines(gawkPath("longwrds.ok"))
 				.expectExit(0)
 				.runAndAssert();
 	}
 
 	@Test
-	public void test_forcenum() throws Exception {
+	public void test_argcasfile() throws Exception {
 		AwkTestSupport
-				.cliTest("GAWK forcenum")
-				.argument("-f", gawkFile("forcenum.awk"))
-				.expectLines(gawkPath("forcenum.ok"))
+				.cliTest("GAWK argcasfile")
+				.argument("-f", gawkFile("argcasfile.awk"))
+				.stdin(gawkText("argcasfile.in"))
+				.operand("ARGC=1", " /no/such/file")
+				.expectLines(gawkPath("argcasfile.ok"))
 				.expectExit(0)
 				.runAndAssert();
 	}
 
-	@Test
-	public void test_fpat1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fpat1")
-				.argument("-f", gawkFile("fpat1.awk"))
-				.stdin(gawkText("fpat1.in"))
-				.expectLines(gawkPath("fpat1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fpat2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fpat2")
-				.argument("-f", gawkFile("fpat2.awk"))
-				.expectLines(gawkPath("fpat2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fpat3() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fpat3")
-				.argument("-f", gawkFile("fpat3.awk"))
-				.stdin(gawkText("fpat3.in"))
-				.expectLines(gawkPath("fpat3.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fpat4() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fpat4")
-				.argument("-f", gawkFile("fpat4.awk"))
-				.expectLines(gawkPath("fpat4.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fpat5() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fpat5")
-				.argument("-f", gawkFile("fpat5.awk"))
-				.stdin(gawkText("fpat5.in"))
-				.expectLines(gawkPath("fpat5.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fpat6() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fpat6")
-				.argument("-f", gawkFile("fpat6.awk"))
-				.stdin(gawkText("fpat6.in"))
-				.expectLines(gawkPath("fpat6.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fpat7() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fpat7")
-				.argument("-f", gawkFile("fpat7.awk"))
-				.stdin(gawkText("fpat7.in"))
-				.expectLines(gawkPath("fpat7.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fpat8() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fpat8")
-				.argument("-f", gawkFile("fpat8.awk"))
-				.stdin(gawkText("fpat8.in"))
-				.expectLines(gawkPath("fpat8.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fpat9() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fpat9")
-				.argument("-f", gawkFile("fpat9.awk"))
-				.stdin(gawkText("fpat9.in"))
-				.expectLines(gawkPath("fpat9.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fpatnull() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fpatnull")
-				.argument("-f", gawkFile("fpatnull.awk"))
-				.stdin(gawkText("fpatnull.in"))
-				.expectLines(gawkPath("fpatnull.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fsfwfs() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fsfwfs")
-				.argument("-f", gawkFile("fsfwfs.awk"))
-				.stdin(gawkText("fsfwfs.in"))
-				.expectLines(gawkPath("fsfwfs.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_functab1() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_functab2() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_functab3() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK functab3")
-				.argument("-f", gawkFile("functab3.awk"))
-				.expectLines(gawkPath("functab3.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_functab6() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_funlen() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK funlen")
-				.argument("-f", gawkFile("funlen.awk"))
-				.stdin(gawkText("funlen.in"))
-				.expectLines(gawkPath("funlen.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fwtest() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fwtest")
-				.argument("-f", gawkFile("fwtest.awk"))
-				.stdin(gawkText("fwtest.in"))
-				.expectLines(gawkPath("fwtest.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fwtest2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fwtest2")
-				.argument("-f", gawkFile("fwtest2.awk"))
-				.stdin(gawkText("fwtest2.in"))
-				.expectLines(gawkPath("fwtest2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fwtest3() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fwtest3")
-				.argument("-f", gawkFile("fwtest3.awk"))
-				.stdin(gawkText("fwtest3.in"))
-				.expectLines(gawkPath("fwtest3.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fwtest4() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fwtest4")
-				.argument("-f", gawkFile("fwtest4.awk"))
-				.stdin(gawkText("fwtest4.in"))
-				.expectLines(gawkPath("fwtest4.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fwtest5() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fwtest5")
-				.argument("-f", gawkFile("fwtest5.awk"))
-				.stdin(gawkText("fwtest5.in"))
-				.expectLines(gawkPath("fwtest5.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fwtest6() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_fwtest7() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fwtest7")
-				.argument("-f", gawkFile("fwtest7.awk"))
-				.stdin(gawkText("fwtest7.in"))
-				.expectLines(gawkPath("fwtest7.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fwtest8() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_gensub() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK gensub")
-				.argument("-f", gawkFile("gensub.awk"))
-				.stdin(gawkText("gensub.in"))
-				.expectLines(gawkPath("gensub.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_gensub2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK gensub2")
-				.argument("-f", gawkFile("gensub2.awk"))
-				.expectLines(gawkPath("gensub2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_gensub3() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK gensub3")
-				.argument("-f", gawkFile("gensub3.awk"))
-				.stdin(gawkText("gensub3.in"))
-				.expectLines(gawkPath("gensub3.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_gensub4() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK gensub4")
-				.argument("-f", gawkFile("gensub4.awk"))
-				.expectLines(gawkPath("gensub4.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_getlndir() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK getlndir")
-				.argument("-f", gawkFile("getlndir.awk"))
-				.expectLines(gawkPath("getlndir.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_gnuops2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK gnuops2")
-				.argument("-f", gawkFile("gnuops2.awk"))
-				.expectLines(gawkPath("gnuops2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_gnuops3() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK gnuops3")
-				.argument("-f", gawkFile("gnuops3.awk"))
-				.expectLines(gawkPath("gnuops3.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_gnureops() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK gnureops")
-				.argument("-f", gawkFile("gnureops.awk"))
-				.expectLines(gawkPath("gnureops.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_gsubind() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_icasefs() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK icasefs")
-				.argument("-f", gawkFile("icasefs.awk"))
-				.expectLines(gawkPath("icasefs.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_icasers() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK icasers")
-				.argument("-f", gawkFile("icasers.awk"))
-				.stdin(gawkText("icasers.in"))
-				.expectLines(gawkPath("icasers.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_id() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK id")
-				.argument("-f", gawkFile("id.awk"))
-				.expectLines(gawkPath("id.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_igncdym() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK igncdym")
-				.argument("-f", gawkFile("igncdym.awk"))
-				.stdin(gawkText("igncdym.in"))
-				.expectLines(gawkPath("igncdym.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_igncfs() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK igncfs")
-				.argument("-f", gawkFile("igncfs.awk"))
-				.stdin(gawkText("igncfs.in"))
-				.expectLines(gawkPath("igncfs.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_ignrcas2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK ignrcas2")
-				.argument("--locale", "en-US")
-				.argument("-f", gawkFile("ignrcas2.awk"))
-				.expectLines(gawkPath("ignrcas2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_ignrcas4() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK ignrcas4")
-				.argument("-f", gawkFile("ignrcas4.awk"))
-				.expectLines(gawkPath("ignrcas4.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_ignrcase() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK ignrcase")
-				.argument("-f", gawkFile("ignrcase.awk"))
-				.stdin(gawkText("ignrcase.in"))
-				.expectLines(gawkPath("ignrcase.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_include() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK include")
-				.argument("-f", gawkFile("include.awk"))
-				.expectLines(gawkPath("include.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_indirectbuiltin() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK indirectbuiltin")
-				.argument("-f", gawkFile("indirectbuiltin.awk"))
-				.expectLines(gawkPath("indirectbuiltin.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_indirectcall() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK indirectcall")
-				.argument("-f", gawkFile("indirectcall.awk"))
-				.stdin(gawkText("indirectcall.in"))
-				.expectLines(gawkPath("indirectcall.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_indirectcall2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK indirectcall2")
-				.argument("-f", gawkFile("indirectcall2.awk"))
-				.expectLines(gawkPath("indirectcall2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_indirectcall3() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK indirectcall3")
-				.argument("-f", gawkFile("indirectcall3.awk"))
-				.expectLines(gawkPath("indirectcall3.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_intarray() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK intarray")
-				.argument("-f", gawkFile("intarray.awk"))
-				.expectLines(gawkPath("intarray.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_isarrayunset() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK isarrayunset")
-				.argument("-f", gawkFile("isarrayunset.awk"))
-				.expectLines(gawkPath("isarrayunset.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_lint() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK lint")
-				.argument("-f", gawkFile("lint.awk"))
-				.expectLines(gawkPath("lint.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_lintexp() throws Exception {
-		skip("gawk's --lint diagnostics are not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_lintindex() throws Exception {
-		skip("gawk's --lint diagnostics are not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_lintint() throws Exception {
-		skip("gawk's --lint diagnostics are not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_lintlength() throws Exception {
-		skip("gawk's --lint diagnostics are not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_lintold() throws Exception {
-		skip("gawk's --lint-old diagnostics are not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_lintplus() throws Exception {
-		skip("gawk's --lint diagnostics are not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_lintset() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK lintset")
-				.argument("-f", gawkFile("lintset.awk"))
-				.expectLines(gawkPath("lintset.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_lintwarn() throws Exception {
-		skip("gawk's --lint diagnostics are not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_match1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK match1")
-				.argument("-f", gawkFile("match1.awk"))
-				.expectLines(gawkPath("match1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_match2() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_match3() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK match3")
-				.argument("-f", gawkFile("match3.awk"))
-				.stdin(gawkText("match3.in"))
-				.expectLines(gawkPath("match3.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_mbstr1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mbstr1")
-				.argument("--locale", "en-US")
-				.argument("-f", gawkFile("mbstr1.awk"))
-				.expectLines(gawkPath("mbstr1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_mbstr2() throws Exception {
-		skip(NON_UTF8_STDIN_REASON);
-	}
-
-	@Test
-	public void test_mdim1() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_mdim2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mdim2")
-				.argument("-f", gawkFile("mdim2.awk"))
-				.expectLines(gawkPath("mdim2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_mdim3() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mdim3")
-				.argument("-f", gawkFile("mdim3.awk"))
-				.expectLines(gawkPath("mdim3.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_mdim4() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mdim4")
-				.argument("-f", gawkFile("mdim4.awk"))
-				.stdin(gawkText("mdim4.in"))
-				.expectLines(gawkPath("mdim4.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_mdim5() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mdim5")
-				.argument("-f", gawkFile("mdim5.awk"))
-				.expectLines(gawkPath("mdim5.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_mdim6() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_mdim7() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mdim7")
-				.argument("-f", gawkFile("mdim7.awk"))
-				.expectLines(gawkPath("mdim7.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_mdim8() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mdim8")
-				.argument("-f", gawkFile("mdim8.awk"))
-				.stdin(gawkText("mdim8.in"))
-				.expectLines(gawkPath("mdim8.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_mktime() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mktime")
-				.argument("-f", gawkFile("mktime.awk"))
-				.stdin(gawkText("mktime.in"))
-				.expectLines(gawkPath("mktime.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_modifiers() throws Exception {
-		skip(
-				"Shell-script target generated by Maketests; the in-process Jawk harness does not execute external shell scripts.");
-	}
-
-	@Test
-	public void test_muldimposix() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_nastyparm() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_next() throws Exception {
-		skip(
-				"Shell-script target generated by Maketests; the in-process Jawk harness does not execute external shell scripts.");
-	}
-
-	@Test
-	public void test_nondec() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK nondec")
-				.argument("-f", gawkFile("nondec.awk"))
-				.expectLines(gawkPath("nondec.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_nondec2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK nondec2")
-				.argument("-f", gawkFile("nondec2.awk"))
-				.expectLines(gawkPath("nondec2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_nonfatal2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK nonfatal2")
-				.argument("-f", gawkFile("nonfatal2.awk"))
-				.expectLines(gawkPath("nonfatal2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_nonfatal3() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK nonfatal3")
-				.argument("-f", gawkFile("nonfatal3.awk"))
-				.expectLines(gawkPath("nonfatal3.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_nsbad() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_nsbad2() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_nsbad3() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_nsforloop() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK nsforloop")
-				.argument("-f", gawkFile("nsforloop.awk"))
-				.expectLines(gawkPath("nsforloop.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_nsfuncrecurse() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK nsfuncrecurse")
-				.argument("-f", gawkFile("nsfuncrecurse.awk"))
-				.expectLines(gawkPath("nsfuncrecurse.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_nsindirect1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK nsindirect1")
-				.argument("-f", gawkFile("nsindirect1.awk"))
-				.expectLines(gawkPath("nsindirect1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_nsindirect2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK nsindirect2")
-				.argument("-f", gawkFile("nsindirect2.awk"))
-				.expectLines(gawkPath("nsindirect2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_nsprof1() throws Exception {
-		skip("gawk's --pretty-print mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_nsprof2() throws Exception {
-		skip("gawk's --pretty-print mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_octdec() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK octdec")
-				.argument("-f", gawkFile("octdec.awk"))
-				.expectLines(gawkPath("octdec.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_patsplit() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK patsplit")
-				.argument("-f", gawkFile("patsplit.awk"))
-				.expectLines(gawkPath("patsplit.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_posix() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK posix")
-				.argument("-f", gawkFile("posix.awk"))
-				.stdin(gawkText("posix.in"))
-				.expectLines(gawkPath("posix.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_printfbad1() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_printfbad3() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK printfbad3")
-				.argument("-f", gawkFile("printfbad3.awk"))
-				.expectLines(gawkPath("printfbad3.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_printfbad4() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_printhuge() throws Exception {
-		skip(NON_UTF8_EXPECTED_REASON);
-	}
-
-	@Test
-	public void test_procinfs() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK procinfs")
-				.argument("-f", gawkFile("procinfs.awk"))
-				.expectLines(gawkPath("procinfs.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_profile4() throws Exception {
-		skip("gawk's --pretty-print mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_profile8() throws Exception {
-		skip("gawk's --pretty-print mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_profile9() throws Exception {
-		skip("gawk's --pretty-print mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_profile10() throws Exception {
-		skip("gawk's --pretty-print mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_profile11() throws Exception {
-		skip("gawk's --pretty-print mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_profile13() throws Exception {
-		skip("gawk's --pretty-print mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_profile14() throws Exception {
-		skip("gawk's --pretty-print mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_profile15() throws Exception {
-		skip("gawk's --pretty-print mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_profile16() throws Exception {
-		skip("gawk's --pretty-print mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_profile17() throws Exception {
-		skip("gawk's --pretty-print mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_regexsub() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK regexsub")
-				.argument("-f", gawkFile("regexsub.awk"))
-				.expectLines(gawkPath("regexsub.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_regnul1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK regnul1")
-				.argument("-f", gawkFile("regnul1.awk"))
-				.expectLines(gawkPath("regnul1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_regnul2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK regnul2")
-				.argument("-f", gawkFile("regnul2.awk"))
-				.expectLines(gawkPath("regnul2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_regx8bit() throws Exception {
-		skip(NON_UTF8_EXPECTED_REASON);
-	}
-
-	@Test
-	public void test_reint() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK reint")
-				.argument("-f", gawkFile("reint.awk"))
-				.stdin(gawkText("reint.in"))
-				.expectLines(gawkPath("reint.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_reint2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK reint2")
-				.argument("--locale", "en-US")
-				.argument("-f", gawkFile("reint2.awk"))
-				.stdin(gawkText("reint2.in"))
-				.expectLines(gawkPath("reint2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_rsgetline() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK rsgetline")
-				.argument("-f", gawkFile("rsgetline.awk"))
-				.stdin(gawkText("rsgetline.in"))
-				.expectLines(gawkPath("rsgetline.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_rsstart1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK rsstart1")
-				.argument("-f", gawkFile("rsstart1.awk"))
-				.stdin(gawkText("rsstart1.in"))
-				.expectLines(gawkPath("rsstart1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_rsstart2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK rsstart2")
-				.argument("-f", gawkFile("rsstart2.awk"))
-				.stdin(gawkText("rsstart2.in"))
-				.expectLines(gawkPath("rsstart2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_rstest6() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK rstest6")
-				.argument("-f", gawkFile("rstest6.awk"))
-				.stdin(gawkText("rstest6.in"))
-				.expectLines(gawkPath("rstest6.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_sandbox1() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_shadow() throws Exception {
-		skip("gawk's --lint diagnostics are not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_shadowbuiltin() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK shadowbuiltin")
-				.argument("-f", gawkFile("shadowbuiltin.awk"))
-				.expectLines(gawkPath("shadowbuiltin.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_sortfor() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK sortfor")
-				.argument("-f", gawkFile("sortfor.awk"))
-				.stdin(gawkText("sortfor.in"))
-				.expectLines(gawkPath("sortfor.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_sortfor2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK sortfor2")
-				.argument("-f", gawkFile("sortfor2.awk"))
-				.stdin(gawkText("sortfor2.in"))
-				.expectLines(gawkPath("sortfor2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_sortu() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK sortu")
-				.argument("-f", gawkFile("sortu.awk"))
-				.expectLines(gawkPath("sortu.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_split_after_fpat() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK split_after_fpat")
-				.argument("-f", gawkFile("split_after_fpat.awk"))
-				.stdin(gawkText("split_after_fpat.in"))
-				.expectLines(gawkPath("split_after_fpat.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_splitarg4() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK splitarg4")
-				.argument("-f", gawkFile("splitarg4.awk"))
-				.stdin(gawkText("splitarg4.in"))
-				.expectLines(gawkPath("splitarg4.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_strftfld() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK strftfld")
-				.argument("-f", gawkFile("strftfld.awk"))
-				.stdin(gawkText("strftfld.in"))
-				.expectLines(gawkPath("strftfld.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_strtonum() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK strtonum")
-				.argument("-f", gawkFile("strtonum.awk"))
-				.expectLines(gawkPath("strtonum.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_strtonum1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK strtonum1")
-				.argument("-f", gawkFile("strtonum1.awk"))
-				.expectLines(gawkPath("strtonum1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_stupid1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK stupid1")
-				.argument("-f", gawkFile("stupid1.awk"))
-				.expectLines(gawkPath("stupid1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_stupid2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK stupid2")
-				.argument("-f", gawkFile("stupid2.awk"))
-				.expectLines(gawkPath("stupid2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_stupid3() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK stupid3")
-				.argument("-f", gawkFile("stupid3.awk"))
-				.expectLines(gawkPath("stupid3.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_stupid4() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK stupid4")
-				.argument("-f", gawkFile("stupid4.awk"))
-				.expectLines(gawkPath("stupid4.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_stupid5() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK stupid5")
-				.argument("-f", gawkFile("stupid5.awk"))
-				.expectLines(gawkPath("stupid5.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_switch2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK switch2")
-				.argument("-f", gawkFile("switch2.awk"))
-				.expectLines(gawkPath("switch2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_symtab1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK symtab1")
-				.argument("-f", gawkFile("symtab1.awk"))
-				.expectLines(gawkPath("symtab1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_symtab2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK symtab2")
-				.argument("-f", gawkFile("symtab2.awk"))
-				.expectLines(gawkPath("symtab2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_symtab3() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_symtab4() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK symtab4")
-				.argument("-f", gawkFile("symtab4.awk"))
-				.stdin(gawkText("symtab4.in"))
-				.expectLines(gawkPath("symtab4.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_symtab5() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK symtab5")
-				.argument("-f", gawkFile("symtab5.awk"))
-				.stdin(gawkText("symtab5.in"))
-				.expectLines(gawkPath("symtab5.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_symtab7() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_symtab10() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_symtab11() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK symtab11")
-				.argument("-f", gawkFile("symtab11.awk"))
-				.expectLines(gawkPath("symtab11.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_symtab12() throws Exception {
-		skip(NON_ZERO_TRANSCRIPT_REASON);
-	}
-
-	@Test
-	public void test_timeout() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK timeout")
-				.argument("-f", gawkFile("timeout.awk"))
-				.expectLines(gawkPath("timeout.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_typedregex1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK typedregex1")
-				.argument("-f", gawkFile("typedregex1.awk"))
-				.expectLines(gawkPath("typedregex1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_typedregex2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK typedregex2")
-				.argument("-f", gawkFile("typedregex2.awk"))
-				.expectLines(gawkPath("typedregex2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_typedregex3() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK typedregex3")
-				.argument("-f", gawkFile("typedregex3.awk"))
-				.expectLines(gawkPath("typedregex3.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_typedregex5() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK typedregex5")
-				.argument("-f", gawkFile("typedregex5.awk"))
-				.stdin(gawkText("typedregex5.in"))
-				.expectLines(gawkPath("typedregex5.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_typedregex6() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK typedregex6")
-				.argument("-f", gawkFile("typedregex6.awk"))
-				.stdin(gawkText("typedregex6.in"))
-				.expectLines(gawkPath("typedregex6.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_typeof1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK typeof1")
-				.argument("-f", gawkFile("typeof1.awk"))
-				.expectLines(gawkPath("typeof1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_typeof2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK typeof2")
-				.argument("-f", gawkFile("typeof2.awk"))
-				.expectLines(gawkPath("typeof2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_typeof3() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK typeof3")
-				.argument("-f", gawkFile("typeof3.awk"))
-				.expectLines(gawkPath("typeof3.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_typeof4() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK typeof4")
-				.argument("-f", gawkFile("typeof4.awk"))
-				.expectLines(gawkPath("typeof4.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_typeof5() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK typeof5")
-				.argument("-f", gawkFile("typeof5.awk"))
-				.stdin(gawkText("typeof5.in"))
-				.expectLines(gawkPath("typeof5.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_typeof6() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK typeof6")
-				.argument("-f", gawkFile("typeof6.awk"))
-				.expectLines(gawkPath("typeof6.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_unicode1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK unicode1")
-				.argument("--locale", "en-US")
-				.argument("-f", gawkFile("unicode1.awk"))
-				.expectLines(gawkPath("unicode1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_double1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK double1")
-				.argument("-f", gawkFile("double1.awk"))
-				.expectLines(gawkPath("double1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_double2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK double2")
-				.argument("-f", gawkFile("double2.awk"))
-				.expectLines(gawkPath("double2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_inf_nan_torture() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK inf-nan-torture")
-				.argument("-f", gawkFile("inf-nan-torture.awk"))
-				.stdin(gawkText("inf-nan-torture.in"))
-				.expectLines(gawkPath("inf-nan-torture.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_intformat() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK intformat")
-				.argument("-f", gawkFile("intformat.awk"))
-				.expectLines(gawkPath("intformat.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_asort() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK asort")
-				.argument("-f", gawkFile("asort.awk"))
-				.expectLines(gawkPath("asort.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_asorti() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK asorti")
-				.argument("-f", gawkFile("asorti.awk"))
-				.expectLines(gawkPath("asorti.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_backbigs1() throws Exception {
-		skip(NON_UTF8_STDIN_REASON);
-	}
-
-	@Test
-	public void test_backsmalls1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK backsmalls1")
-				.argument("--locale", "en-US")
-				.argument("-f", gawkFile("backsmalls1.awk"))
-				.stdin(gawkText("backsmalls1.in"))
-				.expectLines(gawkPath("backsmalls1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_backsmalls2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK backsmalls2")
-				.argument("--locale", "en-US")
-				.argument("-f", gawkFile("backsmalls2.awk"))
-				.expectLines(gawkPath("backsmalls2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fmttest() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fmttest")
-				.argument("-f", gawkFile("fmttest.awk"))
-				.expectLines(gawkPath("fmttest.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fnarydel() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fnarydel")
-				.argument("-f", gawkFile("fnarydel.awk"))
-				.expectLines(gawkPath("fnarydel.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fnparydl() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fnparydl")
-				.argument("-f", gawkFile("fnparydl.awk"))
-				.expectLines(gawkPath("fnparydl.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_lc_num1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK lc_num1")
-				.argument("--locale", "en-US")
-				.argument("-f", gawkFile("lc_num1.awk"))
-				.expectLines(gawkPath("lc_num1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_mbfw1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mbfw1")
-				.argument("--locale", "en-US")
-				.argument("-f", gawkFile("mbfw1.awk"))
-				.stdin(gawkText("mbfw1.in"))
-				.expectLines(gawkPath("mbfw1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_mbprintf1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mbprintf1")
-				.argument("--locale", "en-US")
-				.argument("-f", gawkFile("mbprintf1.awk"))
-				.stdin(gawkText("mbprintf1.in"))
-				.expectLines(gawkPath("mbprintf1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_mbprintf2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mbprintf2")
-				.argument("--locale", "ja-JP")
-				.argument("-f", gawkFile("mbprintf2.awk"))
-				.expectLines(gawkPath("mbprintf2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_mbprintf3() throws Exception {
-		skip(NON_UTF8_EXPECTED_REASON);
-	}
-
-	@Test
-	public void test_mbprintf4() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mbprintf4")
-				.argument("--locale", "en-US")
-				.argument("-f", gawkFile("mbprintf4.awk"))
-				.stdin(gawkText("mbprintf4.in"))
-				.expectLines(gawkPath("mbprintf4.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_mtchi18n() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mtchi18n")
-				.argument("--locale", "ru-RU")
-				.argument("-f", gawkFile("mtchi18n.awk"))
-				.stdin(gawkText("mtchi18n.in"))
-				.expectLines(gawkPath("mtchi18n.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_rebt8b2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK rebt8b2")
-				.argument("-f", gawkFile("rebt8b2.awk"))
-				.expectLines(gawkPath("rebt8b2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_sort1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK sort1")
-				.argument("-f", gawkFile("sort1.awk"))
-				.expectLines(gawkPath("sort1.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_sprintfc() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK sprintfc")
-				.argument("-f", gawkFile("sprintfc.awk"))
-				.stdin(gawkText("sprintfc.in"))
-				.expectLines(gawkPath("sprintfc.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_apiterm() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK apiterm")
-				.argument("-f", gawkFile("apiterm.awk"))
-				.stdin(gawkText("apiterm.in"))
-				.expectLines(gawkPath("apiterm.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fnmatch() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fnmatch")
-				.argument("-f", gawkFile("fnmatch.awk"))
-				.expectLines(gawkPath("fnmatch.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fork() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fork")
-				.argument("-f", gawkFile("fork.awk"))
-				.expectLines(gawkPath("fork.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_fork2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fork2")
-				.argument("-f", gawkFile("fork2.awk"))
-				.expectLines(gawkPath("fork2.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_functab4() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK functab4")
-				.argument("-f", gawkFile("functab4.awk"))
-				.expectLines(gawkPath("functab4.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_functab5() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK functab5")
-				.argument("-f", gawkFile("functab5.awk"))
-				.expectLines(gawkPath("functab5.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_ordchr() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK ordchr")
-				.argument("-f", gawkFile("ordchr.awk"))
-				.expectLines(gawkPath("ordchr.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_revout() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK revout")
-				.argument("-f", gawkFile("revout.awk"))
-				.expectLines(gawkPath("revout.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_revtwoway() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK revtwoway")
-				.argument("-f", gawkFile("revtwoway.awk"))
-				.expectLines(gawkPath("revtwoway.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_rwarray() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK rwarray")
-				.argument("-f", gawkFile("rwarray.awk"))
-				.stdin(gawkText("rwarray.in"))
-				.expectLines(gawkPath("rwarray.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_time() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK time")
-				.argument("-f", gawkFile("time.awk"))
-				.expectLines(gawkPath("time.ok"))
-				.expectExit(0)
-				.runAndAssert();
-	}
-
-	@Test
-	public void test_mpfrbigint() throws Exception {
-		skip("gawk's -M bignum mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_mpfrbigint2() throws Exception {
-		skip("gawk's -M bignum mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_mpfrcase() throws Exception {
-		skip("gawk's -M bignum mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_mpfrcase2() throws Exception {
-		skip("gawk's -M bignum mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_mpfrfield() throws Exception {
-		skip("gawk's -M bignum mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_mpfrnegzero() throws Exception {
-		skip("gawk's -M bignum mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_mpfrnegzero2() throws Exception {
-		skip("gawk's -M bignum mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_mpfrnonum() throws Exception {
-		skip("gawk's -M bignum mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_mpfrnr() throws Exception {
-		skip("gawk's -M bignum mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_mpfrrem() throws Exception {
-		skip("gawk's -M bignum mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_mpfrrndeval() throws Exception {
-		skip("gawk's -M bignum mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_mpfrstrtonum() throws Exception {
-		skip("gawk's -M bignum mode is not implemented by Jawk.");
-	}
-
-	@Test
-	public void test_mpgforcenum() throws Exception {
-		skip("gawk's -M bignum mode is not implemented by Jawk.");
-	}
 }

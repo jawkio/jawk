@@ -78,15 +78,17 @@ Jawk maintains compatibility tests derived from the BWK (One True AWK) and gawk 
 
 Compatibility suites now live under `src/it/java`, with their vendored inputs under `src/it/resources`.
 The compatibility suites read those vendored files directly from the repository checkout instead of relying on the Maven test classpath layout.
-The gawk coverage is also split in two parts, but both are now explicit Java integration suites built on `AwkTestSupport`. `GawkIT` mirrors the portable cases from gawk's vendored `Maketests` snapshot as checked-in Java tests, and `GawkManualIT` mirrors handwritten `Makefile.am` rules the same way. The vendored gawk files remain in the repository to make future refreshes and diffs straightforward, but the runtime source of truth is the Java test code.
+The gawk coverage is split into a small set of explicit Java integration suites built on `AwkTestSupport`, following the broad test families declared in gawk's vendored `Makefile.am`. The vendored gawk files remain in the repository to make future refreshes and diffs straightforward, but the runtime source of truth is the Java test code.
 
 | Suite | Coverage |
 | --- | --- |
 | **BwkPIT** | Pattern matching and basic AWK operations from the BWK test collection |
 | **BwkTIT** | Text processing, field splitting, built-in functions, and output formatting |
 | **BwkMiscIT** | Miscellaneous BWK compatibility edge cases |
-| **GawkIT** | Portable gawk compatibility mirrored from the vendored `Maketests` snapshot as explicit `AwkTestSupport` CLI tests, with unsupported shell, debugger, CSV, pretty-print, lint, traditional, and bignum modes skipped explicitly |
-| **GawkManualIT** | Handwritten `Makefile.am` rules mirrored as explicit `AwkTestSupport` integration tests or explicit skipped placeholders |
+| **GawkIT** | Core gawk compatibility mirrored from the vendored basic and Unix test groups |
+| **GawkExtensionIT** | gawk extension-oriented compatibility mirrored from the vendored extension-style test groups |
+| **GawkLocaleIT** | Locale- and charset-sensitive gawk compatibility mirrored from the vendored locale test groups |
+| **GawkOptionalFeatureIT** | Optional-feature and environment-specific gawk compatibility mirrored from the vendored optional test groups |
 
 Not all gawk compatibility cases pass, primarily because Jawk uses Java regular expressions and `java.util.Formatter` rather than their C equivalents. Linux CI is the authoritative environment for the full compatibility pass rate. Windows can still run the explicit Java gawk suites without requiring Unix tooling.
 

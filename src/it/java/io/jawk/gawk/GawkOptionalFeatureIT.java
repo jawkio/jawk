@@ -1,4 +1,4 @@
-package io.jawk;
+package io.jawk.gawk;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -22,10 +22,13 @@ package io.jawk;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import io.jawk.AwkTestSupport;
 import org.junit.Test;
 
 /**
- * Optional-feature and environment-specific gawk compatibility cases mirrored from the vendored optional gawk groups.
+ * Optional-feature and environment-specific gawk compatibility cases mirrored
+ * from the vendored GNU Awk optional test groups.
+ * Upstream source: {@code git://git.savannah.gnu.org/gawk.git}
  */
 public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 

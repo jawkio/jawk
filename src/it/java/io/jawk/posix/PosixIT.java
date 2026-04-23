@@ -1,4 +1,4 @@
-package io.jawk;
+package io.jawk.posix;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -22,12 +22,20 @@ package io.jawk;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import io.jawk.AwkTestSupport;
 import java.util.Locale;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-public class AwkMan7Test {
+/**
+ * Integration suite for POSIX AWK behavior, expressed as explicit Jawk tests
+ * derived from the POSIX awk utility specification.
+ *
+ * @see <a href="https://pubs.opengroup.org/onlinepubs/9699919799/utilities/awk.html">POSIX awk utility
+ *      specification</a>
+ */
+public class PosixIT {
 
 	private static Locale defaultLocale;
 
@@ -952,8 +960,8 @@ public class AwkMan7Test {
 	public void spec92EnvironExposesEnvironmentVariable() throws Exception {
 		AwkTestSupport
 				.awkTest("92. ENVIRON exposes environment variable")
-				.script("BEGIN{print ENVIRON[\"AWK_TEST\"]}")
-				.expectLines(System.getenv().getOrDefault("AWK_TEST", ""))
+				.script("BEGIN{print ENVIRON[\"PATH\"]}")
+				.expectLines(System.getenv().getOrDefault("PATH", ""))
 				.runAndAssert();
 	}
 

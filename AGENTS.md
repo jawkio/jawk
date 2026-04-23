@@ -2,7 +2,7 @@
 
 ## Code format
 
-Your never need to worry about code formatting at all. Simply run `mvn formatter:format` before committing changes to make sure the new code follows this project's code formatting rules.
+You never need to worry about code formatting at all. Simply run `mvn formatter:format` before committing changes to make sure the new code follows this project's code formatting rules. Make sure not to run `mvn formatter:format` separately before other Maven commands, to avoid concurrency issues.
 
 All files must include the proper license header. When you add a new file, make sure to include the proper license header by running the `mvn license:update-file-header` command before committing (or even before trying the build and test, since the build will fail if a file doesn't include the proper license header).
 

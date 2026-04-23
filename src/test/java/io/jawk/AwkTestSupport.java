@@ -33,7 +33,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.io.Reader;
 import java.io.StringReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -334,9 +336,77 @@ public final class AwkTestSupport {
 		private Awk customAwk;
 		private final List<JawkExtension> extensions = new ArrayList<>();
 		private InputSource inputSource;
+		private Reader scriptReader;
+		private Path scriptPath;
 
 		private AwkTestBuilder(String description) {
 			super(description);
+		}
+
+		/**
+		 * Sets the AWK script to execute using a raw {@link String}. Any
+		 * placeholder tokens in the script are resolved before execution.
+		 *
+		 * @param script the script contents
+		 * @return this builder for method chaining
+		 */
+		@Override
+		public AwkTestBuilder script(String script) {
+			scriptReader = null;
+			scriptPath = null;
+			return super.script(script);
+		}
+
+		/**
+		 * Sets the AWK script to execute using a {@link Reader}. The reader is
+		 * consumed directly by the compiler when the test runs.
+		 *
+		 * @param reader the script reader
+		 * @return this builder for method chaining
+		 * @throws IllegalArgumentException when {@code reader} is {@code null}
+		 */
+		public AwkTestBuilder script(Reader reader) {
+			if (reader == null) {
+				throw new IllegalArgumentException("reader must not be null");
+			}
+			script = null;
+			scriptReader = reader;
+			scriptPath = null;
+			return this;
+		}
+
+		/**
+		 * Sets the AWK script to execute using a UTF-8 input stream. The stream is
+		 * wrapped in a reader and consumed directly by the compiler when the test
+		 * runs.
+		 *
+		 * @param scriptStream the stream supplying the script contents
+		 * @return this builder for method chaining
+		 * @throws IllegalArgumentException when {@code scriptStream} is
+		 *         {@code null}
+		 */
+		public AwkTestBuilder script(InputStream scriptStream) {
+			if (scriptStream == null) {
+				throw new IllegalArgumentException("scriptStream must not be null");
+			}
+			return script(new InputStreamReader(scriptStream, StandardCharsets.UTF_8));
+		}
+
+		/**
+		 * Sets the AWK script to execute from a UTF-8 file.
+		 *
+		 * @param path path to the script file
+		 * @return this builder for method chaining
+		 * @throws IllegalArgumentException when {@code path} is {@code null}
+		 */
+		public AwkTestBuilder script(Path path) {
+			if (path == null) {
+				throw new IllegalArgumentException("path must not be null");
+			}
+			script = null;
+			scriptReader = null;
+			scriptPath = path;
+			return this;
 		}
 
 		/**
@@ -432,7 +502,9 @@ public final class AwkTestSupport {
 					preAssignments,
 					customAwk,
 					extensions,
-					inputSource);
+					inputSource,
+					scriptReader,
+					scriptPath);
 		}
 	}
 
@@ -524,32 +596,6 @@ public final class AwkTestSupport {
 		public B script(String script) {
 			this.script = script;
 			return (B) this;
-		}
-
-		/**
-		 * Sets the AWK script to execute using a stream. The contents are read as
-		 * UTF-8 and treated equivalently to {@link #script(String)}.
-		 *
-		 * @param scriptStream the stream supplying the script contents
-		 * @return this builder for method chaining
-		 * @throws IllegalArgumentException when {@code scriptStream} is
-		 *         {@code null}
-		 * @throws UncheckedIOException when the stream cannot be read
-		 */
-		public B script(InputStream scriptStream) {
-			if (scriptStream == null) {
-				throw new IllegalArgumentException("scriptStream must not be null");
-			}
-			try (InputStream in = scriptStream; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-				byte[] buffer = new byte[8192];
-				int read;
-				while ((read = in.read(buffer)) != -1) {
-					out.write(buffer, 0, read);
-				}
-				return script(new String(out.toByteArray(), StandardCharsets.UTF_8));
-			} catch (IOException ex) {
-				throw new UncheckedIOException("Failed to read script stream", ex);
-			}
 		}
 
 		/**
@@ -928,6 +974,8 @@ public final class AwkTestSupport {
 		private final Awk customAwk;
 		private final List<JawkExtension> extensions;
 		private final InputSource inputSource;
+		private final Reader scriptReader;
+		private final Path scriptPath;
 
 		AwkTestCase(
 				TestLayout layout,
@@ -938,19 +986,34 @@ public final class AwkTestSupport {
 				Map<String, Object> preAssignments,
 				Awk customAwk,
 				List<JawkExtension> extensions,
-				InputSource inputSource) {
+				InputSource inputSource,
+				Reader scriptReader,
+				Path scriptPath) {
 			super(layout, fileContents, operandSpecs, pathPlaceholders, requiresPosix);
 			this.preAssignments = new LinkedHashMap<>(preAssignments);
 			this.customAwk = customAwk;
 			this.extensions = new ArrayList<>(extensions);
 			this.inputSource = inputSource;
+			this.scriptReader = scriptReader;
+			this.scriptPath = scriptPath;
 		}
 
 		@Override
 		protected ActualResult execute(ExecutionEnvironment env) throws Exception {
 			Awk awk = customAwk != null ? customAwk : new Awk(extensions);
 			StringBuilder out = new StringBuilder();
-			AwkProgram program = awk.compile(resolvedScript(env));
+			AwkProgram program;
+			if (scriptPath != null) {
+				try (BufferedReader reader = Files.newBufferedReader(scriptPath, StandardCharsets.UTF_8)) {
+					program = awk.compile(reader);
+				}
+			} else if (scriptReader != null) {
+				try (Reader reader = scriptReader) {
+					program = awk.compile(reader);
+				}
+			} else {
+				program = awk.compile(resolvedScript(env));
+			}
 			Awk.AwkRunBuilder builder = awk
 					.script(program)
 					.arguments(resolvedOperands(env))

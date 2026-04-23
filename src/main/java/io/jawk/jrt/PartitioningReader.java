@@ -159,13 +159,7 @@ public class PartitioningReader extends FilterReader {
 	 * @throws java.io.IOException upon an IO error
 	 */
 	public String readRecord() throws IOException {
-		if (matcher == null) {
-			matcher = rs.matcher(remaining);
-		} else {
-			matcher.reset(remaining);
-		}
-
-		while (consumeAll || eof || remaining.length() == 0 || !matcher.find()) {
+		while (consumeAll || eof || remaining.length() == 0 || !findRecordSeparator()) {
 			int len = read(readBuffer, 0, readBuffer.length);
 			if (eof || (len < 0)) {
 				eof = true;
@@ -179,7 +173,6 @@ public class PartitioningReader extends FilterReader {
 			} else if (len == 0) {
 				throw new RuntimeException("len == 0 ?!");
 			}
-			matcher = rs.matcher(remaining);
 		}
 
 		// if force greedy regex consumption:
@@ -191,7 +184,9 @@ public class PartitioningReader extends FilterReader {
 			// (one char at a time!)
 			while (matcher.find() && matcher.end() == remaining.length() && matcher.requireEnd()) {
 				if (read(readBuffer, 0, 1) >= 0) {
-					matcher = rs.matcher(remaining);
+					if (!findRecordSeparator()) {
+						break;
+					}
 				} else {
 					break;
 				}
@@ -203,5 +198,27 @@ public class PartitioningReader extends FilterReader {
 		String retVal = remaining.substring(0, matcher.start());
 		remaining.delete(0, matcher.end());
 		return retVal;
+	}
+
+	/**
+	 * Finds the next record separator match that consumes at least one
+	 * character. Zero-length regular-expression matches are ignored because
+	 * using them as separators would not advance the reader and would loop
+	 * forever on nullable regexes such as {@code ()}.
+	 *
+	 * @return {@code true} when a non-empty record separator match was found
+	 */
+	private boolean findRecordSeparator() {
+		if (matcher == null) {
+			matcher = rs.matcher(remaining);
+		} else {
+			matcher.reset(remaining);
+		}
+		while (matcher.find()) {
+			if (matcher.start() != matcher.end()) {
+				return true;
+			}
+		}
+		return false;
 	}
 }

@@ -1,4 +1,4 @@
-package io.jawk;
+package io.jawk.onetrueawk;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -27,6 +27,8 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.stream.Collectors;
+import io.jawk.AwkTestSupport;
+import io.jawk.CompatibilityTestResources;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -36,11 +38,12 @@ import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 
 /**
- * Integration suite based on BWK miscellaneous compatibility tests. Each AWK
- * script in the BWK compatibility resources executes against its corresponding
- * input file and its output is compared with the recorded result.
+ * Integration suite based on the BWK miscellaneous compatibility tests vendored
+ * from the One True Awk upstream repository. Each AWK script executes against
+ * its corresponding input file and its output is compared with the recorded
+ * result.
  *
- * @see <a href="https://github.com/onetrueawk/awk">One True Awk</a>
+ * @see <a href="https://github.com/onetrueawk/awk">BWK / One True Awk upstream repository</a>
  */
 @RunWith(Parameterized.class)
 public class BwkMiscIT {

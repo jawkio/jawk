@@ -1,10 +1,10 @@
-package io.jawk;
+package io.jawk.gawk;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
- * Copyright 2006 - 2026 MetricsHub
+ * Copyright (C) 2006 - 2026 MetricsHub
  * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -28,9 +28,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import io.jawk.CompatibilityTestResources;
 
 /**
- * Shared helpers for the explicit gawk compatibility integration suites.
+ * Shared helpers for the explicit gawk compatibility integration suites
+ * transcribed from the vendored GNU Awk test suite.
  */
 abstract class AbstractGawkSuite {
 

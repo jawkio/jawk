@@ -30,11 +30,18 @@ import java.nio.file.Paths;
  * Resolves vendored integration-test resources directly from the repository
  * checkout instead of relying on the Maven test classpath layout.
  */
-final class CompatibilityTestResources {
+public final class CompatibilityTestResources {
 
 	private CompatibilityTestResources() {}
 
-	static Path projectDirectory(Class<?> anchor) {
+	/**
+	 * Resolves the Maven project directory from the compiled location of an
+	 * integration-test class.
+	 *
+	 * @param anchor a class loaded from the current test output
+	 * @return the project base directory
+	 */
+	public static Path projectDirectory(Class<?> anchor) {
 		try {
 			Path testClassesDirectory = Paths
 					.get(anchor.getProtectionDomain().getCodeSource().getLocation().toURI())
@@ -54,7 +61,17 @@ final class CompatibilityTestResources {
 		}
 	}
 
-	static Path resourceDirectory(Class<?> anchor, String firstSegment, String... additionalSegments) {
+	/**
+	 * Resolves a vendored integration-test resource directory relative to
+	 * {@code src/it/resources}.
+	 *
+	 * @param anchor a class loaded from the current test output
+	 * @param firstSegment the first resource path segment under
+	 *        {@code src/it/resources}
+	 * @param additionalSegments any remaining resource path segments
+	 * @return the resolved resource directory path
+	 */
+	public static Path resourceDirectory(Class<?> anchor, String firstSegment, String... additionalSegments) {
 		Path resourceDirectory = projectDirectory(anchor).resolve(Paths.get("src", "it", "resources", firstSegment));
 		for (String segment : additionalSegments) {
 			resourceDirectory = resourceDirectory.resolve(segment);

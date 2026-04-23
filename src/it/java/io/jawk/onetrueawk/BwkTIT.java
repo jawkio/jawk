@@ -1,4 +1,4 @@
-package io.jawk;
+package io.jawk.onetrueawk;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -24,9 +24,13 @@ package io.jawk;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.stream.Collectors;
+import io.jawk.AwkTestSupport;
+import io.jawk.CompatibilityTestResources;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -36,20 +40,20 @@ import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 
 /**
- * Integration suite based on BWK pattern tests. Each AWK script in the BWK
- * compatibility resources executes against the shared BWK input file and its
- * output is compared with the recorded result.
+ * Integration suite based on the BWK text-processing tests vendored from the
+ * One True Awk upstream repository. Each AWK script executes against the shared
+ * BWK input file and its output is compared with the recorded result.
  *
- * @see <a href="https://github.com/onetrueawk/awk">One True Awk</a>
+ * @see <a href="https://github.com/onetrueawk/awk">BWK / One True Awk upstream repository</a>
  */
 @RunWith(Parameterized.class)
-public class BwkPIT {
+public class BwkTIT {
 
-	private static Path bwkPDirectory;
+	private static Path bwkTDirectory;
 	private static Path scriptsDirectory;
 
 	/**
-	 * Initializes the BWK.p integration suite.
+	 * Initializes the BWK.t integration suite.
 	 *
 	 * @throws Exception when resource discovery fails
 	 */
@@ -57,19 +61,19 @@ public class BwkPIT {
 	public static void beforeAll() throws Exception {}
 
 	/**
-	 * Returns the BWK.p script names discovered from the integration-test
+	 * Returns the BWK.t script names discovered from the integration-test
 	 * resources.
 	 *
 	 * @return the parameter values for this suite
 	 * @throws Exception when resource discovery fails
 	 */
-	@Parameters(name = "BWK.p {0}")
+	@Parameters(name = "BWK.t {0}")
 	public static Iterable<String> awkList() throws Exception {
-		bwkPDirectory = CompatibilityTestResources.resourceDirectory(BwkPIT.class, "bwk", "p");
-		if (!bwkPDirectory.toFile().isDirectory()) {
-			throw new IOException(bwkPDirectory + " is not a directory");
+		bwkTDirectory = CompatibilityTestResources.resourceDirectory(BwkTIT.class, "bwk", "t");
+		if (!bwkTDirectory.toFile().isDirectory()) {
+			throw new IOException(bwkTDirectory + " is not a directory");
 		}
-		scriptsDirectory = bwkPDirectory.resolve("scripts");
+		scriptsDirectory = bwkTDirectory.resolve("scripts");
 		if (!scriptsDirectory.toFile().isDirectory()) {
 			throw new IOException("scripts is not a directory");
 		}
@@ -80,7 +84,7 @@ public class BwkPIT {
 
 		return Arrays
 				.stream(scriptFiles)
-				.filter(scriptFile -> scriptFile.getName().startsWith("p."))
+				.filter(scriptFile -> scriptFile.getName().startsWith("t."))
 				.map(File::getName)
 				.sorted()
 				.collect(Collectors.toList());
@@ -91,28 +95,53 @@ public class BwkPIT {
 	public String awkName;
 
 	/**
-	 * Executes one BWK.p script and compares its output with the expected result.
+	 * Executes one BWK.t script and compares its output with the expected result.
 	 *
 	 * @throws Exception when the test setup or execution fails unexpectedly
 	 */
 	@Test
 	public void test() throws Exception {
-		Path awkScriptPath = scriptsDirectory.resolve(awkName);
-		Path okFilePath = bwkPDirectory.resolve("results/" + awkName + ".ok");
-		Path inputFilePath = bwkPDirectory.resolve("inputs/test.countries");
+		Path awkPath = scriptsDirectory.resolve(awkName);
+		Path okPath = bwkTDirectory.resolve("results/" + awkName + ".ok");
+		Path inputPath = bwkTDirectory.resolve("inputs/test.data");
 
-		AwkTestSupport
-				.cliTest("BWK.p " + awkName)
-				.argument("-f", awkScriptPath.toString())
-				.operand(inputFilePath.toString())
-				.postProcessWith(output -> output.replace(inputFilePath.toString(), inputFilePath.getFileName().toString()))
-				.expectLines(okFilePath)
-				.build()
-				.runAndAssert();
+		int expectedCode = 0;
+		if ("t.exit".equals(awkName)) {
+			expectedCode = 1;
+		} else if ("t.exit1".equals(awkName)) {
+			expectedCode = 2;
+		}
+
+		if ("t.in2".equals(awkName) || "t.intest2".equals(awkName)) {
+			String expectedResult = Files
+					.readAllLines(okPath, StandardCharsets.UTF_8)
+					.stream()
+					.sorted()
+					.collect(Collectors.joining("\n"));
+
+			AwkTestSupport
+					.awkTest("BWK.t " + awkName)
+					.script(awkPath)
+					.operand(inputPath.toString())
+					.postProcessWith(output -> Arrays.stream(output.split("\\R")).sorted().collect(Collectors.joining("\n")))
+					.expect(expectedResult)
+					.expectExit(expectedCode)
+					.build()
+					.runAndAssert();
+		} else {
+			AwkTestSupport
+					.awkTest("BWK.t " + awkName)
+					.script(awkPath)
+					.operand(inputPath.toString())
+					.expectLines(okPath)
+					.expectExit(expectedCode)
+					.build()
+					.runAndAssert();
+		}
 	}
 
 	/**
-	 * Finalizes the BWK.p integration suite.
+	 * Finalizes the BWK.t integration suite.
 	 *
 	 * @throws Exception unused hook retained for suite symmetry
 	 */

@@ -32,7 +32,7 @@ This maintained fork diverges from the original project in several practical way
 - Jawk supports long integers
 - Jawk supports octal and hexadecimal notation in strings
 - the Maven coordinates are `io.jawk:jawk` and the package root is `io.jawk`
-- gawk and bwk compatibility test suites have been added
+- BWK, POSIX, and gawk compatibility test suites have been added
 - the Maven artifact is published under the LGPL
 - operator precedence is fixed and follows POSIX specifications
 
@@ -74,10 +74,17 @@ Jawk tuples are reusable, but they should be treated as internal artifacts tied 
 
 ## Compatibility Test Suites
 
-Jawk maintains compatibility tests derived from the BWK (One True AWK) and gawk test suites. These run automatically as integration tests during `mvn verify`.
+Jawk maintains compatibility tests derived from:
+
+- BWK / One True Awk: <https://github.com/onetrueawk/awk>
+- POSIX awk utility specification: <https://pubs.opengroup.org/onlinepubs/9699919799/utilities/awk.html>
+- GNU Awk: `git://git.savannah.gnu.org/gawk.git`
+
+These run automatically as integration tests during `mvn verify`.
 
 Compatibility suites now live under `src/it/java`, with their vendored inputs under `src/it/resources`.
 The compatibility suites read those vendored files directly from the repository checkout instead of relying on the Maven test classpath layout.
+They are also grouped by upstream family in separate Java packages so the Failsafe reports aggregate BWK, POSIX, and gawk results independently.
 The gawk coverage is split into a small set of explicit Java integration suites built on `AwkTestSupport`, following the broad test families declared in gawk's vendored `Makefile.am`. The vendored gawk files remain in the repository to make future refreshes and diffs straightforward, but the runtime source of truth is the Java test code.
 
 | Suite | Coverage |
@@ -85,6 +92,7 @@ The gawk coverage is split into a small set of explicit Java integration suites 
 | **BwkPIT** | Pattern matching and basic AWK operations from the BWK test collection |
 | **BwkTIT** | Text processing, field splitting, built-in functions, and output formatting |
 | **BwkMiscIT** | Miscellaneous BWK compatibility edge cases |
+| **PosixIT** | Explicit POSIX AWK specification behaviors transcribed into integration tests |
 | **GawkIT** | Core gawk compatibility mirrored from the vendored basic and Unix test groups |
 | **GawkExtensionIT** | gawk extension-oriented compatibility mirrored from the vendored extension-style test groups |
 | **GawkLocaleIT** | Locale- and charset-sensitive gawk compatibility mirrored from the vendored locale test groups |

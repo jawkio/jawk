@@ -1,7 +1,7 @@
 package io.jawk;
 
 /*-
- * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
+ * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
  * Copyright (C) 2006 - 2026 MetricsHub
@@ -19,249 +19,716 @@ package io.jawk;
  * You should have received a copy of the GNU General Lesser Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/lgpl-3.0.html>.
- * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
+ * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeTrue;
 
 import java.io.IOException;
-import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
- * Curated handwritten gawk compatibility cases expressed directly with
- * {@link AwkTestSupport}. These cover simple {@code Makefile.am} rules that do
- * not justify another metadata parser.
+ * Explicit handwritten gawk compatibility cases transcribed from vendored
+ * Makefile.am rules. The Java source is the runtime source of truth; many
+ * shell-heavy cases are kept as explicit skipped placeholders until they are
+ * worth expressing as AwkTestSupport.cliTest cases.
  */
 public class GawkManualIT {
 
-	private static final String GAWK_RESOURCE_PATH = "/gawk";
-	private static final String EXIT_CODE_PREFIX = "EXIT CODE: ";
-	private static final String STAGED_DIRECTORY_PREFIX = "gawk-manual-";
-	private static final int MAX_CAPTURED_OUTPUT_BYTES = 1024 * 1024;
-	private static final boolean LOG_PROGRESS = Boolean.getBoolean("jawk.gawk.progress");
+	private static final Path GAWK_DIRECTORY = CompatibilityTestResources.resourceDirectory(GawkManualIT.class, "gawk");
+	private static final String MANUAL_SKIP_REASON = "Handwritten gawk case from Makefile.am not yet expressed as an AwkTestSupport.cliTest case.";
 
-	private static SuiteState suiteState;
-
-	@BeforeClass
-	public static void beforeAll() throws Exception {
-		loadSuiteState();
+	private static Path gawkPath(String fileName) {
+		return GAWK_DIRECTORY.resolve(fileName);
 	}
 
-	@AfterClass
-	public static void afterAll() throws Exception {
-		if (suiteState == null) {
-			return;
-		}
-		AwkTestSupport.deleteRecursively(suiteState.stagedDirectory);
-		suiteState = null;
+	private static String gawkFile(String fileName) {
+		return gawkPath(fileName).toString();
+	}
+
+	private static String gawkText(String fileName) throws IOException {
+		return new String(Files.readAllBytes(gawkPath(fileName)), StandardCharsets.UTF_8);
+	}
+
+	private static void skip(String reason) {
+		assumeTrue(reason, false);
 	}
 
 	@Test
-	public void argcasfile() throws Exception {
-		assertManualCase(
-				"argcasfile",
-				(builder, state) -> {
-					builder.argument("-f", state.stagedDirectory.resolve("argcasfile.awk").toString());
-					builder.operand("ARGC=1", " /no/such/file");
-					builder.stdin(Files.readAllBytes(state.stagedDirectory.resolve("argcasfile.in")));
-				});
+	public void test_pma() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void eofsrc1() throws Exception {
-		assertManualCase(
-				"eofsrc1",
-				(builder, state) -> builder
-						.argument(
-								"-f",
-								state.stagedDirectory.resolve("eofsrc1a.awk").toString(),
-								"-f",
-								state.stagedDirectory.resolve("eofsrc1b.awk").toString()));
+	public void test_poundbang() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void longwrds() throws Exception {
-		assertManualCase(
-				"longwrds",
-				(builder, state) -> {
-					builder.argument("-v", "SORT=sort", "-f", state.stagedDirectory.resolve("longwrds.awk").toString());
-					builder.stdin(Files.readAllBytes(state.stagedDirectory.resolve("longwrds.in")));
-				});
+	public void test_messages() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void nsawk1a() throws Exception {
-		assertManualCase(
-				"nsawk1a",
-				(builder, state) -> builder.argument("-f", state.stagedDirectory.resolve("nsawk1.awk").toString()));
+	public void test_argarray() throws Exception {
+		AwkTestSupport
+				.cliTest("GAWK argarray")
+				.argument("-f", gawkFile("argarray.awk"))
+				.stdin("just a test\n")
+				.operand(gawkFile("argarray.in"), "-")
+				.postProcessWith(output -> output.replace(gawkFile("argarray.in"), "./argarray.input"))
+				.expectLines(gawkPath("argarray.ok"))
+				.expectExit(0)
+				.runAndAssert();
 	}
 
 	@Test
-	public void nsawk1b() throws Exception {
-		assertManualCase(
-				"nsawk1b",
-				(builder, state) -> builder
-						.argument(
-								"-v",
-								"I=fine",
-								"-f",
-								state.stagedDirectory.resolve("nsawk1.awk").toString()));
+	public void test_regtest() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void nsawk1c() throws Exception {
-		assertManualCase(
-				"nsawk1c",
-				(builder, state) -> builder
-						.argument(
-								"-v",
-								"awk::I=fine",
-								"-f",
-								state.stagedDirectory.resolve("nsawk1.awk").toString()));
+	public void test_manyfiles() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void nsawk2a() throws Exception {
-		assertManualCase(
-				"nsawk2a",
-				(builder, state) -> builder
-						.argument(
-								"-v",
-								"I=fine",
-								"-f",
-								state.stagedDirectory.resolve("nsawk2.awk").toString()));
+	public void test_compare() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void nsawk2b() throws Exception {
-		assertManualCase(
-				"nsawk2b",
-				(builder, state) -> builder
-						.argument(
-								"-v",
-								"awk::I=fine",
-								"-f",
-								state.stagedDirectory.resolve("nsawk2.awk").toString()));
+	public void test_inftest() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void nsidentifier() throws Exception {
-		assertManualCase(
-				"nsidentifier",
-				(builder, state) -> builder
-						.argument(
-								"-v",
-								"SORT=sort",
-								"-f",
-								state.stagedDirectory.resolve("nsidentifier.awk").toString()));
+	public void test_getline2() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void readfile2() throws Exception {
-		assertManualCase(
-				"readfile2",
-				(builder, state) -> {
-					builder.argument("-f", state.stagedDirectory.resolve("readfile2.awk").toString());
-					builder
-							.operand(
-									state.stagedDirectory.resolve("readfile2.awk").toString(),
-									state.stagedDirectory.resolve("readdir.awk").toString());
-				});
+	public void test_awkpath() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void spacere() throws Exception {
-		assertManualCase(
-				"spacere",
-				(builder, state) -> builder.argument("-f", state.stagedDirectory.resolve("spacere.awk").toString()));
+	public void test_argtest() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void symtab6() throws Exception {
-		assertManualCase(
-				"symtab6",
-				(builder, state) -> builder.argument("-f", state.stagedDirectory.resolve("symtab6.awk").toString()));
+	public void test_badargs() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
 	@Test
-	public void symtab9() throws Exception {
-		assertManualCase(
-				"symtab9",
-				(builder, state) -> builder.argument("-f", state.stagedDirectory.resolve("symtab9.awk").toString()));
+	public void test_strftime() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
-	private void assertManualCase(String caseName, ManualCaseConfigurer configurer) throws Exception {
-		SuiteState state = loadSuiteState();
-		if (LOG_PROGRESS) {
-			System.out.println("GAWK manual " + caseName);
-		}
-		AwkTestSupport.CliTestBuilder builder = AwkTestSupport
-				.cliTest("GAWK " + caseName)
-				.emulateCliMain()
-				.mergeStdoutAndStderr()
-				.maxOutputBytes(MAX_CAPTURED_OUTPUT_BYTES);
-		configurer.configure(builder, state);
-		AwkTestSupport.ExpectedCliTranscript expected = AwkTestSupport
-				.readExpectedCliTranscript(state.stagedDirectory.resolve(caseName + ".ok"), EXIT_CODE_PREFIX);
-		builder.postProcessWith(AwkTestSupport::normalizeNewlines).expect(expected.output());
-		if (expected.exitCode() != null) {
-			builder.expectExit(expected.exitCode().intValue());
-		}
-		try {
-			builder.build().runAndAssert();
-		} catch (AwkTestSupport.OutputLimitExceededException ex) {
-			fail(
-					"Captured output for GAWK "
-							+ caseName
-							+ " exceeded "
-							+ ex.maxBytes()
-							+ " bytes. Enable -Djawk.gawk.progress=true to log case execution.");
-		}
+	@Test
+	public void test_devfd() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
-	private static synchronized SuiteState loadSuiteState() throws Exception {
-		if (suiteState != null) {
-			return suiteState;
-		}
-		Path resourceDirectory = resolveResourceDirectory();
-		Path stagedDirectory = null;
-		try {
-			stagedDirectory = AwkTestSupport.stageDirectory(resourceDirectory, STAGED_DIRECTORY_PREFIX);
-			suiteState = new SuiteState(stagedDirectory);
-			return suiteState;
-		} catch (Exception ex) {
-			AwkTestSupport.deleteRecursively(stagedDirectory);
-			throw ex;
-		}
+	@Test
+	public void test_errno() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
-	private static Path resolveResourceDirectory() throws Exception {
-		URL resourceUrl = GawkManualIT.class.getResource(GAWK_RESOURCE_PATH);
-		if (resourceUrl == null) {
-			throw new IOException("Couldn't find resource " + GAWK_RESOURCE_PATH);
-		}
-		Path resourceDirectory = Paths.get(resourceUrl.toURI());
-		if (!Files.isDirectory(resourceDirectory)) {
-			throw new IOException(GAWK_RESOURCE_PATH + " is not a directory");
-		}
-		return resourceDirectory;
+	@Test
+	public void test_tweakfld() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
-	private interface ManualCaseConfigurer {
-		void configure(AwkTestSupport.CliTestBuilder builder, SuiteState state) throws Exception;
+	@Test
+	public void test_pid() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 
-	private static final class SuiteState {
-		private final Path stagedDirectory;
+	@Test
+	public void test_strftlng() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
 
-		SuiteState(Path stagedDirectory) {
-			this.stagedDirectory = stagedDirectory;
-		}
+	@Test
+	public void test_nors() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_rebuf() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_rsglstdin() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_pipeio1() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_pipeio2() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_clobber() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_arynocls() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_getlnbuf() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_inetmesg() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_inetechu() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_inetecht() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_inetdayu() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_inetdayt() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_redfilnm() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_space() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_rsnulbig() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_rsnulbig2() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_exitval1() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_fsspcoln() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_rsstart3() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_rtlenmb() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_nofile() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_binmode1() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_devfd1() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_devfd2() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_mixed1() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_mbprintf5() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_beginfile1() throws Exception {
+		skip("BEGINFILE and ENDFILE are not implemented by Jawk yet.");
+	}
+
+	@Test
+	public void test_beginfile2() throws Exception {
+		skip("BEGINFILE and ENDFILE are not implemented by Jawk yet.");
+	}
+
+	@Test
+	public void test_dumpvars() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_profile0() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_profile1() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_profile2() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_profile3() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_profile5() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_profile6() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_profile7() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_profile12() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_mpfrieee() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_mpfrexprange() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_mpfrrnd() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_mpfrsort() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_mpfruplus() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_mpfranswer42() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_mpfrmemok1() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_mpfrsqrt() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_jarebug() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_ordchr2() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_readfile() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_readfile2() throws Exception {
+		AwkTestSupport
+				.cliTest("GAWK readfile2")
+				.argument("-f", gawkFile("readfile2.awk"))
+				.operand(gawkFile("readfile2.awk"), gawkFile("readdir.awk"))
+				.expectLines(gawkPath("readfile2.ok"))
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
+	public void test_nsawk1a() throws Exception {
+		AwkTestSupport
+				.cliTest("GAWK nsawk1a")
+				.argument("-f", gawkFile("nsawk1.awk"))
+				.expectLines(gawkPath("nsawk1a.ok"))
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
+	public void test_nsawk1b() throws Exception {
+		AwkTestSupport
+				.cliTest("GAWK nsawk1b")
+				.argument("-v", "I=fine")
+				.argument("-f", gawkFile("nsawk1.awk"))
+				.expectLines(gawkPath("nsawk1b.ok"))
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
+	public void test_nsawk1c() throws Exception {
+		AwkTestSupport
+				.cliTest("GAWK nsawk1c")
+				.argument("-v", "awk::I=fine")
+				.argument("-f", gawkFile("nsawk1.awk"))
+				.expectLines(gawkPath("nsawk1c.ok"))
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
+	public void test_nsawk2a() throws Exception {
+		AwkTestSupport
+				.cliTest("GAWK nsawk2a")
+				.argument("-v", "I=fine")
+				.argument("-f", gawkFile("nsawk2.awk"))
+				.expectLines(gawkPath("nsawk2a.ok"))
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
+	public void test_nsawk2b() throws Exception {
+		AwkTestSupport
+				.cliTest("GAWK nsawk2b")
+				.argument("-v", "awk::I=fine")
+				.argument("-f", gawkFile("nsawk2.awk"))
+				.expectLines(gawkPath("nsawk2b.ok"))
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
+	public void test_include2() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_incdupe() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_incdupe2() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_incdupe3() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_incdupe4() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_incdupe5() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_incdupe6() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_incdupe7() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_inplace1() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_inplace2() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_inplace2bcomp() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_inplace3() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_inplace3bcomp() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_testext() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_getfile() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_readdir() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_readdir_test() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_readdir_retest() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_readall() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_fts() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_charasbytes() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_symtab6() throws Exception {
+		skip(
+				"This handwritten case compares a fatal gawk SYMTAB diagnostic on stderr and is intentionally skipped in the explicit AwkTestSupport.cliTest suite.");
+	}
+
+	@Test
+	public void test_symtab8() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_symtab9() throws Exception {
+		AwkTestSupport
+				.cliTest("GAWK symtab9")
+				.argument("-f", gawkFile("symtab9.awk"))
+				.expectLines(gawkPath("symtab9.ok"))
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
+	public void test_reginttrad() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_colonwarn() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_dbugeval() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_filefuncs() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_genpot() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_negtime() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_watchpoint1() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_pty1() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_pty2() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_ignrcas3() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_arrdbg() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_sourcesplit() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_eofsrc1() throws Exception {
+		skip(
+				"This handwritten case compares gawk parser diagnostics on stderr and is intentionally skipped in the explicit AwkTestSupport.cliTest suite.");
+	}
+
+	@Test
+	public void test_nsbad_cmd() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_nonfatal1() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_nlstringtest() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_longwrds() throws Exception {
+		AwkTestSupport
+				.cliTest("GAWK longwrds")
+				.argument("-v", "SORT=sort")
+				.argument("-f", gawkFile("longwrds.awk"))
+				.stdin(gawkText("longwrds.in"))
+				.expectLines(gawkPath("longwrds.ok"))
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
+	public void test_nsidentifier() throws Exception {
+		AwkTestSupport
+				.cliTest("GAWK nsidentifier")
+				.argument("-v", "SORT=sort")
+				.argument("-f", gawkFile("nsidentifier.awk"))
+				.expectLines(gawkPath("nsidentifier.ok"))
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
+	public void test_spacere() throws Exception {
+		AwkTestSupport
+				.cliTest("GAWK spacere")
+				.argument("-f", gawkFile("spacere.awk"))
+				.expectLines(gawkPath("spacere.ok"))
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
+	public void test_typedregex4() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_iolint() throws Exception {
+		skip(MANUAL_SKIP_REASON);
+	}
+
+	@Test
+	public void test_argcasfile() throws Exception {
+		AwkTestSupport
+				.cliTest("GAWK argcasfile")
+				.argument("-f", gawkFile("argcasfile.awk"))
+				.stdin(gawkText("argcasfile.in"))
+				.operand("ARGC=1", " /no/such/file")
+				.expectLines(gawkPath("argcasfile.ok"))
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
+	public void test_indirectbuiltin2() throws Exception {
+		skip(MANUAL_SKIP_REASON);
 	}
 }

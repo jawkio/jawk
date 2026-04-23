@@ -24,7 +24,7 @@ package io.jawk;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
@@ -45,9 +45,8 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 public class BwkMiscIT {
 
-	private static final String BWK_MISC_PATH = "/bwk/misc";
-	private static File bwkMiscDirectory;
-	private static File scriptsDirectory;
+	private static Path bwkMiscDirectory;
+	private static Path scriptsDirectory;
 
 	/**
 	 * Initializes the BWK miscellaneous integration suite.
@@ -66,19 +65,15 @@ public class BwkMiscIT {
 	 */
 	@Parameters(name = "BWK.misc {0}")
 	public static Iterable<String> awkList() throws Exception {
-		URL bwkMiscUrl = BwkMiscIT.class.getResource(BWK_MISC_PATH);
-		if (bwkMiscUrl == null) {
-			throw new IOException("Couldn't find resource " + BWK_MISC_PATH);
+		bwkMiscDirectory = CompatibilityTestResources.resourceDirectory(BwkMiscIT.class, "bwk", "misc");
+		if (!bwkMiscDirectory.toFile().isDirectory()) {
+			throw new IOException(bwkMiscDirectory + " is not a directory");
 		}
-		bwkMiscDirectory = new File(bwkMiscUrl.toURI());
-		if (!bwkMiscDirectory.isDirectory()) {
-			throw new IOException(BWK_MISC_PATH + " is not a directory");
-		}
-		scriptsDirectory = new File(bwkMiscDirectory, "scripts");
-		if (!scriptsDirectory.isDirectory()) {
+		scriptsDirectory = bwkMiscDirectory.resolve("scripts");
+		if (!scriptsDirectory.toFile().isDirectory()) {
 			throw new IOException("scripts is not a directory");
 		}
-		File[] scriptFiles = scriptsDirectory.listFiles();
+		File[] scriptFiles = scriptsDirectory.toFile().listFiles();
 		if (scriptFiles == null) {
 			throw new IOException("Couldn't list files in " + scriptsDirectory);
 		}
@@ -103,15 +98,15 @@ public class BwkMiscIT {
 	 */
 	@Test
 	public void test() throws Exception {
-		File awkFile = new File(scriptsDirectory, awkName);
+		Path awkFile = scriptsDirectory.resolve(awkName);
 		String shortName = awkName.substring(0, awkName.length() - 4);
-		File inputFile = new File(bwkMiscDirectory, "inputs/" + shortName + ".in");
-		File okFile = new File(bwkMiscDirectory, "results/" + shortName + ".ok");
+		Path inputFile = bwkMiscDirectory.resolve("inputs/" + shortName + ".in");
+		Path okFile = bwkMiscDirectory.resolve("results/" + shortName + ".ok");
 
 		AwkTestSupport
 				.cliTest("BWK.misc " + awkName)
-				.argument("-f", awkFile.getAbsolutePath())
-				.operand(inputFile.getAbsolutePath())
+				.argument("-f", awkFile.toString())
+				.operand(inputFile.toString())
 				.expectLines(okFile)
 				.build()
 				.runAndAssert();

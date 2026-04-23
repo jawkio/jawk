@@ -24,9 +24,7 @@ package io.jawk;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
@@ -47,7 +45,6 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 public class BwkPIT {
 
-	private static final String BWK_P_PATH = "/bwk/p";
 	private static Path bwkPDirectory;
 	private static Path scriptsDirectory;
 
@@ -68,14 +65,9 @@ public class BwkPIT {
 	 */
 	@Parameters(name = "BWK.p {0}")
 	public static Iterable<String> awkList() throws Exception {
-		URL bwkPUrl = BwkPIT.class.getResource(BWK_P_PATH);
-		if (bwkPUrl == null) {
-			throw new IOException("Couldn't find resource " + BWK_P_PATH);
-		}
-		Path bwkPPath = Paths.get(bwkPUrl.toURI());
-		bwkPDirectory = bwkPPath.toAbsolutePath().normalize();
+		bwkPDirectory = CompatibilityTestResources.resourceDirectory(BwkPIT.class, "bwk", "p");
 		if (!bwkPDirectory.toFile().isDirectory()) {
-			throw new IOException(BWK_P_PATH + " is not a directory");
+			throw new IOException(bwkPDirectory + " is not a directory");
 		}
 		scriptsDirectory = bwkPDirectory.resolve("scripts");
 		if (!scriptsDirectory.toFile().isDirectory()) {

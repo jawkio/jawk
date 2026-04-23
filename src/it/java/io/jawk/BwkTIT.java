@@ -24,11 +24,9 @@ package io.jawk;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
@@ -49,7 +47,6 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 public class BwkTIT {
 
-	private static final String BWK_T_PATH = "/bwk/t";
 	private static Path bwkTDirectory;
 	private static Path scriptsDirectory;
 
@@ -70,13 +67,9 @@ public class BwkTIT {
 	 */
 	@Parameters(name = "BWK.t {0}")
 	public static Iterable<String> awkList() throws Exception {
-		URL bwkTUrl = BwkTIT.class.getResource(BWK_T_PATH);
-		if (bwkTUrl == null) {
-			throw new IOException("Couldn't find resource " + BWK_T_PATH);
-		}
-		bwkTDirectory = Paths.get(bwkTUrl.toURI());
+		bwkTDirectory = CompatibilityTestResources.resourceDirectory(BwkTIT.class, "bwk", "t");
 		if (!bwkTDirectory.toFile().isDirectory()) {
-			throw new IOException(BWK_T_PATH + " is not a directory");
+			throw new IOException(bwkTDirectory + " is not a directory");
 		}
 		scriptsDirectory = bwkTDirectory.resolve("scripts");
 		if (!scriptsDirectory.toFile().isDirectory()) {
@@ -126,7 +119,7 @@ public class BwkTIT {
 
 			AwkTestSupport
 					.awkTest("BWK.t " + awkName)
-					.script(Files.newInputStream(awkPath))
+					.script(awkPath)
 					.operand(inputPath.toString())
 					.postProcessWith(output -> Arrays.stream(output.split("\\R")).sorted().collect(Collectors.joining("\n")))
 					.expect(expectedResult)
@@ -136,7 +129,7 @@ public class BwkTIT {
 		} else {
 			AwkTestSupport
 					.awkTest("BWK.t " + awkName)
-					.script(Files.newInputStream(awkPath))
+					.script(awkPath)
 					.operand(inputPath.toString())
 					.expectLines(okPath)
 					.expectExit(expectedCode)

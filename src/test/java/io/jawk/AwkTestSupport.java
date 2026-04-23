@@ -33,7 +33,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.io.Reader;
 import java.io.StringReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -51,7 +53,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import io.jawk.ext.JawkExtension;
-import io.jawk.jrt.AwkRuntimeException;
 import io.jawk.jrt.InputSource;
 
 /**
@@ -116,85 +117,6 @@ public final class AwkTestSupport {
 	 */
 	public static Path sharedTempDirectory() {
 		return SHARED_TEMP_DIR;
-	}
-
-	static Path stageDirectory(Path sourceDirectory, String prefix) throws IOException {
-		Path stagedDirectory = Files.createTempDirectory(prefix);
-		try {
-			copyDirectoryRecursively(sourceDirectory, stagedDirectory);
-			return stagedDirectory;
-		} catch (IOException | RuntimeException ex) {
-			deleteRecursively(stagedDirectory);
-			throw ex;
-		}
-	}
-
-	static void copyDirectoryRecursively(Path sourceDirectory, Path destinationDirectory) throws IOException {
-		try (Stream<Path> paths = Files.walk(sourceDirectory)) {
-			paths.forEach(path -> copyToDirectory(sourceDirectory, destinationDirectory, path));
-		}
-	}
-
-	static String readUtf8(Path path) throws IOException {
-		return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
-	}
-
-	static String readUtf8Normalized(Path path) throws IOException {
-		return normalizeNewlines(readUtf8(path));
-	}
-
-	static String normalizeNewlines(String text) {
-		return text.replace("\r\n", "\n").replace("\r", "\n");
-	}
-
-	static ExpectedCliTranscript readExpectedCliTranscript(Path path, String exitCodePrefix) throws IOException {
-		String transcript = readUtf8Normalized(path);
-		int trailerLineStart = transcript.length();
-		while (trailerLineStart > 0 && transcript.charAt(trailerLineStart - 1) == '\n') {
-			trailerLineStart--;
-		}
-		while (trailerLineStart > 0 && transcript.charAt(trailerLineStart - 1) != '\n') {
-			trailerLineStart--;
-		}
-		String lastLine = transcript.substring(trailerLineStart).trim();
-		if (!lastLine.startsWith(exitCodePrefix)) {
-			return new ExpectedCliTranscript(transcript, null);
-		}
-		Integer exitCode = Integer.valueOf(lastLine.substring(exitCodePrefix.length()).trim());
-		return new ExpectedCliTranscript(transcript.substring(0, trailerLineStart), exitCode);
-	}
-
-	static final class OutputLimitExceededException extends RuntimeException {
-		private static final long serialVersionUID = 1L;
-
-		private final int maxBytes;
-
-		OutputLimitExceededException(int maxBytes) {
-			super("Captured output exceeded " + maxBytes + " bytes");
-			this.maxBytes = maxBytes;
-		}
-
-		int maxBytes() {
-			return maxBytes;
-		}
-	}
-
-	static final class ExpectedCliTranscript {
-		private final String output;
-		private final Integer exitCode;
-
-		ExpectedCliTranscript(String output, Integer exitCode) {
-			this.output = output;
-			this.exitCode = exitCode;
-		}
-
-		String output() {
-			return output;
-		}
-
-		Integer exitCode() {
-			return exitCode;
-		}
 	}
 
 	/**
@@ -414,9 +336,77 @@ public final class AwkTestSupport {
 		private Awk customAwk;
 		private final List<JawkExtension> extensions = new ArrayList<>();
 		private InputSource inputSource;
+		private Reader scriptReader;
+		private Path scriptPath;
 
 		private AwkTestBuilder(String description) {
 			super(description);
+		}
+
+		/**
+		 * Sets the AWK script to execute using a raw {@link String}. Any
+		 * placeholder tokens in the script are resolved before execution.
+		 *
+		 * @param script the script contents
+		 * @return this builder for method chaining
+		 */
+		@Override
+		public AwkTestBuilder script(String script) {
+			scriptReader = null;
+			scriptPath = null;
+			return super.script(script);
+		}
+
+		/**
+		 * Sets the AWK script to execute using a {@link Reader}. The reader is
+		 * consumed directly by the compiler when the test runs.
+		 *
+		 * @param reader the script reader
+		 * @return this builder for method chaining
+		 * @throws IllegalArgumentException when {@code reader} is {@code null}
+		 */
+		public AwkTestBuilder script(Reader reader) {
+			if (reader == null) {
+				throw new IllegalArgumentException("reader must not be null");
+			}
+			script = null;
+			scriptReader = reader;
+			scriptPath = null;
+			return this;
+		}
+
+		/**
+		 * Sets the AWK script to execute using a UTF-8 input stream. The stream is
+		 * wrapped in a reader and consumed directly by the compiler when the test
+		 * runs.
+		 *
+		 * @param scriptStream the stream supplying the script contents
+		 * @return this builder for method chaining
+		 * @throws IllegalArgumentException when {@code scriptStream} is
+		 *         {@code null}
+		 */
+		public AwkTestBuilder script(InputStream scriptStream) {
+			if (scriptStream == null) {
+				throw new IllegalArgumentException("scriptStream must not be null");
+			}
+			return script(new InputStreamReader(scriptStream, StandardCharsets.UTF_8));
+		}
+
+		/**
+		 * Sets the AWK script to execute from a UTF-8 file.
+		 *
+		 * @param path path to the script file
+		 * @return this builder for method chaining
+		 * @throws IllegalArgumentException when {@code path} is {@code null}
+		 */
+		public AwkTestBuilder script(Path path) {
+			if (path == null) {
+				throw new IllegalArgumentException("path must not be null");
+			}
+			script = null;
+			scriptReader = null;
+			scriptPath = path;
+			return this;
 		}
 
 		/**
@@ -512,7 +502,9 @@ public final class AwkTestSupport {
 					preAssignments,
 					customAwk,
 					extensions,
-					inputSource);
+					inputSource,
+					scriptReader,
+					scriptPath);
 		}
 	}
 
@@ -524,10 +516,6 @@ public final class AwkTestSupport {
 	public static final class CliTestBuilder extends BaseTestBuilder<CliTestBuilder> {
 		private final List<String> argumentSpecs = new ArrayList<>();
 		private final Map<String, Object> assignments = new LinkedHashMap<>();
-		private boolean emulateCliMain;
-		private boolean mergeStdoutAndStderr;
-		private Integer maxOutputBytes;
-		private byte[] stdinBytes;
 
 		private CliTestBuilder(String description) {
 			super(description);
@@ -558,82 +546,6 @@ public final class AwkTestSupport {
 			return this;
 		}
 
-		/**
-		 * Provides text data that will be delivered on standard input when the
-		 * script runs. Calling this method clears any previously configured raw
-		 * byte stdin for the same builder.
-		 *
-		 * @param stdin the content to stream into standard input
-		 * @return this builder for method chaining
-		 */
-		@Override
-		public CliTestBuilder stdin(String stdin) {
-			stdinBytes = null;
-			return super.stdin(stdin);
-		}
-
-		/**
-		 * Provides raw bytes that will be delivered on standard input when the
-		 * script runs. This preserves fixture bytes exactly as supplied, which is
-		 * useful for compatibility cases whose redirected input is not valid
-		 * UTF-8. Calling this method clears any previously configured text stdin
-		 * for the same builder.
-		 *
-		 * @param stdinParam raw bytes to stream into standard input
-		 * @return this builder for method chaining
-		 * @throws IllegalArgumentException when {@code stdinParam} is {@code null}
-		 */
-		public CliTestBuilder stdin(byte[] stdinParam) {
-			if (stdinParam == null) {
-				throw new IllegalArgumentException("stdinParam must not be null");
-			}
-			stdin = null;
-			stdinBytes = Arrays.copyOf(stdinParam, stdinParam.length);
-			return this;
-		}
-
-		/**
-		 * Captures CLI standard output and standard error through the same
-		 * stream. This mirrors shell invocations that redirect {@code 2>&1},
-		 * allowing tests to compare diagnostics and regular output as a single
-		 * combined result.
-		 *
-		 * @return this builder for method chaining
-		 */
-		public CliTestBuilder mergeStdoutAndStderr() {
-			mergeStdoutAndStderr = true;
-			return this;
-		}
-
-		/**
-		 * Executes the CLI through the same exception handling flow used by
-		 * {@link Cli#main(String[])} so that diagnostics are rendered to the error
-		 * stream and failures become exit codes instead of propagating as Java
-		 * exceptions.
-		 *
-		 * @return this builder for method chaining
-		 */
-		public CliTestBuilder emulateCliMain() {
-			emulateCliMain = true;
-			return this;
-		}
-
-		/**
-		 * Caps the combined captured CLI output. This prevents compatibility
-		 * suites from exhausting heap space when a script emits unbounded output.
-		 *
-		 * @param maxBytes maximum number of UTF-8 bytes to capture
-		 * @return this builder for method chaining
-		 * @throws IllegalArgumentException when {@code maxBytes} is not positive
-		 */
-		public CliTestBuilder maxOutputBytes(int maxBytes) {
-			if (maxBytes <= 0) {
-				throw new IllegalArgumentException("maxBytes must be positive");
-			}
-			maxOutputBytes = maxBytes;
-			return this;
-		}
-
 		@Override
 		protected CliTestCase buildTestCase(
 				TestLayout layout,
@@ -643,18 +555,7 @@ public final class AwkTestSupport {
 			if (useTempDir && !assignments.containsKey("TEMPDIR")) {
 				assignments.put("TEMPDIR", SHARED_TEMP_DIR.toString());
 			}
-			return new CliTestCase(
-					layout,
-					files,
-					operands,
-					placeholders,
-					requiresPosix,
-					argumentSpecs,
-					assignments,
-					emulateCliMain,
-					mergeStdoutAndStderr,
-					maxOutputBytes,
-					stdinBytes);
+			return new CliTestCase(layout, files, operands, placeholders, requiresPosix, argumentSpecs, assignments);
 		}
 	}
 
@@ -695,32 +596,6 @@ public final class AwkTestSupport {
 		public B script(String script) {
 			this.script = script;
 			return (B) this;
-		}
-
-		/**
-		 * Sets the AWK script to execute using a stream. The contents are read as
-		 * UTF-8 and treated equivalently to {@link #script(String)}.
-		 *
-		 * @param scriptStream the stream supplying the script contents
-		 * @return this builder for method chaining
-		 * @throws IllegalArgumentException when {@code scriptStream} is
-		 *         {@code null}
-		 * @throws UncheckedIOException when the stream cannot be read
-		 */
-		public B script(InputStream scriptStream) {
-			if (scriptStream == null) {
-				throw new IllegalArgumentException("scriptStream must not be null");
-			}
-			try (InputStream in = scriptStream; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-				byte[] buffer = new byte[8192];
-				int read;
-				while ((read = in.read(buffer)) != -1) {
-					out.write(buffer, 0, read);
-				}
-				return script(new String(out.toByteArray(), StandardCharsets.UTF_8));
-			} catch (IOException ex) {
-				throw new UncheckedIOException("Failed to read script stream", ex);
-			}
 		}
 
 		/**
@@ -1030,10 +905,6 @@ public final class AwkTestSupport {
 						layout.expectedException,
 						null);
 			} catch (Throwable ex) {
-				OutputLimitExceededException outputLimitException = findOutputLimitExceeded(ex);
-				if (outputLimitException != null) {
-					throw outputLimitException;
-				}
 				if (layout.expectedException != null && layout.expectedException.isInstance(ex)) {
 					return new TestResult(
 							layout.description,
@@ -1103,6 +974,8 @@ public final class AwkTestSupport {
 		private final Awk customAwk;
 		private final List<JawkExtension> extensions;
 		private final InputSource inputSource;
+		private final Reader scriptReader;
+		private final Path scriptPath;
 
 		AwkTestCase(
 				TestLayout layout,
@@ -1113,19 +986,34 @@ public final class AwkTestSupport {
 				Map<String, Object> preAssignments,
 				Awk customAwk,
 				List<JawkExtension> extensions,
-				InputSource inputSource) {
+				InputSource inputSource,
+				Reader scriptReader,
+				Path scriptPath) {
 			super(layout, fileContents, operandSpecs, pathPlaceholders, requiresPosix);
 			this.preAssignments = new LinkedHashMap<>(preAssignments);
 			this.customAwk = customAwk;
 			this.extensions = new ArrayList<>(extensions);
 			this.inputSource = inputSource;
+			this.scriptReader = scriptReader;
+			this.scriptPath = scriptPath;
 		}
 
 		@Override
 		protected ActualResult execute(ExecutionEnvironment env) throws Exception {
 			Awk awk = customAwk != null ? customAwk : new Awk(extensions);
 			StringBuilder out = new StringBuilder();
-			AwkProgram program = awk.compile(resolvedScript(env));
+			AwkProgram program;
+			if (scriptPath != null) {
+				try (BufferedReader reader = Files.newBufferedReader(scriptPath, StandardCharsets.UTF_8)) {
+					program = awk.compile(reader);
+				}
+			} else if (scriptReader != null) {
+				try (Reader reader = scriptReader) {
+					program = awk.compile(reader);
+				}
+			} else {
+				program = awk.compile(resolvedScript(env));
+			}
 			Awk.AwkRunBuilder builder = awk
 					.script(program)
 					.arguments(resolvedOperands(env))
@@ -1151,10 +1039,6 @@ public final class AwkTestSupport {
 	private static final class CliTestCase extends BaseTestCase {
 		private final List<String> argumentSpecs;
 		private final Map<String, Object> assignments;
-		private final boolean emulateCliMain;
-		private final boolean mergeStdoutAndStderr;
-		private final Integer maxOutputBytes;
-		private final byte[] stdinBytes;
 
 		CliTestCase(
 				TestLayout layout,
@@ -1163,36 +1047,24 @@ public final class AwkTestSupport {
 				List<String> pathPlaceholders,
 				boolean requiresPosix,
 				List<String> argumentSpecs,
-				Map<String, Object> assignments,
-				boolean emulateCliMain,
-				boolean mergeStdoutAndStderr,
-				Integer maxOutputBytes,
-				byte[] stdinBytes) {
+				Map<String, Object> assignments) {
 			super(layout, fileContents, operandSpecs, pathPlaceholders, requiresPosix);
 			this.argumentSpecs = new ArrayList<>(argumentSpecs);
 			this.assignments = new LinkedHashMap<>(assignments);
-			this.emulateCliMain = emulateCliMain;
-			this.mergeStdoutAndStderr = mergeStdoutAndStderr;
-			this.maxOutputBytes = maxOutputBytes;
-			this.stdinBytes = stdinBytes != null ? Arrays.copyOf(stdinBytes, stdinBytes.length) : null;
 		}
 
 		@Override
 		protected ActualResult execute(ExecutionEnvironment env) throws Exception {
 			String stdin = resolvedStdin(env);
-			InputStream in = stdinBytes != null ?
-					new ByteArrayInputStream(Arrays.copyOf(stdinBytes, stdinBytes.length)) :
-					stdin != null ?
-							new ByteArrayInputStream(stdin.getBytes(StandardCharsets.UTF_8)) :
-							new ByteArrayInputStream(new byte[0]);
-			ByteArrayOutputStream outBytes = maxOutputBytes != null ?
-					new LimitedByteArrayOutputStream(maxOutputBytes.intValue()) :
-					new ByteArrayOutputStream();
-			PrintStream stdout = new PrintStream(outBytes, true, StandardCharsets.UTF_8.name());
-			PrintStream stderr = mergeStdoutAndStderr ?
-					stdout :
-					new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8.name());
-			Cli cli = new Cli(in, stdout, stderr);
+			InputStream in = stdin != null ?
+					new ByteArrayInputStream(stdin.getBytes(StandardCharsets.UTF_8)) :
+					new ByteArrayInputStream(new byte[0]);
+			ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
+			ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
+			Cli cli = new Cli(
+					in,
+					new PrintStream(outBytes, true, StandardCharsets.UTF_8.name()),
+					new PrintStream(errBytes, true, StandardCharsets.UTF_8.name()));
 
 			List<String> args = new ArrayList<>();
 			for (Map.Entry<String, Object> entry : assignments.entrySet()) {
@@ -1210,72 +1082,14 @@ public final class AwkTestSupport {
 
 			int exitCode = 0;
 			try {
-				if (emulateCliMain) {
-					exitCode = executeLikeCliMain(cli, stderr, args);
-				} else {
-					cli.parse(args.toArray(new String[0]));
-					cli.run();
-				}
+				cli.parse(args.toArray(new String[0]));
+				cli.run();
 			} catch (ExitException ex) {
 				exitCode = ex.getCode();
 			}
 			return new ActualResult(
 					outBytes.toString(StandardCharsets.UTF_8.name()),
 					exitCode);
-		}
-
-		private static int executeLikeCliMain(Cli cli, PrintStream err, List<String> args) throws Exception {
-			try {
-				cli.parse(args.toArray(new String[0]));
-				cli.run();
-				return 0;
-			} catch (ExitException ex) {
-				return ex.getCode();
-			} catch (AwkRuntimeException ex) {
-				OutputLimitExceededException outputLimitException = findOutputLimitExceeded(ex);
-				if (outputLimitException != null) {
-					throw outputLimitException;
-				}
-				if (ex.getLineNumber() > 0) {
-					err.printf("%s (line %d): %s%n", ex.getClass().getSimpleName(), ex.getLineNumber(), ex.getMessage());
-				} else {
-					err.printf("%s: %s%n", ex.getClass().getSimpleName(), ex.getMessage());
-				}
-				return 1;
-			} catch (IllegalArgumentException ex) {
-				err.println("Failed to parse arguments. Please see the help/usage output (cmd line switch '-h').");
-				ex.printStackTrace(err);
-				return 1;
-			} catch (Exception ex) {
-				err.printf("%s: %s%n", ex.getClass().getSimpleName(), ex.getMessage());
-				return 1;
-			}
-		}
-	}
-
-	private static final class LimitedByteArrayOutputStream extends ByteArrayOutputStream {
-		private final int maxBytes;
-
-		LimitedByteArrayOutputStream(int maxBytes) {
-			this.maxBytes = maxBytes;
-		}
-
-		@Override
-		public synchronized void write(int b) {
-			ensureCapacityFor(1);
-			super.write(b);
-		}
-
-		@Override
-		public synchronized void write(byte[] b, int off, int len) {
-			ensureCapacityFor(len);
-			super.write(b, off, len);
-		}
-
-		private void ensureCapacityFor(int additionalBytes) {
-			if (additionalBytes > 0 && count > maxBytes - additionalBytes) {
-				throw new OutputLimitExceededException(maxBytes);
-			}
 		}
 	}
 
@@ -1356,7 +1170,7 @@ public final class AwkTestSupport {
 		}
 	}
 
-	static void deleteRecursively(Path root) throws IOException {
+	private static void deleteRecursively(Path root) throws IOException {
 		if (root == null || !Files.exists(root)) {
 			return;
 		}
@@ -1368,38 +1182,6 @@ public final class AwkTestSupport {
 					// best effort cleanup
 				}
 			});
-		}
-	}
-
-	private static OutputLimitExceededException findOutputLimitExceeded(Throwable throwable) {
-		Throwable current = throwable;
-		while (current != null) {
-			if (current instanceof OutputLimitExceededException) {
-				return (OutputLimitExceededException) current;
-			}
-			current = current.getCause();
-		}
-		return null;
-	}
-
-	private static void copyToDirectory(Path sourceDirectory, Path destinationDirectory, Path sourcePath) {
-		try {
-			Path relativePath = sourceDirectory.relativize(sourcePath);
-			if (relativePath.toString().isEmpty()) {
-				return;
-			}
-			Path destination = destinationDirectory.resolve(relativePath);
-			if (Files.isDirectory(sourcePath)) {
-				Files.createDirectories(destination);
-			} else {
-				Path parent = destination.getParent();
-				if (parent != null) {
-					Files.createDirectories(parent);
-				}
-				Files.copy(sourcePath, destination);
-			}
-		} catch (IOException ex) {
-			throw new IllegalStateException("Failed to stage test resource " + sourcePath, ex);
 		}
 	}
 

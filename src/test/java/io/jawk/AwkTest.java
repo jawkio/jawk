@@ -40,6 +40,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1237,6 +1238,26 @@ public class AwkTest {
 				.execute();
 
 		assertEquals("one\n", result);
+	}
+
+	/**
+	 * Verifies that {@link AwkTestSupport} can execute a script loaded directly
+	 * from a file path without first materializing it as a {@link String}.
+	 */
+	@Test
+	public void awkTestSupportCanExecuteScriptFromPath() throws Exception {
+		Path scriptPath = Files.createTempFile("jawk-script", ".awk");
+		try {
+			Files.write(scriptPath, "{ print toupper($0) }\n".getBytes(StandardCharsets.UTF_8));
+			AwkTestSupport
+					.awkTest("script from path")
+					.script(scriptPath)
+					.stdin("alpha\n")
+					.expectLines("ALPHA")
+					.runAndAssert();
+		} finally {
+			Files.deleteIfExists(scriptPath);
+		}
 	}
 
 	/**

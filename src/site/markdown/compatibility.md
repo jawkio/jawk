@@ -77,16 +77,17 @@ Jawk tuples are reusable, but they should be treated as internal artifacts tied 
 Jawk maintains compatibility tests derived from the BWK (One True AWK) and gawk test suites. These run automatically as integration tests during `mvn verify`.
 
 Compatibility suites now live under `src/it/java`, with their vendored inputs under `src/it/resources`.
-The gawk coverage is split in two parts: Jawk vendors gawk's `Makefile.am`, `Gentests`, and generated `Maketests` snapshot, parses the portable generated `Maketests` rules in JUnit 4, and keeps a separate handwritten `AwkTestSupport` suite for a curated subset of manual `Makefile.am` rules.
+The compatibility suites read those vendored files directly from the repository checkout instead of relying on the Maven test classpath layout.
+The gawk coverage is also split in two parts, but both are now explicit Java integration suites built on `AwkTestSupport`. `GawkIT` mirrors the portable cases from gawk's vendored `Maketests` snapshot as checked-in Java tests, and `GawkManualIT` mirrors handwritten `Makefile.am` rules the same way. The vendored gawk files remain in the repository to make future refreshes and diffs straightforward, but the runtime source of truth is the Java test code.
 
 | Suite | Coverage |
 | --- | --- |
 | **BwkPIT** | Pattern matching and basic AWK operations from the BWK test collection |
 | **BwkTIT** | Text processing, field splitting, built-in functions, and output formatting |
 | **BwkMiscIT** | Miscellaneous BWK compatibility edge cases |
-| **GawkCompatibilityIT** | Portable gawk compatibility derived from the vendored `Maketests` snapshot, with unsupported shell, debugger, CSV, pretty-print, lint, traditional, and bignum modes skipped explicitly |
-| **GawkManualIT** | Curated handwritten `Makefile.am` rules expressed directly as `AwkTestSupport` integration tests |
+| **GawkIT** | Portable gawk compatibility mirrored from the vendored `Maketests` snapshot as explicit `AwkTestSupport` CLI tests, with unsupported shell, debugger, CSV, pretty-print, lint, traditional, and bignum modes skipped explicitly |
+| **GawkManualIT** | Handwritten `Makefile.am` rules mirrored as explicit `AwkTestSupport` integration tests or explicit skipped placeholders |
 
-Not all gawk compatibility cases pass, primarily because Jawk uses Java regular expressions and `java.util.Formatter` rather than their C equivalents. Linux CI is the authoritative environment for the full compatibility pass rate. Windows can still run the portable metadata-driven subset without requiring Unix tooling.
+Not all gawk compatibility cases pass, primarily because Jawk uses Java regular expressions and `java.util.Formatter` rather than their C equivalents. Linux CI is the authoritative environment for the full compatibility pass rate. Windows can still run the explicit Java gawk suites without requiring Unix tooling.
 
 Results are stored in `target/failsafe-reports/` and summarized on the [Failsafe Report](failsafe-report.html) page of the generated site.

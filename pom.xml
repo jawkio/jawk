@@ -116,6 +116,18 @@
 				<version>3.6.0</version>
 				<executions>
 					<execution>
+						<id>add-compatibility-summary-source</id>
+						<phase>pre-site</phase>
+						<goals>
+							<goal>add-test-source</goal>
+						</goals>
+						<configuration>
+							<sources>
+								<source>${project.basedir}/src/it/java</source>
+							</sources>
+						</configuration>
+					</execution>
+					<execution>
 						<id>add-compatibility-test-source</id>
 						<phase>generate-test-sources</phase>
 						<goals>
@@ -271,10 +283,10 @@
 				<artifactId>maven-compiler-plugin</artifactId>
 				<executions>
 					<execution>
-						<id>compile-for-site</id>
+						<id>test-compile-for-site</id>
 						<phase>pre-site</phase>
 						<goals>
-							<goal>compile</goal>
+							<goal>testCompile</goal>
 						</goals>
 					</execution>
 				</executions>
@@ -293,6 +305,7 @@
 						</goals>
 						<configuration>
 							<mainClass>io.jawk.site.CompatibilitySummaryGenerator</mainClass>
+							<classpathScope>test</classpathScope>
 							<arguments>
 								<argument>${project.build.directory}/failsafe-reports</argument>
 								<argument>${project.build.directory}/generated-site/compatibility-summary.xml</argument>

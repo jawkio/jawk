@@ -583,18 +583,18 @@ body.dark {
 }
 
 .compat-row .progress-bar-success {
-	background-color: var(--success-fg);
-	color: var(--success-bg);
+	background-color: var(--success-fg, #198754);
+	color: var(--success-bg, #ffffff);
 }
 
 .compat-row .progress-bar-warning {
-	background-color: var(--warning-fg);
-	color: var(--warning-bg);
+	background-color: var(--warning-fg, #fd7e14);
+	color: var(--warning-bg, #ffffff);
 }
 
 .compat-row .progress-bar-danger {
-	background-color: var(--danger-fg);
-	color: var(--danger-bg);
+	background-color: var(--danger-fg, #dc3545);
+	color: var(--danger-bg, #ffffff);
 }
 
 .compat-summary {
@@ -629,7 +629,7 @@ body.dark {
 	gap: 4px;
 	padding: 0.9rem;
 	border-radius: 14px;
-	background-color: color-mix(in srgb, var(--banner-bgcolor) 5%, transparent);
+	background-color: color-mix(in srgb, var(--banner-bgcolor, #6d4635) 5%, transparent);
 }
 
 .compat-cell {
@@ -637,19 +637,19 @@ body.dark {
 	width: 12px;
 	height: 12px;
 	border-radius: 3px;
-	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--main-bgcolor) 38%, transparent);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--main-bgcolor, #ffffff) 38%, transparent);
 }
 
 .compat-cell-pass {
-	background-color: var(--success-fg);
+	background-color: var(--success-fg, #198754);
 }
 
 .compat-cell-failure {
-	background-color: var(--warning-fg);
+	background-color: var(--warning-fg, #fd7e14);
 }
 
 .compat-cell-error {
-	background-color: var(--danger-fg);
+	background-color: var(--danger-fg, #dc3545);
 }
 
 .compat-cell-skipped {

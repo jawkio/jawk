@@ -1,11 +1,11 @@
 package io.jawk.site;
 
 /*-
- * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
+ * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
- * ڇڇڇڇڇڇ
- * Copyright (C) 2006 - 2026 MetricsHub
- * ڇڇڇڇڇڇ
+ * ჻჻჻჻჻჻
+ * Copyright 2006 - 2026 MetricsHub
+ * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3 of the
@@ -19,14 +19,14 @@ package io.jawk.site;
  * You should have received a copy of the GNU General Lesser Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/lgpl-3.0.html>.
- * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
+ * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,18 +35,20 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
 /**
  * Generates an aggregate compatibility summary XML file from Failsafe XML reports.
  */
 public final class CompatibilitySummaryGenerator {
 
-	private CompatibilitySummaryGenerator() {
-	}
+	private CompatibilitySummaryGenerator() {}
 
 	/**
 	 * Generates a compatibility summary XML file.
@@ -60,10 +62,13 @@ public final class CompatibilitySummaryGenerator {
 			throw new IllegalArgumentException("Expected arguments: <failsafe-report-dir> <output-file>");
 		}
 
-		final Path reportDirectory = Path.of(args[0]);
-		final Path outputFile = Path.of(args[1]);
+		final Path reportDirectory = Paths.get(args[0]);
+		final Path outputFile = Paths.get(args[1]);
+		final Path parent = outputFile.getParent();
 
-		Files.createDirectories(outputFile.getParent());
+		if (parent != null) {
+			Files.createDirectories(parent);
+		}
 
 		final SuiteSummary posix = summarize(reportDirectory, "TEST-io.jawk.posix.");
 		final SuiteSummary bwk = summarize(reportDirectory, "TEST-io.jawk.onetrueawk.");
@@ -77,16 +82,18 @@ public final class CompatibilitySummaryGenerator {
 				+ suiteXml("gawk", "gawk", gawk)
 				+ "</compatibility-summary>\n";
 
-		Files.writeString(outputFile, xml, StandardCharsets.UTF_8);
+		Files.write(outputFile, xml.getBytes(StandardCharsets.UTF_8));
 	}
 
 	private static SuiteSummary summarize(final Path reportDirectory, final String prefix) throws Exception {
 
-		final File[] reports = reportDirectory.toFile().listFiles(
-				file -> file.isFile() && file.getName().startsWith(prefix) && file.getName().endsWith(".xml"));
+		final File[] reports = reportDirectory
+				.toFile()
+				.listFiles(
+						file -> file.isFile() && file.getName().startsWith(prefix) && file.getName().endsWith(".xml"));
 
 		if (reports == null || reports.length == 0) {
-			throw new IOException("No Failsafe XML reports found for prefix " + prefix + " in " + reportDirectory);
+			return new SuiteSummary(0, 0, 0, 0, new ArrayList<TestCaseSummary>(), "");
 		}
 
 		Arrays.sort(reports, Comparator.comparing(File::getName));
@@ -95,7 +102,7 @@ public final class CompatibilitySummaryGenerator {
 		int failures = 0;
 		int errors = 0;
 		int skipped = 0;
-		final List<TestCaseSummary> testCases = new ArrayList<>();
+		final List<TestCaseSummary> testCases = new ArrayList<TestCaseSummary>();
 
 		for (final File report : reports) {
 			final Element root = parse(report.toPath()).getDocumentElement();
@@ -106,16 +113,26 @@ public final class CompatibilitySummaryGenerator {
 			collectTestCases(root, testCases);
 		}
 
-		return new SuiteSummary(tests, failures, errors, skipped,
+		return new SuiteSummary(
+				tests,
+				failures,
+				errors,
+				skipped,
 				testCases,
 				Arrays.stream(reports).map(File::getName).collect(Collectors.joining("|")));
 	}
 
 	private static void collectTestCases(final Element root, final List<TestCaseSummary> testCases) {
-		for (int index = 0; index < root.getElementsByTagName("testcase").getLength(); index++) {
-			final Element testCase = (Element) root.getElementsByTagName("testcase").item(index);
-			testCases.add(new TestCaseSummary(testCase.getAttribute("classname"), testCase.getAttribute("name"),
-					getStatus(testCase)));
+		final NodeList testCaseNodes = root.getElementsByTagName("testcase");
+
+		for (int index = 0; index < testCaseNodes.getLength(); index++) {
+			final Element testCase = (Element) testCaseNodes.item(index);
+			testCases
+					.add(
+							new TestCaseSummary(
+									testCase.getAttribute("classname"),
+									testCase.getAttribute("name"),
+									getStatus(testCase)));
 		}
 	}
 
@@ -135,7 +152,25 @@ public final class CompatibilitySummaryGenerator {
 	private static Document parse(final Path file) throws Exception {
 		final DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
 		documentBuilderFactory.setNamespaceAware(false);
+		documentBuilderFactory.setXIncludeAware(false);
+		documentBuilderFactory.setExpandEntityReferences(false);
+		configureFeature(documentBuilderFactory, XMLConstants.FEATURE_SECURE_PROCESSING, true);
+		configureFeature(documentBuilderFactory, "http://apache.org/xml/features/disallow-doctype-decl", true);
+		configureFeature(documentBuilderFactory, "http://xml.org/sax/features/external-general-entities", false);
+		configureFeature(documentBuilderFactory, "http://xml.org/sax/features/external-parameter-entities", false);
+		configureFeature(
+				documentBuilderFactory,
+				"http://apache.org/xml/features/nonvalidating/load-external-dtd",
+				false);
 		return documentBuilderFactory.newDocumentBuilder().parse(file.toFile());
+	}
+
+	private static void configureFeature(
+			final DocumentBuilderFactory factory,
+			final String feature,
+			final boolean enabled)
+			throws ParserConfigurationException {
+		factory.setFeature(feature, enabled);
 	}
 
 	private static int getIntAttribute(final Element element, final String attributeName) {
@@ -144,14 +179,31 @@ public final class CompatibilitySummaryGenerator {
 
 	private static String suiteXml(final String id, final String title, final SuiteSummary summary) {
 		final StringBuilder builder = new StringBuilder();
-		builder.append(String.format(Locale.ROOT,
-				"  <suite id=\"%s\" title=\"%s\" tests=\"%d\" failures=\"%d\" errors=\"%d\" skipped=\"%d\" passed=\"%d\" percent=\"%d\" files=\"%s\">%n",
-				escape(id), escape(title), summary.tests, summary.failures, summary.errors, summary.skipped,
-				summary.getPassed(), summary.getPercent(), escape(summary.files)));
+		builder
+				.append(
+						String
+								.format(
+										Locale.ROOT,
+										"  <suite id=\"%s\" title=\"%s\" tests=\"%d\" failures=\"%d\" errors=\"%d\" skipped=\"%d\" passed=\"%d\" percent=\"%d\" files=\"%s\">%n",
+										escape(id),
+										escape(title),
+										summary.tests,
+										summary.failures,
+										summary.errors,
+										summary.skipped,
+										summary.getPassed(),
+										summary.getPercent(),
+										escape(summary.files)));
 		for (final TestCaseSummary testCase : summary.testCases) {
-			builder.append(String.format(Locale.ROOT,
-					"    <testcase classname=\"%s\" name=\"%s\" status=\"%s\"/>%n", escape(testCase.className),
-					escape(testCase.name), escape(testCase.status)));
+			builder
+					.append(
+							String
+									.format(
+											Locale.ROOT,
+											"    <testcase classname=\"%s\" name=\"%s\" status=\"%s\"/>%n",
+											escape(testCase.className),
+											escape(testCase.name),
+											escape(testCase.status)));
 		}
 		builder.append("  </suite>\n");
 		return builder.toString();
@@ -185,7 +237,7 @@ public final class CompatibilitySummaryGenerator {
 		}
 
 		private int getPercent() {
-			return tests == 0 ? 0 : (getPassed() * 100) / tests;
+			return tests == 0 ? 0 : getPassed() * 100 / tests;
 		}
 	}
 

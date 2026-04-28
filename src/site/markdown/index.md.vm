@@ -1,0 +1,149 @@
+keywords: jawk, awk, java, cli, text processing
+description: Pure Java AWK for command-line use and Java embedding.
+
+Jawk: AWK for Java
+==================
+
+<!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
+
+Overview
+--------
+
+Jawk is a pure Java implementation of [AWK](https://en.wikipedia.org/wiki/AWK). You can run AWK programs in a JVM
+application and integrate with your Java code:
+
+> [!TABS]
+> - CLI
+>
+>   ```shell-session
+>   $ echo "hello world" | java -jar jawk-${project.version}-standalone.jar '{ print $2 ", " $1 "!" }'
+>   world, hello!
+>   ```
+>
+> - Java
+>
+>   ```java
+>   Awk awk = new Awk();
+>   String result = awk.script("{ print toupper($0) }").input("hello world").execute();
+>   // result = "HELLO WORLD\n"
+>   ```
+
+#set($summary = $xml.read("${project.build.directory}/generated-site/compatibility-summary.xml"))
+#set($posixSummary = $summary.find("/compatibility-summary/suite[@id='posix']").getFirst())
+#set($bwkSummary = $summary.find("/compatibility-summary/suite[@id='bwk']").getFirst())
+#set($gawkSummary = $summary.find("/compatibility-summary/suite[@id='gawk']").getFirst())
+
+#set($posixTests = $posixSummary.attr("tests"))
+#set($posixPassed = $posixSummary.attr("passed"))
+#set($posixPercent = $posixSummary.attr("percent"))
+#set($posixType = "danger")
+#if($posixPercent >= 90)
+#set($posixType = "success")
+#elseif($posixPercent >= 70)
+#set($posixType = "warning")
+#end
+
+#set($bwkTests = $bwkSummary.attr("tests"))
+#set($bwkPassed = $bwkSummary.attr("passed"))
+#set($bwkPercent = $bwkSummary.attr("percent"))
+#set($bwkType = "danger")
+#if($bwkPercent >= 90)
+#set($bwkType = "success")
+#elseif($bwkPercent >= 70)
+#set($bwkType = "warning")
+#end
+
+#set($gawkTests = $gawkSummary.attr("tests"))
+#set($gawkPassed = $gawkSummary.attr("passed"))
+#set($gawkPercent = $gawkSummary.attr("percent"))
+#set($gawkType = "danger")
+#if($gawkPercent >= 90)
+#set($gawkType = "success")
+#elseif($gawkPercent >= 70)
+#set($gawkType = "warning")
+#end
+
+Compatibility and Compliance
+----------------------------
+
+<div class="row compat-row compat-summary">
+  <div class="col-sm-4">
+    <div>
+      <strong>POSIX</strong>
+    </div>
+    <div class="progress">
+      <div class="progress-bar progress-bar-${posixType}" role="progressbar" aria-valuenow="${posixPercent}" aria-valuemin="0" aria-valuemax="100" style="width: ${posixPercent}%;">
+        <span>${posixPercent}%</span>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div>
+      <strong>One True Awk</strong>
+    </div>
+    <div class="progress">
+      <div class="progress-bar progress-bar-${bwkType}" role="progressbar" aria-valuenow="${bwkPercent}" aria-valuemin="0" aria-valuemax="100" style="width: ${bwkPercent}%;">
+        <span>${bwkPercent}%</span>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div>
+      <strong>gawk</strong>
+    </div>
+    <div class="progress">
+      <div class="progress-bar progress-bar-${gawkType}" role="progressbar" aria-valuenow="${gawkPercent}" aria-valuemin="0" aria-valuemax="100" style="width: ${gawkPercent}%;">
+        <span>${gawkPercent}%</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+The above scores are calculated from the latest compatibility tests during `mvn verify site`. See the full [compatibility dashboard](compatibility.html) for per-suite maps and the [Failsafe report](failsafe.html) for detailed test results.
+
+Key Capabilities
+----------------
+
+- CLI-compatible AWK execution with inline scripts, script files, operands, and input files
+- Java entry points for script execution, expression evaluation, tuple compilation, and repeated reuse
+- Structured input through `InputSource` for row-oriented or already-tokenized data
+- Explicit extension loading through the Java API or the CLI
+- Tuple serialization for CLI precompilation and later loading
+- Sandbox-specific tuples and runtime components through `SandboxedAwk`
+
+Differences with Traditional AWK
+--------------------------------
+
+Jawk aims to be a practical AWK implementation for JVM environments, but it is not a byte-for-byte clone of every historical AWK behavior. Some differences are deliberate and come from the way Jawk integrates with Java:
+
+- Regular expression behavior follows Java's regex engine, which may differ from traditional AWK regexes in edge cases.
+- `printf()` and `sprintf()` try to replicate C-style formatting but may have differences due to Java's formatting capabilities and limitations.
+- Some floating-point edge cases may differ due to Java's handling of floating-point arithmetic and representation.
+- Jawk resolves user-defined function calls during compilation. It does not defer all of that work to runtime.
+
+History of Jawk
+---------------
+
+| Date       | Event                                                                                     |
+|------------|-------------------------------------------------------------------------------------------|
+| 2006-&#8288;02-&#8288;26 | Initial release of [Jawk 0.1 on SourceForge](https://sourceforge.net/projects/jawk/files/jawk/0.1/) by [Danny Daglas](https://sourceforge.net/u/ddaglas/profile/), the original author of this project. |
+| 2008-&#8288;01-&#8288;18 | Last release of Jawk 1.02 on SourceForge, corresponding to the [official (now defunct) Jawk website](https://web.archive.org/web/20260209081949/https://jawk.sourceforge.net/). |
+| 2012-&#8288;07-&#8288;18 | [Fork on GitHub](https://github.com/hoijui/Jawk) by [hoijui](https://github.com/hoijui) (a.k.a. Robin Vodruba), with the first commit being a copy of the original Jawk 1.02 source code + Maven. |
+| 2018-&#8288;02-&#8288;06 | Bertrand Martin begins maintaining a private fork at [Sentry Software](https://www.sentrysoftware.com/) with a first private release of Jawk 1.03. |
+| 2023-&#8288;07-&#8288;20 | Bertrand's fork is **finally** made public on Sentry Software's GitHub repository. Jawk is in version 2.1.xx. |
+| 2023-&#8288;12-&#8288;14 | [Jawk 3.0.00 is released on Maven Central](https://central.sonatype.com/artifact/org.sentrysoftware/jawk/3.0.00) under `org.sentrysoftware.jawk`. |
+| 2025-&#8288;02-&#8288;13 | [Version 3.3.04](https://central.sonatype.com/artifact/org.sentrysoftware/jawk/3.3.04) is the last version of Jawk released by Sentry Software. [MetricsHub](https://metricshub.com) takes over the project. |
+| 2025-&#8288;11-&#8288;04 | MetricsHub releases [Jawk 5.0.00](https://central.sonatype.com/artifact/org.metricshub/jawk/5.0.00) on Maven Central. |
+| 2026-&#8288;03-&#8288;26 | Bertrand Martin moves Jawk to an independent [jawkio/jawk GitHub repository](https://github.com/jawkio/jawk), dedicated to Jawk only. |
+| 2026-&#8288;04-&#8288;16 | Version 6.0.00 of Jawk is released on [Maven Central](https://central.sonatype.com/artifact/io.jawk/jawk/6.0.00) under `io.jawk`. The project is now hosted at [jawk.io](https://jawk.io). |
+
+Next Steps
+----------
+
+- [Install Jawk](install.html)
+- [Embed Jawk in Java](java.html)
+- [Learn the CLI](cli.html)
+- [Work with variables and arguments](java-variables.html)
+- [Work with structured input](java-input.html)
+- [Compile, evaluate, and reuse tuples](java-compile.html)
+- [Load or write extensions](extensions.html)

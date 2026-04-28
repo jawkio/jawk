@@ -575,3 +575,100 @@ body.dark {
 	--alternate-bgcolor: #efb0be;
 	--alternate-fgcolor: #681f30;
 }
+
+/* Compatibility suite */
+.compat-row .progress {
+	margin-bottom: 0;
+	height: 24px;
+}
+
+.compat-row .progress-bar-success {
+	background-color: var(--success-fg);
+	color: var(--success-bg);
+}
+
+.compat-row .progress-bar-warning {
+	background-color: var(--warning-fg);
+	color: var(--warning-bg);
+}
+
+.compat-row .progress-bar-danger {
+	background-color: var(--danger-fg);
+	color: var(--danger-bg);
+}
+
+.compat-summary {
+	margin-bottom: 1rem;
+}
+
+.compat-suite-score {
+	text-align: center;
+	font-family: InterDisplay, Inter, sans-serif;
+	font-size: 42px;
+	font-weight: 800;
+	line-height: 1;
+	margin-bottom: 1rem;
+}
+
+.compat-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	margin: 0.75rem 0;
+}
+
+.compat-legend-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.compat-map {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	padding: 0.9rem;
+	border-radius: 14px;
+	background-color: color-mix(in srgb, var(--banner-bgcolor) 5%, transparent);
+}
+
+.compat-cell {
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	border-radius: 3px;
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--main-bgcolor) 38%, transparent);
+}
+
+.compat-cell-pass {
+	background-color: var(--success-fg);
+}
+
+.compat-cell-failure {
+	background-color: var(--warning-fg);
+}
+
+.compat-cell-error {
+	background-color: var(--danger-fg);
+}
+
+.compat-cell-skipped {
+	background-color: var(--main-fgcolor);
+	opacity: 30%;
+}
+
+@media (max-width: 767px) {
+	.compat-suite-score {
+		text-align: left;
+		margin-top: 1rem;
+	}
+
+	.compat-map {
+		gap: 3px;
+	}
+
+	.compat-cell {
+		width: 10px;
+		height: 10px;
+	}
+}

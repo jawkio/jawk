@@ -184,7 +184,7 @@ public final class CompatibilitySummaryGenerator {
 						String
 								.format(
 										Locale.ROOT,
-										"  <suite id=\"%s\" title=\"%s\" tests=\"%d\" failures=\"%d\" errors=\"%d\" skipped=\"%d\" passed=\"%d\" percent=\"%d\" files=\"%s\">%n",
+										"  <suite id=\"%s\" title=\"%s\" tests=\"%d\" failures=\"%d\" errors=\"%d\" skipped=\"%d\" passed=\"%d\" percent=\"%d\" files=\"%s\">\n",
 										escape(id),
 										escape(title),
 										summary.tests,
@@ -200,7 +200,7 @@ public final class CompatibilitySummaryGenerator {
 							String
 									.format(
 											Locale.ROOT,
-											"    <testcase classname=\"%s\" name=\"%s\" status=\"%s\"/>%n",
+											"    <testcase classname=\"%s\" name=\"%s\" status=\"%s\"/>\n",
 											escape(testCase.className),
 											escape(testCase.name),
 											escape(testCase.status)));

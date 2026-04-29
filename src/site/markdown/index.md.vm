@@ -33,8 +33,6 @@ application and integrate with your Java code:
 #set($bwkSummary = $summary.find("/compatibility-summary/suite[@id='bwk']").getFirst())
 #set($gawkSummary = $summary.find("/compatibility-summary/suite[@id='gawk']").getFirst())
 
-#set($posixTests = $posixSummary.attr("tests"))
-#set($posixPassed = $posixSummary.attr("passed"))
 #set($posixPercent = $posixSummary.attr("percent"))
 #set($posixType = "danger")
 #if($posixPercent >= 90)
@@ -43,8 +41,6 @@ application and integrate with your Java code:
 #set($posixType = "warning")
 #end
 
-#set($bwkTests = $bwkSummary.attr("tests"))
-#set($bwkPassed = $bwkSummary.attr("passed"))
 #set($bwkPercent = $bwkSummary.attr("percent"))
 #set($bwkType = "danger")
 #if($bwkPercent >= 90)
@@ -53,8 +49,6 @@ application and integrate with your Java code:
 #set($bwkType = "warning")
 #end
 
-#set($gawkTests = $gawkSummary.attr("tests"))
-#set($gawkPassed = $gawkSummary.attr("passed"))
 #set($gawkPercent = $gawkSummary.attr("percent"))
 #set($gawkType = "danger")
 #if($gawkPercent >= 90)

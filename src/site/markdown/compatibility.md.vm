@@ -17,9 +17,6 @@ Jawk is checked during `mvn verify` against 3 upstream compatibility families:
 #set($gawkSummary = $summary.find("/compatibility-summary/suite[@id='gawk']").getFirst())
 
 #set($posixTests = $posixSummary.attr("tests"))
-#set($posixFailures = $posixSummary.attr("failures"))
-#set($posixErrors = $posixSummary.attr("errors"))
-#set($posixSkipped = $posixSummary.attr("skipped"))
 #set($posixPassed = $posixSummary.attr("passed"))
 #set($posixPercent = $posixSummary.attr("percent"))
 #set($posixType = "danger")
@@ -30,9 +27,6 @@ Jawk is checked during `mvn verify` against 3 upstream compatibility families:
 #end
 
 #set($bwkTests = $bwkSummary.attr("tests"))
-#set($bwkFailures = $bwkSummary.attr("failures"))
-#set($bwkErrors = $bwkSummary.attr("errors"))
-#set($bwkSkipped = $bwkSummary.attr("skipped"))
 #set($bwkPassed = $bwkSummary.attr("passed"))
 #set($bwkPercent = $bwkSummary.attr("percent"))
 #set($bwkType = "danger")
@@ -43,9 +37,6 @@ Jawk is checked during `mvn verify` against 3 upstream compatibility families:
 #end
 
 #set($gawkTests = $gawkSummary.attr("tests"))
-#set($gawkFailures = $gawkSummary.attr("failures"))
-#set($gawkErrors = $gawkSummary.attr("errors"))
-#set($gawkSkipped = $gawkSummary.attr("skipped"))
 #set($gawkPassed = $gawkSummary.attr("passed"))
 #set($gawkPercent = $gawkSummary.attr("percent"))
 #set($gawkType = "danger")

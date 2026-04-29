@@ -116,18 +116,6 @@
 				<version>3.6.0</version>
 				<executions>
 					<execution>
-						<id>add-compatibility-summary-source</id>
-						<phase>pre-site</phase>
-						<goals>
-							<goal>add-test-source</goal>
-						</goals>
-						<configuration>
-							<sources>
-								<source>${project.basedir}/src/it/java</source>
-							</sources>
-						</configuration>
-					</execution>
-					<execution>
 						<id>add-compatibility-test-source</id>
 						<phase>generate-test-sources</phase>
 						<goals>
@@ -280,38 +268,37 @@
 
 			<!-- site -->
 			<plugin>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<executions>
-					<execution>
-						<id>test-compile-for-site</id>
-						<phase>pre-site</phase>
-						<goals>
-							<goal>testCompile</goal>
-						</goals>
-						<configuration>
-							<testIncludes>
-								<testInclude>io/jawk/site/CompatibilitySummaryGenerator.java</testInclude>
-							</testIncludes>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-
-			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>exec-maven-plugin</artifactId>
 				<version>3.6.1</version>
 				<executions>
 					<execution>
+						<id>compile-compatibility-summary-generator</id>
+						<phase>pre-site</phase>
+						<goals>
+							<goal>exec</goal>
+						</goals>
+						<configuration>
+							<executable>${java.home}/bin/javac</executable>
+							<arguments>
+								<argument>-d</argument>
+								<argument>${project.build.directory}/generated-site-classes</argument>
+								<argument>${project.basedir}/src/it/java/io/jawk/site/CompatibilitySummaryGenerator.java</argument>
+							</arguments>
+						</configuration>
+					</execution>
+					<execution>
 						<id>generate-compatibility-summary</id>
 						<phase>pre-site</phase>
 						<goals>
-							<goal>java</goal>
+							<goal>exec</goal>
 						</goals>
 						<configuration>
-							<mainClass>io.jawk.site.CompatibilitySummaryGenerator</mainClass>
-							<classpathScope>test</classpathScope>
+							<executable>${java.home}/bin/java</executable>
 							<arguments>
+								<argument>-cp</argument>
+								<argument>${project.build.directory}/generated-site-classes</argument>
+								<argument>io.jawk.site.CompatibilitySummaryGenerator</argument>
 								<argument>${project.build.directory}/failsafe-reports</argument>
 								<argument>${project.build.directory}/generated-site/compatibility-summary.xml</argument>
 							</arguments>

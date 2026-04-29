@@ -365,6 +365,7 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-report-plugin</artifactId>
 				<version>3.5.5</version>
+				<!-- Also renders the Failsafe HTML report from target/failsafe-reports during site generation. -->
 			</plugin>
 
 			<plugin>

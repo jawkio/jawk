@@ -75,7 +75,7 @@
 		</menu>
 
 		<menu name="Reference">
-			<item name="Compatibility and Differences" href="compatibility.html" />
+			<item name="Compatibility and Compliance" href="compatibility.html" />
 			<item name="Javadoc (API)" href="apidocs/index.html" />
 		</menu>
 

@@ -77,6 +77,15 @@ java -jar jawk-${project.version}-standalone.jar --list-ext
 - `-L` lets you skip source compilation, but the loaded tuples must still be compatible with the current runtime.
 - `-f` and `-L` are distinct paths: source files compile now, tuple files load now.
 
+## Tuple Serialization Compatibility
+
+Jawk tuples are reusable, but they should be treated as internal artifacts tied to the Jawk version that produced them.
+
+- `-K` writes tuples to a file
+- `-L` reads those tuples back
+- version mismatches can cause tuple loading to fail
+- the safe fix is to recompile the tuples with the current Jawk version
+
 ## See Also
 
 - [Quickstart examples](cli.html)

@@ -1,0 +1,186 @@
+keywords: compatibility, differences, awk, bwk, mawk, gawk, jawk
+description: Compatibility notes and live compatibility reports for Jawk against POSIX, BWK, and gawk test suites.
+
+Compatibility and Compliance
+=============================
+
+<!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
+
+Jawk is checked during `mvn verify` against 3 upstream compatibility families:
+[POSIX awk specifications](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/awk.html),
+[One True Awk](https://github.com/onetrueawk/awk),
+[GNU Awk](https://www.gnu.org/software/gawk/). This page summarizes what currently passes, fails, errors, or remains intentionally skipped.
+
+#set($summaryPath = "${project.build.directory}/generated-site/compatibility-summary.xml")
+#set($summaryFile = $files.getFile($summaryPath))
+
+POSIX
+-----
+
+Specification-focused coverage transcribed from the [POSIX awk utility requirements](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/awk.html).
+
+#if($summaryFile.exists())
+#set($summary = $xml.read($summaryPath))
+#set($posixSummary = $summary.find("/compatibility-summary/suite[@id='posix']").getFirst())
+#set($bwkSummary = $summary.find("/compatibility-summary/suite[@id='bwk']").getFirst())
+#set($gawkSummary = $summary.find("/compatibility-summary/suite[@id='gawk']").getFirst())
+#if($posixSummary && $bwkSummary && $gawkSummary)
+
+#set($posixTests = $posixSummary.attr("tests"))
+#set($posixPassed = $posixSummary.attr("passed"))
+#set($posixPercent = $posixSummary.attr("percent"))
+#set($posixType = "danger")
+#if($posixPercent >= 90)
+#set($posixType = "success")
+#elseif($posixPercent >= 70)
+#set($posixType = "warning")
+#end
+
+#set($bwkTests = $bwkSummary.attr("tests"))
+#set($bwkPassed = $bwkSummary.attr("passed"))
+#set($bwkPercent = $bwkSummary.attr("percent"))
+#set($bwkType = "danger")
+#if($bwkPercent >= 90)
+#set($bwkType = "success")
+#elseif($bwkPercent >= 70)
+#set($bwkType = "warning")
+#end
+
+#set($gawkTests = $gawkSummary.attr("tests"))
+#set($gawkPassed = $gawkSummary.attr("passed"))
+#set($gawkPercent = $gawkSummary.attr("percent"))
+#set($gawkType = "danger")
+#if($gawkPercent >= 90)
+#set($gawkType = "success")
+#elseif($gawkPercent >= 70)
+#set($gawkType = "warning")
+#end
+
+<div class="row compat-row">
+  <div class="col-sm-9">
+    <div class="progress">
+      <div class="progress-bar progress-bar-${posixType}" role="progressbar" aria-valuenow="${posixPercent}" aria-valuemin="0" aria-valuemax="100" style="width: ${posixPercent}%;">
+        <span>${posixPassed} / ${posixTests}</span>
+      </div>
+    </div>
+    <div class="compat-legend">
+      <span class="compat-legend-item"><span class="compat-cell compat-cell-pass"></span> Passed</span>
+      <span class="compat-legend-item"><span class="compat-cell compat-cell-failure"></span> Failed</span>
+      <span class="compat-legend-item"><span class="compat-cell compat-cell-error"></span> Error</span>
+      <span class="compat-legend-item"><span class="compat-cell compat-cell-skipped"></span> Skipped</span>
+    </div>
+  </div>
+  <div class="col-sm-3">
+    <div class="compat-suite-score">${posixPercent}%</div>
+  </div>
+</div>
+<div class="compat-map" aria-label="POSIX compatibility map">
+#foreach($testcase in $posixSummary.children())
+#if($testcase.node().nodeName == "testcase")
+#set($cellClass = "compat-cell-pass")
+#if($testcase.attr('status') == "error")
+#set($cellClass = "compat-cell-error")
+#elseif($testcase.attr('status') == "failure")
+#set($cellClass = "compat-cell-failure")
+#elseif($testcase.attr('status') == "skipped")
+#set($cellClass = "compat-cell-skipped")
+#end
+  <span class="compat-cell ${cellClass}" title="${testcase.attr('classname')}.${testcase.attr('name')}"></span>
+#end
+#end
+</div>
+
+<p class="compat-suite-footer"><a href="failsafe.html#io-jawk-posix">Open the Failsafe report</a> for per-test details, stack traces, and grouped results.</p>
+
+One True Awk (BWK)
+------------------
+
+Compatibility coverage derived from the original [One True Awk](https://github.com/onetrueawk/awk) test collection.
+
+<div class="row compat-row">
+  <div class="col-sm-9">
+    <div class="progress">
+      <div class="progress-bar progress-bar-${bwkType}" role="progressbar" aria-valuenow="${bwkPercent}" aria-valuemin="0" aria-valuemax="100" style="width: ${bwkPercent}%;">
+        <span>${bwkPassed} / ${bwkTests}</span>
+      </div>
+    </div>
+    <div class="compat-legend">
+      <span class="compat-legend-item"><span class="compat-cell compat-cell-pass"></span> Passed</span>
+      <span class="compat-legend-item"><span class="compat-cell compat-cell-failure"></span> Failed</span>
+      <span class="compat-legend-item"><span class="compat-cell compat-cell-error"></span> Error</span>
+      <span class="compat-legend-item"><span class="compat-cell compat-cell-skipped"></span> Skipped</span>
+    </div>
+  </div>
+  <div class="col-sm-3">
+    <div class="compat-suite-score">${bwkPercent}%</div>
+  </div>
+</div>
+<div class="compat-map" aria-label="BWK compatibility map">
+#foreach($testcase in $bwkSummary.children())
+#if($testcase.node().nodeName == "testcase")
+#set($cellClass = "compat-cell-pass")
+#if($testcase.attr('status') == "error")
+#set($cellClass = "compat-cell-error")
+#elseif($testcase.attr('status') == "failure")
+#set($cellClass = "compat-cell-failure")
+#elseif($testcase.attr('status') == "skipped")
+#set($cellClass = "compat-cell-skipped")
+#end
+  <span class="compat-cell ${cellClass}" title="${testcase.attr('classname')}.${testcase.attr('name')}"></span>
+#end
+#end
+</div>
+<p class="compat-suite-footer"><a href="failsafe.html#io-jawk-onetrueawk">Open the Failsafe report</a> for per-test details, stack traces, and grouped results.</p>
+
+GNU Awk (gawk)
+--------------
+
+[GNU Awk](https://www.gnu.org/software/gawk/) compatibility gathered from explicit Java integration suites that mirror the main gawk test families: core behavior, extensions, locale-sensitive behavior, and optional features.
+
+<div class="row compat-row">
+  <div class="col-sm-9">
+    <div class="progress">
+      <div class="progress-bar progress-bar-${gawkType}" role="progressbar" aria-valuenow="${gawkPercent}" aria-valuemin="0" aria-valuemax="100" style="width: ${gawkPercent}%;">
+        <span>${gawkPassed} / ${gawkTests}</span>
+      </div>
+    </div>
+    <div class="compat-legend">
+      <span class="compat-legend-item"><span class="compat-cell compat-cell-pass"></span> Passed</span>
+      <span class="compat-legend-item"><span class="compat-cell compat-cell-failure"></span> Failed</span>
+      <span class="compat-legend-item"><span class="compat-cell compat-cell-error"></span> Error</span>
+      <span class="compat-legend-item"><span class="compat-cell compat-cell-skipped"></span> Skipped</span>
+    </div>
+  </div>
+  <div class="col-sm-3">
+    <div class="compat-suite-score">${gawkPercent}%</div>
+  </div>
+</div>
+<div class="compat-map" aria-label="gawk compatibility map">
+#foreach($testcase in $gawkSummary.children())
+#if($testcase.node().nodeName == "testcase")
+#set($cellClass = "compat-cell-pass")
+#if($testcase.attr('status') == "error")
+#set($cellClass = "compat-cell-error")
+#elseif($testcase.attr('status') == "failure")
+#set($cellClass = "compat-cell-failure")
+#elseif($testcase.attr('status') == "skipped")
+#set($cellClass = "compat-cell-skipped")
+#end
+  <span class="compat-cell ${cellClass}" title="${testcase.attr('classname')}.${testcase.attr('name')}"></span>
+#end
+#end
+</div>
+<p class="compat-suite-footer"><a href="failsafe.html#io-jawk-gawk">Open the Failsafe report</a> for per-test details, stack traces, and grouped results.</p>
+
+#else
+Compatibility data is unavailable in this build. Run `mvn verify site` to generate the compatibility reports and this dashboard.
+#end
+#else
+Compatibility data is unavailable in this build. Run `mvn verify site` to generate the compatibility reports and this dashboard.
+#end
+
+See Also
+--------
+
+- [CLI options and tuple workflows](cli-reference.html)
+- [Java compilation and reuse APIs](java-compile.html)

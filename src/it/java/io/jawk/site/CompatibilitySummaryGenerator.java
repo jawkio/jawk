@@ -27,7 +27,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -76,7 +75,7 @@ public final class CompatibilitySummaryGenerator {
 
 		final String xml = ""
 				+ "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-				+ "<compatibility-summary generatedAt=\"" + escape(Instant.now().toString()) + "\">\n"
+				+ "<compatibility-summary>\n"
 				+ suiteXml("posix", "POSIX", posix)
 				+ suiteXml("bwk", "BWK / One True Awk", bwk)
 				+ suiteXml("gawk", "gawk", gawk)

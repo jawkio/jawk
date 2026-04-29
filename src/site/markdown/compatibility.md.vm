@@ -11,10 +11,20 @@ Jawk is checked during `mvn verify` against 3 upstream compatibility families:
 [One True Awk](https://github.com/onetrueawk/awk),
 [GNU Awk](https://www.gnu.org/software/gawk/). This page summarizes what currently passes, fails, errors, or remains intentionally skipped.
 
-#set($summary = $xml.read("${project.build.directory}/generated-site/compatibility-summary.xml"))
+#set($summaryPath = "${project.build.directory}/generated-site/compatibility-summary.xml")
+#set($summaryFile = $files.getFile($summaryPath))
+
+POSIX
+-----
+
+Specification-focused coverage transcribed from the [POSIX awk utility requirements](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/awk.html).
+
+#if($summaryFile.exists())
+#set($summary = $xml.read($summaryPath))
 #set($posixSummary = $summary.find("/compatibility-summary/suite[@id='posix']").getFirst())
 #set($bwkSummary = $summary.find("/compatibility-summary/suite[@id='bwk']").getFirst())
 #set($gawkSummary = $summary.find("/compatibility-summary/suite[@id='gawk']").getFirst())
+#if($posixSummary && $bwkSummary && $gawkSummary)
 
 #set($posixTests = $posixSummary.attr("tests"))
 #set($posixPassed = $posixSummary.attr("passed"))
@@ -45,11 +55,6 @@ Jawk is checked during `mvn verify` against 3 upstream compatibility families:
 #elseif($gawkPercent >= 70)
 #set($gawkType = "warning")
 #end
-
-POSIX
------
-
-Specification-focused coverage transcribed from the [POSIX awk utility requirements](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/awk.html).
 
 <div class="row compat-row">
   <div class="col-sm-9">
@@ -166,6 +171,13 @@ GNU Awk (gawk)
 #end
 </div>
 <p class="compat-suite-footer"><a href="failsafe.html#io-jawk-gawk">Open the Failsafe report</a> for per-test details, stack traces, and grouped results.</p>
+
+#else
+Compatibility data is unavailable in this build. Run `mvn verify site` to generate the compatibility reports and this dashboard.
+#end
+#else
+Compatibility data is unavailable in this build. Run `mvn verify site` to generate the compatibility reports and this dashboard.
+#end
 
 See Also
 --------

@@ -654,7 +654,7 @@ body.dark {
 
 .compat-cell-skipped {
 	background-color: var(--main-fgcolor);
-	opacity: 30%;
+	opacity: 0.3;
 }
 
 @media (max-width: 767px) {

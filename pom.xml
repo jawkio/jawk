@@ -288,6 +288,11 @@
 						<goals>
 							<goal>testCompile</goal>
 						</goals>
+						<configuration>
+							<testIncludes>
+								<testInclude>io/jawk/site/CompatibilitySummaryGenerator.java</testInclude>
+							</testIncludes>
+						</configuration>
 					</execution>
 				</executions>
 			</plugin>

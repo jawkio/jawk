@@ -273,32 +273,15 @@
 				<version>3.6.1</version>
 				<executions>
 					<execution>
-						<id>compile-compatibility-summary-generator</id>
-						<phase>pre-site</phase>
-						<goals>
-							<goal>exec</goal>
-						</goals>
-						<configuration>
-							<executable>${java.home}/bin/javac</executable>
-							<arguments>
-								<argument>-d</argument>
-								<argument>${project.build.directory}/generated-site-classes</argument>
-								<argument>${project.basedir}/src/it/java/io/jawk/site/CompatibilitySummaryGenerator.java</argument>
-							</arguments>
-						</configuration>
-					</execution>
-					<execution>
 						<id>generate-compatibility-summary</id>
-						<phase>pre-site</phase>
+						<phase>post-integration-test</phase>
 						<goals>
-							<goal>exec</goal>
+							<goal>java</goal>
 						</goals>
 						<configuration>
-							<executable>${java.home}/bin/java</executable>
+							<mainClass>io.jawk.site.CompatibilitySummaryGenerator</mainClass>
+							<classpathScope>test</classpathScope>
 							<arguments>
-								<argument>-cp</argument>
-								<argument>${project.build.directory}/generated-site-classes</argument>
-								<argument>io.jawk.site.CompatibilitySummaryGenerator</argument>
 								<argument>${project.build.directory}/failsafe-reports</argument>
 								<argument>${project.build.directory}/generated-site/compatibility-summary.xml</argument>
 							</arguments>

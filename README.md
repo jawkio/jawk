@@ -22,6 +22,7 @@ String result = awk.script("{ print toupper($0) }").input("hello world").execute
 ```
 
 When writing custom extensions, annotate associative array parameters with `@JawkAssocArray` and declare them as `Map` values rather than concrete map implementations.
+If you embed Jawk through [`AVM`](https://jawk.io/apidocs/io/jawk/backend/AVM.html), use `executePersistingGlobals(...)` when you want user-defined globals to survive across sequential runs on the same runtime instance.
 
 ## Documentation
 

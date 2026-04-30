@@ -45,6 +45,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.Test;
@@ -1435,6 +1436,204 @@ public class AwkTest {
 				.script("BEGIN { print ARGV[0] }")
 				.expect("\n")
 				.runAndAssert();
+	}
+
+	@Test
+	public void executePersistingGlobalsSharesUserGlobalsAcrossPrograms() throws Exception {
+		Awk awk = new Awk();
+		AwkProgram first = awk.compile("BEGIN { A = 1; B = 2; C = 3; print A, B, C }");
+		AwkProgram second = awk.compile("BEGIN { D = C + 1; C = C + 10; print C, D }");
+		AwkProgram third = awk.compile("BEGIN { print A, B, C, D }");
+
+		try (AVM avm = awk.createAvm()) {
+			assertEquals("1 2 3\n", executePersistent(avm, first));
+			assertEquals("13 4\n", executePersistent(avm, second));
+			assertEquals("1 2 13 4\n", executePersistent(avm, third));
+		}
+	}
+
+	@Test
+	public void executePersistingGlobalsRetainsGlobalsAcrossRepeatedRunsOfSameProgram() throws Exception {
+		AwkProgram program = AWK.compile("BEGIN { count++; print count }");
+
+		try (AVM avm = AWK.createAvm()) {
+			assertEquals("1\n", executePersistent(avm, program));
+			assertEquals("2\n", executePersistent(avm, program));
+		}
+	}
+
+	@Test
+	public void existingExecuteDoesNotPersistGlobals() throws Exception {
+		AwkProgram assign = AWK.compile("BEGIN { A = 1 }");
+		AwkProgram read = AWK.compile("BEGIN { print A }");
+
+		try (AVM avm = AWK.createAvm()) {
+			assertEquals("", executeNormally(avm, assign));
+			assertEquals("\n", executeNormally(avm, read));
+		}
+	}
+
+	@Test
+	public void executePersistingGlobalsImportsGlobalsFromPreviousExecute() throws Exception {
+		AwkProgram first = AWK.compile("BEGIN { A = 1; B = 2; C = 3 }");
+		AwkProgram second = AWK.compile("BEGIN { D = C + 1; C = C + 10 }");
+		AwkProgram third = AWK.compile("BEGIN { print A, B, C, D }");
+
+		try (AVM avm = AWK.createAvm()) {
+			assertEquals("", executeNormally(avm, first));
+			assertEquals("", executePersistent(avm, second));
+			assertEquals("1 2 13 4\n", executePersistent(avm, third));
+		}
+	}
+
+	@Test
+	public void executePersistingGlobalsPersistsSeededCompiledAndUncompiledUserGlobals() throws Exception {
+		AwkProgram seedNothing = AWK.compile("BEGIN { }");
+		AwkProgram readValues = AWK.compile("BEGIN { print x, y }");
+		Map<String, Object> overrides = new LinkedHashMap<String, Object>();
+		overrides.put("x", Long.valueOf(4L));
+
+		try (AVM avm = AWK.createAvm()) {
+			assertEquals(
+					"",
+					executePersistent(avm, seedNothing, Collections.singletonList("y=5"), overrides, emptyInputSource()));
+			assertEquals("4 5\n", executePersistent(avm, readValues));
+		}
+	}
+
+	@Test
+	public void executePersistingGlobalsDoesNotPersistBuiltInsAndKeepsArraysOnlyForGlobals() throws Exception {
+		AwkProgram writeBuiltIn = AWK.compile("BEGIN { NR = 99; print NR }");
+		AwkProgram readBuiltIn = AWK.compile("BEGIN { print NR }");
+		AwkProgram seedArrayAndLocal = AWK
+				.compile(
+						"function seed(tmp) { tmp = 7; arr[\"x\"] = 9 } BEGIN { seed() }");
+		AwkProgram readArrayAndLocal = AWK.compile("BEGIN { print arr[\"x\"]; print tmp }");
+
+		try (AVM avm = AWK.createAvm()) {
+			assertEquals("99\n", executePersistent(avm, writeBuiltIn));
+			assertEquals("0\n", executePersistent(avm, readBuiltIn));
+			assertEquals("", executePersistent(avm, seedArrayAndLocal));
+			assertEquals("9\n\n", executePersistent(avm, readArrayAndLocal));
+		}
+	}
+
+	@Test
+	public void executePersistingGlobalsPersistsMutationsBeforeExitAndIoFailure() throws Exception {
+		AwkProgram exitProgram = AWK.compile("BEGIN { A = 3; exit 7 }");
+		AwkProgram increment = AWK.compile("{ A++ }");
+		AwkProgram readA = AWK.compile("BEGIN { print A }");
+
+		try (AVM avm = AWK.createAvm()) {
+			avm.setAwkSink(new AppendableAwkSink(new StringBuilder(), java.util.Locale.US));
+			ExitException exit = assertThrows(
+					ExitException.class,
+					() -> avm.executePersistingGlobals(exitProgram, emptyInputSource()));
+			assertEquals(7, exit.getCode());
+			assertEquals("3\n", executePersistent(avm, readA));
+
+			avm.clearPersistentGlobals();
+			avm.setAwkSink(new AppendableAwkSink(new StringBuilder(), java.util.Locale.US));
+			IOException io = assertThrows(
+					IOException.class,
+					() -> avm.executePersistingGlobals(increment, new ThrowingAfterFirstRecordInputSource()));
+			assertEquals("boom", io.getMessage());
+			assertEquals("1\n", executePersistent(avm, readA));
+		}
+	}
+
+	@Test
+	public void clearPersistentGlobalsRemovesOnlyPersistentUserGlobals() throws Exception {
+		AwkProgram assign = AWK.compile("BEGIN { A = 1 }");
+		AwkProgram read = AWK.compile("BEGIN { print A }");
+
+		try (AVM avm = AWK.createAvm()) {
+			assertEquals("", executePersistent(avm, assign));
+			avm.clearPersistentGlobals();
+			assertEquals("\n", executePersistent(avm, read));
+			assertEquals("\n", executeNormally(avm, read));
+		}
+	}
+
+	private static String executePersistent(AVM avm, AwkProgram program) throws Exception {
+		return executePersistent(
+				avm,
+				program,
+				Collections.<String>emptyList(),
+				Collections.<String, Object>emptyMap(),
+				emptyInputSource());
+	}
+
+	private static String executePersistent(
+			AVM avm,
+			AwkProgram program,
+			List<String> arguments,
+			Map<String, Object> variableOverrides,
+			InputSource inputSource)
+			throws Exception {
+		StringBuilder out = new StringBuilder();
+		avm.setAwkSink(new AppendableAwkSink(out, java.util.Locale.US));
+		avm.executePersistingGlobals(program, inputSource, arguments, variableOverrides);
+		return out.toString();
+	}
+
+	private static String executeNormally(AVM avm, AwkProgram program) throws Exception {
+		StringBuilder out = new StringBuilder();
+		avm.setAwkSink(new AppendableAwkSink(out, java.util.Locale.US));
+		avm.execute(program, emptyInputSource(), Collections.<String>emptyList(), null);
+		return out.toString();
+	}
+
+	private static InputSource emptyInputSource() {
+		return new InputSource() {
+			@Override
+			public boolean nextRecord() {
+				return false;
+			}
+
+			@Override
+			public String getRecordText() {
+				return null;
+			}
+
+			@Override
+			public List<String> getFields() {
+				return null;
+			}
+
+			@Override
+			public boolean isFromFilenameList() {
+				return false;
+			}
+		};
+	}
+
+	private static final class ThrowingAfterFirstRecordInputSource implements InputSource {
+		private boolean firstRecordAvailable = true;
+
+		@Override
+		public boolean nextRecord() throws IOException {
+			if (firstRecordAvailable) {
+				firstRecordAvailable = false;
+				return true;
+			}
+			throw new IOException("boom");
+		}
+
+		@Override
+		public String getRecordText() {
+			return "row";
+		}
+
+		@Override
+		public List<String> getFields() {
+			return null;
+		}
+
+		@Override
+		public boolean isFromFilenameList() {
+			return false;
+		}
 	}
 
 	private static final class StructuredOutputSink extends AwkSink {

@@ -52,6 +52,21 @@ try (AVM avm = awk.createAvm()) {
 
 Each `execute(...)` resets the AWK execution state before the program starts again, but it still reuses the same interpreter instance and runtime infrastructure.
 
+When you want user-defined globals to survive into a later program run on the same runtime, use `executePersistingGlobals(...)` for the run where you want the remapping to happen:
+
+```java
+Awk awk = new Awk();
+AwkProgram first = awk.compile("BEGIN { total = 5 }");
+AwkProgram second = awk.compile("BEGIN { print total }");
+
+try (AVM avm = awk.createAvm()) {
+    avm.execute(first, firstSource);
+    avm.executePersistingGlobals(second, secondSource);
+}
+```
+
+`executePersistingGlobals(...)` first imports the user-defined globals currently materialized in that `AVM`, then remaps them onto the next program's compiled global slots. The persistent memory lives only for that `AVM` instance. Built-in runtime variables such as `NR`, `NF`, `FS`, and `RS` still reset between runs.
+
 ## Why Stateful Eval Is Powerful and Dangerous
 
 Raw repeated eval against one runtime is intentionally stateful:

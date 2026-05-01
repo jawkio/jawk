@@ -1505,14 +1505,26 @@ public class AwkTest {
 	public void executePersistingGlobalsDoesNotPersistBuiltInsAndKeepsArraysOnlyForGlobals() throws Exception {
 		AwkProgram writeBuiltIn = AWK.compile("BEGIN { NR = 99; print NR }");
 		AwkProgram readBuiltIn = AWK.compile("BEGIN { print NR }");
+		AwkProgram readIgnoreCase = AWK.compile("BEGIN { print IGNORECASE + 0, match(\"Abc\", \"abc\") }");
 		AwkProgram seedArrayAndLocal = AWK
 				.compile(
 						"function seed(tmp) { tmp = 7; arr[\"x\"] = 9 } BEGIN { seed() }");
 		AwkProgram readArrayAndLocal = AWK.compile("BEGIN { print arr[\"x\"]; print tmp }");
+		Map<String, Object> ignoreCaseOverride = new LinkedHashMap<String, Object>();
+		ignoreCaseOverride.put("IGNORECASE", Long.valueOf(1L));
 
 		try (AVM avm = AWK.createAvm()) {
 			assertEquals("99\n", executePersistent(avm, writeBuiltIn));
 			assertEquals("0\n", executePersistent(avm, readBuiltIn));
+			assertEquals(
+					"1 1\n",
+					executePersistent(
+							avm,
+							readIgnoreCase,
+							Collections.<String>emptyList(),
+							ignoreCaseOverride,
+							emptyInputSource()));
+			assertEquals("0 0\n", executePersistent(avm, readIgnoreCase));
 			assertEquals("", executePersistent(avm, seedArrayAndLocal));
 			assertEquals("9\n\n", executePersistent(avm, readArrayAndLocal));
 		}

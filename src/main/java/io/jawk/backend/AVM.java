@@ -670,6 +670,44 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	/**
+	 * Applies execution-level initial variables to stack-managed globals.
+	 * <p>
+	 * Plain {@link #execute(AwkProgram, InputSource, List, Map)} calls apply all
+	 * compatible globals here. Persistent executions only reapply non-persistent
+	 * globals so carried user globals are not overwritten unless they were
+	 * explicitly supplied for the current run.
+	 *
+	 * @param skipPersistentEligibleGlobals whether persistent user globals should
+	 *        be skipped by this application pass
+	 */
+	private void applyExecutionInitialVariablesToGlobalSlots(boolean skipPersistentEligibleGlobals) {
+		for (Map.Entry<String, Object> entry : executionInitialVariables.entrySet()) {
+			String key = entry.getKey();
+			if (skipPersistentEligibleGlobals && isPersistentEligibleGlobal(key)) {
+				continue;
+			}
+			if (functionNames.contains(key)) {
+				throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + key + ").");
+			}
+			Integer offsetObj = globalVariableOffsets.get(key);
+			Boolean arrayObj = globalVariableArrays.get(key);
+			if (offsetObj != null) {
+				Object obj = entry.getValue();
+				if (arrayObj.booleanValue()) {
+					if (obj instanceof Map) {
+						runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
+					} else {
+						throw new IllegalArgumentException(
+								"Cannot assign a scalar to a non-scalar variable (" + key + ").");
+					}
+				} else {
+					runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
+				}
+			}
+		}
+	}
+
+	/**
 	 * Prepares the per-execution runtime arguments and variable overrides.
 	 * <p>
 	 * Base settings-level variables remain the default source. Per-call overrides
@@ -2341,6 +2379,7 @@ public class AVM implements VariableManager, Closeable {
 							throw new IllegalStateException(
 									"AVM globals are already initialized for an incompatible persistent layout.");
 						}
+						applyExecutionInitialVariablesToGlobalSlots(true);
 					} else if (globals == null) {
 						runtimeStack.setNumGlobals(position.intArg(0), globalVariableOffsets);
 						initializedEvalGlobalVariableOffsets = globalVariableOffsets;
@@ -2350,27 +2389,7 @@ public class AVM implements VariableManager, Closeable {
 						// we can allocate the initial variables
 
 						// assign -v variables and per-call overrides prepared for this execution
-						for (Map.Entry<String, Object> entry : executionInitialVariables.entrySet()) {
-							String key = entry.getKey();
-							if (functionNames.contains(key)) {
-								throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + key + ").");
-							}
-							Integer offsetObj = globalVariableOffsets.get(key);
-							Boolean arrayObj = globalVariableArrays.get(key);
-							if (offsetObj != null) {
-								Object obj = entry.getValue();
-								if (arrayObj.booleanValue()) {
-									if (obj instanceof Map) {
-										runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
-									} else {
-										throw new IllegalArgumentException(
-												"Cannot assign a scalar to a non-scalar variable (" + key + ").");
-									}
-								} else {
-									runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
-								}
-							}
-						}
+						applyExecutionInitialVariablesToGlobalSlots(false);
 					} else if (!hasCompatibleEvalGlobalLayout(position.intArg(0))) {
 						throw new IllegalStateException(
 								"AVM globals are already initialized for a different eval layout. Call prepareForEval(...) first.");

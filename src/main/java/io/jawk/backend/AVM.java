@@ -25,7 +25,6 @@ package io.jawk.backend;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.io.Serializable;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -441,13 +440,12 @@ public class AVM implements VariableManager, Closeable {
 	 * persistent execution.
 	 * <p>
 	 * The returned snapshot is serializable and can later be fed back into
-	 * {@link #restorePersistentMemory(PersistentMemorySnapshot)} on this or another
-	 * AVM instance.
+	 * {@link #restorePersistentMemory(Map)} on this or another AVM instance.
 	 *
 	 * @return serializable snapshot of the persistent user-global bank
 	 */
-	public PersistentMemorySnapshot snapshotPersistentMemory() {
-		return new PersistentMemorySnapshot(collectPersistentGlobalValues());
+	public Map<String, Object> snapshotPersistentMemory() {
+		return new LinkedHashMap<String, Object>(collectPersistentGlobalValues());
 	}
 
 	/**
@@ -460,10 +458,10 @@ public class AVM implements VariableManager, Closeable {
 	 *
 	 * @param snapshot snapshot to restore
 	 */
-	public void restorePersistentMemory(PersistentMemorySnapshot snapshot) {
-		PersistentMemorySnapshot restoredSnapshot = Objects.requireNonNull(snapshot, "snapshot");
+	public void restorePersistentMemory(Map<String, Object> snapshot) {
+		Map<String, Object> restoredSnapshot = Objects.requireNonNull(snapshot, "snapshot");
 		Map<String, Object> restoredGlobals = new LinkedHashMap<String, Object>();
-		for (Map.Entry<String, Object> entry : restoredSnapshot.globalValues.entrySet()) {
+		for (Map.Entry<String, Object> entry : restoredSnapshot.entrySet()) {
 			if (isPersistentEligibleGlobal(entry.getKey())) {
 				restoredGlobals.put(entry.getKey(), entry.getValue());
 			}
@@ -3292,24 +3290,6 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	private static final UninitializedObject BLANK = new UninitializedObject();
-
-	/**
-	 * Serializable representation of the AVM's retained user-defined globals.
-	 * <p>
-	 * The snapshot intentionally excludes transient execution state, locals,
-	 * runtime-managed built-in variables, and open I/O resources.
-	 */
-	public static final class PersistentMemorySnapshot implements Serializable {
-
-		private static final long serialVersionUID = 1L;
-
-		/** Retained user-defined globals keyed by variable name. */
-		private final LinkedHashMap<String, Object> globalValues;
-
-		private PersistentMemorySnapshot(Map<String, Object> globalValues) {
-			this.globalValues = new LinkedHashMap<String, Object>(globalValues);
-		}
-	}
 
 	private static final class NameValueAssignment {
 		private final String name;

@@ -470,53 +470,25 @@ public final class Cli {
 			if (memoryFile != null) {
 				restorePersistentMemoryIfPresent(avm, memoryFile);
 			}
-			StreamInputSource resolvedSource = new StreamInputSource(resolveExecutionInputStream(), avm, avm.getJrt());
+			InputStream runtimeInput = inputStream != null ? inputStream : new ByteArrayInputStream(new byte[0]);
+			StreamInputSource resolvedSource = new StreamInputSource(runtimeInput, avm, avm.getJrt());
 			try {
-				executeOnPreparedAvm(avm, program, resolvedSource, memoryFile != null);
+				try {
+					if (memoryFile != null) {
+						avm.executePersistingGlobals(program, resolvedSource, nameValueOrFileNames, null);
+					} else {
+						avm.execute(program, resolvedSource, nameValueOrFileNames, null);
+					}
+				} catch (ExitException ex) {
+					if (ex.getCode() != 0) {
+						throw ex;
+					}
+				}
 			} finally {
 				if (memoryFile != null) {
 					savePersistentMemory(avm, memoryFile);
 				}
 				sink.flush();
-			}
-		}
-	}
-
-	/**
-	 * Creates the CLI input stream used for the current execution.
-	 *
-	 * @return input stream to feed into the runtime
-	 */
-	private InputStream resolveExecutionInputStream() {
-		return inputStream != null ? inputStream : new ByteArrayInputStream(new byte[0]);
-	}
-
-	/**
-	 * Executes a compiled program on an already configured AVM.
-	 *
-	 * @param avm configured runtime instance
-	 * @param program compiled program to execute
-	 * @param resolvedSource input source bound to the current runtime
-	 * @param persistGlobals whether persistent globals should be merged across runs
-	 * @throws ExitException when the program exits with a non-zero status
-	 * @throws IOException if execution fails
-	 */
-	private void executeOnPreparedAvm(
-			AVM avm,
-			AwkProgram program,
-			StreamInputSource resolvedSource,
-			boolean persistGlobals)
-			throws ExitException,
-			IOException {
-		try {
-			if (persistGlobals) {
-				avm.executePersistingGlobals(program, resolvedSource, nameValueOrFileNames, null);
-			} else {
-				avm.execute(program, resolvedSource, nameValueOrFileNames, null);
-			}
-		} catch (ExitException ex) {
-			if (ex.getCode() != 0) {
-				throw ex;
 			}
 		}
 	}
@@ -537,7 +509,9 @@ public final class Cli {
 					"Persistent memory path '" + memoryFile + "' exists but is not a regular file.");
 		}
 		try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(memoryFile))) {
-			avm.restorePersistentMemory((AVM.PersistentMemorySnapshot) ois.readObject());
+			@SuppressWarnings("unchecked")
+			Map<String, Object> snapshot = (Map<String, Object>) ois.readObject();
+			avm.restorePersistentMemory(snapshot);
 		} catch (java.io.InvalidClassException ex) {
 			throw new IllegalArgumentException(
 					"Persistent memory file '" + memoryFile + "' is not compatible with this version ("

@@ -607,7 +607,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 		try {
 			AwkTestSupport
 					.cliTest("GAWK pma first run")
-					.environmentVariable("JAWK_PERSISTENT_MEMORY", memoryFile.toString())
+					.env("JAWK_PERSISTENT_MEMORY", memoryFile.toString())
 					.script("BEGIN { print ++i }")
 					.expect("1\n")
 					.expectExit(0)
@@ -615,7 +615,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 			assertTrue(Files.isRegularFile(memoryFile));
 			AwkTestSupport
 					.cliTest("GAWK pma second run")
-					.environmentVariable("JAWK_PERSISTENT_MEMORY", memoryFile.toString())
+					.env("JAWK_PERSISTENT_MEMORY", memoryFile.toString())
 					.script("BEGIN { print ++i }")
 					.expect("2\n")
 					.expectExit(0)

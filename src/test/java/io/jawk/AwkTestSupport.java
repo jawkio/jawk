@@ -555,7 +555,7 @@ public final class AwkTestSupport {
 		 * @param value environment variable value
 		 * @return this builder for method chaining
 		 */
-		public CliTestBuilder environmentVariable(String name, String value) {
+		public CliTestBuilder env(String name, String value) {
 			environment.put(name, value);
 			return this;
 		}
@@ -568,7 +568,7 @@ public final class AwkTestSupport {
 		 * @param values environment variables to expose
 		 * @return this builder for method chaining
 		 */
-		public CliTestBuilder environmentVariables(Map<String, String> values) {
+		public CliTestBuilder env(Map<String, String> values) {
 			if (values != null) {
 				environment.putAll(values);
 			}

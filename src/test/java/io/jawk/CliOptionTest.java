@@ -188,7 +188,7 @@ public class CliOptionTest {
 
 		AwkTestSupport
 				.cliTest("CLI env persist first run")
-				.environmentVariables(environment)
+				.env(environment)
 				.script("BEGIN { print ++i }")
 				.expect("1\n")
 				.expectExit(0)
@@ -196,7 +196,7 @@ public class CliOptionTest {
 		assertTrue(memory.isFile());
 		AwkTestSupport
 				.cliTest("CLI env persist second run")
-				.environmentVariables(environment)
+				.env(environment)
 				.script("BEGIN { print ++i }")
 				.expect("2\n")
 				.expectExit(0)
@@ -212,7 +212,7 @@ public class CliOptionTest {
 
 		AwkTestSupport
 				.cliTest("CLI persist option first run")
-				.environmentVariables(environment)
+				.env(environment)
 				.argument("--persist", optionMemory.getAbsolutePath())
 				.script("BEGIN { print ++i }")
 				.expect("1\n")
@@ -220,14 +220,14 @@ public class CliOptionTest {
 				.runAndAssert();
 		AwkTestSupport
 				.cliTest("CLI env-only persist run")
-				.environmentVariables(environment)
+				.env(environment)
 				.script("BEGIN { print ++i }")
 				.expect("1\n")
 				.expectExit(0)
 				.runAndAssert();
 		AwkTestSupport
 				.cliTest("CLI persist option second run")
-				.environmentVariables(environment)
+				.env(environment)
 				.argument("--persist", optionMemory.getAbsolutePath())
 				.script("BEGIN { print ++i }")
 				.expect("2\n")

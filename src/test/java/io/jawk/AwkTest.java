@@ -1573,7 +1573,7 @@ public class AwkTest {
 		AwkProgram assign = AWK.compile("BEGIN { arr[\"x\"] = 9; total = 7 }");
 		AwkProgram read = AWK.compile("BEGIN { print total, arr[\"x\"] }");
 
-		AVM.PersistentMemorySnapshot snapshot;
+		Map<String, Object> snapshot;
 		try (AVM writer = AWK.createAvm()) {
 			assertEquals("", executePersistent(writer, assign));
 			ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -1581,7 +1581,9 @@ public class AwkTest {
 				oos.writeObject(writer.snapshotPersistentMemory());
 			}
 			try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes.toByteArray()))) {
-				snapshot = (AVM.PersistentMemorySnapshot) ois.readObject();
+				@SuppressWarnings("unchecked")
+				Map<String, Object> restoredSnapshot = (Map<String, Object>) ois.readObject();
+				snapshot = restoredSnapshot;
 			}
 		}
 

@@ -14,8 +14,6 @@ Jawk is a pure Java implementation of [AWK](https://en.wikipedia.org/wiki/AWK). 
 echo "hello world" | java -jar jawk-${project.version}-standalone.jar '{ print $2 ", " $1 "!" }'
 ```
 
-For gawk-style persistent globals across separate CLI invocations, use `--persist state.bin` or set the `JAWK_PERSISTENT_MEMORY` environment variable to a state file path. Jawk reloads the retained user-defined globals from that file before execution and writes them back after the run finishes.
-
 ## Java Example
 
 ```java
@@ -24,7 +22,6 @@ String result = awk.script("{ print toupper($0) }").input("hello world").execute
 ```
 
 When writing custom extensions, annotate associative array parameters with `@JawkAssocArray` and declare them as `Map` values rather than concrete map implementations.
-If you embed Jawk through [`AVM`](https://jawk.io/apidocs/io/jawk/backend/AVM.html), use `executePersistingGlobals(...)` when you want user-defined globals to survive across sequential runs on the same runtime instance.
 
 ## Documentation
 

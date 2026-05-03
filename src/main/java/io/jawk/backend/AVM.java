@@ -25,6 +25,7 @@ package io.jawk.backend;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.Serializable;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -432,6 +433,46 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	public void clearPersistentGlobals() {
 		runtimeStack.clearGlobals();
+		mergedGlobalLayoutActive = false;
+	}
+
+	/**
+	 * Captures the user-defined globals currently retained by this AVM for
+	 * persistent execution.
+	 * <p>
+	 * The returned snapshot is serializable and can later be fed back into
+	 * {@link #restorePersistentMemory(PersistentMemorySnapshot)} on this or another
+	 * AVM instance.
+	 *
+	 * @return serializable snapshot of the persistent user-global bank
+	 */
+	public PersistentMemorySnapshot snapshotPersistentMemory() {
+		return new PersistentMemorySnapshot(collectPersistentGlobalValues());
+	}
+
+	/**
+	 * Restores the user-defined globals retained by this AVM from a previously
+	 * captured persistent-memory snapshot.
+	 * <p>
+	 * Restoring a snapshot replaces the current retained global bank. The next
+	 * {@link #executePersistingGlobals(AwkProgram, InputSource, List, Map)} call
+	 * will merge these globals into the compiled layout of the incoming program.
+	 *
+	 * @param snapshot snapshot to restore
+	 */
+	public void restorePersistentMemory(PersistentMemorySnapshot snapshot) {
+		PersistentMemorySnapshot restoredSnapshot = Objects.requireNonNull(snapshot, "snapshot");
+		Map<String, Object> restoredGlobals = new LinkedHashMap<String, Object>();
+		for (Map.Entry<String, Object> entry : restoredSnapshot.globalValues.entrySet()) {
+			if (isPersistentEligibleGlobal(entry.getKey())) {
+				restoredGlobals.put(entry.getKey(), entry.getValue());
+			}
+		}
+		runtimeStack.clearGlobals();
+		if (!restoredGlobals.isEmpty()) {
+			runtimeStack.rebindGlobals(new ArrayList<String>(restoredGlobals.keySet()));
+			applyNamedGlobalOverrides(restoredGlobals);
+		}
 		mergedGlobalLayoutActive = false;
 	}
 
@@ -3251,6 +3292,24 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	private static final UninitializedObject BLANK = new UninitializedObject();
+
+	/**
+	 * Serializable representation of the AVM's retained user-defined globals.
+	 * <p>
+	 * The snapshot intentionally excludes transient execution state, locals,
+	 * runtime-managed built-in variables, and open I/O resources.
+	 */
+	public static final class PersistentMemorySnapshot implements Serializable {
+
+		private static final long serialVersionUID = 1L;
+
+		/** Retained user-defined globals keyed by variable name. */
+		private final LinkedHashMap<String, Object> globalValues;
+
+		private PersistentMemorySnapshot(Map<String, Object> globalValues) {
+			this.globalValues = new LinkedHashMap<String, Object>(globalValues);
+		}
+	}
 
 	private static final class NameValueAssignment {
 		private final String name;

@@ -67,6 +67,8 @@ try (AVM avm = awk.createAvm()) {
 
 `executePersistingGlobals(...)` first imports the user-defined globals currently materialized in that `AVM`, then remaps them onto the next program's compiled global slots. The persistent memory lives only for that `AVM` instance. Built-in runtime variables such as `NR`, `NF`, `FS`, and `RS` still reset between runs.
 
+If you need to carry that retained global bank into another `AVM` instance, serialize `avm.snapshotPersistentMemory()` and later restore it with `restorePersistentMemory(...)` before the next `executePersistingGlobals(...)` call.
+
 ## Why Stateful Eval Is Powerful and Dangerous
 
 Raw repeated eval against one runtime is intentionally stateful:

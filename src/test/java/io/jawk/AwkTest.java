@@ -33,6 +33,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintStream;
 import java.io.StringReader;
@@ -1564,6 +1565,29 @@ public class AwkTest {
 			avm.clearPersistentGlobals();
 			assertEquals("\n", executePersistent(avm, read));
 			assertEquals("\n", executeNormally(avm, read));
+		}
+	}
+
+	@Test
+	public void persistentMemorySnapshotRestoresGlobalsIntoAnotherAvm() throws Exception {
+		AwkProgram assign = AWK.compile("BEGIN { arr[\"x\"] = 9; total = 7 }");
+		AwkProgram read = AWK.compile("BEGIN { print total, arr[\"x\"] }");
+
+		AVM.PersistentMemorySnapshot snapshot;
+		try (AVM writer = AWK.createAvm()) {
+			assertEquals("", executePersistent(writer, assign));
+			ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+			try (ObjectOutputStream oos = new ObjectOutputStream(bytes)) {
+				oos.writeObject(writer.snapshotPersistentMemory());
+			}
+			try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes.toByteArray()))) {
+				snapshot = (AVM.PersistentMemorySnapshot) ois.readObject();
+			}
+		}
+
+		try (AVM reader = AWK.createAvm()) {
+			reader.restorePersistentMemory(snapshot);
+			assertEquals("7 9\n", executePersistent(reader, read));
 		}
 	}
 

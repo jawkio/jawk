@@ -14,6 +14,8 @@ Jawk is a pure Java implementation of [AWK](https://en.wikipedia.org/wiki/AWK). 
 echo "hello world" | java -jar jawk-${project.version}-standalone.jar '{ print $2 ", " $1 "!" }'
 ```
 
+For gawk-style persistent globals across separate CLI invocations, use `--persist state.bin` or set the `JAWK_PERSISTENT_MEMORY` environment variable to a state file path. Jawk reloads the retained user-defined globals from that file before execution and writes them back after the run finishes.
+
 ## Java Example
 
 ```java

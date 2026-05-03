@@ -32,6 +32,7 @@ java -jar jawk-${project.version}-standalone.jar --list-ext
 >   - `script` is the inline AWK program used when you do not pass `-f` or `-L`.
 >   - `-f <filename>` reads a script from a file. You can repeat `-f` to combine multiple script sources.
 >   - `-L <filename>` loads previously serialized `AwkTuples` instead of compiling source now.
+>   - `--persist <filename>` loads retained user-defined globals from a serialized state file before execution and writes them back after the run finishes.
 >   - `-K <filename>` compiles the current script sources to a tuples file and exits without executing the script.
 >
 > - Input and `ARGV`
@@ -49,6 +50,7 @@ java -jar jawk-${project.version}-standalone.jar --list-ext
 >   - `--locale <locale>` sets the locale through `Locale.forLanguageTag(...)`.
 >   - `-t` keeps associative array keys sorted.
 >   - `--posix` enforces POSIX-oriented compile-time behavior such as disabling gawk-style nested arrays.
+>   - `JAWK_PERSISTENT_MEMORY` can also point at the persistent-memory file when you do not want to pass `--persist` explicitly. `--persist` wins when both are present.
 >
 > - Extensions and sandbox
 >
@@ -76,6 +78,7 @@ java -jar jawk-${project.version}-standalone.jar --list-ext
 - `--posix` is rejected together with `-L`, because loading precompiled tuples bypasses source compilation entirely.
 - `-L` lets you skip source compilation, but the loaded tuples must still be compatible with the current runtime.
 - `-f` and `-L` are distinct paths: source files compile now, tuple files load now.
+- `--persist` and `JAWK_PERSISTENT_MEMORY` affect only real execution. Non-executing modes such as `-K`, `--dump-syntax`, and `--dump-intermediate` ignore persistent memory.
 
 ## Tuple Serialization Compatibility
 
@@ -85,6 +88,8 @@ Jawk tuples are reusable, but they should be treated as internal artifacts tied 
 - `-L` reads those tuples back
 - version mismatches can cause tuple loading to fail
 - the safe fix is to recompile the tuples with the current Jawk version
+
+Persistent memory files use the same Java serialization machinery. They are therefore version-sensitive as well and should be discarded when Jawk reports an incompatibility.
 
 ## See Also
 

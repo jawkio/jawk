@@ -22,6 +22,11 @@ package io.jawk.gawk;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 import io.jawk.AwkTestSupport;
 import org.junit.Test;
 
@@ -597,7 +602,28 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_pma() throws Exception {
-		skip(MANUAL_SKIP_REASON);
+		Path memoryFile = Files.createTempFile("jawk-pma-", ".bin");
+		Files.deleteIfExists(memoryFile);
+		try {
+			AwkTestSupport
+					.cliTest("GAWK pma first run")
+					.environmentVariable("JAWK_PERSISTENT_MEMORY", memoryFile.toString())
+					.script("BEGIN { print ++i }")
+					.expect("1\n")
+					.expectExit(0)
+					.runAndAssert();
+			assertTrue(Files.isRegularFile(memoryFile));
+			AwkTestSupport
+					.cliTest("GAWK pma second run")
+					.environmentVariable("JAWK_PERSISTENT_MEMORY", memoryFile.toString())
+					.script("BEGIN { print ++i }")
+					.expect("2\n")
+					.expectExit(0)
+					.runAndAssert();
+			assertEquals("1\n2\n", gawkText("pma.ok").replace("\r\n", "\n"));
+		} finally {
+			Files.deleteIfExists(memoryFile);
+		}
 	}
 
 	@Test

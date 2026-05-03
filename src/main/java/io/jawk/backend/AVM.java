@@ -25,6 +25,8 @@ package io.jawk.backend;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -445,7 +447,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @return serializable snapshot of the persistent user-global bank
 	 */
 	public Map<String, Object> snapshotPersistentMemory() {
-		return new LinkedHashMap<String, Object>(collectPersistentGlobalValues());
+		return new LinkedHashMap<>(collectPersistentGlobalValues());
 	}
 
 	/**
@@ -460,16 +462,11 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	public void restorePersistentMemory(Map<String, Object> snapshot) {
 		Map<String, Object> restoredSnapshot = Objects.requireNonNull(snapshot, "snapshot");
-		Map<String, Object> restoredGlobals = new LinkedHashMap<String, Object>();
-		for (Map.Entry<String, Object> entry : restoredSnapshot.entrySet()) {
-			if (isPersistentEligibleGlobal(entry.getKey())) {
-				restoredGlobals.put(entry.getKey(), entry.getValue());
-			}
-		}
+		Map<String, Object> restoredGlobals = filterToPersistentEligible(restoredSnapshot);
 		runtimeStack.clearGlobals();
 		if (!restoredGlobals.isEmpty()) {
-			runtimeStack.rebindGlobals(new ArrayList<String>(restoredGlobals.keySet()));
-			applyNamedGlobalOverrides(restoredGlobals);
+			runtimeStack.rebindGlobals(new ArrayList<>(restoredGlobals.keySet()));
+			applyGlobalsToStack(restoredGlobals);
 		}
 		mergedGlobalLayoutActive = false;
 	}
@@ -672,9 +669,11 @@ public class AVM implements VariableManager, Closeable {
 				executionUserSeeds);
 
 		runtimeStack.rebindGlobals(mergedGlobalNamesByOffset);
-		restoreNamedGlobals(carriedGlobals);
-		seedMissingNamedGlobals(carriedGlobals, basePersistentSeeds);
-		applyNamedGlobalOverrides(executionUserSeeds);
+		applyGlobalsToStack(carriedGlobals);
+		Map<String, Object> missingSeeds = new LinkedHashMap<>(basePersistentSeeds);
+		missingSeeds.keySet().removeAll(carriedGlobals.keySet());
+		applyGlobalsToStack(missingSeeds);
+		applyGlobalsToStack(executionUserSeeds);
 		mergedGlobalLayoutActive = true;
 	}
 
@@ -764,17 +763,34 @@ public class AVM implements VariableManager, Closeable {
 			executionInitialVariables = baseInitialVariables;
 			executionSpecialVariables = baseSpecialVariables;
 		} else {
-			executionInitialVariables = new HashMap<String, Object>(baseInitialVariables);
+			executionInitialVariables = new HashMap<>(baseInitialVariables);
 			executionInitialVariables.putAll(variableOverrides);
 
 			Map<String, Object> specialOverrides = JRT.copySpecialVariables(variableOverrides);
 			if (specialOverrides.isEmpty()) {
 				executionSpecialVariables = baseSpecialVariables;
 			} else {
-				executionSpecialVariables = new HashMap<String, Object>(baseSpecialVariables);
+				executionSpecialVariables = new HashMap<>(baseSpecialVariables);
 				executionSpecialVariables.putAll(specialOverrides);
 			}
 		}
+	}
+
+	/**
+	 * Filters the given map to retain only entries whose keys are
+	 * persistent-eligible globals.
+	 *
+	 * @param source source map to filter
+	 * @return insertion-ordered map containing only persistent-eligible entries
+	 */
+	private Map<String, Object> filterToPersistentEligible(Map<String, Object> source) {
+		Map<String, Object> result = new LinkedHashMap<>();
+		for (Map.Entry<String, Object> entry : source.entrySet()) {
+			if (isPersistentEligibleGlobal(entry.getKey())) {
+				result.put(entry.getKey(), entry.getValue());
+			}
+		}
+		return result;
 	}
 
 	/**
@@ -783,13 +799,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @return retained user globals keyed by name, in current runtime order
 	 */
 	private Map<String, Object> collectPersistentGlobalValues() {
-		Map<String, Object> retainedGlobals = new LinkedHashMap<String, Object>();
-		for (Map.Entry<String, Object> entry : runtimeStack.snapshotGlobalVariables().entrySet()) {
-			if (isPersistentEligibleGlobal(entry.getKey())) {
-				retainedGlobals.put(entry.getKey(), entry.getValue());
-			}
-		}
-		return retainedGlobals;
+		return filterToPersistentEligible(runtimeStack.snapshotGlobalVariables());
 	}
 
 	/**
@@ -799,7 +809,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @return baseline user globals keyed by name
 	 */
 	private Map<String, Object> collectBasePersistentGlobalSeeds() {
-		Map<String, Object> basePersistentSeeds = new LinkedHashMap<String, Object>();
+		Map<String, Object> basePersistentSeeds = new LinkedHashMap<>();
 		for (Map.Entry<String, Object> entry : baseInitialVariables.entrySet()) {
 			String name = entry.getKey();
 			if (isPersistentEligibleGlobal(name)) {
@@ -824,7 +834,7 @@ public class AVM implements VariableManager, Closeable {
 	private Map<String, Object> collectExecutionUserGlobalSeeds(
 			List<String> runtimeArguments,
 			Map<String, Object> variableOverrides) {
-		Map<String, Object> executionUserSeeds = new LinkedHashMap<String, Object>();
+		Map<String, Object> executionUserSeeds = new LinkedHashMap<>();
 		if (variableOverrides != null) {
 			for (Map.Entry<String, Object> entry : variableOverrides.entrySet()) {
 				String name = entry.getKey();
@@ -864,61 +874,26 @@ public class AVM implements VariableManager, Closeable {
 			Map<String, Object> carriedGlobals,
 			Map<String, Object> basePersistentSeeds,
 			Map<String, Object> executionUserSeeds) {
-		LinkedHashSet<String> orderedNames = new LinkedHashSet<String>();
-		List<Map.Entry<String, Integer>> compiledGlobals = new ArrayList<Map.Entry<String, Integer>>(
-				globalVariableOffsets.entrySet());
-		Collections.sort(compiledGlobals, (left, right) -> left.getValue().compareTo(right.getValue()));
+		LinkedHashSet<String> orderedNames = new LinkedHashSet<>();
+		List<Map.Entry<String, Integer>> compiledGlobals = new ArrayList<>(globalVariableOffsets.entrySet());
+		compiledGlobals.sort(java.util.Comparator.comparingInt(Map.Entry::getValue));
 		for (Map.Entry<String, Integer> entry : compiledGlobals) {
 			orderedNames.add(entry.getKey());
 		}
-		for (String name : carriedGlobals.keySet()) {
-			orderedNames.add(name);
-		}
-		for (String name : basePersistentSeeds.keySet()) {
-			orderedNames.add(name);
-		}
-		for (String name : executionUserSeeds.keySet()) {
-			orderedNames.add(name);
-		}
-		return new ArrayList<String>(orderedNames);
+		orderedNames.addAll(carriedGlobals.keySet());
+		orderedNames.addAll(basePersistentSeeds.keySet());
+		orderedNames.addAll(executionUserSeeds.keySet());
+		return new ArrayList<>(orderedNames);
 	}
 
 	/**
-	 * Restores retained global values into the runtime stack after the merged
-	 * layout has been installed.
+	 * Writes each entry from {@code globals} into the corresponding named slot in
+	 * the runtime stack.
 	 *
-	 * @param carriedGlobals retained user globals from the previous execution
+	 * @param globals map of variable name to value to apply
 	 */
-	private void restoreNamedGlobals(Map<String, Object> carriedGlobals) {
-		for (Map.Entry<String, Object> entry : carriedGlobals.entrySet()) {
-			runtimeStack.setGlobalVariable(entry.getKey(), entry.getValue());
-		}
-	}
-
-	/**
-	 * Applies baseline user globals when no retained value exists yet for the
-	 * same name.
-	 *
-	 * @param carriedGlobals retained user globals from the previous execution
-	 * @param basePersistentSeeds baseline user globals coming from the AVM settings
-	 */
-	private void seedMissingNamedGlobals(
-			Map<String, Object> carriedGlobals,
-			Map<String, Object> basePersistentSeeds) {
-		for (Map.Entry<String, Object> entry : basePersistentSeeds.entrySet()) {
-			if (!carriedGlobals.containsKey(entry.getKey())) {
-				runtimeStack.setGlobalVariable(entry.getKey(), entry.getValue());
-			}
-		}
-	}
-
-	/**
-	 * Applies per-execution user overrides on top of the merged runtime globals.
-	 *
-	 * @param executionUserSeeds per-call user overrides for this execution
-	 */
-	private void applyNamedGlobalOverrides(Map<String, Object> executionUserSeeds) {
-		for (Map.Entry<String, Object> entry : executionUserSeeds.entrySet()) {
+	private void applyGlobalsToStack(Map<String, Object> globals) {
+		for (Map.Entry<String, Object> entry : globals.entrySet()) {
 			runtimeStack.setGlobalVariable(entry.getKey(), entry.getValue());
 		}
 	}
@@ -933,12 +908,7 @@ public class AVM implements VariableManager, Closeable {
 	private boolean isPersistentEligibleGlobal(String name) {
 		return name != null
 				&& !JRT.isJrtManagedSpecialVariable(name)
-				&& !"ARGV".equals(name)
-				&& !"ARGC".equals(name)
-				&& !"ENVIRON".equals(name)
-				&& !"RSTART".equals(name)
-				&& !"RLENGTH".equals(name)
-				&& !"IGNORECASE".equals(name);
+				&& !NON_PERSISTENT_GLOBALS.contains(name);
 	}
 
 	/**
@@ -3290,6 +3260,13 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	private static final UninitializedObject BLANK = new UninitializedObject();
+
+	/**
+	 * Global names that must not participate in persistent memory even though they
+	 * are technically user-visible variables.
+	 */
+	private static final Set<String> NON_PERSISTENT_GLOBALS = new HashSet<>(
+			Arrays.asList("ARGV", "ARGC", "ENVIRON", "RSTART", "RLENGTH", "IGNORECASE"));
 
 	private static final class NameValueAssignment {
 		private final String name;

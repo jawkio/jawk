@@ -207,7 +207,7 @@ public class CliOptionTest {
 	public void persistOptionOverridesPersistentMemoryEnvironmentVariable() throws Exception {
 		File optionMemory = new File(tempFolder.getRoot(), "option-memory.bin");
 		File envMemory = new File(tempFolder.getRoot(), "env-memory.bin");
-		Map<String, String> environment = new HashMap<String, String>();
+		Map<String, String> environment = new HashMap<>();
 		environment.put("JAWK_PERSISTENT_MEMORY", envMemory.getAbsolutePath());
 
 		AwkTestSupport

@@ -1622,28 +1622,30 @@ public class AwkTest {
 		return out.toString();
 	}
 
+	private static final InputSource EMPTY_INPUT_SOURCE = new InputSource() {
+		@Override
+		public boolean nextRecord() {
+			return false;
+		}
+
+		@Override
+		public String getRecordText() {
+			return null;
+		}
+
+		@Override
+		public List<String> getFields() {
+			return null;
+		}
+
+		@Override
+		public boolean isFromFilenameList() {
+			return false;
+		}
+	};
+
 	private static InputSource emptyInputSource() {
-		return new InputSource() {
-			@Override
-			public boolean nextRecord() {
-				return false;
-			}
-
-			@Override
-			public String getRecordText() {
-				return null;
-			}
-
-			@Override
-			public List<String> getFields() {
-				return null;
-			}
-
-			@Override
-			public boolean isFromFilenameList() {
-				return false;
-			}
-		};
+		return EMPTY_INPUT_SOURCE;
 	}
 
 	private static final class ThrowingAfterFirstRecordInputSource implements InputSource {

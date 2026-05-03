@@ -473,16 +473,14 @@ public final class Cli {
 			InputStream runtimeInput = inputStream != null ? inputStream : new ByteArrayInputStream(new byte[0]);
 			StreamInputSource resolvedSource = new StreamInputSource(runtimeInput, avm, avm.getJrt());
 			try {
-				try {
-					if (memoryFile != null) {
-						avm.executePersistingGlobals(program, resolvedSource, nameValueOrFileNames, null);
-					} else {
-						avm.execute(program, resolvedSource, nameValueOrFileNames, null);
-					}
-				} catch (ExitException ex) {
-					if (ex.getCode() != 0) {
-						throw ex;
-					}
+				if (memoryFile != null) {
+					avm.executePersistingGlobals(program, resolvedSource, nameValueOrFileNames, null);
+				} else {
+					avm.execute(program, resolvedSource, nameValueOrFileNames, null);
+				}
+			} catch (ExitException ex) {
+				if (ex.getCode() != 0) {
+					throw ex;
 				}
 			} finally {
 				if (memoryFile != null) {

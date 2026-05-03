@@ -179,6 +179,26 @@ public class CliOptionTest {
 	}
 
 	@Test
+	public void persistOptionPersistsAssociativeArraysAcrossCliRuns() throws Exception {
+		File memory = new File(tempFolder.getRoot(), "array-memory.bin");
+
+		AwkTestSupport
+				.cliTest("CLI persist array first run")
+				.argument("--persist", memory.getAbsolutePath())
+				.script("BEGIN { arr[\"x\"] = 9 }")
+				.expect("")
+				.expectExit(0)
+				.runAndAssert();
+		AwkTestSupport
+				.cliTest("CLI persist array second run")
+				.argument("--persist", memory.getAbsolutePath())
+				.script("BEGIN { print arr[\"x\"] }")
+				.expect("9\n")
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
 	public void persistentMemoryEnvironmentVariablePersistsUserGlobalsAcrossCliRuns() throws Exception {
 		File memory = new File(tempFolder.getRoot(), "env-memory.bin");
 		Map<String, String> environment = Collections
@@ -251,7 +271,9 @@ public class CliOptionTest {
 
 		result.assertExpected();
 		assertTrue(result.thrownException().getMessage().contains("does not contain valid Jawk persistent memory"));
-		assertTrue(result.thrownException().getCause() instanceof ClassCastException);
+		assertTrue(
+				result.thrownException().getCause() instanceof ClassCastException
+						|| result.thrownException().getCause() instanceof java.io.InvalidClassException);
 	}
 
 	private static void writeProgram(File target, String script) throws Exception {

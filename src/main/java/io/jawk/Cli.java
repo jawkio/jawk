@@ -24,29 +24,43 @@ package io.jawk;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jawk.backend.AVM;
+import io.jawk.intermediate.UninitializedObject;
+import io.jawk.jrt.HashAssocArray;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InvalidClassException;
 import java.io.InputStream;
+import java.io.ObjectStreamClass;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintStream;
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import io.jawk.ext.ExtensionRegistry;
 import io.jawk.ext.JawkExtension;
 import io.jawk.ext.StdinExtension;
 import io.jawk.frontend.AstNode;
 import io.jawk.jrt.AwkRuntimeException;
 import io.jawk.jrt.OutputStreamAwkSink;
+import io.jawk.jrt.SortedAssocArray;
 import io.jawk.jrt.StreamInputSource;
 import io.jawk.util.AwkSettings;
 import io.jawk.util.ScriptFileSource;
@@ -60,6 +74,26 @@ public final class Cli {
 	private static final String JAR_NAME;
 	private static final String POSIX_LOAD_CONFLICT_MESSAGE = "--posix cannot be combined with -L because -L loads a precompiled program.";
 	private static final String PERSISTENT_MEMORY_ENVIRONMENT_VARIABLE = "JAWK_PERSISTENT_MEMORY";
+	private static final Set<String> PERSISTENT_MEMORY_ALLOWED_CLASS_NAMES = Collections
+			.unmodifiableSet(
+					new LinkedHashSet<String>(
+							Arrays
+									.asList(
+											LinkedHashMap.class.getName(),
+											java.util.HashMap.class.getName(),
+											java.util.TreeMap.class.getName(),
+											HashAssocArray.class.getName(),
+											SortedAssocArray.class.getName(),
+											String.class.getName(),
+											Number.class.getName(),
+											Integer.class.getName(),
+											Long.class.getName(),
+											Double.class.getName(),
+											Float.class.getName(),
+											Short.class.getName(),
+											Byte.class.getName(),
+											Boolean.class.getName(),
+											UninitializedObject.class.getName())));
 
 	static {
 		String myName;
@@ -126,7 +160,9 @@ public final class Cli {
 		this.out = out;
 		this.inputStream = in;
 		this.err = err != null ? err : System.err;
-		this.environment = environment != null ? environment : System.getenv();
+		this.environment = environment != null ?
+				Collections.unmodifiableMap(new LinkedHashMap<String, String>(environment)) :
+				System.getenv();
 	}
 
 	/**
@@ -222,7 +258,7 @@ public final class Cli {
 				String file = args[++argIdx];
 				try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
 					precompiledProgram = (AwkProgram) ois.readObject();
-				} catch (java.io.InvalidClassException ex) {
+				} catch (InvalidClassException ex) {
 					throw new IllegalArgumentException(
 							"Precompiled program '" + file + "' is not compatible with this version (" + ex.getMessage()
 									+ "). Please recompile.",
@@ -506,15 +542,16 @@ public final class Cli {
 			throw new IllegalArgumentException(
 					"Persistent memory path '" + memoryFile + "' exists but is not a regular file.");
 		}
-		try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(memoryFile))) {
+		try (ObjectInputStream ois = new PersistentMemoryObjectInputStream(new FileInputStream(memoryFile))) {
 			@SuppressWarnings("unchecked")
 			Map<String, Object> snapshot = (Map<String, Object>) ois.readObject();
 			avm.restorePersistentMemory(snapshot);
-		} catch (java.io.InvalidClassException ex) {
+		} catch (InvalidClassException ex) {
 			throw new IllegalArgumentException(
-					"Persistent memory file '" + memoryFile + "' is not compatible with this version ("
+					"Persistent memory file '" + memoryFile
+							+ "' is not compatible with this version or does not contain valid Jawk persistent memory ("
 							+ ex.getMessage()
-							+ "). Please discard it and rerun.",
+							+ ").",
 					ex);
 		} catch (ClassCastException ex) {
 			throw new IllegalArgumentException(
@@ -535,12 +572,56 @@ public final class Cli {
 	 * @throws IOException if the snapshot cannot be written
 	 */
 	private static void savePersistentMemory(AVM avm, File memoryFile) throws IOException {
-		File parent = memoryFile.getAbsoluteFile().getParentFile();
-		if (parent != null && !parent.isDirectory() && !parent.mkdirs() && !parent.isDirectory()) {
-			throw new IOException("Failed to create directory '" + parent + "' for persistent memory.");
+		Path targetPath = memoryFile.toPath().toAbsolutePath();
+		Path parentPath = targetPath.getParent();
+		Path tempDirectory = parentPath != null ? parentPath : targetPath.toAbsolutePath().getRoot();
+		if (tempDirectory == null) {
+			tempDirectory = new File(".").getAbsoluteFile().toPath();
 		}
-		try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(memoryFile))) {
-			oos.writeObject(avm.snapshotPersistentMemory());
+		Files.createDirectories(tempDirectory);
+		Path targetFileName = targetPath.getFileName();
+		String tempPrefix;
+		if (targetFileName == null) {
+			tempPrefix = "jawk";
+		} else {
+			tempPrefix = targetFileName.toString();
+		}
+		if (tempPrefix.length() < 3) {
+			tempPrefix = (tempPrefix + "___").substring(0, 3);
+		}
+		Path tempFile = Files.createTempFile(tempDirectory, tempPrefix, ".tmp");
+		try {
+			try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(tempFile.toFile()))) {
+				oos.writeObject(avm.snapshotPersistentMemory());
+			}
+			try {
+				Files.move(tempFile, targetPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+			} catch (AtomicMoveNotSupportedException ex) {
+				Files.move(tempFile, targetPath, StandardCopyOption.REPLACE_EXISTING);
+			}
+		} finally {
+			Files.deleteIfExists(tempFile);
+		}
+	}
+
+	private static final class PersistentMemoryObjectInputStream extends ObjectInputStream {
+
+		private PersistentMemoryObjectInputStream(InputStream in) throws IOException {
+			super(in);
+		}
+
+		@Override
+		protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
+			String className = desc.getName();
+			if (!PERSISTENT_MEMORY_ALLOWED_CLASS_NAMES.contains(className)) {
+				throw new InvalidClassException(className, "Unsupported persistent memory type");
+			}
+			return super.resolveClass(desc);
+		}
+
+		@Override
+		protected Class<?> resolveProxyClass(String[] interfaces) throws IOException, ClassNotFoundException {
+			throw new InvalidClassException("Proxy classes are not supported in Jawk persistent memory");
 		}
 	}
 

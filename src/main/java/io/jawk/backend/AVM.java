@@ -662,7 +662,7 @@ public class AVM implements VariableManager, Closeable {
 		installProgramMetadata(compiledProgram);
 
 		Map<String, Object> basePersistentSeeds = collectBasePersistentGlobalSeeds();
-		Map<String, Object> executionUserSeeds = collectExecutionUserGlobalSeeds(runtimeArguments, variableOverrides);
+		Map<String, Object> executionUserSeeds = collectExecutionUserGlobalSeeds(variableOverrides);
 		List<String> mergedGlobalNamesByOffset = buildMergedGlobalNamesByOffset(
 				carriedGlobals,
 				basePersistentSeeds,
@@ -827,13 +827,10 @@ public class AVM implements VariableManager, Closeable {
 	 * Only user globals are included here. JRT-managed special variables still
 	 * flow through the normal execution setup.
 	 *
-	 * @param runtimeArguments name=value or filename entries for this execution
 	 * @param variableOverrides per-call variable overrides for this execution
 	 * @return insertion-ordered overriding seed values keyed by variable name
 	 */
-	private Map<String, Object> collectExecutionUserGlobalSeeds(
-			List<String> runtimeArguments,
-			Map<String, Object> variableOverrides) {
+	private Map<String, Object> collectExecutionUserGlobalSeeds(Map<String, Object> variableOverrides) {
 		Map<String, Object> executionUserSeeds = new LinkedHashMap<>();
 		if (variableOverrides != null) {
 			for (Map.Entry<String, Object> entry : variableOverrides.entrySet()) {
@@ -842,16 +839,6 @@ public class AVM implements VariableManager, Closeable {
 					validateSeededGlobal(name, entry.getValue());
 					executionUserSeeds.put(name, entry.getValue());
 				}
-			}
-		}
-		for (String argument : runtimeArguments != null ? runtimeArguments : Collections.<String>emptyList()) {
-			if (argument.indexOf('=') <= 0) {
-				continue;
-			}
-			NameValueAssignment assignment = parseNameValueAssignment(argument);
-			if (isPersistentEligibleGlobal(assignment.name)) {
-				validateSeededGlobal(assignment.name, assignment.value);
-				executionUserSeeds.put(assignment.name, assignment.value);
 			}
 		}
 		return executionUserSeeds;

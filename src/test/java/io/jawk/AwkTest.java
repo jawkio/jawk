@@ -1493,12 +1493,31 @@ public class AwkTest {
 		AwkProgram readValues = AWK.compile("BEGIN { print x, y }");
 		Map<String, Object> overrides = new LinkedHashMap<String, Object>();
 		overrides.put("x", Long.valueOf(4L));
+		overrides.put("y", Long.valueOf(5L));
 
 		try (AVM avm = AWK.createAvm()) {
 			assertEquals(
 					"",
-					executePersistent(avm, seedNothing, Collections.singletonList("y=5"), overrides, emptyInputSource()));
+					executePersistent(avm, seedNothing, Collections.<String>emptyList(), overrides, emptyInputSource()));
 			assertEquals("4 5\n", executePersistent(avm, readValues));
+		}
+	}
+
+	@Test
+	public void executePersistingGlobalsDefersRuntimeArgumentAssignmentsUntilInputTraversal() throws Exception {
+		AwkProgram seedFromRuntimeArguments = AWK.compile("BEGIN { print x } { x = x } END { print x }");
+		AwkProgram readValue = AWK.compile("BEGIN { print x }");
+
+		try (AVM avm = AWK.createAvm()) {
+			assertEquals(
+					"\n1\n",
+					executePersistent(
+							avm,
+							seedFromRuntimeArguments,
+							Collections.singletonList("x=1"),
+							Collections.<String, Object>emptyMap(),
+							new SingleRecordInputSource("record")));
+			assertEquals("1\n", executePersistent(avm, readValue));
 		}
 	}
 
@@ -1668,6 +1687,39 @@ public class AwkTest {
 		@Override
 		public List<String> getFields() {
 			return null;
+		}
+
+		@Override
+		public boolean isFromFilenameList() {
+			return false;
+		}
+	}
+
+	private static final class SingleRecordInputSource implements InputSource {
+		private final String record;
+		private boolean consumed;
+
+		private SingleRecordInputSource(String record) {
+			this.record = record;
+		}
+
+		@Override
+		public boolean nextRecord() {
+			if (consumed) {
+				return false;
+			}
+			consumed = true;
+			return true;
+		}
+
+		@Override
+		public String getRecordText() {
+			return consumed ? record : null;
+		}
+
+		@Override
+		public List<String> getFields() {
+			return consumed ? Collections.singletonList(record) : null;
 		}
 
 		@Override

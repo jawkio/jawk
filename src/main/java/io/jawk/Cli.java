@@ -125,6 +125,8 @@ public final class Cli {
 	 * @param environment environment variables visible to this CLI instance
 	 */
 	Cli(InputStream in, PrintStream out, PrintStream err, Map<String, String> environment) {
+		// Keep the caller-provided streams live so the CLI reads and writes directly
+		// against the requested endpoints during execution.
 		this.out = out;
 		this.inputStream = in;
 		this.err = err != null ? err : System.err;
@@ -487,10 +489,10 @@ public final class Cli {
 					throw ex;
 				}
 			} finally {
+				sink.flush();
 				if (memoryFile != null) {
 					savePersistentMemory(avm, memoryFile);
 				}
-				sink.flush();
 			}
 		}
 	}

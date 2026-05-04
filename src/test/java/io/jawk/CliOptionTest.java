@@ -22,13 +22,20 @@ package io.jawk;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -274,9 +281,47 @@ public class CliOptionTest {
 		assertTrue(result.thrownException().getCause() instanceof ClassCastException);
 	}
 
+	@Test
+	public void persistOptionFlushesOutputBeforeSaveFailure() throws Exception {
+		File blockingParent = tempFolder.newFile("not-a-directory");
+		File memory = new File(blockingParent, "memory.bin");
+		FlushTrackingOutputStream output = new FlushTrackingOutputStream();
+		Cli cli = new Cli(
+				new ByteArrayInputStream(new byte[0]),
+				new PrintStream(output, false, StandardCharsets.UTF_8.name()),
+				new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8.name()),
+				Collections.<String, String>emptyMap());
+		cli.parse(new String[] { "--persist", memory.getAbsolutePath(), "BEGIN { print \"ok\" }" });
+
+		IOException ex = assertThrows(IOException.class, () -> cli.run());
+
+		assertTrue(ex.getMessage().contains("Failed to create directory"));
+		assertEquals("ok\n", output.flushedText());
+	}
+
 	private static void writeProgram(File target, String script) throws Exception {
 		try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(target))) {
 			oos.writeObject(new Awk().compile(script));
+		}
+	}
+
+	private static final class FlushTrackingOutputStream extends OutputStream {
+		private final ByteArrayOutputStream pending = new ByteArrayOutputStream();
+		private final ByteArrayOutputStream flushed = new ByteArrayOutputStream();
+
+		@Override
+		public void write(int b) {
+			pending.write(b);
+		}
+
+		@Override
+		public void flush() throws IOException {
+			pending.writeTo(flushed);
+			pending.reset();
+		}
+
+		private String flushedText() {
+			return new String(flushed.toByteArray(), StandardCharsets.UTF_8);
 		}
 	}
 }

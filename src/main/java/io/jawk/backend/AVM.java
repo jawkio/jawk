@@ -670,9 +670,7 @@ public class AVM implements VariableManager, Closeable {
 
 		runtimeStack.rebindGlobals(mergedGlobalNamesByOffset);
 		applyGlobalsToStack(carriedGlobals);
-		Map<String, Object> missingSeeds = new LinkedHashMap<>(basePersistentSeeds);
-		missingSeeds.keySet().removeAll(carriedGlobals.keySet());
-		applyGlobalsToStack(missingSeeds);
+		applyGlobalsToStack(basePersistentSeeds);
 		applyGlobalsToStack(executionUserSeeds);
 		mergedGlobalLayoutActive = true;
 	}
@@ -803,8 +801,8 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	/**
-	 * Collects the AVM-wide baseline variables that should seed persistent
-	 * globals when no retained value exists yet for the same name.
+	 * Collects the AVM-wide baseline variables that should be reapplied before
+	 * each persistent execution.
 	 *
 	 * @return baseline user globals keyed by name
 	 */

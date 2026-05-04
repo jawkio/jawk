@@ -35,6 +35,8 @@ import java.io.ObjectOutputStream;
 import java.io.PrintStream;
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -126,7 +128,9 @@ public final class Cli {
 		this.out = out;
 		this.inputStream = in;
 		this.err = err != null ? err : System.err;
-		this.environment = environment != null ? environment : System.getenv();
+		this.environment = environment != null ?
+				Collections.unmodifiableMap(new LinkedHashMap<String, String>(environment)) :
+				System.getenv();
 	}
 
 	/**

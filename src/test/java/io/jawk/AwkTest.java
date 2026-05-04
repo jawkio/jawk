@@ -1522,6 +1522,21 @@ public class AwkTest {
 	}
 
 	@Test
+	public void executePersistingGlobalsReappliesBaselineVariablesBeforeBegin() throws Exception {
+		AwkSettings settings = new AwkSettings();
+		settings.putVariable("x", Long.valueOf(5L));
+		Awk configuredAwk = new Awk(settings);
+		AwkProgram mutate = configuredAwk.compile("BEGIN { print x; x++ }");
+		AwkProgram read = configuredAwk.compile("BEGIN { print x }");
+
+		try (AVM avm = configuredAwk.createAvm()) {
+			assertEquals("5\n", executePersistent(avm, mutate));
+			assertEquals("5\n", executePersistent(avm, read));
+			assertEquals("5\n", executePersistent(avm, mutate));
+		}
+	}
+
+	@Test
 	public void executePersistingGlobalsDoesNotPersistBuiltInsAndKeepsArraysOnlyForGlobals() throws Exception {
 		AwkProgram writeBuiltIn = AWK.compile("BEGIN { NR = 99; print NR }");
 		AwkProgram readBuiltIn = AWK.compile("BEGIN { print NR }");

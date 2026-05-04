@@ -23,6 +23,8 @@ package io.jawk;
  */
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import io.jawk.backend.AVM;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -33,6 +35,8 @@ import java.io.ObjectOutputStream;
 import java.io.PrintStream;
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -44,6 +48,8 @@ import io.jawk.ext.JawkExtension;
 import io.jawk.ext.StdinExtension;
 import io.jawk.frontend.AstNode;
 import io.jawk.jrt.AwkRuntimeException;
+import io.jawk.jrt.OutputStreamAwkSink;
+import io.jawk.jrt.StreamInputSource;
 import io.jawk.util.AwkSettings;
 import io.jawk.util.ScriptFileSource;
 import io.jawk.util.ScriptSource;
@@ -55,6 +61,7 @@ public final class Cli {
 
 	private static final String JAR_NAME;
 	private static final String POSIX_LOAD_CONFLICT_MESSAGE = "--posix cannot be combined with -L because -L loads a precompiled program.";
+	private static final String PERSISTENT_MEMORY_ENVIRONMENT_VARIABLE = "JAWK_PERSISTENT_MEMORY";
 
 	static {
 		String myName;
@@ -71,6 +78,7 @@ public final class Cli {
 	private final PrintStream out;
 	private final PrintStream err;
 	private final InputStream inputStream;
+	private final Map<String, String> environment;
 	private final List<String> nameValueOrFileNames = new ArrayList<String>();
 
 	private final List<ScriptSource> scriptSources = new ArrayList<ScriptSource>();
@@ -84,12 +92,13 @@ public final class Cli {
 	private boolean printUsage;
 	private boolean sandbox;
 	private boolean disableOptimize;
+	private File persistentMemoryFile;
 
 	/**
 	 * Creates a CLI instance wired to the standard input and output streams.
 	 */
 	public Cli() {
-		this(System.in, System.out, System.err);
+		this(System.in, System.out, System.err, System.getenv());
 	}
 
 	/**
@@ -99,11 +108,31 @@ public final class Cli {
 	 * @param out stream where program output is written
 	 * @param err stream where error messages could be written
 	 */
-	@SuppressFBWarnings("EI_EXPOSE_REP2")
 	public Cli(InputStream in, PrintStream out, PrintStream err) {
+		this(in, out, err, System.getenv());
+	}
+
+	/**
+	 * Creates a CLI instance using the supplied streams and environment variables.
+	 * <p>
+	 * This constructor exists primarily for tests and embedded launchers that need
+	 * deterministic control over environment-driven options such as
+	 * {@value #PERSISTENT_MEMORY_ENVIRONMENT_VARIABLE}.
+	 *
+	 * @param in stream from which program input is read
+	 * @param out stream where program output is written
+	 * @param err stream where error messages could be written
+	 * @param environment environment variables visible to this CLI instance
+	 */
+	Cli(InputStream in, PrintStream out, PrintStream err, Map<String, String> environment) {
+		// Keep the caller-provided streams live so the CLI reads and writes directly
+		// against the requested endpoints during execution.
 		this.out = out;
 		this.inputStream = in;
 		this.err = err != null ? err : System.err;
+		this.environment = environment != null ?
+				Collections.unmodifiableMap(new LinkedHashMap<String, String>(environment)) :
+				System.getenv();
 	}
 
 	/**
@@ -213,6 +242,10 @@ public final class Cli {
 							"Failed to read program '" + file + "': " + ex.getMessage(),
 							ex);
 				}
+			} else if (arg.equals("--persist")) {
+				// --persist filename : load and save persistent user globals
+				checkParameterHasArgument(args, argIdx);
+				persistentMemoryFile = new File(args[++argIdx]);
 			} else if (arg.equals("-l") || arg.equals("--load")) {
 				// -l/--load extension : load extension
 				checkParameterHasArgument(args, argIdx);
@@ -400,8 +433,121 @@ public final class Cli {
 			// If only dumping information, no need to execute the script
 			return;
 		}
-		// Finally run the compiled program with the input and arguments.
-		awk.script(program).input(inputStream).arguments(nameValueOrFileNames).errorStream(err).execute(out);
+		executeProgram(awk, program, resolvePersistentMemoryFile());
+	}
+
+	/**
+	 * Resolves the persistent-memory backing file from the command line or
+	 * environment.
+	 * <p>
+	 * The dedicated {@code --persist} option takes precedence over the
+	 * {@value #PERSISTENT_MEMORY_ENVIRONMENT_VARIABLE} environment variable.
+	 *
+	 * @return resolved persistent-memory file, or {@code null} when persistence
+	 *         was not requested
+	 */
+	private File resolvePersistentMemoryFile() {
+		if (persistentMemoryFile != null) {
+			return persistentMemoryFile;
+		}
+		String configuredPath = environment.get(PERSISTENT_MEMORY_ENVIRONMENT_VARIABLE);
+		if (configuredPath == null || configuredPath.trim().isEmpty()) {
+			return null;
+		}
+		return new File(configuredPath);
+	}
+
+	/**
+	 * Executes the compiled program through one AVM setup path, optionally loading
+	 * and saving persistent user-defined globals when a backing file was
+	 * configured.
+	 *
+	 * @param awk engine used to create the runtime
+	 * @param program compiled program to execute
+	 * @param memoryFile persistent-memory file, or {@code null} for normal
+	 *        execution
+	 * @throws Exception if runtime setup, execution, or persistence fails
+	 */
+	private void executeProgram(Awk awk, AwkProgram program, File memoryFile) throws Exception {
+		OutputStreamAwkSink sink = new OutputStreamAwkSink(out, settings.getLocale());
+		try (AVM avm = awk.createAvm()) {
+			avm.setAwkSink(sink);
+			avm.setErrorStream(err);
+			if (memoryFile != null) {
+				restorePersistentMemoryIfPresent(avm, memoryFile);
+			}
+			InputStream runtimeInput = inputStream != null ? inputStream : new ByteArrayInputStream(new byte[0]);
+			StreamInputSource resolvedSource = new StreamInputSource(runtimeInput, avm, avm.getJrt());
+			try {
+				if (memoryFile != null) {
+					avm.executePersistingGlobals(program, resolvedSource, nameValueOrFileNames, null);
+				} else {
+					avm.execute(program, resolvedSource, nameValueOrFileNames, null);
+				}
+			} catch (ExitException ex) {
+				if (ex.getCode() != 0) {
+					throw ex;
+				}
+			} finally {
+				sink.flush();
+				if (memoryFile != null) {
+					savePersistentMemory(avm, memoryFile);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Restores persistent user-defined globals from the specified file when it
+	 * already exists.
+	 *
+	 * @param avm runtime into which the persistent memory should be restored
+	 * @param memoryFile file containing the serialized persistent snapshot
+	 */
+	private static void restorePersistentMemoryIfPresent(AVM avm, File memoryFile) {
+		if (!memoryFile.exists()) {
+			return;
+		}
+		if (!memoryFile.isFile()) {
+			throw new IllegalArgumentException(
+					"Persistent memory path '" + memoryFile + "' exists but is not a regular file.");
+		}
+		try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(memoryFile))) {
+			@SuppressWarnings("unchecked")
+			Map<String, Object> snapshot = (Map<String, Object>) ois.readObject();
+			avm.restorePersistentMemory(snapshot);
+		} catch (java.io.InvalidClassException ex) {
+			throw new IllegalArgumentException(
+					"Persistent memory file '" + memoryFile + "' is not compatible with this version ("
+							+ ex.getMessage()
+							+ "). Please discard it and rerun.",
+					ex);
+		} catch (ClassCastException ex) {
+			throw new IllegalArgumentException(
+					"File '" + memoryFile + "' does not contain valid Jawk persistent memory.",
+					ex);
+		} catch (IOException | ClassNotFoundException ex) {
+			throw new IllegalArgumentException(
+					"Failed to read persistent memory '" + memoryFile + "': " + ex.getMessage(),
+					ex);
+		}
+	}
+
+	/**
+	 * Saves the AVM's current persistent user-global bank to the specified file.
+	 *
+	 * @param avm runtime whose persistent memory should be saved
+	 * @param memoryFile destination file
+	 * @throws IOException if the snapshot cannot be written
+	 */
+	private static void savePersistentMemory(AVM avm, File memoryFile) throws IOException {
+		File parent = memoryFile.getAbsoluteFile().getParentFile();
+		if (parent != null && !parent.isDirectory() && !parent.mkdirs() && !parent.isDirectory()) {
+			throw new IOException("Failed to create directory '" + parent + "' for persistent memory.");
+		}
+		try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(memoryFile))) {
+			oos.writeObject(avm.snapshotPersistentMemory());
+		}
 	}
 
 	/**
@@ -418,6 +564,7 @@ public final class Cli {
 								" [-F fs_val]" +
 								" [-f script-filename]" +
 								" [-L program-filename]" +
+								" [--persist memory-file]" +
 								" [-K program-filename]" +
 								" [-S|--sandbox]" +
 								" [--posix]" +
@@ -436,6 +583,13 @@ public final class Cli {
 		dest.println(" -F fs_val = Use fs_val for FS.");
 		dest.println(" -f filename = Use contents of filename for script.");
 		dest.println(" -L filename = Load precompiled program from filename.");
+		dest
+				.println(
+						" --persist filename = Load and save persistent user-defined globals from filename.");
+		dest
+				.println(
+						"                      When omitted, the " + PERSISTENT_MEMORY_ENVIRONMENT_VARIABLE
+								+ " environment variable can provide the backing file path.");
 		dest.println(" -l extension = Load an extension by extension name or class name.");
 		dest.println(" --load extension = Same as -l.");
 		dest.println("                      Extensions must already be on the class path before loading them.");
@@ -493,7 +647,6 @@ public final class Cli {
 	 *
 	 * @param args command-line arguments
 	 */
-	@SuppressFBWarnings(value = "VA_FORMAT_STRING_USES_NEWLINE", justification = "let PrintStream decide line separator")
 	public static void main(String[] args) {
 		try {
 			Cli cli = new Cli();
@@ -503,9 +656,9 @@ public final class Cli {
 			System.exit(e.getCode());
 		} catch (AwkRuntimeException e) {
 			if (e.getLineNumber() >= 0) {
-				System.err.printf("%s (line %d): %s\n", e.getClass().getSimpleName(), e.getLineNumber(), e.getMessage());
+				System.err.printf("%s (line %d): %s%n", e.getClass().getSimpleName(), e.getLineNumber(), e.getMessage());
 			} else {
-				System.err.printf("%s: %s\n", e.getClass().getSimpleName(), e.getMessage());
+				System.err.printf("%s: %s%n", e.getClass().getSimpleName(), e.getMessage());
 			}
 			System.exit(1);
 		} catch (IllegalArgumentException e) {
@@ -513,7 +666,7 @@ public final class Cli {
 			e.printStackTrace(System.err);
 			System.exit(1);
 		} catch (Exception e) {
-			System.err.printf("%s: %s\n", e.getClass().getSimpleName(), e.getMessage());
+			System.err.printf("%s: %s%n", e.getClass().getSimpleName(), e.getMessage());
 			System.exit(1);
 		}
 	}

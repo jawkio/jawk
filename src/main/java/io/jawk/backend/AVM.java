@@ -25,6 +25,9 @@ package io.jawk.backend;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.ArrayDeque;
@@ -133,6 +136,7 @@ public class AVM implements VariableManager, Closeable {
 	private boolean inputSourceFilelistAssignmentsApplied;
 	private InputSource resolvedInputSource;
 	private AwkExpression installedEvalExpression;
+	private boolean mergedGlobalLayoutActive;
 
 	/**
 	 * Construct the interpreter.
@@ -335,9 +339,7 @@ public class AVM implements VariableManager, Closeable {
 		AwkProgram compiledProgram = Objects.requireNonNull(program, "program");
 		InputSource resolvedSource = Objects.requireNonNull(inputSource, "inputSource");
 		resetRuntimeState(runtimeArguments, variableOverrides);
-		globalVariableOffsets = compiledProgram.getGlobalVariableOffsetMap();
-		globalVariableArrays = compiledProgram.getGlobalVariableAarrayMap();
-		functionNames = compiledProgram.getFunctionNameSet();
+		installProgramMetadata(compiledProgram);
 
 		jrt.prepareForExecution(settings.getFieldSeparator(), settings.getDefaultRS());
 		if (!executionSpecialVariables.isEmpty()) {
@@ -345,6 +347,128 @@ public class AVM implements VariableManager, Closeable {
 		}
 		rebindResolvedInputSource(resolvedSource);
 		executeTuples(compiledProgram.top());
+	}
+
+	/**
+	 * Executes a compiled AWK program while persisting user-defined global
+	 * variables across repeated executions on this AVM instance.
+	 * <p>
+	 * Before the new program starts, this method imports any user-defined
+	 * globals currently materialized in the AVM and remaps them onto the
+	 * incoming program's compiled global slots.
+	 *
+	 * @param program compiled program to execute
+	 * @param inputSource input source providing records
+	 * @throws ExitException when the program terminates via {@code exit}
+	 * @throws IOException if execution fails
+	 */
+	public void executePersistingGlobals(AwkProgram program, InputSource inputSource)
+			throws ExitException,
+			IOException {
+		executePersistingGlobals(program, inputSource, Collections.<String>emptyList(), null);
+	}
+
+	/**
+	 * Executes a compiled AWK program while persisting user-defined global
+	 * variables across repeated executions on this AVM instance.
+	 * <p>
+	 * Before the new program starts, this method imports any user-defined
+	 * globals currently materialized in the AVM and remaps them onto the
+	 * incoming program's compiled global slots.
+	 *
+	 * @param program compiled program to execute
+	 * @param inputSource input source providing records
+	 * @param runtimeArguments name=value or filename entries from the command line
+	 * @throws ExitException when the program terminates via {@code exit}
+	 * @throws IOException if execution fails
+	 */
+	public void executePersistingGlobals(
+			AwkProgram program,
+			InputSource inputSource,
+			List<String> runtimeArguments)
+			throws ExitException,
+			IOException {
+		executePersistingGlobals(program, inputSource, runtimeArguments, null);
+	}
+
+	/**
+	 * Executes a compiled AWK program while persisting user-defined global
+	 * variables across repeated executions on this AVM instance.
+	 * <p>
+	 * Before the new program starts, this method imports any user-defined
+	 * globals currently materialized in the AVM and remaps them onto the
+	 * incoming program's compiled global slots.
+	 *
+	 * @param program compiled program to execute
+	 * @param inputSource input source providing records
+	 * @param runtimeArguments name=value or filename entries from the command line
+	 * @param variableOverrides additional variable assignments applied on top of
+	 *        the settings-level variables (may be {@code null})
+	 * @throws ExitException when the program terminates via {@code exit}
+	 * @throws IOException if execution fails
+	 */
+	public void executePersistingGlobals(
+			AwkProgram program,
+			InputSource inputSource,
+			List<String> runtimeArguments,
+			Map<String, Object> variableOverrides)
+			throws ExitException,
+			IOException {
+		AwkProgram compiledProgram = Objects.requireNonNull(program, "program");
+		InputSource resolvedSource = Objects.requireNonNull(inputSource, "inputSource");
+		mergeRuntimeState(runtimeArguments, variableOverrides, compiledProgram);
+
+		jrt.prepareForExecution(settings.getFieldSeparator(), settings.getDefaultRS());
+		if (!executionSpecialVariables.isEmpty()) {
+			jrt.applySpecialVariables(executionSpecialVariables);
+		}
+		rebindResolvedInputSource(resolvedSource);
+		executeTuples(compiledProgram.top());
+	}
+
+	/**
+	 * Clears the user-defined globals retained in the current runtime stack.
+	 * <p>
+	 * The next {@link #executePersistingGlobals(AwkProgram, InputSource, List, Map)}
+	 * call will therefore start from an empty persistent global bank.
+	 */
+	public void clearPersistentGlobals() {
+		runtimeStack.clearGlobals();
+		mergedGlobalLayoutActive = false;
+	}
+
+	/**
+	 * Captures the user-defined globals currently retained by this AVM for
+	 * persistent execution.
+	 * <p>
+	 * The returned snapshot is serializable and can later be fed back into
+	 * {@link #restorePersistentMemory(Map)} on this or another AVM instance.
+	 *
+	 * @return serializable snapshot of the persistent user-global bank
+	 */
+	public Map<String, Object> snapshotPersistentMemory() {
+		return new LinkedHashMap<>(collectPersistentGlobalValues());
+	}
+
+	/**
+	 * Restores the user-defined globals retained by this AVM from a previously
+	 * captured persistent-memory snapshot.
+	 * <p>
+	 * Restoring a snapshot replaces the current retained global bank. The next
+	 * {@link #executePersistingGlobals(AwkProgram, InputSource, List, Map)} call
+	 * will merge these globals into the compiled layout of the incoming program.
+	 *
+	 * @param snapshot snapshot to restore
+	 */
+	public void restorePersistentMemory(Map<String, Object> snapshot) {
+		Map<String, Object> restoredSnapshot = Objects.requireNonNull(snapshot, "snapshot");
+		Map<String, Object> restoredGlobals = filterToPersistentEligible(restoredSnapshot);
+		runtimeStack.clearGlobals();
+		if (!restoredGlobals.isEmpty()) {
+			runtimeStack.rebindGlobals(new ArrayList<>(restoredGlobals.keySet()));
+			applyGlobalsToStack(restoredGlobals);
+		}
+		mergedGlobalLayoutActive = false;
 	}
 
 	private void initExtensions() {
@@ -459,6 +583,11 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	private void resetRuntimeState(List<String> runtimeArguments, Map<String, Object> variableOverrides) {
+		resetTransientRuntimeState(runtimeArguments, variableOverrides);
+		runtimeStack.clearGlobals();
+	}
+
+	private void resetTransientRuntimeState(List<String> runtimeArguments, Map<String, Object> variableOverrides) {
 		// Reset the AVM-owned state that must not leak across executions.
 		operandStack.clear();
 		environOffset = NULL_OFFSET;
@@ -475,27 +604,12 @@ public class AVM implements VariableManager, Closeable {
 		initializedEvalGlobalVariableOffsets = null;
 		initializedEvalGlobalVariableArrays = null;
 		installedEvalExpression = null;
-		runtimeStack.reset();
+		mergedGlobalLayoutActive = false;
+		runtimeStack.resetTransientState();
 		randomNumberGenerator.setSeed(1);
 		oldseed = 1;
 
-		this.arguments = runtimeArguments != null ? new ArrayList<>(runtimeArguments) : Collections.<String>emptyList();
-
-		if (variableOverrides == null || variableOverrides.isEmpty()) {
-			executionInitialVariables = baseInitialVariables;
-			executionSpecialVariables = baseSpecialVariables;
-		} else {
-			executionInitialVariables = new HashMap<String, Object>(baseInitialVariables);
-			executionInitialVariables.putAll(variableOverrides);
-
-			Map<String, Object> specialOverrides = JRT.copySpecialVariables(variableOverrides);
-			if (specialOverrides.isEmpty()) {
-				executionSpecialVariables = baseSpecialVariables;
-			} else {
-				executionSpecialVariables = new HashMap<String, Object>(baseSpecialVariables);
-				executionSpecialVariables.putAll(specialOverrides);
-			}
-		}
+		prepareExecutionInputs(runtimeArguments, variableOverrides);
 	}
 
 	private void installExpressionMetadata(AwkExpression compiledExpression) {
@@ -506,6 +620,12 @@ public class AVM implements VariableManager, Closeable {
 		globalVariableArrays = compiledExpression.getGlobalVariableAarrayMap();
 		functionNames = compiledExpression.getFunctionNameSet();
 		installedEvalExpression = compiledExpression;
+	}
+
+	private void installProgramMetadata(AwkProgram compiledProgram) {
+		globalVariableOffsets = compiledProgram.getGlobalVariableOffsetMap();
+		globalVariableArrays = compiledProgram.getGlobalVariableAarrayMap();
+		functionNames = compiledProgram.getFunctionNameSet();
 	}
 
 	private void rebindResolvedInputSource(InputSource resolvedSource) {
@@ -522,6 +642,311 @@ public class AVM implements VariableManager, Closeable {
 				&& globals.length == numGlobals
 				&& Objects.equals(initializedEvalGlobalVariableOffsets, globalVariableOffsets)
 				&& Objects.equals(initializedEvalGlobalVariableArrays, globalVariableArrays);
+	}
+
+	/**
+	 * Resets transient execution state, installs the new program metadata, and
+	 * merges the previously retained user globals into the new compiled global
+	 * layout.
+	 *
+	 * @param runtimeArguments name=value or filename entries for this execution
+	 * @param variableOverrides per-call variable overrides for this execution
+	 * @param compiledProgram program whose global layout should become active
+	 */
+	private void mergeRuntimeState(
+			List<String> runtimeArguments,
+			Map<String, Object> variableOverrides,
+			AwkProgram compiledProgram) {
+		Map<String, Object> carriedGlobals = collectPersistentGlobalValues();
+		resetTransientRuntimeState(runtimeArguments, variableOverrides);
+		installProgramMetadata(compiledProgram);
+
+		Map<String, Object> basePersistentSeeds = collectBasePersistentGlobalSeeds();
+		Map<String, Object> executionUserSeeds = collectExecutionUserGlobalSeeds(variableOverrides);
+		List<String> mergedGlobalNamesByOffset = buildMergedGlobalNamesByOffset(
+				carriedGlobals,
+				basePersistentSeeds,
+				executionUserSeeds);
+
+		runtimeStack.rebindGlobals(mergedGlobalNamesByOffset);
+		applyGlobalsToStack(carriedGlobals);
+		applyGlobalsToStack(basePersistentSeeds);
+		applyGlobalsToStack(executionUserSeeds);
+		mergedGlobalLayoutActive = true;
+	}
+
+	/**
+	 * Returns whether the current runtime stack already contains a merged global
+	 * layout for the compiled program about to execute.
+	 * <p>
+	 * Persistent execution may append previously retained globals after the
+	 * compiled globals of the incoming program. The tuple stream only dereferences
+	 * the prefix defined by {@code SET_NUM_GLOBALS}, so appended globals are valid
+	 * as long as the compiled prefix still matches name-for-name and offset-for-offset.
+	 *
+	 * @param numGlobals number of globals compiled into the active program
+	 * @return {@code true} when the merged layout is compatible with the active
+	 *         program
+	 */
+	private boolean hasCompatiblePersistentGlobalLayout(long numGlobals) {
+		Object[] globals = runtimeStack.getNumGlobals();
+		if (!mergedGlobalLayoutActive
+				|| globals == null
+				|| globalVariableOffsets == null
+				|| globals.length < numGlobals) {
+			return false;
+		}
+		for (Map.Entry<String, Integer> entry : globalVariableOffsets.entrySet()) {
+			int offset = entry.getValue().intValue();
+			if (offset < 0 || offset >= globals.length || !entry.getKey().equals(runtimeStack.getGlobalName(offset))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Applies execution-level initial variables to stack-managed globals.
+	 * <p>
+	 * Plain {@link #execute(AwkProgram, InputSource, List, Map)} calls apply all
+	 * compatible globals here. Persistent executions only reapply non-persistent
+	 * globals so carried user globals are not overwritten unless they were
+	 * explicitly supplied for the current run.
+	 *
+	 * @param skipPersistentEligibleGlobals whether persistent user globals should
+	 *        be skipped by this application pass
+	 */
+	private void applyExecutionInitialVariablesToGlobalSlots(boolean skipPersistentEligibleGlobals) {
+		for (Map.Entry<String, Object> entry : executionInitialVariables.entrySet()) {
+			String key = entry.getKey();
+			if (skipPersistentEligibleGlobals && isPersistentEligibleGlobal(key)) {
+				continue;
+			}
+			if (functionNames.contains(key)) {
+				throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + key + ").");
+			}
+			Integer offsetObj = globalVariableOffsets.get(key);
+			Boolean arrayObj = globalVariableArrays.get(key);
+			if (offsetObj != null) {
+				Object obj = entry.getValue();
+				if (arrayObj.booleanValue()) {
+					if (obj instanceof Map) {
+						runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
+					} else {
+						throw new IllegalArgumentException(
+								"Cannot assign a scalar to a non-scalar variable (" + key + ").");
+					}
+				} else {
+					runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Prepares the per-execution runtime arguments and variable overrides.
+	 * <p>
+	 * Base settings-level variables remain the default source. Per-call overrides
+	 * are layered on top without mutating the base snapshot held by this AVM.
+	 *
+	 * @param runtimeArguments name=value or filename entries for this execution
+	 * @param variableOverrides per-call variable overrides for this execution
+	 */
+	private void prepareExecutionInputs(
+			List<String> runtimeArguments,
+			Map<String, Object> variableOverrides) {
+		this.arguments = runtimeArguments != null ? new ArrayList<>(runtimeArguments) : Collections.<String>emptyList();
+
+		if (variableOverrides == null || variableOverrides.isEmpty()) {
+			executionInitialVariables = baseInitialVariables;
+			executionSpecialVariables = baseSpecialVariables;
+		} else {
+			executionInitialVariables = new HashMap<>(baseInitialVariables);
+			executionInitialVariables.putAll(variableOverrides);
+
+			Map<String, Object> specialOverrides = JRT.copySpecialVariables(variableOverrides);
+			if (specialOverrides.isEmpty()) {
+				executionSpecialVariables = baseSpecialVariables;
+			} else {
+				executionSpecialVariables = new HashMap<>(baseSpecialVariables);
+				executionSpecialVariables.putAll(specialOverrides);
+			}
+		}
+	}
+
+	/**
+	 * Filters the given map to retain only entries whose keys are
+	 * persistent-eligible globals.
+	 *
+	 * @param source source map to filter
+	 * @return insertion-ordered map containing only persistent-eligible entries
+	 */
+	private Map<String, Object> filterToPersistentEligible(Map<String, Object> source) {
+		Map<String, Object> result = new LinkedHashMap<>();
+		for (Map.Entry<String, Object> entry : source.entrySet()) {
+			if (isPersistentEligibleGlobal(entry.getKey())) {
+				result.put(entry.getKey(), entry.getValue());
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * Collects the current user-defined globals retained in the runtime stack.
+	 *
+	 * @return retained user globals keyed by name, in current runtime order
+	 */
+	private Map<String, Object> collectPersistentGlobalValues() {
+		return filterToPersistentEligible(runtimeStack.snapshotGlobalVariables());
+	}
+
+	/**
+	 * Collects the AVM-wide baseline variables that should be reapplied before
+	 * each persistent execution.
+	 *
+	 * @return baseline user globals keyed by name
+	 */
+	private Map<String, Object> collectBasePersistentGlobalSeeds() {
+		Map<String, Object> basePersistentSeeds = new LinkedHashMap<>();
+		for (Map.Entry<String, Object> entry : baseInitialVariables.entrySet()) {
+			String name = entry.getKey();
+			if (isPersistentEligibleGlobal(name)) {
+				validateSeededGlobal(name, entry.getValue());
+				basePersistentSeeds.put(name, entry.getValue());
+			}
+		}
+		return basePersistentSeeds;
+	}
+
+	/**
+	 * Collects the user-defined variables that should override the retained
+	 * global bank for the current persistent execution.
+	 * <p>
+	 * Only user globals are included here. JRT-managed special variables still
+	 * flow through the normal execution setup.
+	 *
+	 * @param variableOverrides per-call variable overrides for this execution
+	 * @return insertion-ordered overriding seed values keyed by variable name
+	 */
+	private Map<String, Object> collectExecutionUserGlobalSeeds(Map<String, Object> variableOverrides) {
+		Map<String, Object> executionUserSeeds = new LinkedHashMap<>();
+		if (variableOverrides != null) {
+			for (Map.Entry<String, Object> entry : variableOverrides.entrySet()) {
+				String name = entry.getKey();
+				if (isPersistentEligibleGlobal(name)) {
+					validateSeededGlobal(name, entry.getValue());
+					executionUserSeeds.put(name, entry.getValue());
+				}
+			}
+		}
+		return executionUserSeeds;
+	}
+
+	/**
+	 * Builds the slot order for the next persistent execution.
+	 * <p>
+	 * The compiled globals are always installed first in their compiled offset
+	 * order. Retained globals and seeded user globals that are not compiled by
+	 * the incoming program are appended afterwards so future runs can still reuse
+	 * them without changing the current program's compiled offsets.
+	 *
+	 * @param carriedGlobals retained user globals from the previous execution
+	 * @param basePersistentSeeds baseline user globals coming from the AVM settings
+	 * @param executionUserSeeds per-call user overrides for this execution
+	 * @return merged slot-to-name layout for the next persistent run
+	 */
+	private List<String> buildMergedGlobalNamesByOffset(
+			Map<String, Object> carriedGlobals,
+			Map<String, Object> basePersistentSeeds,
+			Map<String, Object> executionUserSeeds) {
+		LinkedHashSet<String> orderedNames = new LinkedHashSet<>();
+		List<Map.Entry<String, Integer>> compiledGlobals = new ArrayList<>(globalVariableOffsets.entrySet());
+		compiledGlobals.sort(java.util.Comparator.comparingInt(Map.Entry::getValue));
+		for (Map.Entry<String, Integer> entry : compiledGlobals) {
+			orderedNames.add(entry.getKey());
+		}
+		orderedNames.addAll(carriedGlobals.keySet());
+		orderedNames.addAll(basePersistentSeeds.keySet());
+		orderedNames.addAll(executionUserSeeds.keySet());
+		return new ArrayList<>(orderedNames);
+	}
+
+	/**
+	 * Writes each entry from {@code globals} into the corresponding named slot in
+	 * the runtime stack.
+	 *
+	 * @param globals map of variable name to value to apply
+	 */
+	private void applyGlobalsToStack(Map<String, Object> globals) {
+		for (Map.Entry<String, Object> entry : globals.entrySet()) {
+			runtimeStack.setGlobalVariable(entry.getKey(), entry.getValue());
+		}
+	}
+
+	/**
+	 * Returns whether the given global name should participate in persistent
+	 * memory.
+	 *
+	 * @param name global variable name
+	 * @return {@code true} when the variable should persist across runs
+	 */
+	private boolean isPersistentEligibleGlobal(String name) {
+		return name != null
+				&& !JRT.isJrtManagedSpecialVariable(name)
+				&& !NON_PERSISTENT_GLOBALS.contains(name);
+	}
+
+	/**
+	 * Validates that a seeded global value is compatible with the compiled
+	 * metadata of the current program.
+	 *
+	 * @param name variable name to validate
+	 * @param value proposed seeded value
+	 */
+	private void validateSeededGlobal(String name, Object value) {
+		if (functionNames.contains(name)) {
+			throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + name + ").");
+		}
+		Boolean arrayObj = globalVariableArrays.get(name);
+		if (Boolean.TRUE.equals(arrayObj) && !(value instanceof Map)) {
+			throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + name + ").");
+		}
+	}
+
+	/**
+	 * Parses a runtime {@code name=value} assignment.
+	 *
+	 * @param nameValue raw assignment text
+	 * @return parsed assignment
+	 */
+	private NameValueAssignment parseNameValueAssignment(String nameValue) {
+		int eqIdx = nameValue.indexOf('=');
+		if (eqIdx == 0) {
+			throw new IllegalArgumentException(
+					"Must have a non-blank variable name in a name=value variable assignment argument.");
+		}
+		String name = nameValue.substring(0, eqIdx);
+		String value = nameValue.substring(eqIdx + 1);
+		return new NameValueAssignment(name, coerceVariableAssignmentValue(value));
+	}
+
+	/**
+	 * Coerces a runtime assignment value using the same scalar rules as the
+	 * existing command-line handling: integer first, then double, then string.
+	 *
+	 * @param value raw text to coerce
+	 * @return coerced scalar value
+	 */
+	private Object coerceVariableAssignmentValue(String value) {
+		try {
+			return Integer.parseInt(value);
+		} catch (NumberFormatException nfe) {
+			try {
+				return Double.parseDouble(value);
+			} catch (NumberFormatException nfe2) {
+				return value;
+			}
+		}
 	}
 
 	/**
@@ -1943,8 +2368,14 @@ public class AVM implements VariableManager, Closeable {
 				case SET_NUM_GLOBALS: {
 					// arg[0] = # of globals
 					Object[] globals = runtimeStack.getNumGlobals();
-					if (globals == null) {
-						runtimeStack.setNumGlobals(position.intArg(0));
+					if (mergedGlobalLayoutActive) {
+						if (!hasCompatiblePersistentGlobalLayout(position.intArg(0))) {
+							throw new IllegalStateException(
+									"AVM globals are already initialized for an incompatible persistent layout.");
+						}
+						applyExecutionInitialVariablesToGlobalSlots(true);
+					} else if (globals == null) {
+						runtimeStack.setNumGlobals(position.intArg(0), globalVariableOffsets);
 						initializedEvalGlobalVariableOffsets = globalVariableOffsets;
 						initializedEvalGlobalVariableArrays = globalVariableArrays;
 
@@ -1952,27 +2383,7 @@ public class AVM implements VariableManager, Closeable {
 						// we can allocate the initial variables
 
 						// assign -v variables and per-call overrides prepared for this execution
-						for (Map.Entry<String, Object> entry : executionInitialVariables.entrySet()) {
-							String key = entry.getKey();
-							if (functionNames.contains(key)) {
-								throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + key + ").");
-							}
-							Integer offsetObj = globalVariableOffsets.get(key);
-							Boolean arrayObj = globalVariableArrays.get(key);
-							if (offsetObj != null) {
-								Object obj = entry.getValue();
-								if (arrayObj.booleanValue()) {
-									if (obj instanceof Map) {
-										runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
-									} else {
-										throw new IllegalArgumentException(
-												"Cannot assign a scalar to a non-scalar variable (" + key + ").");
-									}
-								} else {
-									runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
-								}
-							}
-						}
+						applyExecutionInitialVariablesToGlobalSlots(false);
 					} else if (!hasCompatibleEvalGlobalLayout(position.intArg(0))) {
 						throw new IllegalStateException(
 								"AVM globals are already initialized for a different eval layout. Call prepareForEval(...) first.");
@@ -2618,24 +3029,9 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	@SuppressWarnings("unused")
 	private void setFilelistVariable(String nameValue) {
-		int eqIdx = nameValue.indexOf('=');
-		// variable name should be non-blank
-		if (eqIdx == 0) {
-			throw new IllegalArgumentException(
-					"Must have a non-blank variable name in a name=value variable assignment argument.");
-		}
-		String name = nameValue.substring(0, eqIdx);
-		String value = nameValue.substring(eqIdx + 1);
-		Object obj;
-		try {
-			obj = Integer.parseInt(value);
-		} catch (NumberFormatException nfe) {
-			try {
-				obj = Double.parseDouble(value);
-			} catch (NumberFormatException nfe2) {
-				obj = value;
-			}
-		}
+		NameValueAssignment assignment = parseNameValueAssignment(nameValue);
+		String name = assignment.name;
+		Object obj = assignment.value;
 
 		// make sure we're not receiving funcname=value assignments
 		if (functionNames.contains(name)) {
@@ -2651,8 +3047,9 @@ public class AVM implements VariableManager, Closeable {
 			} else {
 				runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
 			}
+		} else if (runtimeStack.hasGlobalVariable(name)) {
+			runtimeStack.setGlobalVariable(name, obj);
 		}
-		// otherwise, do nothing
 	}
 
 	/** {@inheritDoc} */
@@ -2682,6 +3079,8 @@ public class AVM implements VariableManager, Closeable {
 			} else {
 				runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
 			}
+		} else if (runtimeStack.hasGlobalVariable(name)) {
+			runtimeStack.setGlobalVariable(name, obj);
 		}
 	}
 
@@ -2846,6 +3245,23 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	private static final UninitializedObject BLANK = new UninitializedObject();
+
+	/**
+	 * Global names that must not participate in persistent memory even though they
+	 * are technically user-visible variables.
+	 */
+	private static final Set<String> NON_PERSISTENT_GLOBALS = new HashSet<>(
+			Arrays.asList("ARGV", "ARGC", "ENVIRON", "RSTART", "RLENGTH", "IGNORECASE"));
+
+	private static final class NameValueAssignment {
+		private final String name;
+		private final Object value;
+
+		private NameValueAssignment(String name, Object value) {
+			this.name = name;
+			this.value = value;
+		}
+	}
 
 	private static final class SingleRecordInputSource implements InputSource {
 

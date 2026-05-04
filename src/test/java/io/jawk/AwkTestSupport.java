@@ -516,6 +516,7 @@ public final class AwkTestSupport {
 	public static final class CliTestBuilder extends BaseTestBuilder<CliTestBuilder> {
 		private final List<String> argumentSpecs = new ArrayList<>();
 		private final Map<String, Object> assignments = new LinkedHashMap<>();
+		private final Map<String, String> environment = new LinkedHashMap<>();
 
 		private CliTestBuilder(String description) {
 			super(description);
@@ -546,6 +547,34 @@ public final class AwkTestSupport {
 			return this;
 		}
 
+		/**
+		 * Adds one environment variable that should be visible to the CLI during
+		 * execution. Placeholder tokens in the value are resolved at runtime.
+		 *
+		 * @param name environment variable name
+		 * @param value environment variable value
+		 * @return this builder for method chaining
+		 */
+		public CliTestBuilder env(String name, String value) {
+			environment.put(name, value);
+			return this;
+		}
+
+		/**
+		 * Adds several environment variables that should be visible to the CLI
+		 * during execution. Placeholder tokens in the values are resolved at
+		 * runtime.
+		 *
+		 * @param values environment variables to expose
+		 * @return this builder for method chaining
+		 */
+		public CliTestBuilder env(Map<String, String> values) {
+			if (values != null) {
+				environment.putAll(values);
+			}
+			return this;
+		}
+
 		@Override
 		protected CliTestCase buildTestCase(
 				TestLayout layout,
@@ -555,7 +584,15 @@ public final class AwkTestSupport {
 			if (useTempDir && !assignments.containsKey("TEMPDIR")) {
 				assignments.put("TEMPDIR", SHARED_TEMP_DIR.toString());
 			}
-			return new CliTestCase(layout, files, operands, placeholders, requiresPosix, argumentSpecs, assignments);
+			return new CliTestCase(
+					layout,
+					files,
+					operands,
+					placeholders,
+					requiresPosix,
+					argumentSpecs,
+					assignments,
+					environment);
 		}
 	}
 
@@ -1039,6 +1076,7 @@ public final class AwkTestSupport {
 	private static final class CliTestCase extends BaseTestCase {
 		private final List<String> argumentSpecs;
 		private final Map<String, Object> assignments;
+		private final Map<String, String> environment;
 
 		CliTestCase(
 				TestLayout layout,
@@ -1047,10 +1085,12 @@ public final class AwkTestSupport {
 				List<String> pathPlaceholders,
 				boolean requiresPosix,
 				List<String> argumentSpecs,
-				Map<String, Object> assignments) {
+				Map<String, Object> assignments,
+				Map<String, String> environment) {
 			super(layout, fileContents, operandSpecs, pathPlaceholders, requiresPosix);
 			this.argumentSpecs = new ArrayList<>(argumentSpecs);
 			this.assignments = new LinkedHashMap<>(assignments);
+			this.environment = new LinkedHashMap<>(environment);
 		}
 
 		@Override
@@ -1061,10 +1101,15 @@ public final class AwkTestSupport {
 					new ByteArrayInputStream(new byte[0]);
 			ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
 			ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
+			Map<String, String> resolvedEnvironment = new LinkedHashMap<String, String>();
+			for (Map.Entry<String, String> entry : environment.entrySet()) {
+				resolvedEnvironment.put(entry.getKey(), env.resolve(entry.getValue()));
+			}
 			Cli cli = new Cli(
 					in,
 					new PrintStream(outBytes, true, StandardCharsets.UTF_8.name()),
-					new PrintStream(errBytes, true, StandardCharsets.UTF_8.name()));
+					new PrintStream(errBytes, true, StandardCharsets.UTF_8.name()),
+					resolvedEnvironment);
 
 			List<String> args = new ArrayList<>();
 			for (Map.Entry<String, Object> entry : assignments.entrySet()) {

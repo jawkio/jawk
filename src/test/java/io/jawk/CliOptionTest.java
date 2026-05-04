@@ -22,13 +22,23 @@ package io.jawk;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import org.junit.Test;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
@@ -118,6 +128,16 @@ public class CliOptionTest {
 	}
 
 	@Test
+	public void persistOptionWithoutFilenameReportsMissingArgument() {
+		Cli cli = new Cli();
+		IllegalArgumentException ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> cli.parse(new String[]
+				{ "--persist" }));
+		assertTrue(ex.getMessage().contains("Need additional argument for --persist"));
+	}
+
+	@Test
 	public void helpOutputDoesNotAdvertiseUnsupportedOutputOption() throws Exception {
 		AwkTestSupport.TestResult result = AwkTestSupport
 				.cliTest("CLI help omits unsupported -o option")
@@ -144,9 +164,164 @@ public class CliOptionTest {
 		assertTrue(ex.getCause() instanceof ClassCastException);
 	}
 
+	@Test
+	public void persistOptionPersistsUserGlobalsAcrossCliRuns() throws Exception {
+		File memory = new File(tempFolder.getRoot(), "memory.bin");
+
+		AwkTestSupport
+				.cliTest("CLI persist first run")
+				.argument("--persist", memory.getAbsolutePath())
+				.script("BEGIN { print ++i }")
+				.expect("1\n")
+				.expectExit(0)
+				.runAndAssert();
+		assertTrue(memory.isFile());
+		AwkTestSupport
+				.cliTest("CLI persist second run")
+				.argument("--persist", memory.getAbsolutePath())
+				.script("BEGIN { print ++i }")
+				.expect("2\n")
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
+	public void persistOptionPersistsAssociativeArraysAcrossCliRuns() throws Exception {
+		File memory = new File(tempFolder.getRoot(), "array-memory.bin");
+
+		AwkTestSupport
+				.cliTest("CLI persist array first run")
+				.argument("--persist", memory.getAbsolutePath())
+				.script("BEGIN { arr[\"x\"] = 9 }")
+				.expect("")
+				.expectExit(0)
+				.runAndAssert();
+		AwkTestSupport
+				.cliTest("CLI persist array second run")
+				.argument("--persist", memory.getAbsolutePath())
+				.script("BEGIN { print arr[\"x\"] }")
+				.expect("9\n")
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
+	public void persistentMemoryEnvironmentVariablePersistsUserGlobalsAcrossCliRuns() throws Exception {
+		File memory = new File(tempFolder.getRoot(), "env-memory.bin");
+		Map<String, String> environment = Collections
+				.singletonMap(
+						"JAWK_PERSISTENT_MEMORY",
+						memory.getAbsolutePath());
+
+		AwkTestSupport
+				.cliTest("CLI env persist first run")
+				.env(environment)
+				.script("BEGIN { print ++i }")
+				.expect("1\n")
+				.expectExit(0)
+				.runAndAssert();
+		assertTrue(memory.isFile());
+		AwkTestSupport
+				.cliTest("CLI env persist second run")
+				.env(environment)
+				.script("BEGIN { print ++i }")
+				.expect("2\n")
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
+	public void persistOptionOverridesPersistentMemoryEnvironmentVariable() throws Exception {
+		File optionMemory = new File(tempFolder.getRoot(), "option-memory.bin");
+		File envMemory = new File(tempFolder.getRoot(), "env-memory.bin");
+		Map<String, String> environment = new HashMap<>();
+		environment.put("JAWK_PERSISTENT_MEMORY", envMemory.getAbsolutePath());
+
+		AwkTestSupport
+				.cliTest("CLI persist option first run")
+				.env(environment)
+				.argument("--persist", optionMemory.getAbsolutePath())
+				.script("BEGIN { print ++i }")
+				.expect("1\n")
+				.expectExit(0)
+				.runAndAssert();
+		AwkTestSupport
+				.cliTest("CLI env-only persist run")
+				.env(environment)
+				.script("BEGIN { print ++i }")
+				.expect("1\n")
+				.expectExit(0)
+				.runAndAssert();
+		AwkTestSupport
+				.cliTest("CLI persist option second run")
+				.env(environment)
+				.argument("--persist", optionMemory.getAbsolutePath())
+				.script("BEGIN { print ++i }")
+				.expect("2\n")
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
+	public void persistOptionWithWrongSerializedTypeThrowsFriendlyError() throws Exception {
+		File bad = tempFolder.newFile("wrong-persistent-type.ser");
+		try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(bad))) {
+			oos.writeObject("not persistent memory");
+		}
+
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.cliTest("CLI persist rejects wrong serialized type")
+				.argument("--persist", bad.getAbsolutePath())
+				.script("BEGIN { print 1 }")
+				.expectThrow(IllegalArgumentException.class)
+				.run();
+
+		result.assertExpected();
+		assertTrue(result.thrownException().getMessage().contains("does not contain valid Jawk persistent memory"));
+		assertTrue(result.thrownException().getCause() instanceof ClassCastException);
+	}
+
+	@Test
+	public void persistOptionFlushesOutputBeforeSaveFailure() throws Exception {
+		File blockingParent = tempFolder.newFile("not-a-directory");
+		File memory = new File(blockingParent, "memory.bin");
+		FlushTrackingOutputStream output = new FlushTrackingOutputStream();
+		Cli cli = new Cli(
+				new ByteArrayInputStream(new byte[0]),
+				new PrintStream(output, false, StandardCharsets.UTF_8.name()),
+				new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8.name()),
+				Collections.<String, String>emptyMap());
+		cli.parse(new String[] { "--persist", memory.getAbsolutePath(), "BEGIN { print \"ok\" }" });
+
+		IOException ex = assertThrows(IOException.class, () -> cli.run());
+
+		assertTrue(ex.getMessage().contains("Failed to create directory"));
+		assertEquals("ok\n", output.flushedText());
+	}
+
 	private static void writeProgram(File target, String script) throws Exception {
 		try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(target))) {
 			oos.writeObject(new Awk().compile(script));
+		}
+	}
+
+	private static final class FlushTrackingOutputStream extends OutputStream {
+		private final ByteArrayOutputStream pending = new ByteArrayOutputStream();
+		private final ByteArrayOutputStream flushed = new ByteArrayOutputStream();
+
+		@Override
+		public void write(int b) {
+			pending.write(b);
+		}
+
+		@Override
+		public void flush() throws IOException {
+			pending.writeTo(flushed);
+			pending.reset();
+		}
+
+		private String flushedText() {
+			return new String(flushed.toByteArray(), StandardCharsets.UTF_8);
 		}
 	}
 }

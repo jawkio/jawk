@@ -23,8 +23,13 @@ package io.jawk.backend;
  */
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import io.jawk.intermediate.UninitializedObject;
 
 /**
@@ -36,6 +41,8 @@ class RuntimeStack {
 	private static final Object[] NULL_LOCALS_SENTINEL = new Object[0];
 
 	private Object[] globals = null;
+	private List<String> globalNamesByOffset = Collections.emptyList();
+	private Map<String, Integer> globalOffsetsByName = Collections.emptyMap();
 	private Object[] locals = null;
 	private Deque<Object[]> localsStack = new ArrayDeque<Object[]>();
 	private Deque<Integer> returnIndexes = new ArrayDeque<Integer>();
@@ -43,6 +50,7 @@ class RuntimeStack {
 	@SuppressWarnings("unused")
 	public void dump() {
 		System.out.println("globals = " + Arrays.toString(globals));
+		System.out.println("globalNamesByOffset = " + globalNamesByOffset);
 		System.out.println("locals = " + Arrays.toString(locals));
 		System.out.println("localsStack = " + localsStack);
 		System.out.println("returnIndexes = " + returnIndexes);
@@ -53,7 +61,17 @@ class RuntimeStack {
 	}
 
 	void reset() {
+		clearGlobals();
+		resetTransientState();
+	}
+
+	void clearGlobals() {
 		globals = null;
+		globalNamesByOffset = Collections.emptyList();
+		globalOffsetsByName = Collections.emptyMap();
+	}
+
+	void resetTransientState() {
 		locals = null;
 		localsStack.clear();
 		returnIndexes.clear();
@@ -61,11 +79,12 @@ class RuntimeStack {
 	}
 
 	/** Must be one of the first methods executed. */
-	void setNumGlobals(long l) {
+	void setNumGlobals(long l, Map<String, Integer> offsetsByName) {
 		globals = new Object[(int) l];
 		for (int i = 0; i < l; i++) {
 			globals[i] = null;
 		}
+		setGlobalLayoutMetadata((int) l, offsetsByName);
 		// must accept multiple executions
 		// expandFrameIfNecessary(num_globals);
 	}
@@ -83,6 +102,48 @@ class RuntimeStack {
 	 * globals = new_frame;
 	 * }
 	 */
+
+	void rebindGlobals(List<String> namesByOffset) {
+		globals = new Object[namesByOffset.size()];
+		for (int i = 0; i < globals.length; i++) {
+			globals[i] = null;
+		}
+		setGlobalLayoutMetadata(namesByOffset);
+	}
+
+	Map<String, Object> snapshotGlobalVariables() {
+		Map<String, Object> snapshot = new LinkedHashMap<String, Object>();
+		if (globals == null) {
+			return snapshot;
+		}
+		for (int i = 0; i < globals.length && i < globalNamesByOffset.size(); i++) {
+			String name = globalNamesByOffset.get(i);
+			if (name != null) {
+				snapshot.put(name, globals[i]);
+			}
+		}
+		return snapshot;
+	}
+
+	boolean hasGlobalVariable(String name) {
+		return globalOffsetsByName.containsKey(name);
+	}
+
+	Object getGlobalVariable(String name) {
+		Integer offset = globalOffsetsByName.get(name);
+		return offset == null ? null : globals[offset.intValue()];
+	}
+
+	void setGlobalVariable(String name, Object value) {
+		Integer offset = globalOffsetsByName.get(name);
+		if (offset != null) {
+			globals[offset.intValue()] = value;
+		}
+	}
+
+	String getGlobalName(int offset) {
+		return offset >= 0 && offset < globalNamesByOffset.size() ? globalNamesByOffset.get(offset) : null;
+	}
 
 	Object getVariable(long offset, boolean isGlobal) {
 		if (isGlobal) {
@@ -151,5 +212,30 @@ class RuntimeStack {
 		}
 		returnValue = null;
 		return retval;
+	}
+
+	private void setGlobalLayoutMetadata(int numGlobals, Map<String, Integer> offsetsByName) {
+		List<String> namesByOffset = new ArrayList<String>(Collections.nCopies(numGlobals, (String) null));
+		if (offsetsByName != null) {
+			for (Map.Entry<String, Integer> entry : offsetsByName.entrySet()) {
+				int offset = entry.getValue().intValue();
+				if (offset >= 0 && offset < numGlobals) {
+					namesByOffset.set(offset, entry.getKey());
+				}
+			}
+		}
+		setGlobalLayoutMetadata(namesByOffset);
+	}
+
+	private void setGlobalLayoutMetadata(List<String> namesByOffset) {
+		globalNamesByOffset = new ArrayList<String>(namesByOffset);
+		Map<String, Integer> offsetsByName = new LinkedHashMap<String, Integer>();
+		for (int i = 0; i < namesByOffset.size(); i++) {
+			String name = namesByOffset.get(i);
+			if (name != null) {
+				offsetsByName.put(name, Integer.valueOf(i));
+			}
+		}
+		globalOffsetsByName = offsetsByName;
 	}
 }

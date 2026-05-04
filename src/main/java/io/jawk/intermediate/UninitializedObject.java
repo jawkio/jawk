@@ -29,7 +29,9 @@ package io.jawk.intermediate;
  *
  * @author Danny Daglas
  */
-public class UninitializedObject {
+public class UninitializedObject implements java.io.Serializable {
+
+	private static final long serialVersionUID = 1L;
 
 	/**
 	 * <p>

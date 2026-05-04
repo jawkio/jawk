@@ -271,9 +271,7 @@ public class CliOptionTest {
 
 		result.assertExpected();
 		assertTrue(result.thrownException().getMessage().contains("does not contain valid Jawk persistent memory"));
-		assertTrue(
-				result.thrownException().getCause() instanceof ClassCastException
-						|| result.thrownException().getCause() instanceof java.io.InvalidClassException);
+		assertTrue(result.thrownException().getCause() instanceof ClassCastException);
 	}
 
 	private static void writeProgram(File target, String script) throws Exception {

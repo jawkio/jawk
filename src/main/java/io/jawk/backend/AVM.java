@@ -165,7 +165,6 @@ public class AVM implements VariableManager, Closeable {
 		arguments = Collections.emptyList();
 		sortedArrayKeys = this.settings.isUseSortedArrayKeys();
 		baseInitialVariables = new HashMap<String, Object>(this.settings.getVariables());
-		normalizeVariableValues(baseInitialVariables);
 		baseSpecialVariables = JRT.copySpecialVariables(baseInitialVariables);
 		executionInitialVariables = baseInitialVariables;
 		executionSpecialVariables = baseSpecialVariables;
@@ -729,7 +728,7 @@ public class AVM implements VariableManager, Closeable {
 			Integer offsetObj = globalVariableOffsets.get(key);
 			Boolean arrayObj = globalVariableArrays.get(key);
 			if (offsetObj != null) {
-				Object obj = entry.getValue();
+				Object obj = normalizeVariableValue(entry.getValue());
 				if (arrayObj.booleanValue()) {
 					if (obj instanceof Map) {
 						runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
@@ -764,7 +763,6 @@ public class AVM implements VariableManager, Closeable {
 		} else {
 			executionInitialVariables = new HashMap<>(baseInitialVariables);
 			executionInitialVariables.putAll(variableOverrides);
-			normalizeVariableValues(executionInitialVariables);
 
 			Map<String, Object> specialOverrides = JRT.copySpecialVariables(variableOverrides);
 			if (specialOverrides.isEmpty()) {
@@ -772,7 +770,6 @@ public class AVM implements VariableManager, Closeable {
 			} else {
 				executionSpecialVariables = new HashMap<>(baseSpecialVariables);
 				executionSpecialVariables.putAll(specialOverrides);
-				normalizeVariableValues(executionSpecialVariables);
 			}
 		}
 	}
@@ -3060,10 +3057,10 @@ public class AVM implements VariableManager, Closeable {
 	/** {@inheritDoc} */
 	@Override
 	public final void assignVariable(String name, Object obj) {
-		Object normalized = normalizeVariableValue(obj);
 		// When offsets are not available yet, treat the assignment as part of this
 		// AVM's baseline initial-variable snapshot.
 		if (globalVariableOffsets == null || globalVariableArrays == null) {
+			Object normalized = normalizeVariableValue(obj);
 			baseInitialVariables.put(name, normalized);
 			if (JRT.isJrtManagedSpecialVariable(name)) {
 				baseSpecialVariables.put(name, normalized);
@@ -3080,6 +3077,7 @@ public class AVM implements VariableManager, Closeable {
 		Boolean arrayObj = globalVariableArrays.get(name);
 
 		if (offsetObj != null) {
+			Object normalized = normalizeVariableValue(obj);
 			if (arrayObj.booleanValue()) {
 				if (normalized instanceof Map) {
 					runtimeStack.setFilelistVariable(offsetObj.intValue(), normalized);
@@ -3091,6 +3089,7 @@ public class AVM implements VariableManager, Closeable {
 				runtimeStack.setFilelistVariable(offsetObj.intValue(), normalized);
 			}
 		} else if (runtimeStack.hasGlobalVariable(name)) {
+			Object normalized = normalizeVariableValue(obj);
 			runtimeStack.setGlobalVariable(name, normalized);
 		}
 	}
@@ -3253,16 +3252,6 @@ public class AVM implements VariableManager, Closeable {
 		@SuppressWarnings("unchecked")
 		Map<Object, Object> nested = (Map<Object, Object>) value;
 		return nested;
-	}
-
-	private void normalizeVariableValues(Map<String, Object> variables) {
-		for (Map.Entry<String, Object> entry : variables.entrySet()) {
-			Object originalValue = entry.getValue();
-			Object normalizedValue = normalizeVariableValue(originalValue);
-			if (normalizedValue != originalValue) {
-				entry.setValue(normalizedValue);
-			}
-		}
 	}
 
 	private Object normalizeVariableValue(Object value) {

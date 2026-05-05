@@ -25,12 +25,15 @@ package io.jawk;
 import static org.junit.Assert.*;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import org.junit.Test;
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.jrt.AssocArray;
+import io.jawk.jrt.AwkRuntimeException;
 
 public class AssocArrayTest {
 
@@ -160,6 +163,18 @@ public class AssocArrayTest {
 	}
 
 	@Test
+	public void testInjectLinkedListVariableUsesZeroBasedIndexes() throws Exception {
+		List<String> data = new LinkedList<>(Arrays.asList("aaa", "bbb", "ccc"));
+
+		AwkTestSupport
+				.awkTest("inject LinkedList into array variable with zero-based indexes")
+				.script("BEGIN{ print arr[0], arr[2], length(arr) }")
+				.preassign("arr", data)
+				.expectLines("aaa ccc 3")
+				.runAndAssert();
+	}
+
+	@Test
 	public void testInjectMapOfListVariable() throws Exception {
 		Map<Object, Object> data = new LinkedHashMap<>();
 		data.put("items", Arrays.asList("aaa", "bbb", "ccc"));
@@ -170,6 +185,54 @@ public class AssocArrayTest {
 				.preassign("payload", data)
 				.expectLines("aaa ccc")
 				.runAndAssert();
+	}
+
+	@Test
+	public void testInjectImmutableMapOfListVariableThrowsClearException() throws Exception {
+		Map<Object, Object> mutableData = new LinkedHashMap<>();
+		mutableData.put("items", Arrays.asList("aaa", "bbb", "ccc"));
+		Map<Object, Object> data = Collections.unmodifiableMap(mutableData);
+
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.awkTest("inject immutable Map containing List should throw")
+				.script("BEGIN{ print payload[\"items\"][0] }")
+				.preassign("payload", data)
+				.expectThrow(AwkRuntimeException.class)
+				.run();
+		result.assertExpected();
+
+		assertTrue(result.thrownException().getMessage().contains("Injected maps must be mutable"));
+		assertTrue(mutableData.get("items") instanceof List);
+	}
+
+	@Test
+	public void testRejectedFunctionNameAssignmentDoesNotNormalizeMapValue() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+		data.put("items", Arrays.asList("aaa", "bbb", "ccc"));
+
+		AwkTestSupport
+				.awkTest("rejected function name assignment leaves Map value unchanged")
+				.script("function payload(){ return 1 } BEGIN{ print \"unused\" }")
+				.preassign("payload", data)
+				.expectThrow(AwkRuntimeException.class)
+				.runAndAssert();
+
+		assertTrue(data.get("items") instanceof List);
+	}
+
+	@Test
+	public void testIgnoredVariableAssignmentDoesNotNormalizeMapValue() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+		data.put("items", Arrays.asList("aaa", "bbb", "ccc"));
+
+		AwkTestSupport
+				.awkTest("ignored variable assignment leaves Map value unchanged")
+				.script("BEGIN{ print \"ok\" }")
+				.preassign("payload", data)
+				.expectLines("ok")
+				.runAndAssert();
+
+		assertTrue(data.get("items") instanceof List);
 	}
 
 	@Test

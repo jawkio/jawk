@@ -47,7 +47,7 @@ import java.util.Set;
  *
  * @author MetricsHub
  */
-public class ListAssocArray extends HashAssocArray {
+public final class ListAssocArray extends HashAssocArray {
 
 	private static final long serialVersionUID = 1L;
 
@@ -160,8 +160,10 @@ public class ListAssocArray extends HashAssocArray {
 			return;
 		}
 		try {
-			for (int index = 0; index < values.size(); index++) {
-				target.put(Long.valueOf(index), normalizeValue(values.get(index), sortedArrayKeys, activeContainers));
+			long index = 0L;
+			for (Object listValue : values) {
+				target.put(Long.valueOf(index), normalizeValue(listValue, sortedArrayKeys, activeContainers));
+				index++;
 			}
 		} finally {
 			activeContainers.remove(values);
@@ -194,7 +196,13 @@ public class ListAssocArray extends HashAssocArray {
 				Object originalValue = entry.getValue();
 				Object normalizedValue = normalizeValue(originalValue, sortedArrayKeys, activeContainers);
 				if (normalizedValue != originalValue) {
-					entry.setValue(normalizedValue);
+					try {
+						entry.setValue(normalizedValue);
+					} catch (UnsupportedOperationException | ClassCastException ex) {
+						throw new IllegalArgumentException(
+								"Injected maps must be mutable when nested List values need to be materialized as AWK arrays.",
+								ex);
+					}
 				}
 			}
 		} finally {

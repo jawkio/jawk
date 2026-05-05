@@ -53,9 +53,21 @@ Awk awk = new Awk(settings);
 Object result = awk.eval("threshold");
 ```
 
-Values may be scalars such as `Long`, `Double`, and `String`, or associative-array-style values such as mutable `Map` instances and `AssocArray`.
+Values may be scalars such as `Long`, `Double`, and `String`, or associative-array-style values such as mutable `Map` instances, `List` instances, and `AssocArray`.
 
 When you pass a plain Java `Map`, Jawk exposes it directly to the script. The runtime may mutate that map, so do not pass immutable map implementations. Numeric AWK array indexes are represented as `Long` keys (e.g. `0L`, `1L`, `2L`).
+
+When you pass a Java `List`, Jawk materializes it as an AWK associative array with zero-based `Long` indexes. This matches JSON array indexing in common Java JSON parsers while preserving normal AWK array behavior for writes, deletes, sparse indexes, and string keys:
+
+```java
+List<String> values = Arrays.asList("aaa", "bbb", "ccc");
+
+String result = awk.script("BEGIN { print values[0] }")
+        .variable("values", values)
+        .execute();
+```
+
+Nested `Map` and `List` values are supported, so JSON-like object trees can be traversed with array syntax such as `payload["items"][0]["name"]`.
 
 ## Per-Call Variable Overrides
 

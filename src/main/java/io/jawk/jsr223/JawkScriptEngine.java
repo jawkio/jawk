@@ -30,6 +30,7 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.script.AbstractScriptEngine;
 import javax.script.Bindings;
@@ -147,6 +148,6 @@ public class JawkScriptEngine extends AbstractScriptEngine {
 	}
 
 	private static boolean isSupportedBindingValue(Object value) {
-		return value instanceof String || value instanceof Number || value instanceof Map;
+		return value instanceof String || value instanceof Number || value instanceof Map || value instanceof List;
 	}
 }

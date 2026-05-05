@@ -61,11 +61,14 @@ public class AwkSettings {
 	 * The values may be of type <code>Integer</code>,
 	 * <code>Double</code>, <code>String</code>,
 	 * {@link io.jawk.jrt.AssocArray} (for array variables),
-	 * or any {@link java.util.Map} that Jawk exposes directly to the script.
+	 * any {@link java.util.Map} that Jawk exposes directly to the script,
+	 * or any {@link java.util.List} that Jawk materializes as an array with
+	 * zero-based {@link java.lang.Long} keys.
 	 * <p>
 	 * When a {@link java.util.Map} is provided, the Jawk runtime may mutate it
 	 * during execution. Callers must therefore supply a mutable map
-	 * implementation. Numeric indices written by the runtime into such maps use
+	 * implementation. Numeric indices written by the runtime into such maps and
+	 * indices derived from {@link java.util.List} values use
 	 * {@link java.lang.Long} keys (for example, <code>0L</code>,
 	 * <code>1L</code>, ...).
 	 * </p>
@@ -180,7 +183,9 @@ public class AwkSettings {
 	 * The values may be of type <code>Integer</code>,
 	 * <code>Double</code>, <code>String</code>,
 	 * {@link io.jawk.jrt.AssocArray} (for array variables),
-	 * or any {@link java.util.Map} that Jawk exposes directly to the script.
+	 * any {@link java.util.Map} that Jawk exposes directly to the script,
+	 * or any {@link java.util.List} that Jawk materializes as an array with
+	 * zero-based {@link java.lang.Long} keys.
 	 *
 	 * @return the variables
 	 */
@@ -211,7 +216,9 @@ public class AwkSettings {
 	 * The values may be of type <code>Integer</code>,
 	 * <code>Double</code>, <code>String</code>,
 	 * {@link io.jawk.jrt.AssocArray} (for array variables),
-	 * or any {@link java.util.Map} that Jawk exposes directly to the script.
+	 * any {@link java.util.Map} that Jawk exposes directly to the script,
+	 * or any {@link java.util.List} that Jawk materializes as an array with
+	 * zero-based {@link java.lang.Long} keys.
 	 *
 	 * @param variables the variables to set
 	 */

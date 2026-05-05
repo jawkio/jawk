@@ -23,6 +23,8 @@ String result = awk.script("{ print toupper($0) }").input("hello world").execute
 
 When writing custom extensions, annotate associative array parameters with `@JawkAssocArray` and declare them as `Map` values rather than concrete map implementations.
 
+Java variables passed to embedded Jawk scripts may include `Map` and `List` values, including nested JSON-like object trees. Lists are materialized as AWK arrays with zero-based numeric indexes.
+
 ## Documentation
 
 - Overview: https://jawk.io/index.html

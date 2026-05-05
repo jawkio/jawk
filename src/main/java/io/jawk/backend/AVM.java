@@ -165,6 +165,7 @@ public class AVM implements VariableManager, Closeable {
 		arguments = Collections.emptyList();
 		sortedArrayKeys = this.settings.isUseSortedArrayKeys();
 		baseInitialVariables = new HashMap<String, Object>(this.settings.getVariables());
+		normalizeVariableValues(baseInitialVariables);
 		baseSpecialVariables = JRT.copySpecialVariables(baseInitialVariables);
 		executionInitialVariables = baseInitialVariables;
 		executionSpecialVariables = baseSpecialVariables;
@@ -763,6 +764,7 @@ public class AVM implements VariableManager, Closeable {
 		} else {
 			executionInitialVariables = new HashMap<>(baseInitialVariables);
 			executionInitialVariables.putAll(variableOverrides);
+			normalizeVariableValues(executionInitialVariables);
 
 			Map<String, Object> specialOverrides = JRT.copySpecialVariables(variableOverrides);
 			if (specialOverrides.isEmpty()) {
@@ -770,6 +772,7 @@ public class AVM implements VariableManager, Closeable {
 			} else {
 				executionSpecialVariables = new HashMap<>(baseSpecialVariables);
 				executionSpecialVariables.putAll(specialOverrides);
+				normalizeVariableValues(executionSpecialVariables);
 			}
 		}
 	}
@@ -811,8 +814,9 @@ public class AVM implements VariableManager, Closeable {
 		for (Map.Entry<String, Object> entry : baseInitialVariables.entrySet()) {
 			String name = entry.getKey();
 			if (isPersistentEligibleGlobal(name)) {
-				validateSeededGlobal(name, entry.getValue());
-				basePersistentSeeds.put(name, entry.getValue());
+				Object value = normalizeVariableValue(entry.getValue());
+				validateSeededGlobal(name, value);
+				basePersistentSeeds.put(name, value);
 			}
 		}
 		return basePersistentSeeds;
@@ -834,8 +838,9 @@ public class AVM implements VariableManager, Closeable {
 			for (Map.Entry<String, Object> entry : variableOverrides.entrySet()) {
 				String name = entry.getKey();
 				if (isPersistentEligibleGlobal(name)) {
-					validateSeededGlobal(name, entry.getValue());
-					executionUserSeeds.put(name, entry.getValue());
+					Object value = normalizeVariableValue(entry.getValue());
+					validateSeededGlobal(name, value);
+					executionUserSeeds.put(name, value);
 				}
 			}
 		}
@@ -3055,12 +3060,13 @@ public class AVM implements VariableManager, Closeable {
 	/** {@inheritDoc} */
 	@Override
 	public final void assignVariable(String name, Object obj) {
+		Object normalized = normalizeVariableValue(obj);
 		// When offsets are not available yet, treat the assignment as part of this
 		// AVM's baseline initial-variable snapshot.
 		if (globalVariableOffsets == null || globalVariableArrays == null) {
-			baseInitialVariables.put(name, obj);
+			baseInitialVariables.put(name, normalized);
 			if (JRT.isJrtManagedSpecialVariable(name)) {
-				baseSpecialVariables.put(name, obj);
+				baseSpecialVariables.put(name, normalized);
 			}
 			return;
 		}
@@ -3075,12 +3081,17 @@ public class AVM implements VariableManager, Closeable {
 
 		if (offsetObj != null) {
 			if (arrayObj.booleanValue()) {
-				throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + name + ").");
+				if (normalized instanceof Map) {
+					runtimeStack.setFilelistVariable(offsetObj.intValue(), normalized);
+				} else {
+					throw new IllegalArgumentException(
+							"Cannot assign a scalar to a non-scalar variable (" + name + ").");
+				}
 			} else {
-				runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
+				runtimeStack.setFilelistVariable(offsetObj.intValue(), normalized);
 			}
 		} else if (runtimeStack.hasGlobalVariable(name)) {
-			runtimeStack.setGlobalVariable(name, obj);
+			runtimeStack.setGlobalVariable(name, normalized);
 		}
 	}
 
@@ -3242,6 +3253,20 @@ public class AVM implements VariableManager, Closeable {
 		@SuppressWarnings("unchecked")
 		Map<Object, Object> nested = (Map<Object, Object>) value;
 		return nested;
+	}
+
+	private void normalizeVariableValues(Map<String, Object> variables) {
+		for (Map.Entry<String, Object> entry : variables.entrySet()) {
+			Object originalValue = entry.getValue();
+			Object normalizedValue = normalizeVariableValue(originalValue);
+			if (normalizedValue != originalValue) {
+				entry.setValue(normalizedValue);
+			}
+		}
+	}
+
+	private Object normalizeVariableValue(Object value) {
+		return AssocArray.normalizeValue(value, sortedArrayKeys);
 	}
 
 	private static final UninitializedObject BLANK = new UninitializedObject();

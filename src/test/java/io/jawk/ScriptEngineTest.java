@@ -29,6 +29,7 @@ import java.io.ByteArrayInputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import javax.script.Bindings;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
@@ -54,5 +55,22 @@ public class ScriptEngineTest {
 		engine.eval(script, bindings);
 
 		assertEquals("HELLO WORLD\n", result.toString());
+	}
+
+	@Test
+	public void testJawkScriptEngineAcceptsListBinding() throws Exception {
+		ScriptEngineManager manager = new ScriptEngineManager();
+		ScriptEngine engine = manager.getEngineByName("jawk");
+		assertNotNull("Jawk ScriptEngine not found", engine);
+
+		Bindings bindings = engine.createBindings();
+		bindings.put("values", Arrays.asList("aaa", "bbb", "ccc"));
+
+		StringWriter result = new StringWriter();
+		engine.getContext().setWriter(new PrintWriter(result));
+
+		engine.eval("BEGIN { print values[1] }", bindings);
+
+		assertEquals("bbb\n", result.toString());
 	}
 }

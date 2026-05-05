@@ -29,13 +29,11 @@ application and integrate with your Java code:
 >   ```
 
 #set($summaryPath = "${project.build.directory}/generated-site/compatibility-summary.xml")
-#set($summaryFile = $files.getFile($summaryPath))
+#set($summary = $xml.fetch("file:///${summaryPath}"))
 
 Compatibility and Compliance
 ----------------------------
 
-#if($summaryFile.exists())
-#set($summary = $xml.read($summaryPath))
 #set($posixSummary = $summary.find("/compatibility-summary/suite[@id='posix']").getFirst())
 #set($bwkSummary = $summary.find("/compatibility-summary/suite[@id='bwk']").getFirst())
 #set($gawkSummary = $summary.find("/compatibility-summary/suite[@id='gawk']").getFirst())
@@ -100,9 +98,6 @@ Compatibility and Compliance
 
 The above scores are calculated from the latest compatibility tests during `mvn verify site`. See the full [compatibility dashboard](compatibility.html) for per-suite maps and the [Failsafe report](failsafe.html) for detailed test results.
 
-#else
-Compatibility summary is unavailable in this build. Run `mvn verify site` to generate the compatibility reports.
-#end
 #else
 Compatibility summary is unavailable in this build. Run `mvn verify site` to generate the compatibility reports.
 #end

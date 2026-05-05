@@ -12,15 +12,13 @@ Jawk is checked during `mvn verify` against 3 upstream compatibility families:
 [GNU Awk](https://www.gnu.org/software/gawk/). This page summarizes what currently passes, fails, errors, or remains intentionally skipped.
 
 #set($summaryPath = "${project.build.directory}/generated-site/compatibility-summary.xml")
-#set($summaryFile = $files.getFile($summaryPath))
+#set($summary = $xml.fetch("file:///${summaryPath}"))
 
 POSIX
 -----
 
 Specification-focused coverage transcribed from the [POSIX awk utility requirements](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/awk.html).
 
-#if($summaryFile.exists())
-#set($summary = $xml.read($summaryPath))
 #set($posixSummary = $summary.find("/compatibility-summary/suite[@id='posix']").getFirst())
 #set($bwkSummary = $summary.find("/compatibility-summary/suite[@id='bwk']").getFirst())
 #set($gawkSummary = $summary.find("/compatibility-summary/suite[@id='gawk']").getFirst())
@@ -172,9 +170,6 @@ GNU Awk (gawk)
 </div>
 <p class="compat-suite-footer"><a href="failsafe.html#io-jawk-gawk">Open the Failsafe report</a> for per-test details, stack traces, and grouped results.</p>
 
-#else
-Compatibility data is unavailable in this build. Run `mvn verify site` to generate the compatibility reports and this dashboard.
-#end
 #else
 Compatibility data is unavailable in this build. Run `mvn verify site` to generate the compatibility reports and this dashboard.
 #end

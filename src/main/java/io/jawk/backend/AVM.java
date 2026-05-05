@@ -811,8 +811,9 @@ public class AVM implements VariableManager, Closeable {
 		for (Map.Entry<String, Object> entry : baseInitialVariables.entrySet()) {
 			String name = entry.getKey();
 			if (isPersistentEligibleGlobal(name)) {
+				validateSeededGlobalName(name);
 				Object value = normalizeVariableValue(entry.getValue());
-				validateSeededGlobal(name, value);
+				validateSeededGlobalValue(name, value);
 				basePersistentSeeds.put(name, value);
 			}
 		}
@@ -835,8 +836,9 @@ public class AVM implements VariableManager, Closeable {
 			for (Map.Entry<String, Object> entry : variableOverrides.entrySet()) {
 				String name = entry.getKey();
 				if (isPersistentEligibleGlobal(name)) {
+					validateSeededGlobalName(name);
 					Object value = normalizeVariableValue(entry.getValue());
-					validateSeededGlobal(name, value);
+					validateSeededGlobalValue(name, value);
 					executionUserSeeds.put(name, value);
 				}
 			}
@@ -899,16 +901,26 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	/**
-	 * Validates that a seeded global value is compatible with the compiled
-	 * metadata of the current program.
+	 * Validates that a seeded global name is compatible with the compiled
+	 * metadata of the current program before any value normalization can mutate a
+	 * caller-provided object graph.
 	 *
 	 * @param name variable name to validate
-	 * @param value proposed seeded value
 	 */
-	private void validateSeededGlobal(String name, Object value) {
+	private void validateSeededGlobalName(String name) {
 		if (functionNames.contains(name)) {
 			throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + name + ").");
 		}
+	}
+
+	/**
+	 * Validates that a normalized seeded global value is compatible with the
+	 * compiled metadata of the current program.
+	 *
+	 * @param name variable name to validate
+	 * @param value proposed seeded value after normalization
+	 */
+	private void validateSeededGlobalValue(String name, Object value) {
 		Boolean arrayObj = globalVariableArrays.get(name);
 		if (Boolean.TRUE.equals(arrayObj) && !(value instanceof Map)) {
 			throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + name + ").");

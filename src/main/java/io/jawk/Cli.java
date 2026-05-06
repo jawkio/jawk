@@ -24,6 +24,7 @@ package io.jawk;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jawk.backend.AVM;
+import io.jawk.backend.ProfilingAVM;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -92,6 +93,8 @@ public final class Cli {
 	private boolean printUsage;
 	private boolean sandbox;
 	private boolean disableOptimize;
+	private boolean profiling;
+	private File profilingOutputFile;
 	private File persistentMemoryFile;
 
 	/**
@@ -161,6 +164,15 @@ public final class Cli {
 	 */
 	public boolean isDisableOptimize() {
 		return disableOptimize;
+	}
+
+	/**
+	 * Indicates whether runtime profiling was requested.
+	 *
+	 * @return {@code true} when profiling should be enabled
+	 */
+	public boolean isProfiling() {
+		return profiling;
 	}
 
 	/**
@@ -276,6 +288,17 @@ public final class Cli {
 			} else if (arg.equals("-s") || arg.equals("--no-optimize")) {
 				// -s/--no-optimize : skip tuple queue optimizations
 				disableOptimize = true;
+			} else if (arg.equals("--profile")) {
+				// --profile : collect and print runtime profiling statistics
+				profiling = true;
+			} else if (arg.startsWith("--profile=")) {
+				// --profile=filename : collect profiling statistics and write them to a file
+				String file = arg.substring("--profile=".length());
+				if (file.length() == 0) {
+					throw new IllegalArgumentException("Need output filename for --profile");
+				}
+				profiling = true;
+				profilingOutputFile = new File(file);
 			} else if (arg.equals("--dump-intermediate")) {
 				// --dump-intermediate : dump intermediate tuples to file
 				dumpIntermediateCode = true;
@@ -406,8 +429,12 @@ public final class Cli {
 		}
 
 		Awk awk;
-		if (sandbox) {
+		if (sandbox && profiling) {
+			awk = new ProfilingSandboxedAwk(extensions, settings);
+		} else if (sandbox) {
 			awk = extensions.isEmpty() ? new SandboxedAwk(settings) : new SandboxedAwk(extensions, settings);
+		} else if (profiling) {
+			awk = extensions.isEmpty() ? new ProfilingAwk(settings) : new ProfilingAwk(extensions, settings);
 		} else {
 			awk = extensions.isEmpty() ? new Awk(settings) : new Awk(extensions, settings);
 		}
@@ -493,7 +520,31 @@ public final class Cli {
 				if (memoryFile != null) {
 					savePersistentMemory(avm, memoryFile);
 				}
+				printProfilingReport(avm);
 			}
+		}
+	}
+
+	private void printProfilingReport(AVM avm) {
+		if (!profiling || !(avm instanceof ProfilingAVM)) {
+			return;
+		}
+		if (profilingOutputFile == null) {
+			err.println();
+			((ProfilingAVM) avm).getProfilingReport().print(err);
+			return;
+		}
+		File parent = profilingOutputFile.getAbsoluteFile().getParentFile();
+		if (parent != null && !parent.isDirectory() && !parent.mkdirs() && !parent.isDirectory()) {
+			throw new IllegalArgumentException(
+					"Failed to create directory '" + parent + "' for profiling report.");
+		}
+		try (PrintStream profileOut = new PrintStream(profilingOutputFile, "UTF-8")) {
+			((ProfilingAVM) avm).getProfilingReport().print(profileOut);
+		} catch (IOException ex) {
+			throw new IllegalArgumentException(
+					"Failed to write profiling report '" + profilingOutputFile + "': " + ex.getMessage(),
+					ex);
 		}
 	}
 
@@ -571,6 +622,7 @@ public final class Cli {
 								" [--dump-syntax]" +
 								" [--dump-intermediate]" +
 								" [-s|--no-optimize]" +
+								" [--profile[=filename]]" +
 								" [--locale locale]" +
 								" [-t]" +
 								" [-l extension]..." +
@@ -605,6 +657,9 @@ public final class Cli {
 		dest.println(" --dump-syntax = Print the syntax tree.");
 		dest.println(" --dump-intermediate = Print the intermediate code.");
 		dest.println(" -s, --no-optimize = (extension) Disable optimizations during compilation.");
+		dest
+				.println(
+						" --profile[=filename] = (extension) Print tuple and function execution statistics to stderr or file.");
 		dest.println(" --locale Locale = (extension) Specify a locale to be used instead of US-English");
 		dest.println(" --list-ext = (extension) List available extensions.");
 		dest.println();

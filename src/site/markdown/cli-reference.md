@@ -63,6 +63,8 @@ java -jar jawk-${project.version}-standalone.jar --list-ext
 >   - `--dump-syntax` prints the parsed abstract syntax tree and skips execution.
 >   - `--dump-intermediate` prints the tuple stream and skips execution.
 >   - `-s` or `--no-optimize` disables tuple optimization during compilation.
+>   - `--profile` executes the script with runtime profiling enabled and prints tuple and function timing statistics to stderr.
+>   - `--profile=<filename>` writes the same profiling report to the specified file instead of stderr.
 >
 > - Help and errors
 >
@@ -73,6 +75,8 @@ java -jar jawk-${project.version}-standalone.jar --list-ext
 ## Execution Notes
 
 - `--dump-syntax`, `--dump-intermediate`, `-K`, `-h`, `-?`, and `--list-ext` are non-executing modes.
+- `--profile` is an executing mode. It keeps normal AWK output on stdout and writes the profiling report to stderr after execution finishes.
+- `--profile=<filename>` keeps normal AWK output on stdout and writes only the profiling report to the file.
 - `-S` affects compilation and execution, not just runtime behavior.
 - `--posix` currently disables arrays-of-arrays syntax and related subarray-only operands in order to keep CLI compilation aligned with classic POSIX-style AWK expectations.
 - `--posix` is rejected together with `-L`, because loading precompiled tuples bypasses source compilation entirely.

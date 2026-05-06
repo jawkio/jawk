@@ -979,6 +979,7 @@ public class AVM implements VariableManager, Closeable {
 			while (!position.isEOF()) {
 				// System_out.println("--> "+position);
 				opcode = position.opcode();
+				long tupleStartNanos = beforeTupleExecution(position, opcode);
 				// switch on OPCODE
 				switch (opcode) {
 				case PRINT: {
@@ -2217,7 +2218,8 @@ public class AVM implements VariableManager, Closeable {
 					if (!position.classArg().isInstance(o)) {
 						throw new AwkRuntimeException(
 								position.lineNumber(),
-								"Verification failed. Top-of-stack = " + o.getClass() + " isn't an instance of " + position.classArg());
+								"Verification failed. Top-of-stack = " + o.getClass() + " isn't an instance of "
+										+ position.classArg());
 					}
 					push(o);
 					position.next();
@@ -2811,6 +2813,7 @@ public class AVM implements VariableManager, Closeable {
 				default:
 					throw new Error("invalid opcode: " + position.opcode());
 				}
+				afterTupleExecution(position, opcode, tupleStartNanos);
 			}
 
 		} catch (IOException ioe) {
@@ -2840,6 +2843,30 @@ public class AVM implements VariableManager, Closeable {
 		if (throwExitException) {
 			throw new ExitException(exitCode, "The AWK script requested an exit");
 		}
+	}
+
+	/**
+	 * Hook invoked immediately before a tuple is executed.
+	 *
+	 * @param position current tuple position
+	 * @param opcode opcode about to execute
+	 * @return hook-specific state passed to
+	 *         {@link #afterTupleExecution(PositionTracker, Opcode, long)}
+	 */
+	protected long beforeTupleExecution(PositionTracker position, Opcode opcode) {
+		return 0L;
+	}
+
+	/**
+	 * Hook invoked immediately after a tuple execution attempt completes.
+	 *
+	 * @param position current tuple position after execution
+	 * @param opcode opcode that was executed
+	 * @param tupleStartNanos state returned by
+	 *        {@link #beforeTupleExecution(PositionTracker, Opcode)}
+	 */
+	protected void afterTupleExecution(PositionTracker position, Opcode opcode, long tupleStartNanos) {
+		// default AVM execution does not collect profiling information
 	}
 
 	/**

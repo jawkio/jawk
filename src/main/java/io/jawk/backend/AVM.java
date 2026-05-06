@@ -909,7 +909,7 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	private void validateSeededGlobalName(String name) {
 		if (functionNames.contains(name)) {
-			throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + name + ").");
+			throw new IllegalArgumentException("Cannot assign a value to a function name (" + name + ").");
 		}
 	}
 

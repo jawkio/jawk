@@ -728,7 +728,7 @@ public class AVM implements VariableManager, Closeable {
 			Integer offsetObj = globalVariableOffsets.get(key);
 			Boolean arrayObj = globalVariableArrays.get(key);
 			if (offsetObj != null) {
-				Object obj = entry.getValue();
+				Object obj = normalizeVariableValue(entry.getValue());
 				if (arrayObj.booleanValue()) {
 					if (obj instanceof Map) {
 						runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
@@ -811,8 +811,10 @@ public class AVM implements VariableManager, Closeable {
 		for (Map.Entry<String, Object> entry : baseInitialVariables.entrySet()) {
 			String name = entry.getKey();
 			if (isPersistentEligibleGlobal(name)) {
-				validateSeededGlobal(name, entry.getValue());
-				basePersistentSeeds.put(name, entry.getValue());
+				validateSeededGlobalName(name);
+				Object value = normalizeVariableValue(entry.getValue());
+				validateSeededGlobalValue(name, value);
+				basePersistentSeeds.put(name, value);
 			}
 		}
 		return basePersistentSeeds;
@@ -834,8 +836,10 @@ public class AVM implements VariableManager, Closeable {
 			for (Map.Entry<String, Object> entry : variableOverrides.entrySet()) {
 				String name = entry.getKey();
 				if (isPersistentEligibleGlobal(name)) {
-					validateSeededGlobal(name, entry.getValue());
-					executionUserSeeds.put(name, entry.getValue());
+					validateSeededGlobalName(name);
+					Object value = normalizeVariableValue(entry.getValue());
+					validateSeededGlobalValue(name, value);
+					executionUserSeeds.put(name, value);
 				}
 			}
 		}
@@ -897,16 +901,26 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	/**
-	 * Validates that a seeded global value is compatible with the compiled
-	 * metadata of the current program.
+	 * Validates that a seeded global name is compatible with the compiled
+	 * metadata of the current program before any value normalization can mutate a
+	 * caller-provided object graph.
 	 *
 	 * @param name variable name to validate
-	 * @param value proposed seeded value
 	 */
-	private void validateSeededGlobal(String name, Object value) {
+	private void validateSeededGlobalName(String name) {
 		if (functionNames.contains(name)) {
-			throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + name + ").");
+			throw new IllegalArgumentException("Cannot assign a value to a function name (" + name + ").");
 		}
+	}
+
+	/**
+	 * Validates that a normalized seeded global value is compatible with the
+	 * compiled metadata of the current program.
+	 *
+	 * @param name variable name to validate
+	 * @param value proposed seeded value after normalization
+	 */
+	private void validateSeededGlobalValue(String name, Object value) {
 		Boolean arrayObj = globalVariableArrays.get(name);
 		if (Boolean.TRUE.equals(arrayObj) && !(value instanceof Map)) {
 			throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + name + ").");
@@ -3058,9 +3072,10 @@ public class AVM implements VariableManager, Closeable {
 		// When offsets are not available yet, treat the assignment as part of this
 		// AVM's baseline initial-variable snapshot.
 		if (globalVariableOffsets == null || globalVariableArrays == null) {
-			baseInitialVariables.put(name, obj);
+			Object normalized = normalizeVariableValue(obj);
+			baseInitialVariables.put(name, normalized);
 			if (JRT.isJrtManagedSpecialVariable(name)) {
-				baseSpecialVariables.put(name, obj);
+				baseSpecialVariables.put(name, normalized);
 			}
 			return;
 		}
@@ -3074,13 +3089,20 @@ public class AVM implements VariableManager, Closeable {
 		Boolean arrayObj = globalVariableArrays.get(name);
 
 		if (offsetObj != null) {
+			Object normalized = normalizeVariableValue(obj);
 			if (arrayObj.booleanValue()) {
-				throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + name + ").");
+				if (normalized instanceof Map) {
+					runtimeStack.setFilelistVariable(offsetObj.intValue(), normalized);
+				} else {
+					throw new IllegalArgumentException(
+							"Cannot assign a scalar to a non-scalar variable (" + name + ").");
+				}
 			} else {
-				runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
+				runtimeStack.setFilelistVariable(offsetObj.intValue(), normalized);
 			}
 		} else if (runtimeStack.hasGlobalVariable(name)) {
-			runtimeStack.setGlobalVariable(name, obj);
+			Object normalized = normalizeVariableValue(obj);
+			runtimeStack.setGlobalVariable(name, normalized);
 		}
 	}
 
@@ -3242,6 +3264,10 @@ public class AVM implements VariableManager, Closeable {
 		@SuppressWarnings("unchecked")
 		Map<Object, Object> nested = (Map<Object, Object>) value;
 		return nested;
+	}
+
+	private Object normalizeVariableValue(Object value) {
+		return AssocArray.normalizeValue(value, sortedArrayKeys);
 	}
 
 	private static final UninitializedObject BLANK = new UninitializedObject();

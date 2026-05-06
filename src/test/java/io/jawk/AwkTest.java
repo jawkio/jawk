@@ -1537,6 +1537,62 @@ public class AwkTest {
 	}
 
 	@Test
+	public void executePersistingGlobalsRejectedBaselineFunctionNameDoesNotNormalizeMapValue() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+		data.put("items", Arrays.asList("aaa", "bbb", "ccc"));
+		AwkSettings settings = new AwkSettings();
+		settings.putVariable("payload", data);
+		Awk configuredAwk = new Awk(settings);
+		AwkProgram program = configuredAwk.compile("function payload(){ return 1 } BEGIN { print \"unused\" }");
+
+		try (AVM avm = configuredAwk.createAvm()) {
+			assertThrows(IllegalArgumentException.class, () -> executePersistent(avm, program));
+		}
+
+		assertTrue(data.get("items") instanceof List);
+	}
+
+	@Test
+	public void executePersistingGlobalsRejectedOverrideFunctionNameDoesNotNormalizeMapValue() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+		data.put("items", Arrays.asList("aaa", "bbb", "ccc"));
+		Map<String, Object> overrides = new LinkedHashMap<>();
+		overrides.put("payload", data);
+		AwkProgram program = AWK.compile("function payload(){ return 1 } BEGIN { print \"unused\" }");
+
+		try (AVM avm = AWK.createAvm()) {
+			assertThrows(
+					IllegalArgumentException.class,
+					() -> executePersistent(
+							avm,
+							program,
+							Collections.<String>emptyList(),
+							overrides,
+							emptyInputSource()));
+		}
+
+		assertTrue(data.get("items") instanceof List);
+	}
+
+	@Test
+	public void executePersistingGlobalsAcceptsListSeedForArrayGlobal() throws Exception {
+		Map<String, Object> overrides = new LinkedHashMap<>();
+		overrides.put("arr", Arrays.asList("aaa", "bbb", "ccc"));
+		AwkProgram program = AWK.compile("BEGIN { print arr[0], arr[2] }");
+
+		try (AVM avm = AWK.createAvm()) {
+			assertEquals(
+					"aaa ccc\n",
+					executePersistent(
+							avm,
+							program,
+							Collections.<String>emptyList(),
+							overrides,
+							emptyInputSource()));
+		}
+	}
+
+	@Test
 	public void executePersistingGlobalsDoesNotPersistBuiltInsAndKeepsArraysOnlyForGlobals() throws Exception {
 		AwkProgram writeBuiltIn = AWK.compile("BEGIN { NR = 99; print NR }");
 		AwkProgram readBuiltIn = AWK.compile("BEGIN { print NR }");

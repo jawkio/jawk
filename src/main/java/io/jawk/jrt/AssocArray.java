@@ -22,6 +22,7 @@ package io.jawk.jrt;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import java.util.List;
 import java.util.Map;
 import io.jawk.intermediate.UninitializedObject;
 
@@ -39,6 +40,8 @@ import io.jawk.intermediate.UninitializedObject;
  * </p>
  * <ul>
  * <li>{@link HashAssocArray} &mdash; backed by {@link java.util.HashMap}</li>
+ * <li>{@link ListAssocArray} &mdash; materialized from a {@link java.util.List}
+ * and backed by {@link java.util.HashMap}</li>
  * <li>{@link SortedAssocArray} &mdash; backed by {@link java.util.TreeMap} with
  * AWK key ordering</li>
  * </ul>
@@ -49,6 +52,7 @@ import io.jawk.intermediate.UninitializedObject;
  * <pre>
  * AssocArray hash = AssocArray.createHash();
  * AssocArray sorted = AssocArray.createSorted();
+ * AssocArray list = AssocArray.createFromList(values, sortedArrayKeys);
  * AssocArray aa = AssocArray.create(sortedArrayKeys);
  * </pre>
  *
@@ -212,6 +216,40 @@ public interface AssocArray extends Map<Object, Object> {
 	 */
 	static AssocArray create(boolean sortedArrayKeys) {
 		return sortedArrayKeys ? createSorted() : createHash();
+	}
+
+	/**
+	 * Creates a new associative array materialized from a Java {@link List}.
+	 * <p>
+	 * List elements are stored under zero-based {@link Long} keys. Nested
+	 * {@link List} values are recursively materialized as associative arrays so
+	 * JSON-like object trees can be traversed with AWK array syntax.
+	 * </p>
+	 *
+	 * @param values list values to expose as an AWK array
+	 * @param sortedArrayKeys {@code true} to create a sorted array, {@code false}
+	 *        for a hash-backed array
+	 * @return a new {@link AssocArray} containing the list values
+	 */
+	static AssocArray createFromList(List<?> values, boolean sortedArrayKeys) {
+		return ListAssocArray.createFromList(values, sortedArrayKeys);
+	}
+
+	/**
+	 * Normalizes an externally supplied structured value before the AVM stores it.
+	 * <p>
+	 * {@link List} values are converted to {@link AssocArray} instances.
+	 * {@link Map} values are kept in place to preserve direct-map performance, but
+	 * their nested list values are recursively converted.
+	 * </p>
+	 *
+	 * @param value value to normalize
+	 * @param sortedArrayKeys {@code true} when converted lists should use sorted
+	 *        array keys
+	 * @return the normalized value
+	 */
+	static Object normalizeValue(Object value, boolean sortedArrayKeys) {
+		return ListAssocArray.normalizeValue(value, sortedArrayKeys);
 	}
 
 }

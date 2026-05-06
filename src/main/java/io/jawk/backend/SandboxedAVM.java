@@ -42,7 +42,22 @@ public class SandboxedAVM extends AVM {
 	 */
 	public SandboxedAVM(AwkSettings parameters,
 			Map<String, JawkExtension> extensionInstances) {
-		super(parameters, extensionInstances);
+		this(parameters, extensionInstances, false);
+	}
+
+	/**
+	 * Creates a sandboxed AVM with the provided settings, extension instances, and
+	 * profiling mode.
+	 *
+	 * @param parameters Runtime settings to honor
+	 * @param extensionInstances Available extension implementations
+	 * @param profilingEnabled Whether to collect profiling statistics
+	 */
+	public SandboxedAVM(
+			AwkSettings parameters,
+			Map<String, JawkExtension> extensionInstances,
+			boolean profilingEnabled) {
+		super(parameters, extensionInstances, profilingEnabled);
 	}
 
 	@Override

@@ -133,6 +133,10 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	private final AwkSettings settings;
+	private final boolean profiling;
+	private final Map<Opcode, ProfilingReport.Accumulator> tupleProfilingStats;
+	private final Map<String, ProfilingReport.Accumulator> functionProfilingStats;
+	private final Deque<ActiveFunction> activeProfilingFunctions;
 	private boolean inputSourceFilelistAssignmentsApplied;
 	private InputSource resolvedInputSource;
 	private AwkExpression installedEvalExpression;
@@ -158,9 +162,34 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	public AVM(final AwkSettings parameters,
 			final Map<String, JawkExtension> extensionInstances) {
+		this(parameters, extensionInstances, false);
+	}
+
+	/**
+	 * Construct the interpreter, optionally enabling runtime profiling.
+	 *
+	 * @param parameters The parameters affecting the behavior of the
+	 *        interpreter.
+	 * @param extensionInstances Map of the extensions to load
+	 * @param profilingEnabled Whether to collect profiling statistics
+	 */
+	public AVM(
+			final AwkSettings parameters,
+			final Map<String, JawkExtension> extensionInstances,
+			final boolean profilingEnabled) {
 		this.settings = parameters != null ? parameters : AwkSettings.DEFAULT_SETTINGS;
 		this.extensionInstances = extensionInstances == null ?
 				Collections.<String, JawkExtension>emptyMap() : extensionInstances;
+		this.profiling = profilingEnabled;
+		if (profilingEnabled) {
+			this.tupleProfilingStats = new java.util.EnumMap<Opcode, ProfilingReport.Accumulator>(Opcode.class);
+			this.functionProfilingStats = new LinkedHashMap<String, ProfilingReport.Accumulator>();
+			this.activeProfilingFunctions = new ArrayDeque<ActiveFunction>();
+		} else {
+			this.tupleProfilingStats = null;
+			this.functionProfilingStats = null;
+			this.activeProfilingFunctions = null;
+		}
 
 		arguments = Collections.emptyList();
 		sortedArrayKeys = this.settings.isUseSortedArrayKeys();
@@ -975,11 +1004,14 @@ public class AVM implements VariableManager, Closeable {
 			IOException {
 		Map<Integer, ConditionPair> conditionPairs = null;
 		Opcode opcode = null;
+		long tupleStartNanos = 0L;
 		try {
 			while (!position.isEOF()) {
 				// System_out.println("--> "+position);
 				opcode = position.opcode();
-				long tupleStartNanos = beforeTupleExecution(position, opcode);
+				if (profiling) {
+					tupleStartNanos = beforeProfiledTuple(position, opcode);
+				}
 				// switch on OPCODE
 				switch (opcode) {
 				case PRINT: {
@@ -2813,7 +2845,9 @@ public class AVM implements VariableManager, Closeable {
 				default:
 					throw new Error("invalid opcode: " + position.opcode());
 				}
-				afterTupleExecution(position, opcode, tupleStartNanos);
+				if (profiling) {
+					afterProfiledTuple(opcode, tupleStartNanos);
+				}
 			}
 
 		} catch (IOException ioe) {
@@ -2846,27 +2880,83 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	/**
-	 * Hook invoked immediately before a tuple is executed.
-	 *
-	 * @param position current tuple position
-	 * @param opcode opcode about to execute
-	 * @return hook-specific state passed to
-	 *         {@link #afterTupleExecution(PositionTracker, Opcode, long)}
+	 * Clears all collected profiling statistics.
 	 */
-	protected long beforeTupleExecution(PositionTracker position, Opcode opcode) {
-		return 0L;
+	public void resetProfiling() {
+		if (!profiling) {
+			return;
+		}
+		tupleProfilingStats.clear();
+		functionProfilingStats.clear();
+		activeProfilingFunctions.clear();
 	}
 
 	/**
-	 * Hook invoked immediately after a tuple execution attempt completes.
+	 * Returns an immutable snapshot of the collected profiling statistics.
 	 *
-	 * @param position current tuple position after execution
-	 * @param opcode opcode that was executed
-	 * @param tupleStartNanos state returned by
-	 *        {@link #beforeTupleExecution(PositionTracker, Opcode)}
+	 * @return profiling report snapshot
 	 */
-	protected void afterTupleExecution(PositionTracker position, Opcode opcode, long tupleStartNanos) {
-		// default AVM execution does not collect profiling information
+	public ProfilingReport getProfilingReport() {
+		if (!profiling) {
+			return ProfilingReport.empty();
+		}
+		return new ProfilingReport(tupleProfilingStats, functionProfilingStats);
+	}
+
+	private long beforeProfiledTuple(PositionTracker position, Opcode opcode) {
+		long now = System.nanoTime();
+		if (opcode == Opcode.CALL_FUNCTION) {
+			activeProfilingFunctions.push(new ActiveFunction(position.stringArg(1), now));
+		} else if (opcode == Opcode.EXTENSION) {
+			ExtensionFunction function = position.extensionFunctionArg();
+			activeProfilingFunctions.push(new ActiveFunction(function.getKeyword(), now));
+		}
+		return now;
+	}
+
+	private void afterProfiledTuple(Opcode opcode, long tupleStartNanos) {
+		long now = System.nanoTime();
+		statisticsFor(tupleProfilingStats, opcode).add(now - tupleStartNanos);
+		if (opcode == Opcode.EXIT_WITH_CODE || opcode == Opcode.EXIT_WITHOUT_CODE) {
+			recordAllFunctionExits(now);
+		} else if (opcode == Opcode.EXTENSION || opcode == Opcode.RETURN_FROM_FUNCTION) {
+			recordFunctionExit(now);
+		}
+	}
+
+	private static <K> ProfilingReport.Accumulator statisticsFor(
+			Map<K, ProfilingReport.Accumulator> stats,
+			K key) {
+		ProfilingReport.Accumulator accumulator = stats.get(key);
+		if (accumulator == null) {
+			accumulator = new ProfilingReport.Accumulator();
+			stats.put(key, accumulator);
+		}
+		return accumulator;
+	}
+
+	private void recordFunctionExit(long now) {
+		if (activeProfilingFunctions.isEmpty()) {
+			return;
+		}
+		ActiveFunction function = activeProfilingFunctions.pop();
+		statisticsFor(functionProfilingStats, function.name).add(now - function.startNanos);
+	}
+
+	private void recordAllFunctionExits(long now) {
+		while (!activeProfilingFunctions.isEmpty()) {
+			recordFunctionExit(now);
+		}
+	}
+
+	private static final class ActiveFunction {
+		private final String name;
+		private final long startNanos;
+
+		private ActiveFunction(String name, long startNanos) {
+			this.name = name;
+			this.startNanos = startNanos;
+		}
 	}
 
 	/**

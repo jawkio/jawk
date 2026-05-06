@@ -97,8 +97,18 @@ public final class SandboxedAwk extends Awk {
 	}
 
 	@Override
+	public AVM createAvm(boolean profilingEnabled) {
+		return createAvm(getSettings(), profilingEnabled);
+	}
+
+	@Override
 	protected AVM createAvm(AwkSettings settingsParam) {
-		return new SandboxedAVM(settingsParam, getExtensionInstances());
+		return createAvm(settingsParam, false);
+	}
+
+	@Override
+	protected AVM createAvm(AwkSettings settingsParam, boolean profilingEnabled) {
+		return new SandboxedAVM(settingsParam, getExtensionInstances(), profilingEnabled);
 	}
 }
 

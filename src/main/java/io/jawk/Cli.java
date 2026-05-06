@@ -24,7 +24,6 @@ package io.jawk;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jawk.backend.AVM;
-import io.jawk.backend.ProfilingAVM;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -429,12 +428,8 @@ public final class Cli {
 		}
 
 		Awk awk;
-		if (sandbox && profiling) {
-			awk = new ProfilingSandboxedAwk(extensions, settings);
-		} else if (sandbox) {
+		if (sandbox) {
 			awk = extensions.isEmpty() ? new SandboxedAwk(settings) : new SandboxedAwk(extensions, settings);
-		} else if (profiling) {
-			awk = extensions.isEmpty() ? new ProfilingAwk(settings) : new ProfilingAwk(extensions, settings);
 		} else {
 			awk = extensions.isEmpty() ? new Awk(settings) : new Awk(extensions, settings);
 		}
@@ -497,7 +492,7 @@ public final class Cli {
 	 */
 	private void executeProgram(Awk awk, AwkProgram program, File memoryFile) throws Exception {
 		OutputStreamAwkSink sink = new OutputStreamAwkSink(out, settings.getLocale());
-		try (AVM avm = awk.createAvm()) {
+		try (AVM avm = awk.createAvm(profiling)) {
 			avm.setAwkSink(sink);
 			avm.setErrorStream(err);
 			if (memoryFile != null) {
@@ -520,18 +515,17 @@ public final class Cli {
 				if (memoryFile != null) {
 					savePersistentMemory(avm, memoryFile);
 				}
-				printProfilingReport(avm);
+				if (profiling) {
+					printProfilingReport(avm);
+				}
 			}
 		}
 	}
 
 	private void printProfilingReport(AVM avm) {
-		if (!profiling || !(avm instanceof ProfilingAVM)) {
-			return;
-		}
 		if (profilingOutputFile == null) {
 			err.println();
-			((ProfilingAVM) avm).getProfilingReport().print(err);
+			avm.getProfilingReport().print(err);
 			return;
 		}
 		File parent = profilingOutputFile.getAbsoluteFile().getParentFile();
@@ -540,7 +534,7 @@ public final class Cli {
 					"Failed to create directory '" + parent + "' for profiling report.");
 		}
 		try (PrintStream profileOut = new PrintStream(profilingOutputFile, "UTF-8")) {
-			((ProfilingAVM) avm).getProfilingReport().print(profileOut);
+			avm.getProfilingReport().print(profileOut);
 		} catch (IOException ex) {
 			throw new IllegalArgumentException(
 					"Failed to write profiling report '" + profilingOutputFile + "': " + ex.getMessage(),

@@ -84,6 +84,21 @@ public class CliOptionTest {
 	}
 
 	@Test
+	public void profileOptionRecordsFunctionThatExitsWithoutReturning() throws Exception {
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.cliTest("CLI --profile records function exit")
+				.argument("--profile")
+				.script("function stop() { exit } BEGIN { stop() }")
+				.expect("")
+				.expectExit(0)
+				.run();
+
+		result.assertExpected();
+		assertTrue(result.errorOutput().contains("Jawk profiling report"));
+		assertTrue(result.errorOutput().contains("stop"));
+	}
+
+	@Test
 	public void profileOptionWithFilenameWritesReportToFile() throws Exception {
 		File profile = tempFolder.newFile("profile.txt");
 		assertTrue(profile.delete());

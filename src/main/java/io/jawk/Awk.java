@@ -311,6 +311,17 @@ public class Awk {
 	}
 
 	/**
+	 * Creates a reusable runtime backed by one {@link AVM} instance, optionally
+	 * collecting runtime profiling statistics.
+	 *
+	 * @param profilingEnabled whether runtime profiling should be enabled
+	 * @return reusable AVM
+	 */
+	public AVM createAvm(boolean profilingEnabled) {
+		return createAvm(this.settings, profilingEnabled);
+	}
+
+	/**
 	 * Starts building a run request for a compiled AWK program.
 	 * <p>
 	 * Use the returned {@link AwkRunBuilder} to configure input, arguments,
@@ -680,7 +691,19 @@ public class Awk {
 	 * @return reusable AVM
 	 */
 	protected AVM createAvm(AwkSettings settingsParam) {
-		return new AVM(settingsParam, this.extensionInstances);
+		return createAvm(settingsParam, false);
+	}
+
+	/**
+	 * Creates an {@link AVM} using the provided runtime settings and profiling
+	 * mode.
+	 *
+	 * @param settingsParam runtime settings to apply
+	 * @param profilingEnabled whether runtime profiling should be enabled
+	 * @return reusable AVM
+	 */
+	protected AVM createAvm(AwkSettings settingsParam, boolean profilingEnabled) {
+		return new AVM(settingsParam, this.extensionInstances, profilingEnabled);
 	}
 
 	/**

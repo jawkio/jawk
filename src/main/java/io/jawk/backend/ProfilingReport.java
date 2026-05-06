@@ -4,7 +4,7 @@ package io.jawk.backend;
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * Jawk
  * ჻჻჻჻჻჻
- * Copyright 2006 - 2026 MetricsHub
+ * Copyright (C) 2006 - 2026 MetricsHub
  * ჻჻჻჻჻჻
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -32,13 +32,24 @@ import java.util.Map;
 import io.jawk.intermediate.Opcode;
 
 /**
- * Snapshot of tuple and function execution statistics collected by a
- * {@link ProfilingAVM}.
+ * Snapshot of tuple and function execution statistics collected by an
+ * {@link AVM}.
  */
 public final class ProfilingReport {
 
 	private final List<Entry> tupleEntries;
 	private final List<Entry> functionEntries;
+
+	/**
+	 * Returns an empty profiling report.
+	 *
+	 * @return empty report
+	 */
+	public static ProfilingReport empty() {
+		return new ProfilingReport(
+				Collections.<Opcode, Accumulator>emptyMap(),
+				Collections.<String, Accumulator>emptyMap());
+	}
 
 	ProfilingReport(Map<Opcode, Accumulator> tupleStats, Map<String, Accumulator> functionStats) {
 		this.tupleEntries = Collections.unmodifiableList(toTupleEntries(tupleStats));

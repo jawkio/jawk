@@ -2850,6 +2850,11 @@ public class AVM implements VariableManager, Closeable {
 				}
 			}
 
+		} catch (ExitException ee) {
+			if (profiling && (opcode == Opcode.EXIT_WITH_CODE || opcode == Opcode.EXIT_WITHOUT_CODE)) {
+				afterProfiledTuple(opcode, tupleStartNanos);
+			}
+			throw ee;
 		} catch (IOException ioe) {
 			// clear runtime stack
 			runtimeStack.popAllFrames();

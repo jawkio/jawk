@@ -88,7 +88,7 @@ public class CliOptionTest {
 		AwkTestSupport.TestResult result = AwkTestSupport
 				.cliTest("CLI --profile records function exit")
 				.argument("--profile")
-				.script("function stop() { exit } BEGIN { stop() }")
+				.script("function stop() { exit } END { stop() }")
 				.expect("")
 				.expectExit(0)
 				.run();

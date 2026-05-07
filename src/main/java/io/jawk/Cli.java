@@ -531,9 +531,8 @@ public final class Cli {
 		}
 		File parent = profilingOutputFile.getAbsoluteFile().getParentFile();
 		if (parent != null && !parent.isDirectory() && !parent.mkdirs() && !parent.isDirectory()) {
-			throw new UncheckedIOException(
-					"Failed to create directory '" + parent + "' for profiling report.",
-					new IOException(parent.toString()));
+			String message = "Failed to create directory '" + parent + "' for profiling report.";
+			throw new UncheckedIOException(message, new IOException(message));
 		}
 		try (PrintStream profileOut = new PrintStream(profilingOutputFile, "UTF-8")) {
 			avm.getProfilingReport().print(profileOut);

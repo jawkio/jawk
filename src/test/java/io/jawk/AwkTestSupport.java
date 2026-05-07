@@ -168,6 +168,7 @@ public final class AwkTestSupport {
 	public static final class TestResult {
 		private final String description;
 		private final String output;
+		private final String errorOutput;
 		private final int exitCode;
 		private final String expectedOutput;
 		private final List<String> expectedLines;
@@ -178,6 +179,7 @@ public final class AwkTestSupport {
 		TestResult(
 				String description,
 				String output,
+				String errorOutput,
 				int exitCode,
 				String expectedOutput,
 				List<String> expectedLines,
@@ -186,6 +188,7 @@ public final class AwkTestSupport {
 				Throwable thrownException) {
 			this.description = description;
 			this.output = output;
+			this.errorOutput = errorOutput;
 			this.exitCode = exitCode;
 			this.expectedOutput = expectedOutput;
 			this.expectedLines = expectedLines != null ? Collections.unmodifiableList(new ArrayList<>(expectedLines)) : null;
@@ -210,6 +213,15 @@ public final class AwkTestSupport {
 		 */
 		public String output() {
 			return output;
+		}
+
+		/**
+		 * Returns the captured stderr of the test execution.
+		 *
+		 * @return the captured error output as a UTF-8 string
+		 */
+		public String errorOutput() {
+			return errorOutput;
 		}
 
 		/**
@@ -935,6 +947,7 @@ public final class AwkTestSupport {
 				return new TestResult(
 						layout.description,
 						actualOutput,
+						result.errorOutput,
 						result.exitCode,
 						expected,
 						expectedLines,
@@ -945,6 +958,7 @@ public final class AwkTestSupport {
 				if (layout.expectedException != null && layout.expectedException.isInstance(ex)) {
 					return new TestResult(
 							layout.description,
+							"",
 							"",
 							0,
 							null,
@@ -1069,7 +1083,7 @@ public final class AwkTestSupport {
 			} catch (ExitException ex) {
 				exitCode = ex.getCode();
 			}
-			return new ActualResult(out.toString(), exitCode);
+			return new ActualResult(out.toString(), "", exitCode);
 		}
 	}
 
@@ -1134,6 +1148,7 @@ public final class AwkTestSupport {
 			}
 			return new ActualResult(
 					outBytes.toString(StandardCharsets.UTF_8.name()),
+					errBytes.toString(StandardCharsets.UTF_8.name()),
 					exitCode);
 		}
 	}
@@ -1176,10 +1191,12 @@ public final class AwkTestSupport {
 
 	private static final class ActualResult {
 		final String output;
+		final String errorOutput;
 		final int exitCode;
 
-		ActualResult(String output, int exitCode) {
+		ActualResult(String output, String errorOutput, int exitCode) {
 			this.output = output;
+			this.errorOutput = errorOutput;
 			this.exitCode = exitCode;
 		}
 	}

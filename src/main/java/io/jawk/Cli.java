@@ -34,6 +34,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintStream;
 import java.io.StringReader;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -92,6 +93,8 @@ public final class Cli {
 	private boolean printUsage;
 	private boolean sandbox;
 	private boolean disableOptimize;
+	private boolean profiling;
+	private File profilingOutputFile;
 	private File persistentMemoryFile;
 
 	/**
@@ -161,6 +164,15 @@ public final class Cli {
 	 */
 	public boolean isDisableOptimize() {
 		return disableOptimize;
+	}
+
+	/**
+	 * Indicates whether runtime profiling was requested.
+	 *
+	 * @return {@code true} when profiling should be enabled
+	 */
+	public boolean isProfiling() {
+		return profiling;
 	}
 
 	/**
@@ -276,6 +288,17 @@ public final class Cli {
 			} else if (arg.equals("-s") || arg.equals("--no-optimize")) {
 				// -s/--no-optimize : skip tuple queue optimizations
 				disableOptimize = true;
+			} else if (arg.equals("--profile")) {
+				// --profile : collect and print runtime profiling statistics
+				profiling = true;
+			} else if (arg.startsWith("--profile=")) {
+				// --profile=filename : collect profiling statistics and write them to a file
+				String file = arg.substring("--profile=".length());
+				if (file.length() == 0) {
+					throw new IllegalArgumentException("Need output filename for --profile");
+				}
+				profiling = true;
+				profilingOutputFile = new File(file);
 			} else if (arg.equals("--dump-intermediate")) {
 				// --dump-intermediate : dump intermediate tuples to file
 				dumpIntermediateCode = true;
@@ -470,7 +493,7 @@ public final class Cli {
 	 */
 	private void executeProgram(Awk awk, AwkProgram program, File memoryFile) throws Exception {
 		OutputStreamAwkSink sink = new OutputStreamAwkSink(out, settings.getLocale());
-		try (AVM avm = awk.createAvm()) {
+		try (AVM avm = awk.createAvm(profiling)) {
 			avm.setAwkSink(sink);
 			avm.setErrorStream(err);
 			if (memoryFile != null) {
@@ -493,7 +516,36 @@ public final class Cli {
 				if (memoryFile != null) {
 					savePersistentMemory(avm, memoryFile);
 				}
+				if (profiling) {
+					printProfilingReport(avm);
+				}
 			}
+		}
+	}
+
+	private void printProfilingReport(AVM avm) {
+		if (profilingOutputFile == null) {
+			err.println();
+			avm.getProfilingReport().print(err);
+			return;
+		}
+		File parent = profilingOutputFile.getAbsoluteFile().getParentFile();
+		if (parent != null && !parent.isDirectory() && !parent.mkdirs() && !parent.isDirectory()) {
+			String message = "Failed to create directory '" + parent + "' for profiling report.";
+			throw new UncheckedIOException(message, new IOException(message));
+		}
+		try (PrintStream profileOut = new PrintStream(profilingOutputFile, "UTF-8")) {
+			avm.getProfilingReport().print(profileOut);
+			profileOut.flush();
+			if (profileOut.checkError()) {
+				throw new UncheckedIOException(
+						"Failed to write profiling report '" + profilingOutputFile + "'.",
+						new IOException("PrintStream reported an error"));
+			}
+		} catch (IOException ex) {
+			throw new UncheckedIOException(
+					"Failed to write profiling report '" + profilingOutputFile + "': " + ex.getMessage(),
+					ex);
 		}
 	}
 
@@ -571,6 +623,7 @@ public final class Cli {
 								" [--dump-syntax]" +
 								" [--dump-intermediate]" +
 								" [-s|--no-optimize]" +
+								" [--profile[=filename]]" +
 								" [--locale locale]" +
 								" [-t]" +
 								" [-l extension]..." +
@@ -605,6 +658,9 @@ public final class Cli {
 		dest.println(" --dump-syntax = Print the syntax tree.");
 		dest.println(" --dump-intermediate = Print the intermediate code.");
 		dest.println(" -s, --no-optimize = (extension) Disable optimizations during compilation.");
+		dest
+				.println(
+						" --profile[=filename] = (extension) Print tuple and function execution statistics to stderr or file.");
 		dest.println(" --locale Locale = (extension) Specify a locale to be used instead of US-English");
 		dest.println(" --list-ext = (extension) List available extensions.");
 		dest.println();
@@ -664,6 +720,9 @@ public final class Cli {
 		} catch (IllegalArgumentException e) {
 			System.err.println("Failed to parse arguments. Please see the help/usage output (cmd line switch '-h').");
 			e.printStackTrace(System.err);
+			System.exit(1);
+		} catch (UncheckedIOException e) {
+			System.err.printf("%s: %s%n", e.getClass().getSimpleName(), e.getMessage());
 			System.exit(1);
 		} catch (Exception e) {
 			System.err.printf("%s: %s%n", e.getClass().getSimpleName(), e.getMessage());

@@ -35,7 +35,9 @@ import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -63,6 +65,89 @@ public class CliOptionTest {
 		cli.parse(new String[] { "--no-optimize", "{ print 1 }" });
 
 		assertTrue(cli.isDisableOptimize());
+	}
+
+	@Test
+	public void profileOptionPrintsReportToStderr() throws Exception {
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.cliTest("CLI --profile prints runtime report")
+				.argument("--profile")
+				.script("function inc(x) { return x + 1 } BEGIN { print inc(1); print inc(2) }")
+				.expect("2\n3\n")
+				.run();
+
+		result.assertExpected();
+		assertTrue(result.errorOutput().contains("Jawk profiling report"));
+		assertTrue(result.errorOutput().contains("Tuple execution:"));
+		assertTrue(result.errorOutput().contains("Function execution:"));
+		assertTrue(result.errorOutput().contains("CALL_FUNCTION"));
+		assertTrue(result.errorOutput().contains("inc"));
+	}
+
+	@Test
+	public void profileOptionRecordsFunctionThatExitsWithoutReturning() throws Exception {
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.cliTest("CLI --profile records function exit")
+				.argument("--profile")
+				.script("function stop() { exit } END { stop() }")
+				.expect("")
+				.expectExit(0)
+				.run();
+
+		result.assertExpected();
+		assertTrue(result.errorOutput().contains("Jawk profiling report"));
+		assertTrue(result.errorOutput().contains("stop"));
+	}
+
+	@Test
+	public void profileOptionWithFilenameWritesReportToFile() throws Exception {
+		File profile = tempFolder.newFile("profile.txt");
+		assertTrue(profile.delete());
+
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.cliTest("CLI --profile=file writes runtime report")
+				.argument("--profile=" + profile.getAbsolutePath())
+				.script("function inc(x) { return x + 1 } BEGIN { print inc(1) }")
+				.expect("2\n")
+				.run();
+
+		result.assertExpected();
+		assertEquals("", result.errorOutput());
+		assertTrue(profile.isFile());
+		String report = new String(Files.readAllBytes(profile.toPath()), StandardCharsets.UTF_8);
+		assertTrue(report.contains("Jawk profiling report"));
+		assertTrue(report.contains("Tuple execution:"));
+		assertTrue(report.contains("Function execution:"));
+		assertTrue(report.contains("CALL_FUNCTION"));
+		assertTrue(report.contains("inc"));
+	}
+
+	@Test
+	public void profileOptionWriteFailureIsReportedAsIoFailure() throws Exception {
+		File profileDirectory = tempFolder.newFolder("profile-directory");
+
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.cliTest("CLI --profile=file reports write failure")
+				.argument("--profile=" + profileDirectory.getAbsolutePath())
+				.script("BEGIN { print 1 }")
+				.expectThrow(UncheckedIOException.class)
+				.run();
+
+		result.assertExpected();
+		assertTrue(result.thrownException().getMessage().contains("Failed to write profiling report"));
+	}
+
+	@Test
+	public void profileOptionWithEmptyFilenameIsRejected() throws Exception {
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.cliTest("CLI --profile= rejects empty filename")
+				.argument("--profile=")
+				.script("BEGIN { print 1 }")
+				.expectThrow(IllegalArgumentException.class)
+				.run();
+
+		result.assertExpected();
+		assertTrue(result.thrownException().getMessage().contains("Need output filename for --profile"));
 	}
 
 	@Test

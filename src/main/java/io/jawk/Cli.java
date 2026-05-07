@@ -537,6 +537,12 @@ public final class Cli {
 		}
 		try (PrintStream profileOut = new PrintStream(profilingOutputFile, "UTF-8")) {
 			avm.getProfilingReport().print(profileOut);
+			profileOut.flush();
+			if (profileOut.checkError()) {
+				throw new UncheckedIOException(
+						"Failed to write profiling report '" + profilingOutputFile + "'.",
+						new IOException("PrintStream reported an error"));
+			}
 		} catch (IOException ex) {
 			throw new UncheckedIOException(
 					"Failed to write profiling report '" + profilingOutputFile + "': " + ex.getMessage(),

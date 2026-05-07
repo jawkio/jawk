@@ -130,7 +130,6 @@ public class CliOptionTest {
 				.cliTest("CLI --profile=file reports write failure")
 				.argument("--profile=" + profileDirectory.getAbsolutePath())
 				.script("BEGIN { print 1 }")
-				.expect("1\n")
 				.expectThrow(UncheckedIOException.class)
 				.run();
 

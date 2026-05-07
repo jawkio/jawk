@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Collections;
@@ -119,6 +120,22 @@ public class CliOptionTest {
 		assertTrue(report.contains("Function execution:"));
 		assertTrue(report.contains("CALL_FUNCTION"));
 		assertTrue(report.contains("inc"));
+	}
+
+	@Test
+	public void profileOptionWriteFailureIsReportedAsIoFailure() throws Exception {
+		File profileDirectory = tempFolder.newFolder("profile-directory");
+
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.cliTest("CLI --profile=file reports write failure")
+				.argument("--profile=" + profileDirectory.getAbsolutePath())
+				.script("BEGIN { print 1 }")
+				.expect("1\n")
+				.expectThrow(UncheckedIOException.class)
+				.run();
+
+		result.assertExpected();
+		assertTrue(result.thrownException().getMessage().contains("Failed to write profiling report"));
 	}
 
 	@Test

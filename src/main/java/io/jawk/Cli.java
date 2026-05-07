@@ -34,6 +34,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintStream;
 import java.io.StringReader;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -530,13 +531,14 @@ public final class Cli {
 		}
 		File parent = profilingOutputFile.getAbsoluteFile().getParentFile();
 		if (parent != null && !parent.isDirectory() && !parent.mkdirs() && !parent.isDirectory()) {
-			throw new IllegalArgumentException(
-					"Failed to create directory '" + parent + "' for profiling report.");
+			throw new UncheckedIOException(
+					"Failed to create directory '" + parent + "' for profiling report.",
+					new IOException(parent.toString()));
 		}
 		try (PrintStream profileOut = new PrintStream(profilingOutputFile, "UTF-8")) {
 			avm.getProfilingReport().print(profileOut);
 		} catch (IOException ex) {
-			throw new IllegalArgumentException(
+			throw new UncheckedIOException(
 					"Failed to write profiling report '" + profilingOutputFile + "': " + ex.getMessage(),
 					ex);
 		}
@@ -713,6 +715,9 @@ public final class Cli {
 		} catch (IllegalArgumentException e) {
 			System.err.println("Failed to parse arguments. Please see the help/usage output (cmd line switch '-h').");
 			e.printStackTrace(System.err);
+			System.exit(1);
+		} catch (UncheckedIOException e) {
+			System.err.printf("%s: %s%n", e.getClass().getSimpleName(), e.getMessage());
 			System.exit(1);
 		} catch (Exception e) {
 			System.err.printf("%s: %s%n", e.getClass().getSimpleName(), e.getMessage());

@@ -40,6 +40,11 @@ import io.jawk.intermediate.Address;
 import io.jawk.intermediate.AwkTuples;
 import io.jawk.intermediate.Opcode;
 import io.jawk.intermediate.PositionTracker;
+import io.jawk.intermediate.Tuple;
+import io.jawk.intermediate.Tuple.AddressTuple;
+import io.jawk.intermediate.Tuple.PushDoubleTuple;
+import io.jawk.intermediate.Tuple.PushLongTuple;
+import io.jawk.intermediate.Tuple.PushStringTuple;
 
 public class AwkTupleOptimizationTest {
 
@@ -208,7 +213,8 @@ public class AwkTupleOptimizationTest {
 		PositionTracker tracker = rawTuples(tuples).top();
 		while (!tracker.isEOF()) {
 			if (tracker.opcode() == Opcode.CALL_FUNCTION) {
-				Address address = tracker.addressArg();
+				AddressTuple tuple = (AddressTuple) tracker.current();
+				Address address = tuple.getAddress();
 				assertTrue("Call target should be assigned", address.index() >= 0);
 				callTargets.add(Integer.valueOf(address.index()));
 			}
@@ -327,7 +333,8 @@ public class AwkTupleOptimizationTest {
 		PositionTracker tracker = rawTuples(tuples).top();
 		while (!tracker.isEOF()) {
 			if (usesAddress(tracker.opcode())) {
-				branchTargets.add(Integer.valueOf(tracker.addressArg().index()));
+				AddressTuple tuple = (AddressTuple) tracker.current();
+				branchTargets.add(Integer.valueOf(tuple.getAddress().index()));
 			}
 			tracker.next();
 		}
@@ -505,7 +512,7 @@ public class AwkTupleOptimizationTest {
 			if (opcode == Opcode.PUSH_LONG
 					|| opcode == Opcode.PUSH_DOUBLE
 					|| opcode == Opcode.PUSH_STRING) {
-				Object value = tracker.arg(0);
+				Object value = literalValue(tracker.current());
 				if (expected instanceof Number && value instanceof Number) {
 					double actual = ((Number) value).doubleValue();
 					if (Double.compare(actual, ((Number) expected).doubleValue()) == 0) {
@@ -540,12 +547,25 @@ public class AwkTupleOptimizationTest {
 	private static Opcode opcodeAt(AwkProgram tuples, int index) {
 		PositionTracker tracker = rawTuples(tuples).top();
 		while (!tracker.isEOF()) {
-			if (tracker.current() == index) {
+			if (tracker.currentIndex() == index) {
 				return tracker.opcode();
 			}
 			tracker.next();
 		}
 		throw new AssertionError("No tuple at index " + index);
+	}
+
+	private static Object literalValue(Tuple tuple) {
+		switch (tuple.getOpcode()) {
+		case PUSH_LONG:
+			return Long.valueOf(((PushLongTuple) tuple).getValue());
+		case PUSH_DOUBLE:
+			return Double.valueOf(((PushDoubleTuple) tuple).getValue());
+		case PUSH_STRING:
+			return ((PushStringTuple) tuple).getValue();
+		default:
+			throw new AssertionError("Tuple is not a literal push: " + tuple);
+		}
 	}
 
 	private static AwkTuples rawTuples(AwkProgram program) {

@@ -54,6 +54,22 @@ import io.jawk.ext.JawkExtension;
 import io.jawk.intermediate.Address;
 import io.jawk.intermediate.Opcode;
 import io.jawk.intermediate.PositionTracker;
+import io.jawk.intermediate.Tuple;
+import io.jawk.intermediate.Tuple.BooleanTuple;
+import io.jawk.intermediate.Tuple.CallFunctionTuple;
+import io.jawk.intermediate.Tuple.ClassTuple;
+import io.jawk.intermediate.Tuple.CountAndAppendTuple;
+import io.jawk.intermediate.Tuple.CountTuple;
+import io.jawk.intermediate.Tuple.DereferenceTuple;
+import io.jawk.intermediate.Tuple.ExtensionTuple;
+import io.jawk.intermediate.Tuple.InputFieldTuple;
+import io.jawk.intermediate.Tuple.LongTuple;
+import io.jawk.intermediate.Tuple.PushDoubleTuple;
+import io.jawk.intermediate.Tuple.PushLongTuple;
+import io.jawk.intermediate.Tuple.PushStringTuple;
+import io.jawk.intermediate.Tuple.RegexTuple;
+import io.jawk.intermediate.Tuple.SubstitutionVariableTuple;
+import io.jawk.intermediate.Tuple.VariableTuple;
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.jrt.AssocArray;
 import io.jawk.jrt.AwkRuntimeException;
@@ -1008,96 +1024,40 @@ public class AVM implements VariableManager, Closeable {
 		try {
 			while (!position.isEOF()) {
 				// System_out.println("--> "+position);
-				opcode = position.opcode();
+				Tuple tuple = position.current();
+				opcode = tuple.getOpcode();
 				if (profiling) {
-					tupleStartNanos = beforeProfiledTuple(position, opcode);
+					tupleStartNanos = beforeProfiledTuple(tuple, opcode);
 				}
 				// switch on OPCODE
 				switch (opcode) {
 				case PRINT: {
-					// arg[0] = # of items to print on the stack
-					// stack[0] = item 1
-					// stack[1] = item 2
-					// etc.
-					long numArgs = position.intArg(0);
-					jrt.printDefault(numArgs == 0 ? new Object[] { jrt.jrtGetInputField(0) } : popArguments(numArgs));
+					execPrint((CountTuple) tuple);
 					position.next();
 					break;
 				}
 				case PRINT_TO_FILE: {
-					// arg[0] = # of items to print on the stack
-					// arg[1] = true=append, false=overwrite
-					// stack[0] = output filename
-					// stack[1] = item 1
-					// stack[2] = item 2
-					// etc.
-					boolean append = position.boolArg(1);
-					String key = jrt.toAwkString(pop());
-					long numArgs = position.intArg(0);
-					jrt
-							.printToFile(
-									key,
-									append,
-									numArgs == 0 ? new Object[]
-									{ jrt.jrtGetInputField(0) } : popArguments(numArgs));
+					execPrintToFile((CountAndAppendTuple) tuple);
 					position.next();
 					break;
 				}
 				case PRINT_TO_PIPE: {
-					// arg[0] = # of items to print on the stack
-					// stack[0] = command to execute
-					// stack[1] = item 1
-					// stack[2] = item 2
-					// etc.
-					String cmd = jrt.toAwkString(pop());
-					long numArgs = position.intArg(0);
-					jrt
-							.printToProcess(
-									cmd,
-									numArgs == 0 ? new Object[]
-									{ jrt.jrtGetInputField(0) } : popArguments(numArgs));
+					execPrintToPipe((CountTuple) tuple);
 					position.next();
 					break;
 				}
 				case PRINTF: {
-					// arg[0] = # of items to print on the stack (includes format string)
-					// stack[0] = format string
-					// stack[1] = item 1
-					// etc.
-					long numArgs = position.intArg(0);
-					Object[] values = popArguments(numArgs - 1);
-					String format = jrt.toAwkString(pop());
-					jrt.printfDefault(format, values);
+					execPrintf((CountTuple) tuple);
 					position.next();
 					break;
 				}
 				case PRINTF_TO_FILE: {
-					// arg[0] = # of items to print on the stack (includes format string)
-					// arg[1] = true=append, false=overwrite
-					// stack[0] = output filename
-					// stack[1] = format string
-					// stack[2] = item 1
-					// etc.
-					boolean append = position.boolArg(1);
-					String key = jrt.toAwkString(pop());
-					long numArgs = position.intArg(0);
-					Object[] values = popArguments(numArgs - 1);
-					String format = jrt.toAwkString(pop());
-					jrt.printfToFile(key, append, format, values);
+					execPrintfToFile((CountAndAppendTuple) tuple);
 					position.next();
 					break;
 				}
 				case PRINTF_TO_PIPE: {
-					// arg[0] = # of items to print on the stack (includes format string)
-					// stack[0] = command to execute
-					// stack[1] = format string
-					// stack[2] = item 1
-					// etc.
-					String cmd = jrt.toAwkString(pop());
-					long numArgs = position.intArg(0);
-					Object[] values = popArguments(numArgs - 1);
-					String format = jrt.toAwkString(pop());
-					jrt.printfToProcess(cmd, format, values);
+					execPrintfToPipe((CountTuple) tuple);
 					position.next();
 					break;
 				}
@@ -1106,47 +1066,35 @@ public class AVM implements VariableManager, Closeable {
 					// stack[0] = arg1 (format string)
 					// stack[1] = arg2
 					// etc.
-					long numArgs = position.intArg(0);
+					CountTuple countTuple = (CountTuple) tuple;
+					long numArgs = countTuple.getCount();
 					push(sprintfFunction(numArgs));
 					position.next();
 					break;
 				}
 				case LENGTH: {
-					// arg[0] = 0==use $0, otherwise, use the stack element
-					// stack[0] = element to measure (only if arg[0] != 0)
-
-					// print items from the top of the stack
-					// # of items
-					long num = position.intArg(0);
-					if (num == 0) {
-						// display $0
-						push(jrt.jrtGetInputField(0).toString().length());
-					} else {
-						Object value = pop();
-						if (value instanceof Map) {
-							push((long) ((Map<?, ?>) value).size());
-						} else {
-							push(jrt.toAwkString(value).length());
-						}
-					}
+					execLength((CountTuple) tuple);
 					position.next();
 					break;
 				}
 				case PUSH_LONG: {
 					// arg[0] = long constant to push onto the stack
-					push(position.intArg(0));
+					PushLongTuple pushTuple = (PushLongTuple) tuple;
+					push(pushTuple.getValue());
 					position.next();
 					break;
 				}
 				case PUSH_DOUBLE: {
 					// arg[0] = double constant to push onto the stack
-					push(position.doubleArg(0));
+					PushDoubleTuple pushTuple = (PushDoubleTuple) tuple;
+					push(pushTuple.getValue());
 					position.next();
 					break;
 				}
 				case PUSH_STRING: {
 					// arg[0] = string constant to push onto the stack
-					push(position.stringArg(0));
+					PushStringTuple pushTuple = (PushStringTuple) tuple;
+					push(pushTuple.getValue());
 					position.next();
 					break;
 				}
@@ -1165,7 +1113,7 @@ public class AVM implements VariableManager, Closeable {
 					// if String, then check for "" or double value of "0"
 					boolean jump = !jrt.toBoolean(pop());
 					if (jump) {
-						position.jump(position.addressArg());
+						position.jump(tuple.getAddress());
 					} else {
 						position.next();
 					}
@@ -1191,7 +1139,7 @@ public class AVM implements VariableManager, Closeable {
 					// if String, then check for "" or double value of "0"
 					boolean jump = jrt.toBoolean(pop());
 					if (jump) {
-						position.jump(position.addressArg());
+						position.jump(tuple.getAddress());
 					} else {
 						position.next();
 					}
@@ -1238,7 +1186,7 @@ public class AVM implements VariableManager, Closeable {
 				case GOTO: {
 					// arg[0] = address
 
-					position.jump(position.addressArg());
+					position.jump(tuple.getAddress());
 					break;
 				}
 				case NOP: {
@@ -1260,9 +1208,9 @@ public class AVM implements VariableManager, Closeable {
 					// arg[0] = offset
 					// arg[1] = isGlobal
 					// stack[0] = value
+					VariableTuple variableTuple = (VariableTuple) tuple;
 					Object value = pop();
-					boolean isGlobal = position.boolArg(1);
-					assign(position.intArg(0), value, isGlobal, position);
+					assign(variableTuple.getVariableOffset(), value, variableTuple.isGlobal(), position);
 					position.next();
 					break;
 				}
@@ -1276,8 +1224,9 @@ public class AVM implements VariableManager, Closeable {
 					if (rhs == null) {
 						rhs = BLANK;
 					}
-					long offset = position.intArg(0);
-					boolean isGlobal = position.boolArg(1);
+					VariableTuple variableTuple = (VariableTuple) tuple;
+					long offset = variableTuple.getVariableOffset();
+					boolean isGlobal = variableTuple.isGlobal();
 					assignArray(offset, arrIdx, rhs, isGlobal);
 					position.next();
 					break;
@@ -1311,8 +1260,9 @@ public class AVM implements VariableManager, Closeable {
 					if (rhs == null) {
 						rhs = BLANK;
 					}
-					long offset = position.intArg(0);
-					boolean isGlobal = position.boolArg(1);
+					VariableTuple variableTuple = (VariableTuple) tuple;
+					long offset = variableTuple.getVariableOffset();
+					boolean isGlobal = variableTuple.isGlobal();
 
 					double val = JRT.toDouble(rhs);
 
@@ -1441,8 +1391,10 @@ public class AVM implements VariableManager, Closeable {
 					// arg[0] = offset
 					// arg[1] = isGlobal
 					// stack[0] = value
-					boolean isGlobal = position.boolArg(1);
-					Object o1 = runtimeStack.getVariable(position.intArg(0), isGlobal);
+					VariableTuple variableTuple = (VariableTuple) tuple;
+					long offset = variableTuple.getVariableOffset();
+					boolean isGlobal = variableTuple.isGlobal();
+					Object o1 = runtimeStack.getVariable(offset, isGlobal);
 					if (o1 == null) {
 						o1 = BLANK;
 					}
@@ -1475,10 +1427,10 @@ public class AVM implements VariableManager, Closeable {
 					if (JRT.isActuallyLong(ans)) {
 						long integral = (long) Math.rint(ans);
 						push(integral);
-						runtimeStack.setVariable(position.intArg(0), integral, isGlobal);
+						runtimeStack.setVariable(offset, integral, isGlobal);
 					} else {
 						push(ans);
-						runtimeStack.setVariable(position.intArg(0), ans, isGlobal);
+						runtimeStack.setVariable(offset, ans, isGlobal);
 					}
 					position.next();
 					break;
@@ -1532,14 +1484,16 @@ public class AVM implements VariableManager, Closeable {
 				case INC: {
 					// arg[0] = offset
 					// arg[1] = isGlobal
-					inc(position.intArg(0), position.boolArg(1));
+					VariableTuple variableTuple = (VariableTuple) tuple;
+					inc(variableTuple.getVariableOffset(), variableTuple.isGlobal());
 					position.next();
 					break;
 				}
 				case DEC: {
 					// arg[0] = offset
 					// arg[1] = isGlobal
-					dec(position.intArg(0), position.boolArg(1));
+					VariableTuple variableTuple = (VariableTuple) tuple;
+					dec(variableTuple.getVariableOffset(), variableTuple.isGlobal());
 					position.next();
 					break;
 				}
@@ -1547,7 +1501,8 @@ public class AVM implements VariableManager, Closeable {
 					// arg[0] = offset
 					// arg[1] = isGlobal
 					pop();
-					push(inc(position.intArg(0), position.boolArg(1)));
+					VariableTuple variableTuple = (VariableTuple) tuple;
+					push(inc(variableTuple.getVariableOffset(), variableTuple.isGlobal()));
 					position.next();
 					break;
 				}
@@ -1555,7 +1510,8 @@ public class AVM implements VariableManager, Closeable {
 					// arg[0] = offset
 					// arg[1] = isGlobal
 					pop();
-					push(dec(position.intArg(0), position.boolArg(1)));
+					VariableTuple variableTuple = (VariableTuple) tuple;
+					push(dec(variableTuple.getVariableOffset(), variableTuple.isGlobal()));
 					position.next();
 					break;
 				}
@@ -1563,8 +1519,9 @@ public class AVM implements VariableManager, Closeable {
 					// arg[0] = offset
 					// arg[1] = isGlobal
 					// stack[0] = array index
-					boolean isGlobal = position.boolArg(1);
-					Map<Object, Object> aa = ensureMapVariable(position.intArg(0), isGlobal);
+					VariableTuple variableTuple = (VariableTuple) tuple;
+					boolean isGlobal = variableTuple.isGlobal();
+					Map<Object, Object> aa = ensureMapVariable(variableTuple.getVariableOffset(), isGlobal);
 					Object key = pop();
 					checkScalar(key);
 					Object o = aa.get(key);
@@ -1581,8 +1538,9 @@ public class AVM implements VariableManager, Closeable {
 					// arg[0] = offset
 					// arg[1] = isGlobal
 					// stack[0] = array index
-					boolean isGlobal = position.boolArg(1);
-					Map<Object, Object> aa = ensureMapVariable(position.intArg(0), isGlobal);
+					VariableTuple variableTuple = (VariableTuple) tuple;
+					boolean isGlobal = variableTuple.isGlobal();
+					Map<Object, Object> aa = ensureMapVariable(variableTuple.getVariableOffset(), isGlobal);
 					Object key = pop();
 					checkScalar(key);
 					Object o = aa.get(key);
@@ -1667,14 +1625,16 @@ public class AVM implements VariableManager, Closeable {
 				case DEREFERENCE: {
 					// arg[0] = offset
 					// arg[1] = isGlobal
-					boolean isGlobal = position.boolArg(2);
-					Object o = runtimeStack.getVariable(position.intArg(0), isGlobal);
+					DereferenceTuple dereferenceTuple = (DereferenceTuple) tuple;
+					boolean isGlobal = dereferenceTuple.isGlobal();
+					long offset = dereferenceTuple.getVariableOffset();
+					Object o = runtimeStack.getVariable(offset, isGlobal);
 					if (o == null) {
-						if (position.boolArg(1)) {
+						if (dereferenceTuple.isArray()) {
 							// is_array
-							push(runtimeStack.setVariable(position.intArg(0), newAwkArray(), isGlobal));
+							push(runtimeStack.setVariable(offset, newAwkArray(), isGlobal));
 						} else {
-							push(runtimeStack.setVariable(position.intArg(0), BLANK, isGlobal));
+							push(runtimeStack.setVariable(offset, BLANK, isGlobal));
 						}
 					} else {
 						push(o);
@@ -1718,7 +1678,8 @@ public class AVM implements VariableManager, Closeable {
 				case SRAND: {
 					// arg[0] = numArgs (where 0 = no args, anything else = one argument)
 					// stack[0] = seed (only if numArgs != 0)
-					long numArgs = position.intArg(0);
+					CountTuple countTuple = (CountTuple) tuple;
+					long numArgs = countTuple.getCount();
 					int seed;
 					if (numArgs == 0) {
 						// use the time of day for the seed
@@ -1796,37 +1757,7 @@ public class AVM implements VariableManager, Closeable {
 					break;
 				}
 				case MATCH: {
-					// stack[0] = 2nd arg to match() function
-					// stack[1] = 1st arg to match() function
-					String ere = jrt.toAwkString(pop());
-					String s = jrt.toAwkString(pop());
-
-					// check if IGNORECASE set
-					int flags = 0;
-
-					if (globalVariableOffsets.containsKey("IGNORECASE")) {
-						Integer offsetObj = globalVariableOffsets.get("IGNORECASE");
-						Object ignorecase = runtimeStack.getVariable(offsetObj, true);
-
-						if (JRT.toDouble(ignorecase) != 0) {
-							flags |= Pattern.CASE_INSENSITIVE;
-						}
-					}
-
-					Pattern pattern = Pattern.compile(ere, flags);
-					Matcher matcher = pattern.matcher(s);
-					boolean result = matcher.find();
-					if (result) {
-						int start = matcher.start() + 1;
-						int len = matcher.end() - matcher.start();
-						jrt.setRSTART(start);
-						jrt.setRLENGTH(len);
-						push(start);
-					} else {
-						jrt.setRSTART(0);
-						jrt.setRLENGTH(-1);
-						push(0);
-					}
+					execMatch();
 					position.next();
 					break;
 				}
@@ -1840,174 +1771,37 @@ public class AVM implements VariableManager, Closeable {
 					break;
 				}
 				case SUB_FOR_DOLLAR_0: {
-					// arg[0] = isGlobal
-					// stack[0] = replacement string
-					// stack[1] = ere
-					boolean isGsub = position.boolArg(0);
-					String repl = jrt.toAwkString(pop());
-					String ere = jrt.toAwkString(pop());
-					String orig = jrt.toAwkString(jrt.jrtGetInputField(0));
-					String newstring;
-					if (isGsub) {
-						newstring = replaceAll(orig, ere, repl);
-					} else {
-						newstring = replaceFirst(orig, ere, repl);
-					}
-					// assign it to "$0"
-					jrt.setInputLine(newstring);
-					jrt.jrtParseFields();
+					execSubForDollar0((BooleanTuple) tuple);
 					position.next();
 					break;
 				}
 				case SUB_FOR_DOLLAR_REFERENCE: {
-					// arg[0] = isGlobal
-					// stack[0] = field num
-					// stack[1] = original field value
-					// stack[2] = replacement string
-					// stack[3] = ere
-					boolean isGsub = position.boolArg(0);
-					long fieldNum = JRT.parseFieldNumber(pop());
-					String orig = jrt.toAwkString(pop());
-					String repl = jrt.toAwkString(pop());
-					String ere = jrt.toAwkString(pop());
-					String newstring;
-					if (isGsub) {
-						newstring = replaceAll(orig, ere, repl);
-					} else {
-						newstring = replaceFirst(orig, ere, repl);
-					}
-					// assign it to "$0"
-					if (fieldNum == 0) {
-						jrt.setInputLine(newstring);
-						jrt.jrtParseFields();
-					} else {
-						jrt.jrtSetInputField(newstring, fieldNum);
-					}
+					execSubForDollarReference((BooleanTuple) tuple);
 					position.next();
 					break;
 				}
 				case SUB_FOR_VARIABLE: {
-					// arg[0] = offset
-					// arg[1] = isGlobal
-					// arg[2] = isGsub
-					// stack[0] = original variable value
-					// stack[1] = replacement string
-					// stack[2] = ere
-					long offset = position.intArg(0);
-					boolean isGlobal = position.boolArg(1);
-					String newString = execSubOrGSub(position, 2);
-					// assign it to "offset/global"
-					assign(offset, newString, isGlobal, position);
-					pop();
+					execSubForVariable((SubstitutionVariableTuple) tuple, position);
 					position.next();
 					break;
 				}
 				case SUB_FOR_ARRAY_REFERENCE: {
-					// arg[0] = offset
-					// arg[1] = isGlobal
-					// arg[2] = isGsub
-					// stack[0] = original variable value
-					// stack[1] = replacement string
-					// stack[2] = ere
-					// stack[3] = array index
-					// ARRAY reference offset/isGlobal
-					long offset = position.intArg(0);
-					boolean isGlobal = position.boolArg(1);
-					Object arrIdx = pop();
-					String newString = execSubOrGSub(position, 2);
-					// assign it to "offset/arrIdx/global"
-					assignArray(offset, arrIdx, newString, isGlobal);
-					pop();
+					execSubForArrayReference((SubstitutionVariableTuple) tuple);
 					position.next();
 					break;
 				}
 				case SUB_FOR_MAP_REFERENCE: {
-					// arg[0] = isGsub
-					// stack[0] = array index
-					// stack[1] = associative array
-					// stack[2] = original variable value
-					// stack[3] = replacement string
-					// stack[4] = ere
-					Object arrIdx = pop();
-					Map<Object, Object> array = toMap(pop());
-					String newString = execSubOrGSub(position, 0);
-					assignMapElement(array, arrIdx, newString);
-					pop();
+					execSubForMapReference((BooleanTuple) tuple);
 					position.next();
 					break;
 				}
 				case SPLIT: {
-					// arg[0] = num args
-					// stack[0] = field_sep (only if num args == 3)
-					// stack[1] = array
-					// stack[2] = string
-					long numArgs = position.intArg(0);
-					String fsString;
-					if (numArgs == 2) {
-						fsString = jrt.toAwkString(jrt.getFSVar());
-					} else if (numArgs == 3) {
-						fsString = jrt.toAwkString(pop());
-					} else {
-						throw new Error("Invalid # of args. split() requires 2 or 3. Got: " + numArgs);
-					}
-					Object o = pop();
-					if (!(o instanceof Map)) {
-						throw new AwkRuntimeException(position.lineNumber(), o + " is not an array.");
-					}
-					String s = jrt.toAwkString(pop());
-					Enumeration<Object> tokenizer;
-					if (fsString.equals(" ")) {
-						tokenizer = new StringTokenizer(s);
-					} else if (fsString.length() == 1) {
-						tokenizer = new SingleCharacterTokenizer(s, fsString.charAt(0));
-					} else if (fsString.isEmpty()) {
-						tokenizer = new CharacterTokenizer(s);
-					} else {
-						tokenizer = new RegexTokenizer(s, fsString);
-					}
-
-					@SuppressWarnings("unchecked")
-					Map<Object, Object> assocArray = (Map<Object, Object>) o;
-					assocArray.clear();
-					long cnt = 0;
-					while (tokenizer.hasMoreElements()) {
-						assocArray.put(++cnt, tokenizer.nextElement());
-					}
-					push(cnt);
+					execSplit((CountTuple) tuple, position);
 					position.next();
 					break;
 				}
 				case SUBSTR: {
-					// arg[0] = num args
-					// stack[0] = length (only if num args == 3)
-					// stack[1] = start pos
-					// stack[2] = string
-					long numArgs = position.intArg(0);
-					int startPos, length;
-					String s;
-					if (numArgs == 3) {
-						length = (int) JRT.toLong(pop());
-						startPos = (int) JRT.toDouble(pop());
-						s = jrt.toAwkString(pop());
-					} else if (numArgs == 2) {
-						startPos = (int) JRT.toDouble(pop());
-						s = jrt.toAwkString(pop());
-						length = s.length() - startPos + 1;
-					} else {
-						throw new Error("numArgs for SUBSTR must be 2 or 3. It is " + numArgs);
-					}
-					if (startPos <= 0) {
-						startPos = 1;
-					}
-					if (length <= 0 || startPos > s.length()) {
-						push(BLANK);
-					} else {
-						if (startPos + length > s.length()) {
-							push(s.substring(startPos - 1));
-						} else {
-							push(s.substring(startPos - 1, startPos + length - 1));
-						}
-					}
+					execSubstr((CountTuple) tuple);
 					position.next();
 					break;
 				}
@@ -2223,7 +2017,7 @@ public class AVM implements VariableManager, Closeable {
 					}
 					Deque<?> keylist = (Deque<?>) o;
 					if (keylist.isEmpty()) {
-						position.jump(position.addressArg());
+						position.jump(tuple.getAddress());
 					} else {
 						position.next();
 					}
@@ -2246,12 +2040,13 @@ public class AVM implements VariableManager, Closeable {
 				case CHECK_CLASS: {
 					// arg[0] = class object
 					// stack[0] = item to check
+					ClassTuple checkTuple = (ClassTuple) tuple;
 					Object o = pop();
-					if (!position.classArg().isInstance(o)) {
+					if (!checkTuple.getType().isInstance(o)) {
 						throw new AwkRuntimeException(
 								position.lineNumber(),
 								"Verification failed. Top-of-stack = " + o.getClass() + " isn't an instance of "
-										+ position.classArg());
+										+ checkTuple.getType());
 					}
 					push(o);
 					position.next();
@@ -2264,7 +2059,7 @@ public class AVM implements VariableManager, Closeable {
 					if (jrt.consumeInput(resolvedInputSource)) {
 						position.next();
 					} else {
-						position.jump(position.addressArg());
+						position.jump(tuple.getAddress());
 					}
 					break;
 				}
@@ -2317,7 +2112,8 @@ public class AVM implements VariableManager, Closeable {
 				case ENVIRON_OFFSET: {
 					// stack[0] = offset
 					//// assignArray(offset, arrIdx, newstring, isGlobal);
-					environOffset = position.intArg(0);
+					LongTuple offsetTuple = (LongTuple) tuple;
+					environOffset = offsetTuple.getValue();
 					// set the initial variables
 					Map<String, String> env = System.getenv();
 					for (Map.Entry<String, String> var : env.entrySet()) {
@@ -2329,7 +2125,8 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case ARGC_OFFSET: {
 					// stack[0] = offset
-					argcOffset = position.intArg(0);
+					LongTuple offsetTuple = (LongTuple) tuple;
+					argcOffset = offsetTuple.getValue();
 					// assign(argcOffset, arguments.size(), true, position); // true = global
 					// +1 to include the "jawk" program name (ARGV[0])
 					assign(argcOffset, arguments.size() + 1, true, position); // true = global
@@ -2339,7 +2136,8 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case ARGV_OFFSET: {
 					// stack[0] = offset
-					argvOffset = position.intArg(0);
+					LongTuple offsetTuple = (LongTuple) tuple;
+					argvOffset = offsetTuple.getValue();
 					// consume argv (looping from 1 to argc)
 					int argc = (int) JRT.toDouble(runtimeStack.getVariable(argcOffset, true)); // true = global
 					assignArray(argvOffset, 0, "jawk", true);
@@ -2360,7 +2158,8 @@ public class AVM implements VariableManager, Closeable {
 					break;
 				}
 				case GET_INPUT_FIELD_CONST: {
-					long fieldnum = position.intArg(0);
+					InputFieldTuple inputFieldTuple = (InputFieldTuple) tuple;
+					long fieldnum = inputFieldTuple.getFieldIndex();
 					push(jrt.jrtGetInputField(fieldnum));
 					position.next();
 					break;
@@ -2380,11 +2179,11 @@ public class AVM implements VariableManager, Closeable {
 					// ...
 					// stack[n-1] = first actual parameter
 					// etc.
-					Address funcAddr = position.addressArg();
-					// String func_name = position.arg(1).toString();
-					long numFormalParams = position.intArg(2);
-					long numActualParams = position.intArg(3);
-					runtimeStack.pushFrame(numFormalParams, position.current());
+					CallFunctionTuple callTuple = (CallFunctionTuple) tuple;
+					Address funcAddr = callTuple.getAddress();
+					long numFormalParams = callTuple.getNumFormalParams();
+					long numActualParams = callTuple.getNumActualParams();
+					runtimeStack.pushFrame(numFormalParams, position.currentIndex());
 					// Arguments are stacked, so first in the stack is the last for the function
 					for (long i = numActualParams - 1; i >= 0; i--) {
 						runtimeStack.setVariable(i, pop(), false); // false = local
@@ -2414,29 +2213,7 @@ public class AVM implements VariableManager, Closeable {
 					break;
 				}
 				case SET_NUM_GLOBALS: {
-					// arg[0] = # of globals
-					Object[] globals = runtimeStack.getNumGlobals();
-					if (mergedGlobalLayoutActive) {
-						if (!hasCompatiblePersistentGlobalLayout(position.intArg(0))) {
-							throw new IllegalStateException(
-									"AVM globals are already initialized for an incompatible persistent layout.");
-						}
-						applyExecutionInitialVariablesToGlobalSlots(true);
-					} else if (globals == null) {
-						runtimeStack.setNumGlobals(position.intArg(0), globalVariableOffsets);
-						initializedEvalGlobalVariableOffsets = globalVariableOffsets;
-						initializedEvalGlobalVariableArrays = globalVariableArrays;
-
-						// now that we have the global variable size,
-						// we can allocate the initial variables
-
-						// assign -v variables and per-call overrides prepared for this execution
-						applyExecutionInitialVariablesToGlobalSlots(false);
-					} else if (!hasCompatibleEvalGlobalLayout(position.intArg(0))) {
-						throw new IllegalStateException(
-								"AVM globals are already initialized for a different eval layout. Call prepareForEval(...) first.");
-					}
-
+					execSetNumGlobals((CountTuple) tuple);
 					position.next();
 					break;
 				}
@@ -2448,30 +2225,7 @@ public class AVM implements VariableManager, Closeable {
 					break;
 				}
 				case APPLY_SUBSEP: {
-					// arg[0] = # of elements for SUBSEP application
-					// stack[0] = first element
-					// stack[1] = second element
-					// etc.
-					long count = position.intArg(0);
-					// String s;
-					if (count == 1) {
-						Object value = pop();
-						checkScalar(value);
-						push(jrt.toAwkString(value));
-					} else {
-						StringBuilder sb = new StringBuilder();
-						Object value = pop();
-						checkScalar(value);
-						sb.append(jrt.toAwkString(value));
-						String subsep = jrt.toAwkString(jrt.getSUBSEPVar());
-						for (int i = 1; i < count; i++) {
-							sb.insert(0, subsep);
-							value = pop();
-							checkScalar(value);
-							sb.insert(0, jrt.toAwkString(value));
-						}
-						push(sb.toString());
-					}
+					execApplySubsep((CountTuple) tuple);
 					position.next();
 					break;
 				}
@@ -2479,8 +2233,9 @@ public class AVM implements VariableManager, Closeable {
 					// arg[0] = offset
 					// arg[1] = isGlobal
 					// stack[0] = array index
-					long offset = position.intArg(0);
-					boolean isGlobal = position.boolArg(1);
+					VariableTuple variableTuple = (VariableTuple) tuple;
+					long offset = variableTuple.getVariableOffset();
+					boolean isGlobal = variableTuple.isGlobal();
 					Map<Object, Object> aa = getMapVariable(offset, isGlobal);
 					Object key = pop();
 					checkScalar(key);
@@ -2504,8 +2259,9 @@ public class AVM implements VariableManager, Closeable {
 					// arg[0] = offset
 					// arg[1] = isGlobal
 					// (nothing on the stack)
-					long offset = position.intArg(0);
-					boolean isGlobal = position.boolArg(1);
+					VariableTuple variableTuple = (VariableTuple) tuple;
+					long offset = variableTuple.getVariableOffset();
+					boolean isGlobal = variableTuple.isGlobal();
 					Map<Object, Object> array = getMapVariable(offset, isGlobal);
 					if (array != null) {
 						array.clear();
@@ -2515,13 +2271,14 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case SET_EXIT_ADDRESS: {
 					// arg[0] = exit address
-					exitAddress = position.addressArg();
+					exitAddress = tuple.getAddress();
 					position.next();
 					break;
 				}
 				case SET_WITHIN_END_BLOCKS: {
 					// arg[0] = whether within the END blocks section
-					withinEndBlocks = position.boolArg(0);
+					BooleanTuple endBlocksTuple = (BooleanTuple) tuple;
+					withinEndBlocks = endBlocksTuple.getValue();
 					position.next();
 					break;
 				}
@@ -2551,7 +2308,8 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case REGEXP: {
 					// Literal regex tuples must provide a precompiled Pattern as arg[1]
-					Pattern pattern = position.patternArg(1);
+					RegexTuple regexTuple = (RegexTuple) tuple;
+					Pattern pattern = regexTuple.getPattern();
 					push(pattern);
 					position.next();
 					break;
@@ -2562,10 +2320,11 @@ public class AVM implements VariableManager, Closeable {
 					if (conditionPairs == null) {
 						conditionPairs = new HashMap<Integer, ConditionPair>();
 					}
-					ConditionPair cp = conditionPairs.get(position.current());
+					int currentIndex = position.currentIndex();
+					ConditionPair cp = conditionPairs.get(currentIndex);
 					if (cp == null) {
 						cp = new ConditionPair();
-						conditionPairs.put(position.current(), cp);
+						conditionPairs.put(currentIndex, cp);
 					}
 					boolean end = jrt.toBoolean(pop());
 					boolean start = jrt.toBoolean(pop());
@@ -2609,9 +2368,10 @@ public class AVM implements VariableManager, Closeable {
 					// stack[0] = first actual parameter
 					// stack[1] = second actual parameter
 					// etc.
-					ExtensionFunction function = position.extensionFunctionArg();
-					long numArgs = position.intArg(1);
-					boolean isInitial = position.boolArg(2);
+					ExtensionTuple extensionTuple = (ExtensionTuple) tuple;
+					ExtensionFunction function = extensionTuple.getFunction();
+					long numArgs = extensionTuple.getArgCount();
+					boolean isInitial = extensionTuple.isInitial();
 
 					Object[] args = new Object[(int) numArgs];
 					for (int i = (int) numArgs - 1; i >= 0; i--) {
@@ -2908,12 +2668,250 @@ public class AVM implements VariableManager, Closeable {
 		return new ProfilingReport(tupleProfilingStats, functionProfilingStats);
 	}
 
-	private long beforeProfiledTuple(PositionTracker position, Opcode opcode) {
+	private void execPrint(CountTuple tuple) throws IOException {
+		long numArgs = tuple.getCount();
+		jrt.printDefault(numArgs == 0 ? new Object[] { jrt.jrtGetInputField(0) } : popArguments(numArgs));
+	}
+
+	private void execPrintToFile(CountAndAppendTuple tuple) throws IOException {
+		String key = jrt.toAwkString(pop());
+		long numArgs = tuple.getCount();
+		jrt
+				.printToFile(
+						key,
+						tuple.isAppend(),
+						numArgs == 0 ? new Object[]
+						{ jrt.jrtGetInputField(0) } : popArguments(numArgs));
+	}
+
+	private void execPrintToPipe(CountTuple tuple) throws IOException {
+		String cmd = jrt.toAwkString(pop());
+		long numArgs = tuple.getCount();
+		jrt.printToProcess(cmd, numArgs == 0 ? new Object[] { jrt.jrtGetInputField(0) } : popArguments(numArgs));
+	}
+
+	private void execPrintf(CountTuple tuple) throws IOException {
+		long numArgs = tuple.getCount();
+		Object[] values = popArguments(numArgs - 1);
+		String format = jrt.toAwkString(pop());
+		jrt.printfDefault(format, values);
+	}
+
+	private void execPrintfToFile(CountAndAppendTuple tuple) throws IOException {
+		String key = jrt.toAwkString(pop());
+		long numArgs = tuple.getCount();
+		Object[] values = popArguments(numArgs - 1);
+		String format = jrt.toAwkString(pop());
+		jrt.printfToFile(key, tuple.isAppend(), format, values);
+	}
+
+	private void execPrintfToPipe(CountTuple tuple) throws IOException {
+		String cmd = jrt.toAwkString(pop());
+		long numArgs = tuple.getCount();
+		Object[] values = popArguments(numArgs - 1);
+		String format = jrt.toAwkString(pop());
+		jrt.printfToProcess(cmd, format, values);
+	}
+
+	private void execLength(CountTuple tuple) {
+		long num = tuple.getCount();
+		if (num == 0) {
+			push(jrt.jrtGetInputField(0).toString().length());
+			return;
+		}
+		Object value = pop();
+		if (value instanceof Map) {
+			push((long) ((Map<?, ?>) value).size());
+		} else {
+			push(jrt.toAwkString(value).length());
+		}
+	}
+
+	private void execMatch() {
+		String ere = jrt.toAwkString(pop());
+		String s = jrt.toAwkString(pop());
+		int flags = 0;
+		if (globalVariableOffsets.containsKey("IGNORECASE")) {
+			Integer offsetObj = globalVariableOffsets.get("IGNORECASE");
+			Object ignorecase = runtimeStack.getVariable(offsetObj, true);
+			if (JRT.toDouble(ignorecase) != 0) {
+				flags |= Pattern.CASE_INSENSITIVE;
+			}
+		}
+		Pattern pattern = Pattern.compile(ere, flags);
+		Matcher matcher = pattern.matcher(s);
+		if (matcher.find()) {
+			int start = matcher.start() + 1;
+			int len = matcher.end() - matcher.start();
+			jrt.setRSTART(start);
+			jrt.setRLENGTH(len);
+			push(start);
+		} else {
+			jrt.setRSTART(0);
+			jrt.setRLENGTH(-1);
+			push(0);
+		}
+	}
+
+	private void execSubForDollar0(BooleanTuple tuple) {
+		boolean isGsub = tuple.getValue();
+		String repl = jrt.toAwkString(pop());
+		String ere = jrt.toAwkString(pop());
+		String orig = jrt.toAwkString(jrt.jrtGetInputField(0));
+		String newstring = isGsub ? replaceAll(orig, ere, repl) : replaceFirst(orig, ere, repl);
+		jrt.setInputLine(newstring);
+		jrt.jrtParseFields();
+	}
+
+	private void execSubForDollarReference(BooleanTuple tuple) {
+		boolean isGsub = tuple.getValue();
+		long fieldNum = JRT.parseFieldNumber(pop());
+		String orig = jrt.toAwkString(pop());
+		String repl = jrt.toAwkString(pop());
+		String ere = jrt.toAwkString(pop());
+		String newstring = isGsub ? replaceAll(orig, ere, repl) : replaceFirst(orig, ere, repl);
+		if (fieldNum == 0) {
+			jrt.setInputLine(newstring);
+			jrt.jrtParseFields();
+		} else {
+			jrt.jrtSetInputField(newstring, fieldNum);
+		}
+	}
+
+	private void execSubForVariable(SubstitutionVariableTuple tuple, PositionTracker position) {
+		String newString = execSubOrGSub(tuple.isGlobalSubstitution());
+		assign(tuple.getVariableOffset(), newString, tuple.isGlobal(), position);
+		pop();
+	}
+
+	private void execSubForArrayReference(SubstitutionVariableTuple tuple) {
+		Object arrIdx = pop();
+		String newString = execSubOrGSub(tuple.isGlobalSubstitution());
+		assignArray(tuple.getVariableOffset(), arrIdx, newString, tuple.isGlobal());
+		pop();
+	}
+
+	private void execSubForMapReference(BooleanTuple tuple) {
+		Object arrIdx = pop();
+		Map<Object, Object> array = toMap(pop());
+		String newString = execSubOrGSub(tuple.getValue());
+		assignMapElement(array, arrIdx, newString);
+		pop();
+	}
+
+	private void execSplit(CountTuple tuple, PositionTracker position) {
+		long numArgs = tuple.getCount();
+		String fsString;
+		if (numArgs == 2) {
+			fsString = jrt.toAwkString(jrt.getFSVar());
+		} else if (numArgs == 3) {
+			fsString = jrt.toAwkString(pop());
+		} else {
+			throw new Error("Invalid # of args. split() requires 2 or 3. Got: " + numArgs);
+		}
+		Object o = pop();
+		if (!(o instanceof Map)) {
+			throw new AwkRuntimeException(position.lineNumber(), o + " is not an array.");
+		}
+		String s = jrt.toAwkString(pop());
+		Enumeration<Object> tokenizer;
+		if (fsString.equals(" ")) {
+			tokenizer = new StringTokenizer(s);
+		} else if (fsString.length() == 1) {
+			tokenizer = new SingleCharacterTokenizer(s, fsString.charAt(0));
+		} else if (fsString.isEmpty()) {
+			tokenizer = new CharacterTokenizer(s);
+		} else {
+			tokenizer = new RegexTokenizer(s, fsString);
+		}
+
+		@SuppressWarnings("unchecked")
+		Map<Object, Object> assocArray = (Map<Object, Object>) o;
+		assocArray.clear();
+		long cnt = 0;
+		while (tokenizer.hasMoreElements()) {
+			assocArray.put(++cnt, tokenizer.nextElement());
+		}
+		push(cnt);
+	}
+
+	private void execSubstr(CountTuple tuple) {
+		long numArgs = tuple.getCount();
+		int startPos, length;
+		String s;
+		if (numArgs == 3) {
+			length = (int) JRT.toLong(pop());
+			startPos = (int) JRT.toDouble(pop());
+			s = jrt.toAwkString(pop());
+		} else if (numArgs == 2) {
+			startPos = (int) JRT.toDouble(pop());
+			s = jrt.toAwkString(pop());
+			length = s.length() - startPos + 1;
+		} else {
+			throw new Error("numArgs for SUBSTR must be 2 or 3. It is " + numArgs);
+		}
+		if (startPos <= 0) {
+			startPos = 1;
+		}
+		if (length <= 0 || startPos > s.length()) {
+			push(BLANK);
+		} else if (startPos + length > s.length()) {
+			push(s.substring(startPos - 1));
+		} else {
+			push(s.substring(startPos - 1, startPos + length - 1));
+		}
+	}
+
+	private void execSetNumGlobals(CountTuple tuple) {
+		long numGlobals = tuple.getCount();
+		Object[] globals = runtimeStack.getNumGlobals();
+		if (mergedGlobalLayoutActive) {
+			if (!hasCompatiblePersistentGlobalLayout(numGlobals)) {
+				throw new IllegalStateException(
+						"AVM globals are already initialized for an incompatible persistent layout.");
+			}
+			applyExecutionInitialVariablesToGlobalSlots(true);
+		} else if (globals == null) {
+			runtimeStack.setNumGlobals(numGlobals, globalVariableOffsets);
+			initializedEvalGlobalVariableOffsets = globalVariableOffsets;
+			initializedEvalGlobalVariableArrays = globalVariableArrays;
+			applyExecutionInitialVariablesToGlobalSlots(false);
+		} else if (!hasCompatibleEvalGlobalLayout(numGlobals)) {
+			throw new IllegalStateException(
+					"AVM globals are already initialized for a different eval layout. Call prepareForEval(...) first.");
+		}
+	}
+
+	private void execApplySubsep(CountTuple tuple) {
+		long count = tuple.getCount();
+		if (count == 1) {
+			Object value = pop();
+			checkScalar(value);
+			push(jrt.toAwkString(value));
+			return;
+		}
+		StringBuilder sb = new StringBuilder();
+		Object value = pop();
+		checkScalar(value);
+		sb.append(jrt.toAwkString(value));
+		String subsep = jrt.toAwkString(jrt.getSUBSEPVar());
+		for (int i = 1; i < count; i++) {
+			sb.insert(0, subsep);
+			value = pop();
+			checkScalar(value);
+			sb.insert(0, jrt.toAwkString(value));
+		}
+		push(sb.toString());
+	}
+
+	private long beforeProfiledTuple(Tuple tuple, Opcode opcode) {
 		long now = System.nanoTime();
 		if (opcode == Opcode.CALL_FUNCTION) {
-			activeProfilingFunctions.push(new ActiveFunction(position.stringArg(1), now));
+			CallFunctionTuple callTuple = (CallFunctionTuple) tuple;
+			activeProfilingFunctions.push(new ActiveFunction(callTuple.getFunctionName(), now));
 		} else if (opcode == Opcode.EXTENSION) {
-			ExtensionFunction function = position.extensionFunctionArg();
+			ExtensionTuple extensionTuple = (ExtensionTuple) tuple;
+			ExtensionFunction function = extensionTuple.getFunction();
 			activeProfilingFunctions.push(new ActiveFunction(function.getKeyword(), now));
 		}
 		return now;
@@ -3038,14 +3036,12 @@ public class AVM implements VariableManager, Closeable {
 		}
 	}
 
-	private String execSubOrGSub(PositionTracker position, int gsubArgPos) {
+	private String execSubOrGSub(boolean isGsub) {
 		String newString;
 
-		// arg[gsubArgPos] = isGsub
 		// stack[0] = original field value
 		// stack[1] = replacement string
 		// stack[2] = ere
-		boolean isGsub = position.boolArg(gsubArgPos);
 		String orig = jrt.toAwkString(pop());
 		String repl = jrt.toAwkString(pop());
 		String ere = jrt.toAwkString(pop());

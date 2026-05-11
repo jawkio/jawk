@@ -106,7 +106,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void pop() {
-		queue.add(new Tuple(Opcode.POP));
+		queue.add(new Tuple.NoOperandTuple(Opcode.POP));
 	}
 
 	/**
@@ -118,13 +118,13 @@ public class AwkTuples implements Serializable {
 	 */
 	public void push(Object o) {
 		if (o instanceof String) {
-			queue.add(new Tuple(Opcode.PUSH_STRING, o.toString()));
+			queue.add(new Tuple.PushStringTuple(o.toString()));
 		} else if (o instanceof Integer) {
-			queue.add(new Tuple(Opcode.PUSH_LONG, (long) (Integer) o));
+			queue.add(new Tuple.PushLongTuple((long) (Integer) o));
 		} else if (o instanceof Long) {
-			queue.add(new Tuple(Opcode.PUSH_LONG, (long) (Long) o));
+			queue.add(new Tuple.PushLongTuple((long) (Long) o));
 		} else if (o instanceof Double) {
-			queue.add(new Tuple(Opcode.PUSH_DOUBLE, (Double) o));
+			queue.add(new Tuple.PushDoubleTuple((Double) o));
 		}
 	}
 
@@ -136,7 +136,7 @@ public class AwkTuples implements Serializable {
 	 * @param address a {@link io.jawk.intermediate.Address} object
 	 */
 	public void ifFalse(Address address) {
-		queue.add(new Tuple(Opcode.IFFALSE, address));
+		queue.add(new Tuple.AddressTuple(Opcode.IFFALSE, address));
 	}
 
 	/**
@@ -145,7 +145,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void toNumber() {
-		queue.add(new Tuple(Opcode.TO_NUMBER));
+		queue.add(new Tuple.NoOperandTuple(Opcode.TO_NUMBER));
 	}
 
 	/**
@@ -156,7 +156,7 @@ public class AwkTuples implements Serializable {
 	 * @param address a {@link io.jawk.intermediate.Address} object
 	 */
 	public void ifTrue(Address address) {
-		queue.add(new Tuple(Opcode.IFTRUE, address));
+		queue.add(new Tuple.AddressTuple(Opcode.IFTRUE, address));
 	}
 
 	/**
@@ -167,7 +167,7 @@ public class AwkTuples implements Serializable {
 	 * @param address a {@link io.jawk.intermediate.Address} object
 	 */
 	public void gotoAddress(Address address) {
-		queue.add(new Tuple(Opcode.GOTO, address));
+		queue.add(new Tuple.AddressTuple(Opcode.GOTO, address));
 	}
 
 	/**
@@ -201,7 +201,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void nop() {
-		queue.add(new Tuple(Opcode.NOP));
+		queue.add(new Tuple.NoOperandTuple(Opcode.NOP));
 	}
 
 	/**
@@ -212,7 +212,7 @@ public class AwkTuples implements Serializable {
 	 * @param numExprs a int
 	 */
 	public void print(int numExprs) {
-		queue.add(new Tuple(Opcode.PRINT, numExprs));
+		queue.add(new Tuple.CountTuple(Opcode.PRINT, numExprs));
 	}
 
 	/**
@@ -224,7 +224,7 @@ public class AwkTuples implements Serializable {
 	 * @param append a boolean
 	 */
 	public void printToFile(int numExprs, boolean append) {
-		queue.add(new Tuple(Opcode.PRINT_TO_FILE, numExprs, append));
+		queue.add(new Tuple.CountAndAppendTuple(Opcode.PRINT_TO_FILE, numExprs, append));
 	}
 
 	/**
@@ -235,7 +235,7 @@ public class AwkTuples implements Serializable {
 	 * @param numExprs a int
 	 */
 	public void printToPipe(int numExprs) {
-		queue.add(new Tuple(Opcode.PRINT_TO_PIPE, numExprs));
+		queue.add(new Tuple.CountTuple(Opcode.PRINT_TO_PIPE, numExprs));
 	}
 
 	/**
@@ -246,7 +246,7 @@ public class AwkTuples implements Serializable {
 	 * @param numExprs a int
 	 */
 	public void printf(int numExprs) {
-		queue.add(new Tuple(Opcode.PRINTF, numExprs));
+		queue.add(new Tuple.CountTuple(Opcode.PRINTF, numExprs));
 	}
 
 	/**
@@ -258,7 +258,7 @@ public class AwkTuples implements Serializable {
 	 * @param append a boolean
 	 */
 	public void printfToFile(int numExprs, boolean append) {
-		queue.add(new Tuple(Opcode.PRINTF_TO_FILE, numExprs, append));
+		queue.add(new Tuple.CountAndAppendTuple(Opcode.PRINTF_TO_FILE, numExprs, append));
 	}
 
 	/**
@@ -269,7 +269,7 @@ public class AwkTuples implements Serializable {
 	 * @param numExprs a int
 	 */
 	public void printfToPipe(int numExprs) {
-		queue.add(new Tuple(Opcode.PRINTF_TO_PIPE, numExprs));
+		queue.add(new Tuple.CountTuple(Opcode.PRINTF_TO_PIPE, numExprs));
 	}
 
 	/**
@@ -280,7 +280,7 @@ public class AwkTuples implements Serializable {
 	 * @param numExprs a int
 	 */
 	public void sprintf(int numExprs) {
-		queue.add(new Tuple(Opcode.SPRINTF, numExprs));
+		queue.add(new Tuple.CountTuple(Opcode.SPRINTF, numExprs));
 	}
 
 	/**
@@ -291,7 +291,7 @@ public class AwkTuples implements Serializable {
 	 * @param numExprs a int
 	 */
 	public void length(int numExprs) {
-		queue.add(new Tuple(Opcode.LENGTH, numExprs));
+		queue.add(new Tuple.CountTuple(Opcode.LENGTH, numExprs));
 	}
 
 	/**
@@ -300,7 +300,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void concat() {
-		queue.add(new Tuple(Opcode.CONCAT));
+		queue.add(new Tuple.NoOperandTuple(Opcode.CONCAT));
 	}
 
 	/**
@@ -312,7 +312,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void assign(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.ASSIGN, offset, isGlobal));
+		queue.add(new Tuple.VariableTuple(Opcode.ASSIGN, offset, isGlobal));
 	}
 
 	/**
@@ -324,14 +324,14 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void assignArray(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.ASSIGN_ARRAY, offset, isGlobal));
+		queue.add(new Tuple.VariableTuple(Opcode.ASSIGN_ARRAY, offset, isGlobal));
 	}
 
 	/**
 	 * Assigns a value to a stack-provided associative-array element.
 	 */
 	public void assignMapElement() {
-		queue.add(new Tuple(Opcode.ASSIGN_MAP_ELEMENT));
+		queue.add(new Tuple.NoOperandTuple(Opcode.ASSIGN_MAP_ELEMENT));
 	}
 
 	/**
@@ -340,7 +340,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void assignAsInput() {
-		queue.add(new Tuple(Opcode.ASSIGN_AS_INPUT));
+		queue.add(new Tuple.NoOperandTuple(Opcode.ASSIGN_AS_INPUT));
 	}
 
 	/**
@@ -358,7 +358,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void assignAsInputField() {
-		queue.add(new Tuple(Opcode.ASSIGN_AS_INPUT_FIELD));
+		queue.add(new Tuple.NoOperandTuple(Opcode.ASSIGN_AS_INPUT_FIELD));
 	}
 
 	/**
@@ -371,7 +371,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void dereference(int offset, boolean isArray, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.DEREFERENCE, offset, isArray, isGlobal));
+		queue.add(new Tuple.DereferenceTuple(offset, isArray, isGlobal));
 	}
 
 	/**
@@ -383,7 +383,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void plusEq(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.PLUS_EQ, offset, isGlobal));
+		queue.add(new Tuple.CompoundAssignTuple(Opcode.PLUS_EQ, offset, isGlobal));
 	}
 
 	/**
@@ -395,7 +395,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void minusEq(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.MINUS_EQ, offset, isGlobal));
+		queue.add(new Tuple.CompoundAssignTuple(Opcode.MINUS_EQ, offset, isGlobal));
 	}
 
 	/**
@@ -407,7 +407,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void multEq(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.MULT_EQ, offset, isGlobal));
+		queue.add(new Tuple.CompoundAssignTuple(Opcode.MULT_EQ, offset, isGlobal));
 	}
 
 	/**
@@ -419,7 +419,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void divEq(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.DIV_EQ, offset, isGlobal));
+		queue.add(new Tuple.CompoundAssignTuple(Opcode.DIV_EQ, offset, isGlobal));
 	}
 
 	/**
@@ -431,7 +431,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void modEq(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.MOD_EQ, offset, isGlobal));
+		queue.add(new Tuple.CompoundAssignTuple(Opcode.MOD_EQ, offset, isGlobal));
 	}
 
 	/**
@@ -443,7 +443,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void powEq(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.POW_EQ, offset, isGlobal));
+		queue.add(new Tuple.CompoundAssignTuple(Opcode.POW_EQ, offset, isGlobal));
 	}
 
 	/**
@@ -455,14 +455,14 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void plusEqArray(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.PLUS_EQ_ARRAY, offset, isGlobal));
+		queue.add(new Tuple.CompoundAssignArrayTuple(Opcode.PLUS_EQ_ARRAY, offset, isGlobal));
 	}
 
 	/**
 	 * Applies {@code +=} to a stack-provided associative-array element.
 	 */
 	public void plusEqMapElement() {
-		queue.add(new Tuple(Opcode.PLUS_EQ_MAP_ELEMENT));
+		queue.add(new Tuple.CompoundAssignMapElementTuple(Opcode.PLUS_EQ_MAP_ELEMENT));
 	}
 
 	/**
@@ -474,14 +474,14 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void minusEqArray(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.MINUS_EQ_ARRAY, offset, isGlobal));
+		queue.add(new Tuple.CompoundAssignArrayTuple(Opcode.MINUS_EQ_ARRAY, offset, isGlobal));
 	}
 
 	/**
 	 * Applies {@code -=} to a stack-provided associative-array element.
 	 */
 	public void minusEqMapElement() {
-		queue.add(new Tuple(Opcode.MINUS_EQ_MAP_ELEMENT));
+		queue.add(new Tuple.CompoundAssignMapElementTuple(Opcode.MINUS_EQ_MAP_ELEMENT));
 	}
 
 	/**
@@ -493,14 +493,14 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void multEqArray(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.MULT_EQ_ARRAY, offset, isGlobal));
+		queue.add(new Tuple.CompoundAssignArrayTuple(Opcode.MULT_EQ_ARRAY, offset, isGlobal));
 	}
 
 	/**
 	 * Applies {@code *=} to a stack-provided associative-array element.
 	 */
 	public void multEqMapElement() {
-		queue.add(new Tuple(Opcode.MULT_EQ_MAP_ELEMENT));
+		queue.add(new Tuple.CompoundAssignMapElementTuple(Opcode.MULT_EQ_MAP_ELEMENT));
 	}
 
 	/**
@@ -512,14 +512,14 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void divEqArray(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.DIV_EQ_ARRAY, offset, isGlobal));
+		queue.add(new Tuple.CompoundAssignArrayTuple(Opcode.DIV_EQ_ARRAY, offset, isGlobal));
 	}
 
 	/**
 	 * Applies {@code /=} to a stack-provided associative-array element.
 	 */
 	public void divEqMapElement() {
-		queue.add(new Tuple(Opcode.DIV_EQ_MAP_ELEMENT));
+		queue.add(new Tuple.CompoundAssignMapElementTuple(Opcode.DIV_EQ_MAP_ELEMENT));
 	}
 
 	/**
@@ -531,14 +531,14 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void modEqArray(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.MOD_EQ_ARRAY, offset, isGlobal));
+		queue.add(new Tuple.CompoundAssignArrayTuple(Opcode.MOD_EQ_ARRAY, offset, isGlobal));
 	}
 
 	/**
 	 * Applies {@code %=} to a stack-provided associative-array element.
 	 */
 	public void modEqMapElement() {
-		queue.add(new Tuple(Opcode.MOD_EQ_MAP_ELEMENT));
+		queue.add(new Tuple.CompoundAssignMapElementTuple(Opcode.MOD_EQ_MAP_ELEMENT));
 	}
 
 	/**
@@ -550,7 +550,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void powEqArray(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.POW_EQ_ARRAY, offset, isGlobal));
+		queue.add(new Tuple.CompoundAssignArrayTuple(Opcode.POW_EQ_ARRAY, offset, isGlobal));
 	}
 
 	/**
@@ -558,7 +558,7 @@ public class AwkTuples implements Serializable {
 	 * element.
 	 */
 	public void powEqMapElement() {
-		queue.add(new Tuple(Opcode.POW_EQ_MAP_ELEMENT));
+		queue.add(new Tuple.CompoundAssignMapElementTuple(Opcode.POW_EQ_MAP_ELEMENT));
 	}
 
 	/**
@@ -567,7 +567,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void plusEqInputField() {
-		queue.add(new Tuple(Opcode.PLUS_EQ_INPUT_FIELD));
+		queue.add(new Tuple.CompoundAssignInputFieldTuple(Opcode.PLUS_EQ_INPUT_FIELD));
 	}
 
 	/**
@@ -576,7 +576,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void minusEqInputField() {
-		queue.add(new Tuple(Opcode.MINUS_EQ_INPUT_FIELD));
+		queue.add(new Tuple.CompoundAssignInputFieldTuple(Opcode.MINUS_EQ_INPUT_FIELD));
 	}
 
 	/**
@@ -585,7 +585,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void multEqInputField() {
-		queue.add(new Tuple(Opcode.MULT_EQ_INPUT_FIELD));
+		queue.add(new Tuple.CompoundAssignInputFieldTuple(Opcode.MULT_EQ_INPUT_FIELD));
 	}
 
 	/**
@@ -594,7 +594,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void divEqInputField() {
-		queue.add(new Tuple(Opcode.DIV_EQ_INPUT_FIELD));
+		queue.add(new Tuple.CompoundAssignInputFieldTuple(Opcode.DIV_EQ_INPUT_FIELD));
 	}
 
 	/**
@@ -603,7 +603,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void modEqInputField() {
-		queue.add(new Tuple(Opcode.MOD_EQ_INPUT_FIELD));
+		queue.add(new Tuple.CompoundAssignInputFieldTuple(Opcode.MOD_EQ_INPUT_FIELD));
 	}
 
 	/**
@@ -612,7 +612,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void powEqInputField() {
-		queue.add(new Tuple(Opcode.POW_EQ_INPUT_FIELD));
+		queue.add(new Tuple.CompoundAssignInputFieldTuple(Opcode.POW_EQ_INPUT_FIELD));
 	}
 
 	/**
@@ -623,7 +623,7 @@ public class AwkTuples implements Serializable {
 	 * @param num a int
 	 */
 	public void srand(int num) {
-		queue.add(new Tuple(Opcode.SRAND, num));
+		queue.add(new Tuple.CountTuple(Opcode.SRAND, num));
 	}
 
 	/**
@@ -632,7 +632,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void rand() {
-		queue.add(new Tuple(Opcode.RAND));
+		queue.add(new Tuple.NoOperandTuple(Opcode.RAND));
 	}
 
 	/**
@@ -641,7 +641,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void intFunc() {
-		queue.add(new Tuple(Opcode.INTFUNC));
+		queue.add(new Tuple.NoOperandTuple(Opcode.INTFUNC));
 	}
 
 	/**
@@ -650,7 +650,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void sqrt() {
-		queue.add(new Tuple(Opcode.SQRT));
+		queue.add(new Tuple.NoOperandTuple(Opcode.SQRT));
 	}
 
 	/**
@@ -659,7 +659,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void log() {
-		queue.add(new Tuple(Opcode.LOG));
+		queue.add(new Tuple.NoOperandTuple(Opcode.LOG));
 	}
 
 	/**
@@ -668,7 +668,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void exp() {
-		queue.add(new Tuple(Opcode.EXP));
+		queue.add(new Tuple.NoOperandTuple(Opcode.EXP));
 	}
 
 	/**
@@ -677,7 +677,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void sin() {
-		queue.add(new Tuple(Opcode.SIN));
+		queue.add(new Tuple.NoOperandTuple(Opcode.SIN));
 	}
 
 	/**
@@ -686,7 +686,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void cos() {
-		queue.add(new Tuple(Opcode.COS));
+		queue.add(new Tuple.NoOperandTuple(Opcode.COS));
 	}
 
 	/**
@@ -695,7 +695,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void atan2() {
-		queue.add(new Tuple(Opcode.ATAN2));
+		queue.add(new Tuple.NoOperandTuple(Opcode.ATAN2));
 	}
 
 	/**
@@ -704,7 +704,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void match() {
-		queue.add(new Tuple(Opcode.MATCH));
+		queue.add(new Tuple.NoOperandTuple(Opcode.MATCH));
 	}
 
 	/**
@@ -713,7 +713,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void index() {
-		queue.add(new Tuple(Opcode.INDEX));
+		queue.add(new Tuple.NoOperandTuple(Opcode.INDEX));
 	}
 
 	/**
@@ -724,7 +724,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGsub a boolean
 	 */
 	public void subForDollar0(boolean isGsub) {
-		queue.add(new Tuple(Opcode.SUB_FOR_DOLLAR_0, isGsub));
+		queue.add(new Tuple.BooleanTuple(Opcode.SUB_FOR_DOLLAR_0, isGsub));
 	}
 
 	/**
@@ -735,7 +735,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGsub a boolean
 	 */
 	public void subForDollarReference(boolean isGsub) {
-		queue.add(new Tuple(Opcode.SUB_FOR_DOLLAR_REFERENCE, isGsub));
+		queue.add(new Tuple.BooleanTuple(Opcode.SUB_FOR_DOLLAR_REFERENCE, isGsub));
 	}
 
 	/**
@@ -748,7 +748,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGsub a boolean
 	 */
 	public void subForVariable(int offset, boolean isGlobal, boolean isGsub) {
-		queue.add(new Tuple(Opcode.SUB_FOR_VARIABLE, offset, isGlobal, isGsub));
+		queue.add(new Tuple.SubstitutionVariableTuple(Opcode.SUB_FOR_VARIABLE, offset, isGlobal, isGsub));
 	}
 
 	/**
@@ -761,7 +761,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGsub a boolean
 	 */
 	public void subForArrayReference(int offset, boolean isGlobal, boolean isGsub) {
-		queue.add(new Tuple(Opcode.SUB_FOR_ARRAY_REFERENCE, offset, isGlobal, isGsub));
+		queue.add(new Tuple.SubstitutionVariableTuple(Opcode.SUB_FOR_ARRAY_REFERENCE, offset, isGlobal, isGsub));
 	}
 
 	/**
@@ -771,7 +771,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGsub {@code true} for {@code gsub}, {@code false} for {@code sub}
 	 */
 	public void subForMapReference(boolean isGsub) {
-		queue.add(new Tuple(Opcode.SUB_FOR_MAP_REFERENCE, isGsub));
+		queue.add(new Tuple.BooleanTuple(Opcode.SUB_FOR_MAP_REFERENCE, isGsub));
 	}
 
 	/**
@@ -782,7 +782,7 @@ public class AwkTuples implements Serializable {
 	 * @param numargs a int
 	 */
 	public void split(int numargs) {
-		queue.add(new Tuple(Opcode.SPLIT, numargs));
+		queue.add(new Tuple.CountTuple(Opcode.SPLIT, numargs));
 	}
 
 	/**
@@ -793,7 +793,7 @@ public class AwkTuples implements Serializable {
 	 * @param numargs a int
 	 */
 	public void substr(int numargs) {
-		queue.add(new Tuple(Opcode.SUBSTR, numargs));
+		queue.add(new Tuple.CountTuple(Opcode.SUBSTR, numargs));
 	}
 
 	/**
@@ -802,7 +802,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void tolower() {
-		queue.add(new Tuple(Opcode.TOLOWER));
+		queue.add(new Tuple.NoOperandTuple(Opcode.TOLOWER));
 	}
 
 	/**
@@ -811,7 +811,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void toupper() {
-		queue.add(new Tuple(Opcode.TOUPPER));
+		queue.add(new Tuple.NoOperandTuple(Opcode.TOUPPER));
 	}
 
 	/**
@@ -820,7 +820,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void system() {
-		queue.add(new Tuple(Opcode.SYSTEM));
+		queue.add(new Tuple.NoOperandTuple(Opcode.SYSTEM));
 	}
 
 	/**
@@ -829,7 +829,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void swap() {
-		queue.add(new Tuple(Opcode.SWAP));
+		queue.add(new Tuple.NoOperandTuple(Opcode.SWAP));
 	}
 
 	/**
@@ -838,7 +838,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void add() {
-		queue.add(new Tuple(Opcode.ADD));
+		queue.add(new Tuple.NoOperandTuple(Opcode.ADD));
 	}
 
 	/**
@@ -847,7 +847,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void subtract() {
-		queue.add(new Tuple(Opcode.SUBTRACT));
+		queue.add(new Tuple.NoOperandTuple(Opcode.SUBTRACT));
 	}
 
 	/**
@@ -856,7 +856,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void multiply() {
-		queue.add(new Tuple(Opcode.MULTIPLY));
+		queue.add(new Tuple.NoOperandTuple(Opcode.MULTIPLY));
 	}
 
 	/**
@@ -865,7 +865,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void divide() {
-		queue.add(new Tuple(Opcode.DIVIDE));
+		queue.add(new Tuple.NoOperandTuple(Opcode.DIVIDE));
 	}
 
 	/**
@@ -874,7 +874,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void mod() {
-		queue.add(new Tuple(Opcode.MOD));
+		queue.add(new Tuple.NoOperandTuple(Opcode.MOD));
 	}
 
 	/**
@@ -883,7 +883,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void pow() {
-		queue.add(new Tuple(Opcode.POW));
+		queue.add(new Tuple.NoOperandTuple(Opcode.POW));
 	}
 
 	/**
@@ -895,7 +895,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void inc(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.INC, offset, isGlobal));
+		queue.add(new Tuple.VariableTuple(Opcode.INC, offset, isGlobal));
 	}
 
 	/**
@@ -907,7 +907,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void dec(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.DEC, offset, isGlobal));
+		queue.add(new Tuple.VariableTuple(Opcode.DEC, offset, isGlobal));
 	}
 
 	/**
@@ -919,7 +919,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void postInc(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.POSTINC, offset, isGlobal));
+		queue.add(new Tuple.VariableTuple(Opcode.POSTINC, offset, isGlobal));
 	}
 
 	/**
@@ -931,7 +931,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void postDec(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.POSTDEC, offset, isGlobal));
+		queue.add(new Tuple.VariableTuple(Opcode.POSTDEC, offset, isGlobal));
 	}
 
 	/**
@@ -943,14 +943,14 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void incArrayRef(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.INC_ARRAY_REF, offset, isGlobal));
+		queue.add(new Tuple.VariableTuple(Opcode.INC_ARRAY_REF, offset, isGlobal));
 	}
 
 	/**
 	 * Increments a stack-provided associative-array element reference.
 	 */
 	public void incMapRef() {
-		queue.add(new Tuple(Opcode.INC_MAP_REF));
+		queue.add(new Tuple.NoOperandTuple(Opcode.INC_MAP_REF));
 	}
 
 	/**
@@ -962,14 +962,14 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void decArrayRef(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.DEC_ARRAY_REF, offset, isGlobal));
+		queue.add(new Tuple.VariableTuple(Opcode.DEC_ARRAY_REF, offset, isGlobal));
 	}
 
 	/**
 	 * Decrements a stack-provided associative-array element reference.
 	 */
 	public void decMapRef() {
-		queue.add(new Tuple(Opcode.DEC_MAP_REF));
+		queue.add(new Tuple.NoOperandTuple(Opcode.DEC_MAP_REF));
 	}
 
 	/**
@@ -978,7 +978,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void incDollarRef() {
-		queue.add(new Tuple(Opcode.INC_DOLLAR_REF));
+		queue.add(new Tuple.NoOperandTuple(Opcode.INC_DOLLAR_REF));
 	}
 
 	/**
@@ -987,7 +987,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void decDollarRef() {
-		queue.add(new Tuple(Opcode.DEC_DOLLAR_REF));
+		queue.add(new Tuple.NoOperandTuple(Opcode.DEC_DOLLAR_REF));
 	}
 
 	/**
@@ -996,7 +996,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void dup() {
-		queue.add(new Tuple(Opcode.DUP));
+		queue.add(new Tuple.NoOperandTuple(Opcode.DUP));
 	}
 
 	/**
@@ -1005,7 +1005,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void not() {
-		queue.add(new Tuple(Opcode.NOT));
+		queue.add(new Tuple.NoOperandTuple(Opcode.NOT));
 	}
 
 	/**
@@ -1014,7 +1014,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void negate() {
-		queue.add(new Tuple(Opcode.NEGATE));
+		queue.add(new Tuple.NoOperandTuple(Opcode.NEGATE));
 	}
 
 	/**
@@ -1023,7 +1023,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void unaryPlus() {
-		queue.add(new Tuple(Opcode.UNARY_PLUS));
+		queue.add(new Tuple.NoOperandTuple(Opcode.UNARY_PLUS));
 	}
 
 	/**
@@ -1032,7 +1032,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void cmpEq() {
-		queue.add(new Tuple(Opcode.CMP_EQ));
+		queue.add(new Tuple.NoOperandTuple(Opcode.CMP_EQ));
 	}
 
 	/**
@@ -1041,7 +1041,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void cmpLt() {
-		queue.add(new Tuple(Opcode.CMP_LT));
+		queue.add(new Tuple.NoOperandTuple(Opcode.CMP_LT));
 	}
 
 	/**
@@ -1050,7 +1050,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void cmpGt() {
-		queue.add(new Tuple(Opcode.CMP_GT));
+		queue.add(new Tuple.NoOperandTuple(Opcode.CMP_GT));
 	}
 
 	/**
@@ -1059,7 +1059,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void matches() {
-		queue.add(new Tuple(Opcode.MATCHES));
+		queue.add(new Tuple.NoOperandTuple(Opcode.MATCHES));
 	}
 
 	/**
@@ -1068,7 +1068,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void dereferenceArray() {
-		queue.add(new Tuple(Opcode.DEREF_ARRAY));
+		queue.add(new Tuple.NoOperandTuple(Opcode.DEREF_ARRAY));
 	}
 
 	/**
@@ -1076,7 +1076,7 @@ public class AwkTuples implements Serializable {
 	 * the key is missing.
 	 */
 	public void peekArrayElement() {
-		queue.add(new Tuple(Opcode.PEEK_ARRAY_ELEMENT));
+		queue.add(new Tuple.NoOperandTuple(Opcode.PEEK_ARRAY_ELEMENT));
 	}
 
 	/**
@@ -1084,7 +1084,7 @@ public class AwkTuples implements Serializable {
 	 * needed.
 	 */
 	public void ensureArrayElement() {
-		queue.add(new Tuple(Opcode.ENSURE_ARRAY_ELEMENT));
+		queue.add(new Tuple.NoOperandTuple(Opcode.ENSURE_ARRAY_ELEMENT));
 	}
 
 	/**
@@ -1093,7 +1093,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void keylist() {
-		queue.add(new Tuple(Opcode.KEYLIST));
+		queue.add(new Tuple.NoOperandTuple(Opcode.KEYLIST));
 	}
 
 	/**
@@ -1104,7 +1104,7 @@ public class AwkTuples implements Serializable {
 	 * @param address a {@link io.jawk.intermediate.Address} object
 	 */
 	public void isEmptyList(Address address) {
-		queue.add(new Tuple(Opcode.IS_EMPTY_KEYLIST, address));
+		queue.add(new Tuple.AddressTuple(Opcode.IS_EMPTY_KEYLIST, address));
 	}
 
 	/**
@@ -1113,7 +1113,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void getFirstAndRemoveFromList() {
-		queue.add(new Tuple(Opcode.GET_FIRST_AND_REMOVE_FROM_KEYLIST));
+		queue.add(new Tuple.NoOperandTuple(Opcode.GET_FIRST_AND_REMOVE_FROM_KEYLIST));
 	}
 
 	/**
@@ -1125,7 +1125,7 @@ public class AwkTuples implements Serializable {
 	 * @return a boolean
 	 */
 	public boolean checkClass(Class<?> cls) {
-		queue.add(new Tuple(Opcode.CHECK_CLASS, cls));
+		queue.add(new Tuple.ClassTuple(cls));
 		return true;
 	}
 
@@ -1135,7 +1135,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void getInputField() {
-		queue.add(new Tuple(Opcode.GET_INPUT_FIELD));
+		queue.add(new Tuple.NoOperandTuple(Opcode.GET_INPUT_FIELD));
 	}
 
 	/**
@@ -1146,7 +1146,7 @@ public class AwkTuples implements Serializable {
 	 * @param fieldIndex a long
 	 */
 	public void getInputField(long fieldIndex) {
-		queue.add(new Tuple(Opcode.GET_INPUT_FIELD_CONST, fieldIndex));
+		queue.add(new Tuple.InputFieldTuple(fieldIndex));
 	}
 
 	/**
@@ -1157,7 +1157,7 @@ public class AwkTuples implements Serializable {
 	 * @param address a {@link io.jawk.intermediate.Address} object
 	 */
 	public void consumeInput(Address address) {
-		queue.add(new Tuple(Opcode.CONSUME_INPUT, address));
+		queue.add(new Tuple.AddressTuple(Opcode.CONSUME_INPUT, address));
 	}
 
 	/**
@@ -1166,7 +1166,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void getlineInput() {
-		queue.add(new Tuple(Opcode.GETLINE_INPUT));
+		queue.add(new Tuple.NoOperandTuple(Opcode.GETLINE_INPUT));
 	}
 
 	/**
@@ -1175,7 +1175,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void getlineInputToTarget() {
-		queue.add(new Tuple(Opcode.GETLINE_INPUT_TO_TARGET));
+		queue.add(new Tuple.NoOperandTuple(Opcode.GETLINE_INPUT_TO_TARGET));
 	}
 
 	/**
@@ -1184,7 +1184,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void useAsFileInput() {
-		queue.add(new Tuple(Opcode.USE_AS_FILE_INPUT));
+		queue.add(new Tuple.NoOperandTuple(Opcode.USE_AS_FILE_INPUT));
 	}
 
 	/**
@@ -1193,7 +1193,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void useAsCommandInput() {
-		queue.add(new Tuple(Opcode.USE_AS_COMMAND_INPUT));
+		queue.add(new Tuple.NoOperandTuple(Opcode.USE_AS_COMMAND_INPUT));
 	}
 
 	/**
@@ -1204,7 +1204,7 @@ public class AwkTuples implements Serializable {
 	 * @param offset a int
 	 */
 	public void nfOffset(int offset) {
-		queue.add(new Tuple(Opcode.NF_OFFSET, offset));
+		queue.add(new Tuple.LongTuple(Opcode.NF_OFFSET, offset));
 	}
 
 	/**
@@ -1215,7 +1215,7 @@ public class AwkTuples implements Serializable {
 	 * @param offset a int
 	 */
 	public void nrOffset(int offset) {
-		queue.add(new Tuple(Opcode.NR_OFFSET, offset));
+		queue.add(new Tuple.LongTuple(Opcode.NR_OFFSET, offset));
 	}
 
 	/**
@@ -1226,7 +1226,7 @@ public class AwkTuples implements Serializable {
 	 * @param offset a int
 	 */
 	public void fnrOffset(int offset) {
-		queue.add(new Tuple(Opcode.FNR_OFFSET, offset));
+		queue.add(new Tuple.LongTuple(Opcode.FNR_OFFSET, offset));
 	}
 
 	/**
@@ -1237,7 +1237,7 @@ public class AwkTuples implements Serializable {
 	 * @param offset a int
 	 */
 	public void fsOffset(int offset) {
-		queue.add(new Tuple(Opcode.FS_OFFSET, offset));
+		queue.add(new Tuple.LongTuple(Opcode.FS_OFFSET, offset));
 	}
 
 	/**
@@ -1248,7 +1248,7 @@ public class AwkTuples implements Serializable {
 	 * @param offset a int
 	 */
 	public void rsOffset(int offset) {
-		queue.add(new Tuple(Opcode.RS_OFFSET, offset));
+		queue.add(new Tuple.LongTuple(Opcode.RS_OFFSET, offset));
 	}
 
 	/**
@@ -1259,7 +1259,7 @@ public class AwkTuples implements Serializable {
 	 * @param offset a int
 	 */
 	public void ofsOffset(int offset) {
-		queue.add(new Tuple(Opcode.OFS_OFFSET, offset));
+		queue.add(new Tuple.LongTuple(Opcode.OFS_OFFSET, offset));
 	}
 
 	/**
@@ -1270,7 +1270,7 @@ public class AwkTuples implements Serializable {
 	 * @param offset a int
 	 */
 	public void orsOffset(int offset) {
-		queue.add(new Tuple(Opcode.ORS_OFFSET, offset));
+		queue.add(new Tuple.LongTuple(Opcode.ORS_OFFSET, offset));
 	}
 
 	/**
@@ -1281,7 +1281,7 @@ public class AwkTuples implements Serializable {
 	 * @param offset a int
 	 */
 	public void rstartOffset(int offset) {
-		queue.add(new Tuple(Opcode.RSTART_OFFSET, offset));
+		queue.add(new Tuple.LongTuple(Opcode.RSTART_OFFSET, offset));
 	}
 
 	/**
@@ -1292,7 +1292,7 @@ public class AwkTuples implements Serializable {
 	 * @param offset a int
 	 */
 	public void rlengthOffset(int offset) {
-		queue.add(new Tuple(Opcode.RLENGTH_OFFSET, offset));
+		queue.add(new Tuple.LongTuple(Opcode.RLENGTH_OFFSET, offset));
 	}
 
 	/**
@@ -1303,7 +1303,7 @@ public class AwkTuples implements Serializable {
 	 * @param offset a int
 	 */
 	public void filenameOffset(int offset) {
-		queue.add(new Tuple(Opcode.FILENAME_OFFSET, offset));
+		queue.add(new Tuple.LongTuple(Opcode.FILENAME_OFFSET, offset));
 	}
 
 	/**
@@ -1314,7 +1314,7 @@ public class AwkTuples implements Serializable {
 	 * @param offset a int
 	 */
 	public void subsepOffset(int offset) {
-		queue.add(new Tuple(Opcode.SUBSEP_OFFSET, offset));
+		queue.add(new Tuple.LongTuple(Opcode.SUBSEP_OFFSET, offset));
 	}
 
 	/**
@@ -1325,7 +1325,7 @@ public class AwkTuples implements Serializable {
 	 * @param offset a int
 	 */
 	public void convfmtOffset(int offset) {
-		queue.add(new Tuple(Opcode.CONVFMT_OFFSET, offset));
+		queue.add(new Tuple.LongTuple(Opcode.CONVFMT_OFFSET, offset));
 	}
 
 	/**
@@ -1336,7 +1336,7 @@ public class AwkTuples implements Serializable {
 	 * @param offset a int
 	 */
 	public void ofmtOffset(int offset) {
-		queue.add(new Tuple(Opcode.OFMT_OFFSET, offset));
+		queue.add(new Tuple.LongTuple(Opcode.OFMT_OFFSET, offset));
 	}
 
 	/**
@@ -1347,7 +1347,7 @@ public class AwkTuples implements Serializable {
 	 * @param offset a int
 	 */
 	public void environOffset(int offset) {
-		queue.add(new Tuple(Opcode.ENVIRON_OFFSET, offset));
+		queue.add(new Tuple.LongTuple(Opcode.ENVIRON_OFFSET, offset));
 	}
 
 	/**
@@ -1358,7 +1358,7 @@ public class AwkTuples implements Serializable {
 	 * @param offset a int
 	 */
 	public void argcOffset(int offset) {
-		queue.add(new Tuple(Opcode.ARGC_OFFSET, offset));
+		queue.add(new Tuple.LongTuple(Opcode.ARGC_OFFSET, offset));
 	}
 
 	/**
@@ -1369,148 +1369,148 @@ public class AwkTuples implements Serializable {
 	 * @param offset a int
 	 */
 	public void argvOffset(int offset) {
-		queue.add(new Tuple(Opcode.ARGV_OFFSET, offset));
+		queue.add(new Tuple.LongTuple(Opcode.ARGV_OFFSET, offset));
 	}
 
 	// JRT-managed special variable helpers
 	/** Pushes the current value of {@code NF} onto the operand stack. */
 	public void pushNF() {
-		queue.add(new Tuple(Opcode.PUSH_NF));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_NF));
 	}
 
 	/** Assigns the top-of-stack value to {@code NF}. */
 	public void assignNF() {
-		queue.add(new Tuple(Opcode.ASSIGN_NF));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_NF));
 	}
 
 	/** Pushes the current value of {@code NR} onto the operand stack. */
 	public void pushNR() {
-		queue.add(new Tuple(Opcode.PUSH_NR));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_NR));
 	}
 
 	/** Assigns the top-of-stack value to {@code NR}. */
 	public void assignNR() {
-		queue.add(new Tuple(Opcode.ASSIGN_NR));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_NR));
 	}
 
 	/** Pushes the current value of {@code FNR} onto the operand stack. */
 	public void pushFNR() {
-		queue.add(new Tuple(Opcode.PUSH_FNR));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_FNR));
 	}
 
 	/** Assigns the top-of-stack value to {@code FNR}. */
 	public void assignFNR() {
-		queue.add(new Tuple(Opcode.ASSIGN_FNR));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_FNR));
 	}
 
 	/** Pushes the current value of {@code FS} onto the operand stack. */
 	public void pushFS() {
-		queue.add(new Tuple(Opcode.PUSH_FS));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_FS));
 	}
 
 	/** Assigns the top-of-stack value to {@code FS}. */
 	public void assignFS() {
-		queue.add(new Tuple(Opcode.ASSIGN_FS));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_FS));
 	}
 
 	/** Pushes the current value of {@code RS} onto the operand stack. */
 	public void pushRS() {
-		queue.add(new Tuple(Opcode.PUSH_RS));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_RS));
 	}
 
 	/** Assigns the top-of-stack value to {@code RS}. */
 	public void assignRS() {
-		queue.add(new Tuple(Opcode.ASSIGN_RS));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_RS));
 	}
 
 	/** Pushes the current value of {@code OFS} onto the operand stack. */
 	public void pushOFS() {
-		queue.add(new Tuple(Opcode.PUSH_OFS));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_OFS));
 	}
 
 	/** Assigns the top-of-stack value to {@code OFS}. */
 	public void assignOFS() {
-		queue.add(new Tuple(Opcode.ASSIGN_OFS));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_OFS));
 	}
 
 	/** Pushes the current value of {@code ORS} onto the operand stack. */
 	public void pushORS() {
-		queue.add(new Tuple(Opcode.PUSH_ORS));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_ORS));
 	}
 
 	/** Assigns the top-of-stack value to {@code ORS}. */
 	public void assignORS() {
-		queue.add(new Tuple(Opcode.ASSIGN_ORS));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_ORS));
 	}
 
 	/** Pushes the current value of {@code RSTART} onto the operand stack. */
 	public void pushRSTART() {
-		queue.add(new Tuple(Opcode.PUSH_RSTART));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_RSTART));
 	}
 
 	/** Assigns the top-of-stack value to {@code RSTART}. */
 	public void assignRSTART() {
-		queue.add(new Tuple(Opcode.ASSIGN_RSTART));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_RSTART));
 	}
 
 	/** Pushes the current value of {@code RLENGTH} onto the operand stack. */
 	public void pushRLENGTH() {
-		queue.add(new Tuple(Opcode.PUSH_RLENGTH));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_RLENGTH));
 	}
 
 	/** Assigns the top-of-stack value to {@code RLENGTH}. */
 	public void assignRLENGTH() {
-		queue.add(new Tuple(Opcode.ASSIGN_RLENGTH));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_RLENGTH));
 	}
 
 	/** Pushes the current value of {@code FILENAME} onto the operand stack. */
 	public void pushFILENAME() {
-		queue.add(new Tuple(Opcode.PUSH_FILENAME));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_FILENAME));
 	}
 
 	/** Assigns the top-of-stack value to {@code FILENAME}. */
 	public void assignFILENAME() {
-		queue.add(new Tuple(Opcode.ASSIGN_FILENAME));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_FILENAME));
 	}
 
 	/** Pushes the current value of {@code SUBSEP} onto the operand stack. */
 	public void pushSUBSEP() {
-		queue.add(new Tuple(Opcode.PUSH_SUBSEP));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_SUBSEP));
 	}
 
 	/** Assigns the top-of-stack value to {@code SUBSEP}. */
 	public void assignSUBSEP() {
-		queue.add(new Tuple(Opcode.ASSIGN_SUBSEP));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_SUBSEP));
 	}
 
 	/** Pushes the current value of {@code CONVFMT} onto the operand stack. */
 	public void pushCONVFMT() {
-		queue.add(new Tuple(Opcode.PUSH_CONVFMT));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_CONVFMT));
 	}
 
 	/** Assigns the top-of-stack value to {@code CONVFMT}. */
 	public void assignCONVFMT() {
-		queue.add(new Tuple(Opcode.ASSIGN_CONVFMT));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_CONVFMT));
 	}
 
 	/** Pushes the current value of {@code OFMT} onto the operand stack. */
 	public void pushOFMT() {
-		queue.add(new Tuple(Opcode.PUSH_OFMT));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_OFMT));
 	}
 
 	/** Assigns the top-of-stack value to {@code OFMT}. */
 	public void assignOFMT() {
-		queue.add(new Tuple(Opcode.ASSIGN_OFMT));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_OFMT));
 	}
 
 	/** Pushes the current value of {@code ARGC} onto the operand stack. */
 	public void pushARGC() {
-		queue.add(new Tuple(Opcode.PUSH_ARGC));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_ARGC));
 	}
 
 	/** Assigns the top-of-stack value to {@code ARGC}. */
 	public void assignARGC() {
-		queue.add(new Tuple(Opcode.ASSIGN_ARGC));
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_ARGC));
 	}
 
 	/**
@@ -1519,7 +1519,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void applyRS() {
-		queue.add(new Tuple(Opcode.APPLY_RS));
+		queue.add(new Tuple.NoOperandTuple(Opcode.APPLY_RS));
 	}
 
 	/**
@@ -1531,11 +1531,8 @@ public class AwkTuples implements Serializable {
 	 * @param numFormalParams a int
 	 */
 	public void function(String funcName, int numFormalParams) {
-		queue.add(new Tuple(Opcode.FUNCTION, funcName, numFormalParams));
+		queue.add(new Tuple.FunctionTuple(funcName, numFormalParams));
 	}
-
-	// public void callFunction(Address addr, String funcName, int numFormalParams, int numActualParams) {
-	// queue.add(new Tuple(Opcode.CALL_FUNCTION, addr, funcName, numFormalParams, numActualParams)); }
 
 	/**
 	 * <p>
@@ -1552,7 +1549,7 @@ public class AwkTuples implements Serializable {
 			String funcName,
 			int numFormalParams,
 			int numActualParams) {
-		queue.add(new Tuple(Opcode.CALL_FUNCTION, addressSupplier, funcName, numFormalParams, numActualParams));
+		queue.add(new Tuple.CallFunctionTuple(addressSupplier, funcName, numFormalParams, numActualParams));
 	}
 
 	/**
@@ -1561,7 +1558,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void setReturnResult() {
-		queue.add(new Tuple(Opcode.SET_RETURN_RESULT));
+		queue.add(new Tuple.NoOperandTuple(Opcode.SET_RETURN_RESULT));
 	}
 
 	/**
@@ -1570,7 +1567,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void returnFromFunction() {
-		queue.add(new Tuple(Opcode.RETURN_FROM_FUNCTION));
+		queue.add(new Tuple.NoOperandTuple(Opcode.RETURN_FROM_FUNCTION));
 	}
 
 	/**
@@ -1581,7 +1578,7 @@ public class AwkTuples implements Serializable {
 	 * @param numGlobals a int
 	 */
 	public void setNumGlobals(int numGlobals) {
-		queue.add(new Tuple(Opcode.SET_NUM_GLOBALS, numGlobals));
+		queue.add(new Tuple.CountTuple(Opcode.SET_NUM_GLOBALS, numGlobals));
 	}
 
 	/**
@@ -1590,7 +1587,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void close() {
-		queue.add(new Tuple(Opcode.CLOSE));
+		queue.add(new Tuple.NoOperandTuple(Opcode.CLOSE));
 	}
 
 	/**
@@ -1601,7 +1598,7 @@ public class AwkTuples implements Serializable {
 	 * @param count a int
 	 */
 	public void applySubsep(int count) {
-		queue.add(new Tuple(Opcode.APPLY_SUBSEP, count));
+		queue.add(new Tuple.CountTuple(Opcode.APPLY_SUBSEP, count));
 	}
 
 	/**
@@ -1613,14 +1610,14 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void deleteArrayElement(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.DELETE_ARRAY_ELEMENT, offset, isGlobal));
+		queue.add(new Tuple.VariableTuple(Opcode.DELETE_ARRAY_ELEMENT, offset, isGlobal));
 	}
 
 	/**
 	 * Deletes a stack-provided associative-array element.
 	 */
 	public void deleteMapElement() {
-		queue.add(new Tuple(Opcode.DELETE_MAP_ELEMENT));
+		queue.add(new Tuple.NoOperandTuple(Opcode.DELETE_MAP_ELEMENT));
 	}
 
 	/**
@@ -1632,7 +1629,7 @@ public class AwkTuples implements Serializable {
 	 * @param isGlobal a boolean
 	 */
 	public void deleteArray(int offset, boolean isGlobal) {
-		queue.add(new Tuple(Opcode.DELETE_ARRAY, offset, isGlobal));
+		queue.add(new Tuple.VariableTuple(Opcode.DELETE_ARRAY, offset, isGlobal));
 	}
 
 	/**
@@ -1643,7 +1640,7 @@ public class AwkTuples implements Serializable {
 	 * @param addr a {@link io.jawk.intermediate.Address} object
 	 */
 	public void setExitAddress(Address addr) {
-		queue.add(new Tuple(Opcode.SET_EXIT_ADDRESS, addr));
+		queue.add(new Tuple.AddressTuple(Opcode.SET_EXIT_ADDRESS, addr));
 	}
 
 	/**
@@ -1654,7 +1651,7 @@ public class AwkTuples implements Serializable {
 	 * @param b a boolean
 	 */
 	public void setWithinEndBlocks(boolean b) {
-		queue.add(new Tuple(Opcode.SET_WITHIN_END_BLOCKS, b));
+		queue.add(new Tuple.BooleanTuple(Opcode.SET_WITHIN_END_BLOCKS, b));
 	}
 
 	/**
@@ -1663,7 +1660,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void exitWithCode() {
-		queue.add(new Tuple(Opcode.EXIT_WITH_CODE));
+		queue.add(new Tuple.NoOperandTuple(Opcode.EXIT_WITH_CODE));
 	}
 
 	/**
@@ -1672,7 +1669,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void exitWithoutCode() {
-		queue.add(new Tuple(Opcode.EXIT_WITHOUT_CODE));
+		queue.add(new Tuple.NoOperandTuple(Opcode.EXIT_WITHOUT_CODE));
 	}
 
 	/**
@@ -1686,7 +1683,7 @@ public class AwkTuples implements Serializable {
 		// For literal regexes (created by RegexpAst), precompile the Pattern
 		// and store it alongside the original string to skip runtime compilation.
 		Pattern precompiled = Pattern.compile(regexpStr);
-		queue.add(new Tuple(Opcode.REGEXP, regexpStr, precompiled));
+		queue.add(new Tuple.RegexTuple(regexpStr, precompiled));
 	}
 
 	/**
@@ -1695,7 +1692,7 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void conditionPair() {
-		queue.add(new Tuple(Opcode.CONDITION_PAIR));
+		queue.add(new Tuple.NoOperandTuple(Opcode.CONDITION_PAIR));
 	}
 
 	/**
@@ -1704,14 +1701,14 @@ public class AwkTuples implements Serializable {
 	 * </p>
 	 */
 	public void isIn() {
-		queue.add(new Tuple(Opcode.IS_IN));
+		queue.add(new Tuple.NoOperandTuple(Opcode.IS_IN));
 	}
 
 	/**
 	 * Emits a tuple that pushes the current script context onto the stack.
 	 */
 	public void scriptThis() {
-		queue.add(new Tuple(Opcode.THIS));
+		queue.add(new Tuple.NoOperandTuple(Opcode.THIS));
 	}
 
 	/**
@@ -1722,7 +1719,7 @@ public class AwkTuples implements Serializable {
 	 * @param isInitial {@code true} when this tuple opens an extension call sequence
 	 */
 	public void extension(ExtensionFunction function, int paramCount, boolean isInitial) {
-		queue.add(new Tuple(Opcode.EXTENSION, function, paramCount, isInitial));
+		queue.add(new Tuple.ExtensionTuple(function, paramCount, isInitial));
 	}
 
 	/**
@@ -1896,7 +1893,7 @@ public class AwkTuples implements Serializable {
 						long fieldIndex = JRT.toLong(literal);
 						Tuple replacement = createGetInputFieldConst(
 								fieldIndex,
-								tuple.getLineno());
+								tuple.getLineNumber());
 						optimizedQueue.add(replacement);
 						mapFoldedRange(indexMapping, oldIndex, 2, newIndex);
 						oldIndex += 2;
@@ -1912,7 +1909,7 @@ public class AwkTuples implements Serializable {
 					if (secondLiteral != null) {
 						Object folded = foldBinary(literal, secondLiteral, opTuple);
 						if (folded != null) {
-							Tuple replacement = createLiteralPush(folded, tuple.getLineno());
+							Tuple replacement = createLiteralPush(folded, tuple.getLineNumber());
 							optimizedQueue.add(replacement);
 							mapFoldedRange(indexMapping, oldIndex, 3, newIndex);
 							oldIndex += 3;
@@ -1926,7 +1923,7 @@ public class AwkTuples implements Serializable {
 					Tuple opTuple = original.get(oldIndex + 1);
 					Object folded = foldUnary(literal, opTuple);
 					if (folded != null) {
-						Tuple replacement = createLiteralPush(folded, tuple.getLineno());
+						Tuple replacement = createLiteralPush(folded, tuple.getLineNumber());
 						optimizedQueue.add(replacement);
 						mapFoldedRange(indexMapping, oldIndex, 2, newIndex);
 						oldIndex += 2;
@@ -1967,11 +1964,11 @@ public class AwkTuples implements Serializable {
 	private Object literalValue(Tuple tuple) {
 		switch (tuple.getOpcode()) {
 		case PUSH_LONG:
-			return Long.valueOf(tuple.getInts()[0]);
+			return Long.valueOf(((Tuple.PushLongTuple) tuple).getValue());
 		case PUSH_DOUBLE:
-			return Double.valueOf(tuple.getDoubles()[0]);
+			return Double.valueOf(((Tuple.PushDoubleTuple) tuple).getValue());
 		case PUSH_STRING:
-			return tuple.getStrings()[0];
+			return ((Tuple.PushStringTuple) tuple).getValue();
 		default:
 			return null;
 		}
@@ -2082,20 +2079,20 @@ public class AwkTuples implements Serializable {
 	private Tuple createLiteralPush(Object value, int lineNumber) {
 		Tuple tuple;
 		if (value instanceof Long) {
-			tuple = new Tuple(Opcode.PUSH_LONG, ((Long) value).longValue());
+			tuple = new Tuple.PushLongTuple(((Long) value).longValue());
 		} else if (value instanceof Integer) {
-			tuple = new Tuple(Opcode.PUSH_LONG, ((Integer) value).longValue());
+			tuple = new Tuple.PushLongTuple(((Integer) value).longValue());
 		} else if (value instanceof Double) {
-			tuple = new Tuple(Opcode.PUSH_DOUBLE, ((Double) value).doubleValue());
+			tuple = new Tuple.PushDoubleTuple(((Double) value).doubleValue());
 		} else if (value instanceof Number) {
 			double d = ((Number) value).doubleValue();
 			if (JRT.isActuallyLong(d)) {
-				tuple = new Tuple(Opcode.PUSH_LONG, (long) Math.rint(d));
+				tuple = new Tuple.PushLongTuple((long) Math.rint(d));
 			} else {
-				tuple = new Tuple(Opcode.PUSH_DOUBLE, d);
+				tuple = new Tuple.PushDoubleTuple(d);
 			}
 		} else if (value instanceof String) {
-			tuple = new Tuple(Opcode.PUSH_STRING, (String) value);
+			tuple = new Tuple.PushStringTuple((String) value);
 		} else {
 			throw new IllegalArgumentException("Unsupported literal value: " + value);
 		}
@@ -2104,7 +2101,7 @@ public class AwkTuples implements Serializable {
 	}
 
 	private Tuple createGetInputFieldConst(long fieldIndex, int lineNumber) {
-		Tuple tuple = new Tuple(Opcode.GET_INPUT_FIELD_CONST, fieldIndex);
+		Tuple tuple = new Tuple.InputFieldTuple(fieldIndex);
 		tuple.setLineNumber(lineNumber);
 		return tuple;
 	}

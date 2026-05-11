@@ -1534,9 +1534,6 @@ public class AwkTuples implements Serializable {
 		queue.add(new Tuple.FunctionTuple(funcName, numFormalParams));
 	}
 
-	// public void callFunction(Address addr, String funcName, int numFormalParams, int numActualParams) {
-	// queue.add(new Tuple.CallFunctionTuple(addr, funcName, numFormalParams, numActualParams)); }
-
 	/**
 	 * <p>
 	 * callFunction.

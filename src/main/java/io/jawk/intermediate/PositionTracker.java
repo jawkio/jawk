@@ -110,7 +110,7 @@ public class PositionTracker {
 	 *
 	 * @return current tuple
 	 */
-	@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "PositionTracker exposes the current immutable instruction node for typed dispatch")
+	@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "Tuple mutation is limited to package-internal stream construction and deferred address resolution")
 	public Tuple current() {
 		return tuple;
 	}

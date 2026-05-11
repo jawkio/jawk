@@ -1,8 +1,6 @@
 package io.jawk.intermediate;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import io.jawk.ext.ExtensionFunction;
-import java.util.regex.Pattern;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -90,127 +88,12 @@ public class PositionTracker {
 	}
 
 	/**
-	 * Returns the long argument at the specified index without type dispatch.
-	 *
-	 * @param argIdx argument index
-	 * @return the long value
-	 */
-	public long intArg(int argIdx) {
-		return tuple.getInts()[argIdx];
-	}
-
-	/**
-	 * Returns the boolean argument at the specified index without type dispatch.
-	 *
-	 * @param argIdx argument index
-	 * @return the boolean value
-	 */
-	public boolean boolArg(int argIdx) {
-		return tuple.getBools()[argIdx];
-	}
-
-	/**
-	 * Returns the string argument at the specified index without type dispatch.
-	 *
-	 * @param argIdx argument index
-	 * @return the string value
-	 */
-	public String stringArg(int argIdx) {
-		return tuple.getStrings()[argIdx];
-	}
-
-	/**
-	 * Returns the double argument at the specified index without type dispatch.
-	 *
-	 * @param argIdx argument index
-	 * @return the double value
-	 */
-	public double doubleArg(int argIdx) {
-		return tuple.getDoubles()[argIdx];
-	}
-
-	/**
-	 * Returns the current tuple argument with runtime type dispatch.
-	 *
-	 * @param argIdx Argument index
-	 * @return Argument value as its boxed Java type
-	 */
-	public Object arg(int argIdx) {
-		Class<?> c = tuple.getTypes()[argIdx];
-		if (c == Long.class) {
-			return tuple.getInts()[argIdx];
-		}
-		if (c == Double.class) {
-			return tuple.getDoubles()[argIdx];
-		}
-		if (c == String.class) {
-			return tuple.getStrings()[argIdx];
-		}
-		if (c == Pattern.class) {
-			return tuple.getPatterns()[argIdx];
-		}
-		if (c == Address.class) {
-			return tuple.getAddress();
-		}
-		if (c == ExtensionFunction.class) {
-			return tuple.getExtensionFunction();
-		}
-		throw new Error("Invalid arg type: " + c + ", arg_idx = " + argIdx + ", tuple = " + tuple);
-	}
-
-	/**
-	 * Returns the regular-expression argument at the supplied index.
-	 *
-	 * @param argIdx Argument index
-	 * @return Pattern argument
-	 */
-	public Pattern patternArg(int argIdx) {
-		if (tuple.getTypes()[argIdx] != Pattern.class) {
-			throw new Error("Tuple does not contain a Pattern at index " + argIdx + ": " + tuple);
-		}
-		return tuple.getPatterns()[argIdx];
-	}
-
-	/**
-	 * Returns the extension-function argument stored on the current tuple.
-	 *
-	 * @return Extension function metadata
-	 */
-	public ExtensionFunction extensionFunctionArg() {
-		if (tuple.getTypes()[0] != ExtensionFunction.class) {
-			throw new Error("Tuple does not contain an extension function: " + tuple);
-		}
-		return tuple.getExtensionFunction();
-	}
-
-	/**
-	 * Returns the tuple address argument, resolving lazy suppliers when needed.
-	 *
-	 * @return Current tuple address argument
-	 */
-	public Address addressArg() {
-		if (tuple.getAddress() == null) {
-			tuple.setAddress(tuple.getAddressSupplier().get());
-		}
-		return tuple.getAddress();
-	}
-
-	/**
-	 * Returns the class argument stored on the current tuple.
-	 *
-	 * @return Class argument
-	 */
-	public Class<?> classArg() {
-		return tuple.getCls();
-	}
-
-	/**
 	 * Returns the source line number associated with the current tuple.
 	 *
 	 * @return Tuple source line number
 	 */
 	public int lineNumber() {
-		return tuple.getLineno();
+		return tuple.getLineNumber();
 	}
 
 	/**
@@ -218,8 +101,18 @@ public class PositionTracker {
 	 *
 	 * @return Current queue index
 	 */
-	public int current() {
+	public int currentIndex() {
 		return idx;
+	}
+
+	/**
+	 * Returns the current typed tuple.
+	 *
+	 * @return current tuple
+	 */
+	@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "PositionTracker exposes the current immutable instruction node for typed dispatch")
+	public Tuple current() {
+		return tuple;
 	}
 
 	/**

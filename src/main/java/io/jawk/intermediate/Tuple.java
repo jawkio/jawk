@@ -23,146 +23,75 @@ package io.jawk.intermediate;
  */
 
 import java.io.Serializable;
-import java.util.regex.Pattern;
+import java.util.List;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import io.jawk.ext.ExtensionFunction;
 
 /**
- * Represents a single opcode and its arguments within the tuple stream produced
- * by {@link AwkTuples}. While {@code AwkTuples} manages the list of tuples, this
- * class models one instruction and up to four typed operands.
- * <p>
- * Some tuples defer resolution of a function address until the tuple list is
- * finalized; such tuples hold a {@link Supplier} that provides the
- * {@link Address} when needed.
+ * Represents one instruction in the tuple stream produced by {@link AwkTuples}.
+ * Concrete subclasses carry only the operands required by their opcode or opcode
+ * group.
  *
  * @author Danny Daglas
  * @see AwkTuples
  */
-class Tuple implements Serializable {
+public abstract class Tuple implements Serializable {
 
 	private static final long serialVersionUID = 8105941219003992817L;
-	private Opcode opcode;
-	private long[] ints = new long[4];
-	private boolean[] bools = new boolean[4];
-	private double[] doubles = new double[4];
-	private String[] strings = new String[4];
-	private Pattern[] patterns = new Pattern[4];
-	private Class<?>[] types = new Class[4];
-	private Address address = null;
-	private Class<?> cls = null;
-	private transient Supplier<Address> addressSupplier = null;
-	private int lineno = -1;
+	private final Opcode opcode;
+	private int lineNumber = -1;
 	private Tuple next = null;
-	private ExtensionFunction extensionFunction;
 
 	Tuple(Opcode opcode) {
 		this.opcode = opcode;
 	}
 
-	Tuple(Opcode opcode, long i1) {
-		this(opcode);
-		ints[0] = i1;
-		types[0] = Long.class;
+	/**
+	 * Returns this tuple's opcode.
+	 *
+	 * @return opcode executed by the AVM
+	 */
+	public final Opcode getOpcode() {
+		return opcode;
 	}
 
-	Tuple(Opcode opcode, long i1, long i2) {
-		this(opcode, i1);
-		ints[1] = i2;
-		types[1] = Long.class;
+	/**
+	 * Returns this tuple's jump/call address, if it has one.
+	 *
+	 * @return tuple address, or {@code null}
+	 */
+	public Address getAddress() {
+		return null;
 	}
 
-	Tuple(Opcode opcode, long i1, boolean b2) {
-		this(opcode, i1);
-		bools[1] = b2;
-		types[1] = Boolean.class;
-	}
-
-	Tuple(Opcode opcode, long i1, boolean b2, boolean b3) {
-		this(opcode, i1, b2);
-		bools[2] = b3;
-		types[2] = Boolean.class;
-	}
-
-	Tuple(Opcode opcode, double d1) {
-		this(opcode);
-		doubles[0] = d1;
-		types[0] = Double.class;
-	}
-
-	Tuple(Opcode opcode, String s1) {
-		this(opcode);
-		strings[0] = s1;
-		types[0] = String.class;
-	}
-
-	Tuple(Opcode opcode, String s1, Pattern p2) {
-		this(opcode, s1);
-		patterns[1] = p2;
-		types[1] = Pattern.class;
-	}
-
-	Tuple(Opcode opcode, boolean b1) {
-		this(opcode);
-		bools[0] = b1;
-		types[0] = Boolean.class;
-	}
-
-	Tuple(Opcode opcode, String s1, long i2) {
-		this(opcode, s1);
-		ints[1] = i2;
-		types[1] = Long.class;
-	}
-
-	Tuple(Opcode opcode, Address address) {
-		this(opcode);
-		this.address = address;
-		types[0] = Address.class;
-	}
-
-	Tuple(Opcode opcode, String strarg, long intarg, boolean boolarg) {
-		this(opcode, strarg, intarg);
-		bools[2] = boolarg;
-		types[2] = Boolean.class;
-	}
-
-	Tuple(Opcode opcode, ExtensionFunction function, long intarg, boolean boolarg) {
-		this(opcode);
-		this.extensionFunction = function;
-		types[0] = ExtensionFunction.class;
-		ints[1] = intarg;
-		types[1] = Long.class;
-		bools[2] = boolarg;
-		types[2] = Boolean.class;
-	}
-
-	Tuple(Opcode opcode, Supplier<Address> addressSupplier, String s2, long i3, long i4) {
-		this(opcode);
-		this.addressSupplier = addressSupplier;
-		strings[1] = s2;
-		types[1] = String.class;
-		ints[2] = i3;
-		types[2] = Long.class;
-		ints[3] = i4;
-		types[3] = Long.class;
-	}
-
-	Tuple(Opcode opcode, Class<?> cls) {
-		this(opcode);
-		this.cls = cls;
-		types[0] = Class.class;
-	}
-
-	Tuple(Opcode opcode, String s1, String s2) {
-		this(opcode, s1);
-		strings[1] = s2;
-		types[1] = String.class;
+	/**
+	 * Resolves deferred operands and validates resolved addresses.
+	 *
+	 * @param queue tuple queue used to validate address targets
+	 */
+	public void touch(List<Tuple> queue) {
+		Address address = getAddress();
+		if (address == null) {
+			return;
+		}
+		if (address.index() == -1) {
+			throw new Error("address " + address + " is unresolved");
+		}
+		if (address.index() >= queue.size()) {
+			throw new Error("address " + address + " doesn't resolve to an actual list element");
+		}
 	}
 
 	boolean hasNext() {
 		return next != null;
 	}
 
+	/**
+	 * Returns the next tuple in execution order.
+	 *
+	 * @return next tuple, or {@code null} at the end of the stream
+	 */
 	Tuple getNext() {
 		return next;
 	}
@@ -172,110 +101,674 @@ class Tuple implements Serializable {
 	}
 
 	void setLineNumber(int lineNumber) {
-		this.lineno = lineNumber;
+		this.lineNumber = lineNumber;
 	}
 
-	@Override
-	public String toString() {
-		StringBuilder sb = new StringBuilder();
-		sb.append(opcode.name());
-		int idx = 0;
-		while ((idx < types.length) && (types[idx] != null)) {
-			sb.append(", ");
-			Class<?> type = types[idx];
-			if (type == Long.class) {
-				sb.append(ints[idx]);
-			} else if (type == Boolean.class) {
-				sb.append(bools[idx]);
-			} else if (type == Double.class) {
-				sb.append(doubles[idx]);
-			} else if (type == String.class) {
-				sb.append('"').append(strings[idx]).append('"');
-			} else if (type == Pattern.class) {
-				// Display regex patterns in /.../ form for readability
-				Pattern p = patterns[idx];
-				sb
-						.append('/')
-						.append(p == null ? "" : p.pattern())
-						.append('/');
-			} else if (type == Address.class) {
-				sb.append(address);
-			} else if (type == ExtensionFunction.class) {
-				sb.append(extensionFunction.getKeyword());
-			} else if (type == Class.class) {
-				sb.append(cls);
-			} else {
-				throw new Error("Unknown param type (" + idx + "): " + type);
-			}
-			++idx;
-		}
-		return sb.toString();
+	/**
+	 * Returns the source line number associated with this tuple.
+	 *
+	 * @return source line number, or {@code -1} when unknown
+	 */
+	public int getLineNumber() {
+		return lineNumber;
 	}
 
-	public void touch(java.util.List<Tuple> queue) {
-		if (addressSupplier != null) {
-			address = addressSupplier.get();
-			types[0] = Address.class;
+	private static String stringArgument(String value) {
+		return ", \"" + value + '"';
+	}
+
+	private static String patternArgument(Pattern pattern) {
+		return ", /" + (pattern == null ? "" : pattern.pattern()) + '/';
+	}
+
+	/**
+	 * Tuple for opcodes without operands.
+	 */
+	public static class NoOperandTuple extends Tuple {
+		private static final long serialVersionUID = 1L;
+
+		NoOperandTuple(Opcode opcode) {
+			super(opcode);
 		}
-		if (address != null) {
-			if (address.index() == -1) {
-				throw new Error("address " + address + " is unresolved");
-			}
-			if (address.index() >= queue.size()) {
-				throw new Error("address " + address + " doesn't resolve to an actual list element");
-			}
+
+		@Override
+		public String toString() {
+			return getOpcode().name();
 		}
 	}
 
-	Opcode getOpcode() {
-		return opcode;
+	/**
+	 * Tuple for JRT-managed built-in variable operations.
+	 */
+	public static final class BuiltinVarTuple extends NoOperandTuple {
+		private static final long serialVersionUID = 1L;
+
+		BuiltinVarTuple(Opcode opcode) {
+			super(opcode);
+		}
 	}
 
-	long[] getInts() {
-		return ints;
+	/**
+	 * Tuple for a long literal.
+	 */
+	public static final class PushLongTuple extends Tuple {
+		private static final long serialVersionUID = 1L;
+		private final long value;
+
+		PushLongTuple(long value) {
+			super(Opcode.PUSH_LONG);
+			this.value = value;
+		}
+
+		/**
+		 * Returns the literal value.
+		 *
+		 * @return literal long value
+		 */
+		public long getValue() {
+			return value;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name() + ", " + value;
+		}
 	}
 
-	boolean[] getBools() {
-		return bools;
+	/**
+	 * Tuple for a double literal.
+	 */
+	public static final class PushDoubleTuple extends Tuple {
+		private static final long serialVersionUID = 1L;
+		private final double value;
+
+		PushDoubleTuple(double value) {
+			super(Opcode.PUSH_DOUBLE);
+			this.value = value;
+		}
+
+		/**
+		 * Returns the literal value.
+		 *
+		 * @return literal double value
+		 */
+		public double getValue() {
+			return value;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name() + ", " + value;
+		}
 	}
 
-	double[] getDoubles() {
-		return doubles;
+	/**
+	 * Tuple for a string literal.
+	 */
+	public static final class PushStringTuple extends Tuple {
+		private static final long serialVersionUID = 1L;
+		private final String value;
+
+		PushStringTuple(String value) {
+			super(Opcode.PUSH_STRING);
+			this.value = value;
+		}
+
+		/**
+		 * Returns the literal value.
+		 *
+		 * @return literal string value
+		 */
+		public String getValue() {
+			return value;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name() + stringArgument(value);
+		}
 	}
 
-	String[] getStrings() {
-		return strings;
+	/**
+	 * Tuple for opcodes whose single operand is a count.
+	 */
+	public static class CountTuple extends Tuple {
+		private static final long serialVersionUID = 1L;
+		private final long count;
+
+		CountTuple(Opcode opcode, long count) {
+			super(opcode);
+			this.count = count;
+		}
+
+		/**
+		 * Returns the tuple count operand.
+		 *
+		 * @return count operand
+		 */
+		public final long getCount() {
+			return count;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name() + ", " + count;
+		}
 	}
 
-	Pattern[] getPatterns() {
-		return patterns;
+	/**
+	 * Tuple for print/printf redirection with an append flag.
+	 */
+	public static final class CountAndAppendTuple extends CountTuple {
+		private static final long serialVersionUID = 1L;
+		private final boolean append;
+
+		CountAndAppendTuple(Opcode opcode, long count, boolean append) {
+			super(opcode, count);
+			this.append = append;
+		}
+
+		/**
+		 * Indicates whether redirected output should append.
+		 *
+		 * @return {@code true} for append mode
+		 */
+		public boolean isAppend() {
+			return append;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name() + ", " + getCount() + ", " + append;
+		}
 	}
 
-	Class<?>[] getTypes() {
-		return types;
+	/**
+	 * Tuple for a long operand that is not interpreted by the tuple itself.
+	 */
+	public static class LongTuple extends Tuple {
+		private static final long serialVersionUID = 1L;
+		private final long value;
+
+		LongTuple(Opcode opcode, long value) {
+			super(opcode);
+			this.value = value;
+		}
+
+		/**
+		 * Returns the long operand.
+		 *
+		 * @return long operand
+		 */
+		public final long getValue() {
+			return value;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name() + ", " + value;
+		}
 	}
 
-	Address getAddress() {
-		return address;
+	/**
+	 * Tuple for a constant input-field index.
+	 */
+	public static final class InputFieldTuple extends LongTuple {
+		private static final long serialVersionUID = 1L;
+
+		InputFieldTuple(long fieldIndex) {
+			super(Opcode.GET_INPUT_FIELD_CONST, fieldIndex);
+		}
+
+		/**
+		 * Returns the constant input-field index.
+		 *
+		 * @return input-field index
+		 */
+		public long getFieldIndex() {
+			return getValue();
+		}
 	}
 
-	Class<?> getCls() {
-		return cls;
+	/**
+	 * Tuple for an address operand.
+	 */
+	public static class AddressTuple extends Tuple {
+		private static final long serialVersionUID = 1L;
+		private Address address;
+
+		AddressTuple(Opcode opcode, Address address) {
+			super(opcode);
+			this.address = address;
+		}
+
+		@Override
+		public Address getAddress() {
+			return address;
+		}
+
+		void setAddress(Address address) {
+			this.address = address;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name() + ", " + address;
+		}
 	}
 
-	Supplier<Address> getAddressSupplier() {
-		return addressSupplier;
+	/**
+	 * Tuple for variable offset/global operands.
+	 */
+	public static class VariableTuple extends Tuple {
+		private static final long serialVersionUID = 1L;
+		private final long variableOffset;
+		private final boolean global;
+
+		VariableTuple(Opcode opcode, long variableOffset, boolean global) {
+			super(opcode);
+			this.variableOffset = variableOffset;
+			this.global = global;
+		}
+
+		/**
+		 * Returns the variable offset.
+		 *
+		 * @return variable offset
+		 */
+		public final long getVariableOffset() {
+			return variableOffset;
+		}
+
+		/**
+		 * Indicates whether the variable offset belongs to the global frame.
+		 *
+		 * @return {@code true} for a global variable
+		 */
+		public final boolean isGlobal() {
+			return global;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name() + ", " + variableOffset + ", " + global;
+		}
 	}
 
-	ExtensionFunction getExtensionFunction() {
-		return extensionFunction;
+	/**
+	 * Tuple for scalar compound assignments.
+	 */
+	public static final class CompoundAssignTuple extends VariableTuple {
+		private static final long serialVersionUID = 1L;
+
+		CompoundAssignTuple(Opcode opcode, long variableOffset, boolean global) {
+			super(opcode, variableOffset, global);
+		}
 	}
 
-	void setAddress(Address address) {
-		this.address = address;
+	/**
+	 * Tuple for array compound assignments.
+	 */
+	public static final class CompoundAssignArrayTuple extends VariableTuple {
+		private static final long serialVersionUID = 1L;
+
+		CompoundAssignArrayTuple(Opcode opcode, long variableOffset, boolean global) {
+			super(opcode, variableOffset, global);
+		}
 	}
 
-	int getLineno() {
-		return lineno;
+	/**
+	 * Tuple for stack-provided map element compound assignments.
+	 */
+	public static final class CompoundAssignMapElementTuple extends NoOperandTuple {
+		private static final long serialVersionUID = 1L;
+
+		CompoundAssignMapElementTuple(Opcode opcode) {
+			super(opcode);
+		}
+	}
+
+	/**
+	 * Tuple for input-field compound assignments.
+	 */
+	public static final class CompoundAssignInputFieldTuple extends NoOperandTuple {
+		private static final long serialVersionUID = 1L;
+
+		CompoundAssignInputFieldTuple(Opcode opcode) {
+			super(opcode);
+		}
+	}
+
+	/**
+	 * Tuple for variable dereference.
+	 */
+	public static final class DereferenceTuple extends Tuple {
+		private static final long serialVersionUID = 1L;
+		private final long variableOffset;
+		private final boolean array;
+		private final boolean global;
+
+		DereferenceTuple(long variableOffset, boolean array, boolean global) {
+			super(Opcode.DEREFERENCE);
+			this.variableOffset = variableOffset;
+			this.array = array;
+			this.global = global;
+		}
+
+		/**
+		 * Returns the variable offset.
+		 *
+		 * @return variable offset
+		 */
+		public long getVariableOffset() {
+			return variableOffset;
+		}
+
+		/**
+		 * Indicates whether this dereference should initialize an array.
+		 *
+		 * @return {@code true} when the variable is an array
+		 */
+		public boolean isArray() {
+			return array;
+		}
+
+		/**
+		 * Indicates whether the variable offset belongs to the global frame.
+		 *
+		 * @return {@code true} for a global variable
+		 */
+		public boolean isGlobal() {
+			return global;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name() + ", " + variableOffset + ", " + array + ", " + global;
+		}
+	}
+
+	/**
+	 * Tuple for boolean operands.
+	 */
+	public static final class BooleanTuple extends Tuple {
+		private static final long serialVersionUID = 1L;
+		private final boolean value;
+
+		BooleanTuple(Opcode opcode, boolean value) {
+			super(opcode);
+			this.value = value;
+		}
+
+		/**
+		 * Returns the boolean operand.
+		 *
+		 * @return boolean operand
+		 */
+		public boolean getValue() {
+			return value;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name() + ", " + value;
+		}
+	}
+
+	/**
+	 * Tuple for sub/gsub against variable-backed values.
+	 */
+	public static final class SubstitutionVariableTuple extends VariableTuple {
+		private static final long serialVersionUID = 1L;
+		private final boolean globalSubstitution;
+
+		SubstitutionVariableTuple(Opcode opcode, long variableOffset, boolean global, boolean globalSubstitution) {
+			super(opcode, variableOffset, global);
+			this.globalSubstitution = globalSubstitution;
+		}
+
+		/**
+		 * Indicates whether this substitution is global.
+		 *
+		 * @return {@code true} for {@code gsub}, {@code false} for {@code sub}
+		 */
+		public boolean isGlobalSubstitution() {
+			return globalSubstitution;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name() + ", " + getVariableOffset() + ", " + isGlobal() + ", " + globalSubstitution;
+		}
+	}
+
+	/**
+	 * Tuple for a precompiled literal regular expression.
+	 */
+	public static final class RegexTuple extends Tuple {
+		private static final long serialVersionUID = 1L;
+		private final String regex;
+		private final Pattern pattern;
+
+		RegexTuple(String regex, Pattern pattern) {
+			super(Opcode.REGEXP);
+			this.regex = regex;
+			this.pattern = pattern;
+		}
+
+		/**
+		 * Returns the original regular expression text.
+		 *
+		 * @return regular expression text
+		 */
+		public String getRegex() {
+			return regex;
+		}
+
+		/**
+		 * Returns the precompiled regular expression.
+		 *
+		 * @return compiled pattern
+		 */
+		public Pattern getPattern() {
+			return pattern;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name() + stringArgument(regex) + patternArgument(pattern);
+		}
+	}
+
+	/**
+	 * Tuple for a class check.
+	 */
+	public static final class ClassTuple extends Tuple {
+		private static final long serialVersionUID = 1L;
+		private final Class<?> type;
+
+		ClassTuple(Class<?> type) {
+			super(Opcode.CHECK_CLASS);
+			this.type = type;
+		}
+
+		/**
+		 * Returns the required runtime type.
+		 *
+		 * @return required class
+		 */
+		public Class<?> getType() {
+			return type;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name() + ", " + type;
+		}
+	}
+
+	/**
+	 * Tuple for function definitions.
+	 */
+	public static final class FunctionTuple extends Tuple {
+		private static final long serialVersionUID = 1L;
+		private final String functionName;
+		private final long numFormalParams;
+
+		FunctionTuple(String functionName, long numFormalParams) {
+			super(Opcode.FUNCTION);
+			this.functionName = functionName;
+			this.numFormalParams = numFormalParams;
+		}
+
+		/**
+		 * Returns the function name.
+		 *
+		 * @return function name
+		 */
+		public String getFunctionName() {
+			return functionName;
+		}
+
+		/**
+		 * Returns the number of formal parameters.
+		 *
+		 * @return formal parameter count
+		 */
+		public long getNumFormalParams() {
+			return numFormalParams;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name() + stringArgument(functionName) + ", " + numFormalParams;
+		}
+	}
+
+	/**
+	 * Tuple for function calls.
+	 */
+	public static final class CallFunctionTuple extends AddressTuple {
+		private static final long serialVersionUID = 1L;
+		private transient Supplier<Address> addressSupplier;
+		private final String functionName;
+		private final long numFormalParams;
+		private final long numActualParams;
+
+		CallFunctionTuple(
+				Supplier<Address> addressSupplier,
+				String functionName,
+				long numFormalParams,
+				long numActualParams) {
+			super(Opcode.CALL_FUNCTION, null);
+			this.addressSupplier = addressSupplier;
+			this.functionName = functionName;
+			this.numFormalParams = numFormalParams;
+			this.numActualParams = numActualParams;
+		}
+
+		@Override
+		public Address getAddress() {
+			Address address = super.getAddress();
+			if (address == null && addressSupplier != null) {
+				address = addressSupplier.get();
+				setAddress(address);
+			}
+			return address;
+		}
+
+		@Override
+		public void touch(List<Tuple> queue) {
+			getAddress();
+			super.touch(queue);
+		}
+
+		/**
+		 * Returns the function name.
+		 *
+		 * @return function name
+		 */
+		public String getFunctionName() {
+			return functionName;
+		}
+
+		/**
+		 * Returns the number of formal parameters.
+		 *
+		 * @return formal parameter count
+		 */
+		public long getNumFormalParams() {
+			return numFormalParams;
+		}
+
+		/**
+		 * Returns the number of actual parameters at this call site.
+		 *
+		 * @return actual parameter count
+		 */
+		public long getNumActualParams() {
+			return numActualParams;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name()
+					+ ", "
+					+ getAddress()
+					+ stringArgument(functionName)
+					+ ", "
+					+ numFormalParams
+					+ ", "
+					+ numActualParams;
+		}
+	}
+
+	/**
+	 * Tuple for extension function invocations.
+	 */
+	public static final class ExtensionTuple extends Tuple {
+		private static final long serialVersionUID = 1L;
+		private final ExtensionFunction function;
+		private final long argCount;
+		private final boolean initial;
+
+		ExtensionTuple(ExtensionFunction function, long argCount, boolean initial) {
+			super(Opcode.EXTENSION);
+			this.function = function;
+			this.argCount = argCount;
+			this.initial = initial;
+		}
+
+		/**
+		 * Returns the extension function metadata.
+		 *
+		 * @return extension function
+		 */
+		public ExtensionFunction getFunction() {
+			return function;
+		}
+
+		/**
+		 * Returns the number of extension arguments.
+		 *
+		 * @return argument count
+		 */
+		public long getArgCount() {
+			return argCount;
+		}
+
+		/**
+		 * Indicates whether this tuple starts an extension call sequence.
+		 *
+		 * @return {@code true} for the initial extension call tuple
+		 */
+		public boolean isInitial() {
+			return initial;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name() + ", " + function.getKeyword() + ", " + argCount + ", " + initial;
+		}
 	}
 }

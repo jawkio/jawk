@@ -673,6 +673,7 @@ public abstract class Tuple implements Serializable {
 			if (address == null && addressSupplier != null) {
 				address = addressSupplier.get();
 				setAddress(address);
+				addressSupplier = null;
 			}
 			return address;
 		}

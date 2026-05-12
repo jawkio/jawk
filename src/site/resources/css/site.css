@@ -672,3 +672,59 @@ body.dark {
 		height: 10px;
 	}
 }
+
+/* Benchmarks */
+.benchmarks-page[ng-cloak],
+.benchmarks-page [ng-cloak] {
+	display: none !important;
+}
+
+.benchmark-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.75rem;
+	margin: 1rem 0;
+}
+
+.benchmark-toolbar label {
+	margin-bottom: 0;
+}
+
+.benchmark-toolbar .form-control {
+	width: auto;
+	min-width: 16rem;
+}
+
+.benchmark-note {
+	margin-bottom: 1rem;
+}
+
+.benchmark-table code {
+	white-space: nowrap;
+}
+
+.benchmark-number {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.benchmark-environment {
+	margin-top: 1rem;
+}
+
+.benchmark-environment-output {
+	white-space: pre-wrap;
+}
+
+@media (max-width: 767px) {
+	.benchmark-toolbar {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.benchmark-toolbar .form-control,
+	.benchmark-toolbar .btn {
+		width: 100%;
+	}
+}

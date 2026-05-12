@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>Performance Benchmarks</title>
+	<meta name="keywords" content="benchmarks, jmh, performance, jawk" />
+	<meta name="description" content="Release-time JMH benchmark reports for Jawk." />
+</head>
+<body>
+<div id="jawk-benchmarks" class="benchmarks-page">
+	<h1>Performance Benchmarks</h1>
+
+	<p>
+		Jawk publishes release-time <a href="https://openjdk.org/projects/code-tools/jmh/">JMH</a> benchmark
+		results for selected hot runtime paths. These numbers are useful for comparisons within the same benchmark
+		environment, but should not be treated as absolute performance claims across different JVMs, operating systems,
+		or hardware.
+	</p>
+
+	<div class="alert alert-warning benchmark-angular-missing" style="display: none;">
+		AngularJS is not available, so benchmark results cannot be loaded dynamically.
+	</div>
+
+	<div id="benchmark-application"></div>
+
+	<script type="text/javascript">
+	//<![CDATA[
+	(function() {
+		'use strict';
+
+		var bootstrapAttempts = 0;
+		var maxBootstrapAttempts = 100;
+		var indexUrl = 'benchmarks/index.json';
+
+		function renderTemplate(host) {
+			host.innerHTML = [
+				'<div ng-controller="BenchmarkController as vm" ng-cloak="">',
+				'  <div class="alert alert-info" ng-if="vm.loading">Loading published benchmark index...</div>',
+				'  <div class="alert alert-warning" ng-if="vm.error">{{vm.error}}</div>',
+				'  <div ng-if="!vm.loading && vm.releases.length">',
+				'    <div class="benchmark-toolbar">',
+				'      <label for="benchmark-release">Release</label>',
+				'      <select id="benchmark-release" class="form-control" ng-model="vm.selectedRelease"',
+				'        ng-options="release as vm.releaseLabel(release) for release in vm.releases track by release.version"',
+				'        ng-change="vm.loadRelease(vm.selectedRelease)"></select>',
+				'      <a class="btn btn-default" ng-href="{{vm.selectedRelease.jmh}}" ng-if="vm.selectedRelease.jmh">Raw JMH JSON</a>',
+				'      <a class="btn btn-default" ng-href="{{vm.selectedRelease.environment}}"',
+				'        ng-if="vm.selectedRelease.environment">Environment JSON</a>',
+				'    </div>',
+				'    <div class="alert alert-info benchmark-note">',
+				'      Compare releases only after checking the environment details below. JMH scores depend on JVM version, JVM',
+				'      flags, operating system, runner load, and CPU model.',
+				'    </div>',
+				'    <div class="alert alert-info" ng-if="vm.releaseLoading">Loading benchmark results...</div>',
+				'    <div class="alert alert-warning" ng-if="vm.releaseError">{{vm.releaseError}}</div>',
+				'    <div class="table-responsive" ng-if="vm.results.length">',
+				'      <table class="table table-striped table-condensed benchmark-table">',
+				'        <thead>',
+				'          <tr>',
+				'            <th>Benchmark</th>',
+				'            <th>Mode</th>',
+				'            <th class="benchmark-number">Score</th>',
+				'            <th class="benchmark-number">Error</th>',
+				'            <th>Units</th>',
+				'            <th class="benchmark-number">Forks</th>',
+				'          </tr>',
+				'        </thead>',
+				'        <tbody>',
+				'          <tr ng-repeat="result in vm.results">',
+				'            <td><code>{{vm.shortBenchmarkName(result.benchmark)}}</code></td>',
+				'            <td>{{result.mode}}</td>',
+				'            <td class="benchmark-number">{{vm.metric(result).score | number:3}}</td>',
+				'            <td class="benchmark-number">{{vm.metric(result).scoreError | number:3}}</td>',
+				'            <td>{{vm.metric(result).scoreUnit}}</td>',
+				'            <td class="benchmark-number">{{vm.forkCount(result)}}</td>',
+				'          </tr>',
+				'        </tbody>',
+				'      </table>',
+				'    </div>',
+				'    <h2>Benchmark Environment</h2>',
+				'    <div class="benchmark-environment" ng-if="vm.environment">',
+				'      <dl class="dl-horizontal">',
+				'        <dt>Version</dt>',
+				'        <dd>{{vm.environment.version || vm.selectedRelease.version}}</dd>',
+				'        <dt>Commit</dt>',
+				'        <dd><code>{{vm.environment.commit}}</code></dd>',
+				'        <dt>Run date</dt>',
+				'        <dd>{{vm.environment.runDate}}</dd>',
+				'        <dt>Runner</dt>',
+				'        <dd>{{vm.runnerLabel(vm.environment)}}</dd>',
+				'        <dt>System</dt>',
+				'        <dd>{{vm.systemLabel(vm.environment)}}</dd>',
+				'        <dt>JMH pattern</dt>',
+				'        <dd><code>{{vm.environment.benchmarkPattern}}</code></dd>',
+				'        <dt>JMH arguments</dt>',
+				'        <dd><code>{{vm.environment.jmhArgs}}</code></dd>',
+				'        <dt>Workflow run</dt>',
+				'        <dd><a ng-href="{{vm.environment.workflowRunUrl}}">{{vm.environment.workflowRunUrl}}</a></dd>',
+				'      </dl>',
+				'      <h3>Java</h3>',
+				'      <pre class="benchmark-environment-output">{{vm.environment.javaVersion}}</pre>',
+				'      <h3>Maven</h3>',
+				'      <pre class="benchmark-environment-output">{{vm.environment.mavenVersion}}</pre>',
+				'    </div>',
+				'  </div>',
+				'</div>'
+			].join('');
+		}
+
+		function showAngularMissing(host) {
+			var missing = host.querySelector('.benchmark-angular-missing');
+			if (missing) {
+				missing.style.display = 'block';
+			}
+		}
+
+		function siteModule(angular) {
+			try {
+				return angular.module('sentry.site');
+			} catch (error) {
+				return null;
+			}
+		}
+
+		function installApplication(angular, skinModule) {
+			angular.module('jawkBenchmarks', []).controller('BenchmarkController', ['$http', function($http) {
+				var vm = this;
+
+				vm.loading = true;
+				vm.releaseLoading = false;
+				vm.error = null;
+				vm.releaseError = null;
+				vm.releases = [];
+				vm.results = [];
+				vm.environment = null;
+
+				vm.metric = function(result) {
+					return result.primaryMetric || {};
+				};
+
+				vm.shortBenchmarkName = function(benchmark) {
+					if (!benchmark) {
+						return '';
+					}
+					var marker = 'JRTCompare2Benchmark.';
+					var index = benchmark.indexOf(marker);
+					if (index >= 0) {
+						return benchmark.substring(index + marker.length);
+					}
+					return benchmark;
+				};
+
+				vm.forkCount = function(result) {
+					var metric = vm.metric(result);
+					return metric.rawData ? metric.rawData.length : '';
+				};
+
+				vm.releaseLabel = function(release) {
+					if (!release) {
+						return '';
+					}
+					return release.date ? release.version + ' (' + release.date + ')' : release.version;
+				};
+
+				vm.runnerLabel = function(environment) {
+					if (!environment || !environment.runner) {
+						return '';
+					}
+					return [environment.runner.os, environment.runner.arch, environment.runner.name].filter(Boolean).join(' / ');
+				};
+
+				vm.systemLabel = function(environment) {
+					if (!environment || !environment.system) {
+						return '';
+					}
+					var system = environment.system;
+					var label = [system.platform, system.release, system.arch].filter(Boolean).join(' / ');
+					if (system.cpuCount) {
+						label += ' / ' + system.cpuCount + ' CPUs';
+					}
+					if (system.cpus && system.cpus.length) {
+						label += ' / ' + system.cpus.join(', ');
+					}
+					return label;
+				};
+
+				vm.loadRelease = function(release) {
+					if (!release) {
+						return;
+					}
+
+					vm.releaseLoading = true;
+					vm.releaseError = null;
+					vm.results = [];
+					vm.environment = null;
+
+					$http.get(release.jmh, { cache: false }).then(function(response) {
+						vm.results = response.data || [];
+						vm.results.sort(function(left, right) {
+							return left.benchmark.localeCompare(right.benchmark);
+						});
+					}, function() {
+						vm.releaseError = 'Benchmark results could not be loaded for ' + release.version + '.';
+					}).finally(function() {
+						vm.releaseLoading = false;
+					});
+
+					if (release.environment) {
+						$http.get(release.environment, { cache: false }).then(function(response) {
+							vm.environment = response.data;
+						});
+					}
+				};
+
+				$http.get(indexUrl, { cache: false }).then(function(response) {
+					var data = response.data || {};
+					var latest = data.latest;
+					var releases = data.releases || [];
+					var selected = releases.length ? releases[0] : null;
+					var index;
+
+					vm.releases = releases;
+
+					for (index = 0; index < releases.length; index++) {
+						if (releases[index].version === latest) {
+							selected = releases[index];
+							break;
+						}
+					}
+
+					if (!selected) {
+						vm.error = 'No published benchmark releases were found in ' + indexUrl + '.';
+						return;
+					}
+
+					vm.selectedRelease = selected;
+					vm.loadRelease(selected);
+				}, function() {
+					vm.error = 'No benchmark index is published yet. Release benchmarks will create ' + indexUrl + '.';
+				}).finally(function() {
+					vm.loading = false;
+				});
+			}]);
+
+			if (skinModule.requires.indexOf('jawkBenchmarks') < 0) {
+				skinModule.requires.push('jawkBenchmarks');
+			}
+		}
+
+		function bootstrapWhenReady() {
+			var host = document.getElementById('jawk-benchmarks');
+			var application = document.getElementById('benchmark-application');
+			var skinModule;
+			if (!host || !application) {
+				return;
+			}
+
+			if (!window.angular || !siteModule(window.angular)) {
+				bootstrapAttempts++;
+				if (bootstrapAttempts >= maxBootstrapAttempts) {
+					showAngularMissing(host);
+					return;
+				}
+				window.setTimeout(bootstrapWhenReady, 50);
+				return;
+			}
+
+			skinModule = siteModule(window.angular);
+			renderTemplate(application);
+			installApplication(window.angular, skinModule);
+		}
+
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', bootstrapWhenReady);
+		} else {
+			bootstrapWhenReady();
+		}
+	}());
+	//]]>
+	</script>
+</div>
+</body>
+</html>

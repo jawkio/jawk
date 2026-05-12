@@ -26,6 +26,19 @@ mvn site
 
 For more information about Maven-generated documentation, visit [Maven Site plugin](https://maven.apache.org/plugins/maven-site-plugin/) and [Sentry Maven Skin](https://sentrysoftware.github.io/sentry-maven-skin/).
 
+## Benchmarks
+
+Microbenchmarks use [JMH](https://openjdk.org/projects/code-tools/jmh/) and are built only when the benchmark profile is enabled:
+
+```bash
+mvn -Pbenchmark -DskipTests package
+java -jar target/jawk-<VERSION>-benchmarks.jar JRTCompare2Benchmark
+```
+
+Release benchmark data is published by the *Publish Benchmarks* GitHub Action. It builds the Maven site, writes JMH
+JSON files under `target/site/benchmarks/releases/<VERSION>/`, updates `target/site/benchmarks/index.json`, and
+deploys the complete site through GitHub Pages.
+
 ## Development workflows
 
 Please follow this workflow to contribute to this project:

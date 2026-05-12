@@ -76,6 +76,7 @@
 
 		<menu name="Reference">
 			<item name="Compatibility and Compliance" href="compatibility.html" />
+			<item name="Performance Benchmarks" href="benchmarks.html" />
 			<item name="Javadoc (API)" href="apidocs/index.html" />
 		</menu>
 

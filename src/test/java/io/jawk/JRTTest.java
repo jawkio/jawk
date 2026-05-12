@@ -116,6 +116,45 @@ public class JRTTest {
 	}
 
 	@Test
+	public void testCompare2NumericOperands() {
+		assertTrue(JRT.compare2(3L, 3L, 0));
+		assertFalse(JRT.compare2(3L, 4L, 0));
+		assertTrue(JRT.compare2(3L, 4L, -1));
+		assertTrue(JRT.compare2(4L, 3L, 1));
+		assertTrue(JRT.compare2(3.5D, 3.5D, 0));
+		assertTrue(JRT.compare2(3L, 3.0D, 0));
+		assertTrue(JRT.compare2(3L, 3.5D, -1));
+	}
+
+	@Test
+	public void testCompare2NumericStrings() {
+		assertTrue(JRT.compare2("3", "3.0", 0));
+		assertTrue(JRT.compare2("3", "4.0", -1));
+		assertTrue(JRT.compare2("4.0", "3", 1));
+		assertTrue(JRT.compare2("1e2", "100", 0));
+		assertTrue(JRT.compare2("+.5", "0.5", 0));
+		assertTrue(JRT.compare2("5.", "5.0", 0));
+		assertTrue(JRT.compare2("-1E+2", "-100", 0));
+	}
+
+	@Test
+	public void testCompare2MixedNumberAndString() {
+		assertTrue(JRT.compare2(3L, "3.0", 0));
+		assertTrue(JRT.compare2("3.0", 3L, 0));
+		assertTrue(JRT.compare2(3L, "4", -1));
+		assertTrue(JRT.compare2("4", 3L, 1));
+	}
+
+	@Test
+	public void testCompare2FallsBackToStringComparison() {
+		assertFalse(JRT.compare2("3x", "3.0", 0));
+		assertTrue(JRT.compare2("3x", "4", -1));
+		assertTrue(JRT.compare2(10L, "2x", -1));
+		assertTrue(JRT.compare2("2x", 10L, 1));
+		assertTrue(JRT.compare2("1e", "2", -1));
+	}
+
+	@Test
 	public void testSpawnProcessCat() throws Exception {
 		Assume.assumeFalse(IS_WINDOWS);
 		AwkTestSupport

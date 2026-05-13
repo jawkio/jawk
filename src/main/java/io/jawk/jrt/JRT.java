@@ -687,16 +687,24 @@ public class JRT {
 		if (o1Numeric) {
 			o1Number = ((Number) o1).doubleValue();
 		} else if (isComparisonNumber(o1String)) {
-			o1Number = new BigDecimal(o1String).doubleValue();
-			o1Numeric = true;
+			try {
+				o1Number = new BigDecimal(o1String).doubleValue();
+				o1Numeric = true;
+			} catch (NumberFormatException nfe) { // NOPMD - ignore invalid number
+				o1Number = 0.0;
+			}
 		} else {
 			o1Number = 0.0;
 		}
 		if (o2Numeric) {
 			o2Number = ((Number) o2).doubleValue();
 		} else if (isComparisonNumber(o2String)) {
-			o2Number = new BigDecimal(o2String).doubleValue();
-			o2Numeric = true;
+			try {
+				o2Number = new BigDecimal(o2String).doubleValue();
+				o2Numeric = true;
+			} catch (NumberFormatException nfe) { // NOPMD - ignore invalid number
+				o2Number = 0.0;
+			}
 		} else {
 			o2Number = 0.0;
 		}

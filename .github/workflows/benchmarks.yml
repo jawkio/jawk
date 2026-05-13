@@ -208,6 +208,7 @@ jobs:
 
           const siteBase = new URL(process.env.BENCHMARK_SITE_URL || 'https://jawk.io/');
           const siteRoot = 'target/site';
+          const resolvedSiteRoot = path.resolve(siteRoot);
           const indexPath = path.join(siteRoot, 'benchmarks', 'index.json');
 
           function getText(url) {
@@ -244,11 +245,18 @@ jobs:
               return;
             }
             const normalizedPath = relativePath.replace(/^\/+/, '');
+            if (normalizedPath.includes('\\') || normalizedPath.split('/').includes('..')) {
+              return;
+            }
             const content = await getText(new URL(normalizedPath, siteBase));
             if (content === null) {
               return;
             }
-            const outputPath = path.join(siteRoot, normalizedPath);
+            const outputPath = path.resolve(resolvedSiteRoot, normalizedPath);
+            const outputRelativePath = path.relative(resolvedSiteRoot, outputPath);
+            if (outputRelativePath.startsWith('..') || path.isAbsolute(outputRelativePath)) {
+              return;
+            }
             fs.mkdirSync(path.dirname(outputPath), { recursive: true });
             fs.writeFileSync(outputPath, content);
           }

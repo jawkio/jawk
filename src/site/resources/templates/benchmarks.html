@@ -1,0 +1,101 @@
+<!--
+  Jawk
+  Copyright (C) 2006 - 2026 MetricsHub
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU Lesser General Public License as
+  published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version.
+-->
+<div ng-cloak="">
+  <div class="alert alert-info" ng-if="$ctrl.loading">
+    Loading published benchmark index...
+  </div>
+
+  <div class="alert alert-warning" ng-if="$ctrl.error">
+    {{$ctrl.error}}
+  </div>
+
+  <div ng-if="!$ctrl.loading && $ctrl.releases.length">
+    <div class="benchmark-toolbar">
+      <label for="benchmark-release">Release</label>
+      <select id="benchmark-release" class="form-control" ng-model="$ctrl.selectedRelease"
+        ng-options="release as $ctrl.releaseLabel(release) for release in $ctrl.releases track by $ctrl.releaseKey(release)"
+        ng-change="$ctrl.loadRelease($ctrl.selectedRelease)">
+      </select>
+      <a class="btn btn-default" ng-href="{{$ctrl.selectedRelease.jmh}}" ng-if="$ctrl.selectedRelease.jmh">
+        Raw JMH JSON
+      </a>
+      <a class="btn btn-default" ng-href="{{$ctrl.selectedRelease.environment}}" ng-if="$ctrl.selectedRelease.environment">
+        Environment JSON
+      </a>
+    </div>
+
+    <div class="alert alert-info benchmark-note">
+      Compare releases only after checking the environment details below. JMH scores depend on JVM version, JVM flags,
+      operating system, runner load, and CPU model.
+    </div>
+
+    <div class="alert alert-info" ng-if="$ctrl.releaseLoading">
+      Loading benchmark results...
+    </div>
+
+    <div class="alert alert-warning" ng-if="$ctrl.releaseError">
+      {{$ctrl.releaseError}}
+    </div>
+
+    <div class="table-responsive" ng-if="$ctrl.results.length">
+      <table class="table table-striped table-condensed benchmark-table">
+        <thead>
+          <tr>
+            <th>Benchmark</th>
+            <th>Mode</th>
+            <th class="benchmark-number">Score</th>
+            <th class="benchmark-number">Error</th>
+            <th>Units</th>
+            <th class="benchmark-number">Forks</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr ng-repeat="result in $ctrl.results">
+            <td><code>{{$ctrl.shortBenchmarkName(result.benchmark)}}</code></td>
+            <td>{{result.mode}}</td>
+            <td class="benchmark-number">{{$ctrl.metric(result).score | number:3}}</td>
+            <td class="benchmark-number">{{$ctrl.metric(result).scoreError | number:3}}</td>
+            <td>{{$ctrl.metric(result).scoreUnit}}</td>
+            <td class="benchmark-number">{{$ctrl.forkCount(result)}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>Benchmark Environment</h2>
+
+    <div class="benchmark-environment" ng-if="$ctrl.environment">
+      <dl class="dl-horizontal">
+        <dt>Version</dt>
+        <dd>{{$ctrl.environment.version || $ctrl.selectedRelease.version}}</dd>
+        <dt>Commit</dt>
+        <dd><code>{{$ctrl.environment.commit}}</code></dd>
+        <dt>Run date</dt>
+        <dd>{{$ctrl.environment.runDate}}</dd>
+        <dt>Runner</dt>
+        <dd>{{$ctrl.runnerLabel($ctrl.environment)}}</dd>
+        <dt>System</dt>
+        <dd>{{$ctrl.systemLabel($ctrl.environment)}}</dd>
+        <dt>JMH pattern</dt>
+        <dd><code>{{$ctrl.environment.benchmarkPattern}}</code></dd>
+        <dt>JMH arguments</dt>
+        <dd><code>{{$ctrl.environment.jmhArgs}}</code></dd>
+        <dt>Workflow run</dt>
+        <dd><a ng-href="{{$ctrl.environment.workflowRunUrl}}">{{$ctrl.environment.workflowRunUrl}}</a></dd>
+      </dl>
+
+      <h3>Java</h3>
+      <pre class="benchmark-environment-output">{{$ctrl.environment.javaVersion}}</pre>
+
+      <h3>Maven</h3>
+      <pre class="benchmark-environment-output">{{$ctrl.environment.mavenVersion}}</pre>
+    </div>
+  </div>
+</div>

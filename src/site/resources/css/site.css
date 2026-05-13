@@ -675,7 +675,9 @@ body.dark {
 
 /* Benchmarks */
 .benchmarks-page[ng-cloak],
-.benchmarks-page [ng-cloak] {
+.benchmarks-page [ng-cloak],
+.benchmarks-page[data-ng-cloak],
+.benchmarks-page [data-ng-cloak] {
 	display: none !important;
 }
 

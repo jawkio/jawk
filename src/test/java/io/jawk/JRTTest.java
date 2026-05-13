@@ -135,6 +135,8 @@ public class JRTTest {
 		assertTrue(JRT.compare2("+.5", "0.5", 0));
 		assertTrue(JRT.compare2("5.", "5.0", 0));
 		assertTrue(JRT.compare2("-1E+2", "-100", 0));
+		assertFalse(JRT.compare2("1e2147483649", "2", 0));
+		assertTrue(JRT.compare2("1e2147483649", "2", -1));
 	}
 
 	@Test

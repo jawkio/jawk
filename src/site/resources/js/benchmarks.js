@@ -41,13 +41,17 @@
 		};
 
 		$ctrl.shortBenchmarkName = function(benchmark) {
-			var marker = 'JRTCompare2Benchmark.';
-			var index;
+			var lastSeparatorIndex;
+			var classSeparatorIndex;
 			if (!benchmark) {
 				return '';
 			}
-			index = benchmark.indexOf(marker);
-			return index >= 0 ? benchmark.substring(index + marker.length) : benchmark;
+			lastSeparatorIndex = benchmark.lastIndexOf('.');
+			if (lastSeparatorIndex < 0) {
+				return benchmark;
+			}
+			classSeparatorIndex = benchmark.lastIndexOf('.', lastSeparatorIndex - 1);
+			return benchmark.substring(classSeparatorIndex + 1);
 		};
 
 		$ctrl.forkCount = function(result) {

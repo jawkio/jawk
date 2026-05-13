@@ -19,9 +19,9 @@ on:
         required: false
         default: "JRTCompare2Benchmark"
       jmhArgs:
-        description: "Extra JMH arguments"
+        description: "Extra JMH arguments; when provided, CLI options override benchmark annotations"
         required: false
-        default: "-wi 5 -i 10 -f 3"
+        default: ""
       publish:
         description: "Publish results to GitHub Pages"
         required: false
@@ -34,7 +34,6 @@ concurrency:
 
 env:
   DEFAULT_JMH_PATTERN: JRTCompare2Benchmark
-  DEFAULT_JMH_ARGS: -wi 5 -i 10 -f 3
   BENCHMARK_SITE_URL: https://jawk.io/
 
 jobs:
@@ -62,19 +61,25 @@ jobs:
       - name: Select benchmark ref
         id: select
         shell: bash
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_PATTERN: ${{ inputs.pattern }}
+          INPUT_JMH_ARGS: ${{ inputs.jmhArgs }}
+          INPUT_PUBLISH: ${{ inputs.publish }}
         run: |
           if [ "${{ github.event_name }}" = "push" ]; then
             ref="${GITHUB_REF_NAME}"
             version="${GITHUB_REF_NAME}"
             pattern="${DEFAULT_JMH_PATTERN}"
-            jmh_args="${DEFAULT_JMH_ARGS}"
+            jmh_args=""
             publish="true"
           else
-            ref="${{ inputs.ref }}"
-            version="${{ inputs.version }}"
-            pattern="${{ inputs.pattern }}"
-            jmh_args="${{ inputs.jmhArgs }}"
-            publish="${{ inputs.publish }}"
+            ref="${INPUT_REF}"
+            version="${INPUT_VERSION}"
+            pattern="${INPUT_PATTERN}"
+            jmh_args="${INPUT_JMH_ARGS}"
+            publish="${INPUT_PUBLISH}"
           fi
 
           if [ -z "${ref}" ]; then
@@ -86,16 +91,18 @@ jobs:
           if [ -z "${pattern}" ]; then
             pattern="${DEFAULT_JMH_PATTERN}"
           fi
-          if [ -z "${jmh_args}" ]; then
-            jmh_args="${DEFAULT_JMH_ARGS}"
+          if [[ "${ref}" == -* ]]; then
+            echo "Benchmark ref must not start with '-'." >&2
+            exit 1
           fi
 
           git fetch --tags --force origin
-          if git rev-parse --verify --quiet "${ref}^{commit}" > /dev/null; then
-            git checkout "${ref}"
+          if commit="$(git rev-parse --verify --quiet -- "${ref}^{commit}")"; then
+            git checkout --detach "${commit}"
           else
-            git fetch origin "${ref}"
-            git checkout FETCH_HEAD
+            git fetch origin -- "${ref}"
+            commit="$(git rev-parse --verify --quiet -- "FETCH_HEAD^{commit}")"
+            git checkout --detach "${commit}"
           fi
 
           safe_version="$(printf '%s' "${version}" | tr '/\\ ' '---' | tr -cd 'A-Za-z0-9._-')"

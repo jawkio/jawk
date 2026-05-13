@@ -100,8 +100,12 @@ jobs:
           if commit="$(git rev-parse --verify --quiet -- "${ref}^{commit}")"; then
             git checkout --detach "${commit}"
           else
-            git fetch origin -- "${ref}"
+            git fetch origin "${ref}"
             commit="$(git rev-parse --verify --quiet -- "FETCH_HEAD^{commit}")"
+            if [ -z "${commit}" ]; then
+              echo "Unable to resolve benchmark ref '${ref}' to a commit." >&2
+              exit 1
+            fi
             git checkout --detach "${commit}"
           fi
 

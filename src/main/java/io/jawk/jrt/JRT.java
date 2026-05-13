@@ -646,11 +646,25 @@ public class JRT {
 	 * @return a boolean
 	 */
 	public static boolean compare2(Object o1, Object o2, int mode) {
-		// Pre-compute String representations of o1 and o2
+		boolean o1Numeric = o1 instanceof Number;
+		boolean o2Numeric = o2 instanceof Number;
+		double o1Number;
+		double o2Number;
+
+		if (o1Numeric && o2Numeric) {
+			o1Number = ((Number) o1).doubleValue();
+			o2Number = ((Number) o2).doubleValue();
+			if (mode < 0) {
+				return o1Number < o2Number;
+			} else if (mode == 0) {
+				return o1Number == o2Number;
+			} else {
+				return o1Number > o2Number;
+			}
+		}
 		String o1String = o1.toString();
 		String o2String = o2.toString();
 
-		// Special case of Uninitialized objects
 		if (o1 instanceof UninitializedObject) {
 			if (o2 instanceof UninitializedObject || "".equals(o2String) || "0".equals(o2String)) {
 				return mode == 0;
@@ -666,39 +680,105 @@ public class JRT {
 			}
 		}
 
-		if (!(o1 instanceof Number)) {
-			try {
-				o1 = new BigDecimal(o1String).doubleValue();
-			} catch (NumberFormatException nfe) { // NOPMD - ignore invalid number
-				// ignore invalid number, handled by subsequent logic
-			}
+		if (o1String.equals(o2String)) {
+			return mode == 0;
 		}
-		if (!(o2 instanceof Number)) {
+
+		if (o1Numeric) {
+			o1Number = ((Number) o1).doubleValue();
+		} else if (isComparisonNumber(o1String)) {
 			try {
-				o2 = new BigDecimal(o2String).doubleValue();
+				o1Number = new BigDecimal(o1String).doubleValue();
+				o1Numeric = true;
 			} catch (NumberFormatException nfe) { // NOPMD - ignore invalid number
-				// ignore invalid number, handled by subsequent logic
+				o1Number = 0.0;
+			}
+		} else {
+			o1Number = 0.0;
+		}
+		if (o2Numeric) {
+			o2Number = ((Number) o2).doubleValue();
+		} else if (isComparisonNumber(o2String)) {
+			try {
+				o2Number = new BigDecimal(o2String).doubleValue();
+				o2Numeric = true;
+			} catch (NumberFormatException nfe) { // NOPMD - ignore invalid number
+				o2Number = 0.0;
+			}
+		} else {
+			o2Number = 0.0;
+		}
+
+		if (o1Numeric && o2Numeric) {
+			if (mode < 0) {
+				return o1Number < o2Number;
+			} else if (mode == 0) {
+				return o1Number == o2Number;
+			} else {
+				return o1Number > o2Number;
 			}
 		}
 
-		if ((o1 instanceof Number) && (o2 instanceof Number)) {
-			if (mode < 0) {
-				return ((Number) o1).doubleValue() < ((Number) o2).doubleValue();
-			} else if (mode == 0) {
-				return ((Number) o1).doubleValue() == ((Number) o2).doubleValue();
-			} else {
-				return ((Number) o1).doubleValue() > ((Number) o2).doubleValue();
-			}
+		if (mode == 0) {
+			return o1String.equals(o2String);
+		} else if (mode < 0) {
+			return o1String.compareTo(o2String) < 0;
 		} else {
-			// string equality usually occurs more often than natural ordering comparison
-			if (mode == 0) {
-				return o1String.equals(o2String);
-			} else if (mode < 0) {
-				return o1String.compareTo(o2String) < 0;
-			} else {
-				return o1String.compareTo(o2String) > 0;
+			return o1String.compareTo(o2String) > 0;
+		}
+	}
+
+	static boolean isComparisonNumber(String value) {
+		int index = 0;
+		int length = value.length();
+
+		if (length == 0) {
+			return false;
+		}
+
+		char current = value.charAt(index);
+		if (current == '+' || current == '-') {
+			index++;
+			if (index == length) {
+				return false;
 			}
 		}
+
+		boolean digitFound = false;
+		while (index < length && value.charAt(index) >= '0' && value.charAt(index) <= '9') {
+			index++;
+			digitFound = true;
+		}
+
+		if (index < length && value.charAt(index) == '.') {
+			index++;
+			while (index < length && value.charAt(index) >= '0' && value.charAt(index) <= '9') {
+				index++;
+				digitFound = true;
+			}
+		}
+
+		if (!digitFound) {
+			return false;
+		}
+
+		if (index < length && (value.charAt(index) == 'e' || value.charAt(index) == 'E')) {
+			index++;
+			if (index < length && (value.charAt(index) == '+' || value.charAt(index) == '-')) {
+				index++;
+			}
+
+			boolean exponentDigitFound = false;
+			while (index < length && value.charAt(index) >= '0' && value.charAt(index) <= '9') {
+				index++;
+				exponentDigitFound = true;
+			}
+			if (!exponentDigitFound) {
+				return false;
+			}
+		}
+
+		return index == length;
 	}
 
 	/**

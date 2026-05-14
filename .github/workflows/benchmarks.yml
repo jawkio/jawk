@@ -15,9 +15,9 @@ on:
         required: false
         default: ""
       pattern:
-        description: "JMH benchmark pattern"
+        description: "JMH benchmark pattern; defaults to all benchmarks"
         required: false
-        default: "JRTCompare2Benchmark"
+        default: ".*"
       jmhArgs:
         description: "Extra JMH arguments; when provided, CLI options override benchmark annotations"
         required: false
@@ -33,7 +33,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  DEFAULT_JMH_PATTERN: JRTCompare2Benchmark
+  DEFAULT_JMH_PATTERN: .*
   BENCHMARK_SITE_URL: https://jawk.io/
 
 jobs:
@@ -46,7 +46,15 @@ jobs:
       publish: ${{ steps.select.outputs.publish }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout selected benchmark ref
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref || 'main' }}
+
+      - name: Checkout triggering ref
+        if: github.event_name != 'workflow_dispatch'
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
@@ -91,24 +99,6 @@ jobs:
           if [ -z "${pattern}" ]; then
             pattern="${DEFAULT_JMH_PATTERN}"
           fi
-          if [[ "${ref}" == -* ]]; then
-            echo "Benchmark ref must not start with '-'." >&2
-            exit 1
-          fi
-
-          git fetch --tags --force origin
-          if commit="$(git rev-parse --verify --quiet -- "${ref}^{commit}")"; then
-            git checkout --detach "${commit}"
-          else
-            git fetch origin "${ref}"
-            commit="$(git rev-parse --verify --quiet -- "FETCH_HEAD^{commit}")"
-            if [ -z "${commit}" ]; then
-              echo "Unable to resolve benchmark ref '${ref}' to a commit." >&2
-              exit 1
-            fi
-            git checkout --detach "${commit}"
-          fi
-
           safe_version="$(printf '%s' "${version}" | tr '/\\ ' '---' | tr -cd 'A-Za-z0-9._-')"
           if [ -z "${safe_version}" ]; then
             safe_version="$(git rev-parse --short HEAD)"

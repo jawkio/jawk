@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Git ref to benchmark"
+        description: "Git ref to benchmark; defaults to the version input, then the selected workflow ref"
         required: false
-        default: "main"
+        default: ""
       version:
         description: "Version label to publish; defaults to the selected ref"
         required: false
@@ -51,7 +51,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          ref: ${{ inputs.ref || 'main' }}
+          ref: ${{ inputs.ref || inputs.version || github.ref }}
 
       - name: Checkout triggering ref
         if: github.event_name != 'workflow_dispatch'
@@ -83,7 +83,7 @@ jobs:
             jmh_args=""
             publish="true"
           else
-            ref="${INPUT_REF}"
+            ref="${INPUT_REF:-${INPUT_VERSION:-${GITHUB_REF_NAME}}}"
             version="${INPUT_VERSION}"
             pattern="${INPUT_PATTERN}"
             jmh_args="${INPUT_JMH_ARGS}"

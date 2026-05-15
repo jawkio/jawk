@@ -30,7 +30,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  DEFAULT_JMH_PATTERN: .*
+  DEFAULT_JMH_PATTERN: .
   BENCHMARK_SITE_URL: https://jawk.io/
 
 jobs:

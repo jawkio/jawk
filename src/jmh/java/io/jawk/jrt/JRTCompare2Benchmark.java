@@ -41,8 +41,8 @@ import org.openjdk.jmh.annotations.Warmup;
  */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
-@Warmup(iterations = 5, time = 500, timeUnit = TimeUnit.MILLISECONDS)
-@Measurement(iterations = 5, time = 500, timeUnit = TimeUnit.MILLISECONDS)
+@Warmup(iterations = 2, time = 500, timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(iterations = 3, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 @Fork(2)
 @State(Scope.Thread)
 public class JRTCompare2Benchmark {

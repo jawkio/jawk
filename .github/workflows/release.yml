@@ -148,6 +148,8 @@ jobs:
           rm -f "${benchmark_jar}"
 
       - name: Capture benchmark environment
+        id: benchmark-environment
+        continue-on-error: true
         run: |
           node <<'NODE'
           const childProcess = require('child_process');
@@ -192,7 +194,30 @@ jobs:
           );
           NODE
 
+      - name: Create fallback benchmark environment
+        if: steps.benchmark-environment.outcome == 'failure'
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+
+          const environment = {
+            version: process.env.BENCHMARK_VERSION,
+            versionPath: process.env.BENCHMARK_VERSION_PATH,
+            ref: process.env.BENCHMARK_REF,
+            commit: process.env.BENCHMARK_COMMIT,
+            runDate: new Date().toISOString(),
+            workflowRunUrl: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+            benchmarkPattern: process.env.JMH_PATTERN,
+            jmhArgs: process.env.JMH_ARGS,
+            environmentCaptureError: true
+          };
+
+          fs.mkdirSync('target/benchmarks', { recursive: true });
+          fs.writeFileSync('target/benchmarks/environment.json', `${JSON.stringify(environment, null, 2)}\n`);
+          NODE
+
       - name: Upload benchmark artifacts
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: benchmarks-${{ env.BENCHMARK_VERSION_PATH }}
@@ -220,7 +245,7 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
       - name: Release rollback on failure
-        if: always() && steps.release.outcome != 'success' && hashFiles('release.properties') != ''
+        if: always() && (failure() || steps.release.outcome != 'success') && hashFiles('release.properties') != ''
         run: mvn -B -U -Prelease release:rollback
 
       - name: Create GitHub Release
@@ -266,17 +291,21 @@ jobs:
           const indexPath = path.join(siteRoot, 'benchmarks', 'index.json');
 
           function getText(url) {
-            return new Promise(resolve => {
+            return new Promise((resolve, reject) => {
               const client = url.protocol === 'http:' ? http : https;
               const request = client.get(url, response => {
                 if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
                   response.resume();
-                  resolve(getText(new URL(response.headers.location, url)));
+                  getText(new URL(response.headers.location, url)).then(resolve, reject);
                   return;
                 }
                 if (response.statusCode < 200 || response.statusCode >= 300) {
                   response.resume();
-                  resolve(null);
+                  if (response.statusCode === 404) {
+                    resolve(null);
+                    return;
+                  }
+                  reject(new Error(`HTTP ${response.statusCode} while fetching ${url.href}`));
                   return;
                 }
                 response.setEncoding('utf8');
@@ -286,10 +315,9 @@ jobs:
                 });
                 response.on('end', () => resolve(data));
               });
-              request.on('error', () => resolve(null));
+              request.on('error', reject);
               request.setTimeout(15000, () => {
-                request.destroy();
-                resolve(null);
+                request.destroy(new Error(`Timeout while fetching ${url.href}`));
               });
             });
           }
@@ -328,7 +356,7 @@ jobs:
             try {
               index = JSON.parse(indexText);
             } catch (error) {
-              return;
+              throw new Error(`Published benchmark index is not valid JSON: ${error.message}`);
             }
 
             for (const release of index.releases || []) {
@@ -336,7 +364,8 @@ jobs:
               await restoreFile(release.environment);
             }
           })().catch(error => {
-            console.log(`Benchmark history restore failed: ${error.message}`);
+            console.error(`Benchmark history restore failed: ${error.message}`);
+            process.exit(1);
           });
           NODE
 

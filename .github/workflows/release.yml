@@ -417,7 +417,7 @@ jobs:
 
       - name: Upload Maven site to GitHub Pages
         if: always() && steps.release.outcome == 'success'
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: ./target/release/target/site
 

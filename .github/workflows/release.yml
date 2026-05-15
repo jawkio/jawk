@@ -13,12 +13,425 @@ on:
         required: true
         default: ""
 
+permissions:
+  contents: write
+  pull-requests: write
+  pages: write
+  id-token: write
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  AUTO_RELEASE_AFTER_CLOSE: true
+  BENCHMARK_SITE_URL: https://jawk.io/
+  DEFAULT_JMH_PATTERN: .*
+  JDK_VERSION: "17"
+
 jobs:
   release:
-    uses: metricshub/workflows/.github/workflows/maven-central-release.yml@v4
-    with:
-      releaseVersion: ${{ inputs.releaseVersion }}
-      developmentVersion: ${{ inputs.developmentVersion }}
-      autoRelease: true
-      jdkVersion: "17"
-    secrets: inherit
+    name: Release v${{ inputs.releaseVersion }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up JDK ${{ env.JDK_VERSION }} with Maven Central Repository
+        uses: actions/setup-java@v5
+        with:
+          java-version: ${{ env.JDK_VERSION }}
+          distribution: temurin
+          java-package: jdk
+          cache: maven
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_TOKEN
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      - name: Configure GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v6
+        with:
+          enablement: true
+
+      - name: Configure Git user
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+
+      - name: Set release branch and tag name
+        run: |
+          echo "branchName=release/v${INPUT_RELEASE_VERSION}" >> "${GITHUB_ENV}"
+          echo "tagName=v${INPUT_RELEASE_VERSION}" >> "${GITHUB_ENV}"
+        env:
+          INPUT_RELEASE_VERSION: ${{ inputs.releaseVersion }}
+
+      - name: Create release branch
+        run: |
+          git checkout "${branchName}" 2>/dev/null || git checkout -b "${branchName}"
+          git push --force origin "${branchName}"
+
+      - name: Clean up existing release tag
+        run: |
+          git tag -d "${tagName}" || true
+          git push origin ":refs/tags/${tagName}" || true
+
+      - name: Prepare release
+        id: prepare
+        run: |
+          mvn -B -U \
+            -Prelease \
+            release:clean \
+            release:prepare \
+            -DpreparationGoals="clean verify site" \
+            -Dgpg.passphraseServerId=gpg.passphrase \
+            -Darguments=-Dgpg.passphraseServerId=gpg.passphrase \
+            -DreleaseVersion="${INPUT_RELEASE_VERSION}" \
+            -DdevelopmentVersion="${INPUT_DEVELOPMENT_VERSION}" \
+            -Dtag="${tagName}" \
+            -Dresume=false
+        env:
+          INPUT_DEVELOPMENT_VERSION: ${{ inputs.developmentVersion }}
+          INPUT_RELEASE_VERSION: ${{ inputs.releaseVersion }}
+          MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_CENTRAL_TOKEN }}
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+
+      - name: Set benchmark metadata
+        run: |
+          version="${tagName}"
+          safe_version="$(printf '%s' "${version}" | tr '/\\ ' '---' | tr -cd 'A-Za-z0-9._-')"
+          if [ -z "${safe_version}" ]; then
+            safe_version="$(git rev-list -n 1 --abbrev-commit "${tagName}")"
+          fi
+
+          {
+            echo "BENCHMARK_REF=${tagName}"
+            echo "BENCHMARK_VERSION=${version}"
+            echo "BENCHMARK_VERSION_PATH=${safe_version}"
+            echo "BENCHMARK_COMMIT=$(git rev-list -n 1 "${tagName}")"
+            echo "JMH_PATTERN=${DEFAULT_JMH_PATTERN}"
+            echo "JMH_ARGS="
+          } >> "${GITHUB_ENV}"
+
+      - name: Display benchmark environment details
+        run: |
+          java -version
+          mvn -version
+          echo "Benchmark ref: ${BENCHMARK_REF}"
+          echo "Benchmark version: ${BENCHMARK_VERSION}"
+          echo "Benchmark commit: ${BENCHMARK_COMMIT}"
+          echo "JMH pattern: ${JMH_PATTERN}"
+          echo "JMH arguments: ${JMH_ARGS}"
+
+      - name: Checkout benchmark source
+        run: git worktree add --detach target/benchmark-release "${tagName}"
+
+      - name: Build benchmark jar
+        run: mvn -B -V -f target/benchmark-release/pom.xml -Pbenchmark -DskipTests package
+
+      - name: Run JMH
+        run: |
+          mkdir -p target/benchmarks
+          benchmark_jar="$(find target/benchmark-release/target -maxdepth 1 -name '*-benchmarks.jar' -print -quit)"
+          if [ -z "${benchmark_jar}" ]; then
+            echo "Benchmark jar was not created." >&2
+            exit 1
+          fi
+          java -jar "${benchmark_jar}" "${JMH_PATTERN}" ${JMH_ARGS} -rf json -rff target/benchmarks/jmh-results.json
+          rm -f "${benchmark_jar}"
+
+      - name: Capture benchmark environment
+        id: benchmark-environment
+        continue-on-error: true
+        run: |
+          node <<'NODE'
+          const childProcess = require('child_process');
+          const fs = require('fs');
+          const os = require('os');
+
+          function commandOutput(command) {
+            return childProcess.execSync(command, { encoding: 'utf8', shell: '/bin/bash' });
+          }
+
+          const cpuModels = [...new Set(os.cpus().map(cpu => cpu.model))];
+          const environment = {
+            version: process.env.BENCHMARK_VERSION,
+            versionPath: process.env.BENCHMARK_VERSION_PATH,
+            ref: process.env.BENCHMARK_REF,
+            commit: process.env.BENCHMARK_COMMIT,
+            runDate: new Date().toISOString(),
+            workflowRunUrl: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+            benchmarkPattern: process.env.JMH_PATTERN,
+            jmhArgs: process.env.JMH_ARGS,
+            runner: {
+              os: process.env.RUNNER_OS,
+              arch: process.env.RUNNER_ARCH,
+              name: process.env.RUNNER_NAME
+            },
+            system: {
+              platform: os.platform(),
+              release: os.release(),
+              arch: os.arch(),
+              cpuCount: os.cpus().length,
+              cpus: cpuModels,
+              totalMemory: os.totalmem()
+            },
+            javaVersion: commandOutput('java -version 2>&1'),
+            mavenVersion: commandOutput('mvn -version 2>&1')
+          };
+
+          fs.mkdirSync('target/benchmarks', { recursive: true });
+          fs.writeFileSync(
+            'target/benchmarks/environment.json',
+            `${JSON.stringify(environment, null, 2)}\n`
+          );
+          NODE
+
+      - name: Create fallback benchmark environment
+        if: steps.benchmark-environment.outcome == 'failure'
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+
+          const environment = {
+            version: process.env.BENCHMARK_VERSION,
+            versionPath: process.env.BENCHMARK_VERSION_PATH,
+            ref: process.env.BENCHMARK_REF,
+            commit: process.env.BENCHMARK_COMMIT,
+            runDate: new Date().toISOString(),
+            workflowRunUrl: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+            benchmarkPattern: process.env.JMH_PATTERN,
+            jmhArgs: process.env.JMH_ARGS,
+            environmentCaptureError: true
+          };
+
+          fs.mkdirSync('target/benchmarks', { recursive: true });
+          fs.writeFileSync('target/benchmarks/environment.json', `${JSON.stringify(environment, null, 2)}\n`);
+          NODE
+
+      - name: Upload benchmark artifacts
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmarks-${{ env.BENCHMARK_VERSION_PATH }}
+          path: |
+            target/benchmarks/jmh-results.json
+            target/benchmarks/environment.json
+
+      - name: Perform release to Maven Central
+        id: release
+        run: |
+          mvn -B -U \
+            -Prelease \
+            release:perform \
+            -Dgoals="deploy site" \
+            -DworkingDirectory="${GITHUB_WORKSPACE}/target/release" \
+            -Dgpg.passphraseServerId=gpg.passphrase \
+            -Darguments=-Dgpg.passphraseServerId=gpg.passphrase \
+            -DreleaseVersion="${INPUT_RELEASE_VERSION}" \
+            -DdevelopmentVersion="${INPUT_DEVELOPMENT_VERSION}"
+        env:
+          INPUT_DEVELOPMENT_VERSION: ${{ inputs.developmentVersion }}
+          INPUT_RELEASE_VERSION: ${{ inputs.releaseVersion }}
+          MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_CENTRAL_TOKEN }}
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+
+      - name: Release rollback on failure
+        if: always() && (failure() || steps.release.outcome != 'success') && hashFiles('release.properties') != ''
+        run: mvn -B -U -Prelease release:rollback
+
+      - name: Create GitHub Release
+        if: always() && steps.release.outcome == 'success'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.releaseVersion }}
+          fail_on_unmatched_files: false
+          generate_release_notes: true
+          files: |
+            ./target/release/target/*.jar
+            ./target/release/target/*.buildinfo
+
+      - name: Create pull request for next development version
+        if: always() && steps.release.outcome == 'success'
+        uses: devops-infra/action-pull-request@v0.6.1
+        with:
+          github_token: ${{ github.token }}
+          source_branch: release/v${{ inputs.releaseVersion }}
+          target_branch: ${{ github.event.repository.default_branch }}
+          title: Release v${{ inputs.releaseVersion }} and prepare v${{ inputs.developmentVersion }}
+          body: |
+            ## Automated release
+
+            * Release **v${{ inputs.releaseVersion }}**
+            * Prepare **v${{ inputs.developmentVersion }}**
+          label: automatic
+          get_diff: true
+          allow_no_diff: true
+
+      - name: Restore published benchmark history
+        if: always() && steps.release.outcome == 'success'
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const http = require('http');
+          const https = require('https');
+          const path = require('path');
+
+          const siteBase = new URL(process.env.BENCHMARK_SITE_URL || 'https://jawk.io/');
+          const siteRoot = 'target/release/target/site';
+          const resolvedSiteRoot = path.resolve(siteRoot);
+          const indexPath = path.join(siteRoot, 'benchmarks', 'index.json');
+
+          function getText(url) {
+            return new Promise((resolve, reject) => {
+              const client = url.protocol === 'http:' ? http : https;
+              const request = client.get(url, response => {
+                if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                  response.resume();
+                  getText(new URL(response.headers.location, url)).then(resolve, reject);
+                  return;
+                }
+                if (response.statusCode < 200 || response.statusCode >= 300) {
+                  response.resume();
+                  if (response.statusCode === 404) {
+                    resolve(null);
+                    return;
+                  }
+                  reject(new Error(`HTTP ${response.statusCode} while fetching ${url.href}`));
+                  return;
+                }
+                response.setEncoding('utf8');
+                let data = '';
+                response.on('data', chunk => {
+                  data += chunk;
+                });
+                response.on('end', () => resolve(data));
+              });
+              request.on('error', reject);
+              request.setTimeout(15000, () => {
+                request.destroy(new Error(`Timeout while fetching ${url.href}`));
+              });
+            });
+          }
+
+          async function restoreFile(relativePath) {
+            if (!relativePath) {
+              return;
+            }
+            const normalizedPath = relativePath.replace(/^\/+/, '');
+            if (normalizedPath.includes('\\') || normalizedPath.split('/').includes('..')) {
+              return;
+            }
+            const content = await getText(new URL(normalizedPath, siteBase));
+            if (content === null) {
+              return;
+            }
+            const outputPath = path.resolve(resolvedSiteRoot, normalizedPath);
+            const outputRelativePath = path.relative(resolvedSiteRoot, outputPath);
+            if (outputRelativePath.startsWith('..') || path.isAbsolute(outputRelativePath)) {
+              return;
+            }
+            fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+            fs.writeFileSync(outputPath, content);
+          }
+
+          (async () => {
+            const indexText = await getText(new URL('benchmarks/index.json', siteBase));
+            if (indexText === null) {
+              return;
+            }
+
+            fs.mkdirSync(path.dirname(indexPath), { recursive: true });
+            fs.writeFileSync(indexPath, indexText);
+
+            let index;
+            try {
+              index = JSON.parse(indexText);
+            } catch (error) {
+              throw new Error(`Published benchmark index is not valid JSON: ${error.message}`);
+            }
+
+            for (const release of index.releases || []) {
+              await restoreFile(release.jmh);
+              await restoreFile(release.environment);
+            }
+          })().catch(error => {
+            console.error(`Benchmark history restore failed: ${error.message}`);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Add benchmark JSON to Maven site
+        if: always() && steps.release.outcome == 'success'
+        run: |
+          release_dir="target/release/target/site/benchmarks/releases/${BENCHMARK_VERSION_PATH}"
+          mkdir -p "${release_dir}"
+          cp target/benchmarks/jmh-results.json "${release_dir}/jmh-results.json"
+          cp target/benchmarks/environment.json "${release_dir}/environment.json"
+
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+
+          const indexPath = 'target/release/target/site/benchmarks/index.json';
+          const version = process.env.BENCHMARK_VERSION;
+          const versionPath = process.env.BENCHMARK_VERSION_PATH;
+          const environment = JSON.parse(
+            fs.readFileSync(`target/release/target/site/benchmarks/releases/${versionPath}/environment.json`, 'utf8')
+          );
+          let index = { latest: null, releases: [] };
+
+          if (fs.existsSync(indexPath)) {
+            try {
+              index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+            } catch (error) {
+              index = { latest: null, releases: [] };
+            }
+          }
+
+          const entry = {
+            version,
+            versionPath,
+            date: environment.runDate.substring(0, 10),
+            commit: environment.commit,
+            workflowRunUrl: environment.workflowRunUrl,
+            jmh: path.posix.join('benchmarks', 'releases', versionPath, 'jmh-results.json'),
+            environment: path.posix.join('benchmarks', 'releases', versionPath, 'environment.json')
+          };
+
+          index.releases = (index.releases || []).filter(release => release.versionPath !== versionPath);
+          index.releases.unshift(entry);
+          index.latest = version;
+
+          fs.mkdirSync(path.dirname(indexPath), { recursive: true });
+          fs.writeFileSync(indexPath, `${JSON.stringify(index, null, 2)}\n`);
+          NODE
+
+      - name: Upload Maven site to GitHub Pages
+        if: always() && steps.release.outcome == 'success'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./target/release/target/site
+
+  deploy:
+    name: Deploy GitHub Pages
+    needs: release
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

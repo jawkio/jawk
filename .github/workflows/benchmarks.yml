@@ -30,7 +30,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  DEFAULT_JMH_PATTERN: .
+  DEFAULT_JMH_PATTERN: .*
   BENCHMARK_SITE_URL: https://jawk.io/
 
 jobs:
@@ -121,7 +121,11 @@ jobs:
             echo "Benchmark jar was not created." >&2
             exit 1
           fi
-          java -jar "${benchmark_jar}" "${JMH_PATTERN}" ${JMH_ARGS} -rf json -rff target/benchmarks/jmh-results.json
+          jmh_pattern_args=()
+          if [ -n "${JMH_PATTERN}" ] && [ "${JMH_PATTERN}" != "${DEFAULT_JMH_PATTERN}" ]; then
+            jmh_pattern_args+=("${JMH_PATTERN}")
+          fi
+          java -jar "${benchmark_jar}" "${jmh_pattern_args[@]}" ${JMH_ARGS} -rf json -rff target/benchmarks/jmh-results.json
 
       - name: Capture benchmark environment
         shell: bash

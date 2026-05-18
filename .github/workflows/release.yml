@@ -26,7 +26,7 @@ defaults:
 env:
   AUTO_RELEASE_AFTER_CLOSE: true
   BENCHMARK_SITE_URL: https://jawk.io/
-  DEFAULT_JMH_PATTERN: .
+  DEFAULT_JMH_PATTERN: .*
   JDK_VERSION: "17"
 
 jobs:
@@ -144,7 +144,11 @@ jobs:
             echo "Benchmark jar was not created." >&2
             exit 1
           fi
-          java -jar "${benchmark_jar}" "${JMH_PATTERN}" ${JMH_ARGS} -rf json -rff target/benchmarks/jmh-results.json
+          jmh_pattern_args=()
+          if [ -n "${JMH_PATTERN}" ] && [ "${JMH_PATTERN}" != "${DEFAULT_JMH_PATTERN}" ]; then
+            jmh_pattern_args+=("${JMH_PATTERN}")
+          fi
+          java -jar "${benchmark_jar}" "${jmh_pattern_args[@]}" ${JMH_ARGS} -rf json -rff target/benchmarks/jmh-results.json
           rm -f "${benchmark_jar}"
 
       - name: Capture benchmark environment

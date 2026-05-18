@@ -164,6 +164,7 @@
 				<version>2.7.1</version>
 				<configuration>
 					<licenseName>lgpl_v3</licenseName>
+					<copyrightStringFormat>Copyright (C) %1$s %2$s</copyrightStringFormat>
 					<includes>
 						<include>main/java/**/*.java</include>
 						<include>test/java/**/*.java</include>

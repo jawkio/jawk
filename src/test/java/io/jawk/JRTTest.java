@@ -127,22 +127,22 @@ public class JRTTest {
 	}
 
 	@Test
-	public void testCompare2NumericStrings() {
-		assertTrue(JRT.compare2("3", "3.0", 0));
+	public void testCompare2PlainStrings() {
+		assertFalse(JRT.compare2("3", "3.0", 0));
 		assertTrue(JRT.compare2("3", "4.0", -1));
 		assertTrue(JRT.compare2("4.0", "3", 1));
-		assertTrue(JRT.compare2("1e2", "100", 0));
-		assertTrue(JRT.compare2("+.5", "0.5", 0));
-		assertTrue(JRT.compare2("5.", "5.0", 0));
-		assertTrue(JRT.compare2("-1E+2", "-100", 0));
+		assertFalse(JRT.compare2("1e2", "100", 0));
+		assertFalse(JRT.compare2("+.5", "0.5", 0));
+		assertFalse(JRT.compare2("5.", "5.0", 0));
+		assertFalse(JRT.compare2("-1E+2", "-100", 0));
 		assertFalse(JRT.compare2("1e2147483649", "2", 0));
 		assertTrue(JRT.compare2("1e2147483649", "2", -1));
 	}
 
 	@Test
 	public void testCompare2MixedNumberAndString() {
-		assertTrue(JRT.compare2(3L, "3.0", 0));
-		assertTrue(JRT.compare2("3.0", 3L, 0));
+		assertFalse(JRT.compare2(3L, "3.0", 0));
+		assertFalse(JRT.compare2("3.0", 3L, 0));
 		assertTrue(JRT.compare2(3L, "4", -1));
 		assertTrue(JRT.compare2("4", 3L, 1));
 	}

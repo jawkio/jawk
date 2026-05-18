@@ -342,7 +342,7 @@ public class PosixConformanceTest {
 		AwkTestSupport
 				.awkTest("POSIX 4.8 numeric vs string comparison")
 				.script("BEGIN{print \"10\" < \"2\", 10 < \"2\", \"10\"==\"10\", \"10\"==10}")
-				.expectLines("0 0 1 1")
+				.expectLines("1 1 1 1")
 				.runAndAssert();
 	}
 

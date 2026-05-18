@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Enumeration;
@@ -42,7 +43,6 @@ import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.math.BigDecimal;
 import io.jawk.Awk;
 import io.jawk.intermediate.UninitializedObject;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -119,6 +119,7 @@ public class JRT {
 	private String ofmt; // number-to-string for output
 	private String subsep; // subscript separator
 	private final Locale locale; // locale for number formatting
+	private final char decimalSeparator; // locale decimal separator for strnum recognition
 
 	private static final class FileOutputState {
 
@@ -184,6 +185,7 @@ public class JRT {
 	public JRT(VariableManager vm, Locale locale, AwkSink awkSink, PrintStream error) {
 		this.vm = vm;
 		this.locale = locale == null ? Locale.US : locale;
+		this.decimalSeparator = DecimalFormatSymbols.getInstance(this.locale).getDecimalSeparator();
 		this.awkSink = Objects.requireNonNull(awkSink, "awkSink");
 		this.error = error == null ? System.err : error;
 		this.nr = 0L;
@@ -646,77 +648,30 @@ public class JRT {
 	 * @return a boolean
 	 */
 	public static boolean compare2(Object o1, Object o2, int mode) {
-		boolean o1Numeric = o1 instanceof Number;
-		boolean o2Numeric = o2 instanceof Number;
-		double o1Number;
-		double o2Number;
-
-		if (o1Numeric && o2Numeric) {
-			o1Number = ((Number) o1).doubleValue();
-			o2Number = ((Number) o2).doubleValue();
-			if (mode < 0) {
-				return o1Number < o2Number;
-			} else if (mode == 0) {
-				return o1Number == o2Number;
-			} else {
-				return o1Number > o2Number;
-			}
+		if (o1 instanceof Number && o2 instanceof Number) {
+			return compareNumbers(((Number) o1).doubleValue(), ((Number) o2).doubleValue(), mode);
 		}
-		String o1String = o1.toString();
-		String o2String = o2.toString();
+
+		String o1String = o1 == null ? "" : o1.toString();
+		String o2String = o2 == null ? "" : o2.toString();
 
 		if (o1 instanceof UninitializedObject) {
-			if (o2 instanceof UninitializedObject || "".equals(o2String) || "0".equals(o2String)) {
+			if (isBlankOrZero(o2, o2String)) {
 				return mode == 0;
 			} else {
 				return mode < 0;
 			}
 		}
 		if (o2 instanceof UninitializedObject) {
-			if ("".equals(o1String) || "0".equals(o1String)) {
+			if (isBlankOrZero(o1, o1String)) {
 				return mode == 0;
 			} else {
 				return mode > 0;
 			}
 		}
 
-		if (o1String.equals(o2String)) {
-			return mode == 0;
-		}
-
-		if (o1Numeric) {
-			o1Number = ((Number) o1).doubleValue();
-		} else if (isComparisonNumber(o1String)) {
-			try {
-				o1Number = new BigDecimal(o1String).doubleValue();
-				o1Numeric = true;
-			} catch (NumberFormatException nfe) { // NOPMD - ignore invalid number
-				o1Number = 0.0;
-			}
-		} else {
-			o1Number = 0.0;
-		}
-		if (o2Numeric) {
-			o2Number = ((Number) o2).doubleValue();
-		} else if (isComparisonNumber(o2String)) {
-			try {
-				o2Number = new BigDecimal(o2String).doubleValue();
-				o2Numeric = true;
-			} catch (NumberFormatException nfe) { // NOPMD - ignore invalid number
-				o2Number = 0.0;
-			}
-		} else {
-			o2Number = 0.0;
-		}
-
-		if (o1Numeric && o2Numeric) {
-			if (mode < 0) {
-				return o1Number < o2Number;
-			} else if (mode == 0) {
-				return o1Number == o2Number;
-			} else {
-				return o1Number > o2Number;
-			}
+		if (isNumericComparisonOperand(o1) && isNumericComparisonOperand(o2)) {
+			return compareNumbers(getDoubleForComparison(o1), getDoubleForComparison(o2), mode);
 		}
 
 		if (mode == 0) {
@@ -728,7 +683,51 @@ public class JRT {
 		}
 	}
 
-	static boolean isComparisonNumber(String value) {
+	private static boolean isBlankOrZero(Object value, String stringValue) {
+		if (value instanceof UninitializedObject) {
+			return true;
+		}
+		if (value instanceof Number) {
+			return ((Number) value).doubleValue() == 0.0D;
+		}
+		if (value instanceof StrNum && ((StrNum) value).isNumber()) {
+			return ((StrNum) value).doubleValue() == 0.0D;
+		}
+		return "".equals(stringValue) || "0".equals(stringValue);
+	}
+
+	private static boolean isNumericComparisonOperand(Object value) {
+		return value instanceof Number || value instanceof StrNum && ((StrNum) value).isNumber();
+	}
+
+	private static double getDoubleForComparison(Object value) {
+		if (value instanceof Number) {
+			return ((Number) value).doubleValue();
+		}
+		return ((StrNum) value).doubleValue();
+	}
+
+	private static boolean compareNumbers(double o1Number, double o2Number, int mode) {
+		if (mode < 0) {
+			return o1Number < o2Number;
+		} else if (mode == 0) {
+			return o1Number == o2Number;
+		} else {
+			return o1Number > o2Number;
+		}
+	}
+
+	/**
+	 * Converts an internal runtime scalar to the value exposed through Java APIs.
+	 *
+	 * @param value internal scalar value
+	 * @return plain Java scalar value
+	 */
+	public static Object toJavaScalar(Object value) {
+		return value instanceof StrNum ? value.toString() : value;
+	}
+
+	static boolean isParseableNumber(String value, char decimalSeparator) {
 		int index = 0;
 		int length = value.length();
 
@@ -750,7 +749,7 @@ public class JRT {
 			digitFound = true;
 		}
 
-		if (index < length && value.charAt(index) == '.') {
+		if (index < length && value.charAt(index) == decimalSeparator) {
 			index++;
 			while (index < length && value.charAt(index) >= '0' && value.charAt(index) <= '9') {
 				index++;
@@ -779,6 +778,14 @@ public class JRT {
 		}
 
 		return index == length;
+	}
+
+	static double parseDoubleForComparison(String value, char decimalSeparator) {
+		return Double.parseDouble(normalizeNumberForComparison(value, decimalSeparator));
+	}
+
+	static String normalizeNumberForComparison(String value, char decimalSeparator) {
+		return decimalSeparator == '.' ? value : value.replace(decimalSeparator, '.');
 	}
 
 	/**
@@ -870,6 +877,9 @@ public class JRT {
 			val = ((Long) o).longValue() != 0;
 		} else if (o instanceof Double) {
 			val = ((Double) o).doubleValue() != 0;
+		} else if (o instanceof StrNum) {
+			StrNum strNum = (StrNum) o;
+			val = strNum.isNumber() ? strNum.doubleValue() != 0 : strNum.toString().length() > 0;
 		} else if (o instanceof String) {
 			val = (o.toString().length() > 0);
 		} else if (o instanceof UninitializedObject) {
@@ -966,16 +976,13 @@ public class JRT {
 	 * Getter for the field <code>inputLine</code>.
 	 * </p>
 	 *
-	 * @return a {@link java.lang.String} object
+	 * @return the current input line scalar value, or {@code null}
 	 */
-	public String getInputLine() {
-		if (inputLine != null) {
-			return inputLine;
+	public Object getInputLine() {
+		if (recordState != null) {
+			return recordState.getField(0);
 		}
-		if (recordState == null) {
-			return null;
-		}
-		return recordState.getRecordText();
+		return inputLine == null ? null : new StrNum(inputLine, decimalSeparator);
 	}
 
 	/**
@@ -1294,11 +1301,12 @@ public class JRT {
 	 * Setter for the field <code>inputLine</code>.
 	 * </p>
 	 *
-	 * @param inputLine a {@link java.lang.String} object
+	 * @param inputLine input value
 	 */
-	public void setInputLine(String inputLine) {
-		this.inputLine = inputLine;
-		recordState = newRecordStateFromText(inputLine);
+	public void setInputLine(Object inputLine) {
+		String inputText = inputLine == null ? "" : inputLine.toString();
+		this.inputLine = inputText;
+		recordState = new RecordState(inputText, null, false);
 	}
 
 	/**
@@ -1309,7 +1317,7 @@ public class JRT {
 	public void assignInputLineFromGetline(Object value) {
 		String inputValue = value == null ? "" : value.toString();
 		inputLine = inputValue;
-		recordState = newRecordStateFromText(inputValue);
+		recordState = new RecordState(inputValue, null, true);
 	}
 
 	/**
@@ -1330,7 +1338,7 @@ public class JRT {
 		}
 
 		inputLine = null;
-		recordState = newRecordStateFromSource(source);
+		recordState = new RecordState(source);
 
 		this.nr++;
 		if (source.isFromFilenameList()) {
@@ -1341,16 +1349,16 @@ public class JRT {
 
 	/**
 	 * Attempt to consume one record from a structured input source for
-	 * {@code getline target}, returning only the input text and leaving the
+	 * {@code getline target}, returning the input value and leaving the
 	 * current input record state untouched.
 	 *
 	 * @param source source strategy that provides records and optional
 	 *        pre-split fields
-	 * @return the consumed input text, or {@code null} when the source is
+	 * @return the consumed input value, or {@code null} when the source is
 	 *         exhausted
 	 * @throws IOException if the source raises an I/O error
 	 */
-	public String consumeInputToTarget(final InputSource source) throws IOException {
+	public Object consumeInputToTarget(final InputSource source) throws IOException {
 		Objects.requireNonNull(source, "source");
 		activeSource = source;
 		materializeCurrentRecord();
@@ -1358,12 +1366,12 @@ public class JRT {
 			return null;
 		}
 
-		String input = newRecordStateFromSource(source).getRecordText();
+		RecordState inputState = new RecordState(source);
 		this.nr++;
 		if (source.isFromFilenameList()) {
 			this.fnr++;
 		}
-		return input;
+		return new StrNum(inputState.getRecordText(), decimalSeparator);
 	}
 
 	/**
@@ -1386,7 +1394,7 @@ public class JRT {
 	 * @param preFields current fields where index {@code 0} is {@code $1}
 	 */
 	protected void initializeInputFields(String record, List<String> preFields) {
-		recordState = newRecordStateFromSource(record, preFields);
+		recordState = new RecordState(record, preFields, true);
 	}
 
 	/**
@@ -1473,7 +1481,7 @@ public class JRT {
 		if (fieldNum > Integer.MAX_VALUE) {
 			throw new AwkRuntimeException("Field $(" + Long.valueOf(fieldNum) + ") is incorrect.");
 		}
-		String value = valueObj.toString();
+		String value = valueObj == null ? "" : valueObj.toString();
 		int fieldIndex = (int) fieldNum;
 		RecordState state = ensureRecordStateForFieldMutation();
 		if (valueObj instanceof UninitializedObject) {
@@ -1484,7 +1492,7 @@ public class JRT {
 			while (state.getNF() < fieldIndex) {
 				state.addField("");
 			}
-			state.setField(fieldIndex - 1, value);
+			state.setField(fieldIndex - 1, valueObj);
 		}
 		state.markRecordTextDirty();
 		return value;
@@ -1505,7 +1513,7 @@ public class JRT {
 
 	private RecordState ensureRecordStateForTextMutation() {
 		if (recordState == null) {
-			recordState = newRecordStateFromText(inputLine == null ? "" : inputLine);
+			recordState = new RecordState(inputLine == null ? "" : inputLine, null, false);
 		}
 		return recordState;
 	}
@@ -1516,16 +1524,17 @@ public class JRT {
 		return state;
 	}
 
-	private static List<String> sanitizeFields(List<String> rawFields) {
-		List<String> copy = new ArrayList<String>(rawFields.size());
+	private List<Object> sanitizeFields(List<String> rawFields, boolean inputDerived) {
+		List<Object> copy = new ArrayList<Object>(rawFields.size());
 		for (String field : rawFields) {
-			copy.add(field == null ? "" : field);
+			String value = field == null ? "" : field;
+			copy.add(inputDerived ? new StrNum(value, decimalSeparator) : value);
 		}
 		return copy;
 	}
 
-	private List<String> splitRecordText(String recordText, String fieldSeparator) {
-		List<String> fields = new ArrayList<String>();
+	private List<Object> splitRecordText(String recordText, String fieldSeparator) {
+		List<Object> fields = new ArrayList<Object>();
 		if (recordText == null || recordText.isEmpty()) {
 			return fields;
 		}
@@ -1542,44 +1551,34 @@ public class JRT {
 		}
 
 		while (tokenizer.hasMoreElements()) {
-			fields.add((String) tokenizer.nextElement());
+			fields.add(new StrNum((String) tokenizer.nextElement(), decimalSeparator));
 		}
 		return fields;
 	}
 
-	private static String joinFieldsWithLiteralSeparator(List<String> fields, String separator) {
+	private static String joinFieldsWithLiteralSeparator(List<Object> fields, String separator) {
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < fields.size(); i++) {
 			if (i > 0) {
 				sb.append(separator);
 			}
-			sb.append(fields.get(i));
+			Object field = fields.get(i);
+			sb.append(field == null ? "" : field.toString());
 		}
 		return sb.toString();
 	}
 
-	private String rebuildRecordTextFromFields(List<String> fields) {
+	private String rebuildRecordTextFromFields(List<Object> fields) {
 		return joinFieldsWithLiteralSeparator(fields, ofs);
-	}
-
-	private RecordState newRecordStateFromText(String recordText) {
-		return new RecordState(recordText, null);
-	}
-
-	private RecordState newRecordStateFromSource(InputSource source) {
-		return new RecordState(source);
-	}
-
-	private RecordState newRecordStateFromSource(String recordText, List<String> rawFields) {
-		return new RecordState(recordText, rawFields);
 	}
 
 	private final class RecordState {
 
 		private final String fieldSeparatorAtRead;
 		private final InputSource source;
+		private final boolean inputDerived;
 		private String recordText;
-		private List<String> fields;
+		private List<Object> fields;
 		private boolean recordTextAvailable;
 		private boolean fieldsAvailable;
 		private boolean recordTextDirty;
@@ -1588,16 +1587,17 @@ public class JRT {
 		private boolean fieldsLoadedFromSource;
 
 		private RecordState(InputSource source) {
-			this(null, null, source);
+			this(null, null, source, true);
 		}
 
-		private RecordState(String recordText, List<String> rawFields) {
-			this(recordText, rawFields, null);
+		private RecordState(String recordText, List<String> rawFields, boolean inputDerived) {
+			this(recordText, rawFields, null, inputDerived);
 		}
 
-		private RecordState(String recordText, List<String> rawFields, InputSource source) {
+		private RecordState(String recordText, List<String> rawFields, InputSource source, boolean inputDerived) {
 			this.fieldSeparatorAtRead = fs;
 			this.source = source;
+			this.inputDerived = inputDerived;
 			if (recordText != null) {
 				this.recordText = recordText;
 				this.recordTextAvailable = true;
@@ -1606,7 +1606,7 @@ public class JRT {
 				this.recordTextAvailable = true;
 			}
 			if (rawFields != null) {
-				this.fields = sanitizeFields(rawFields);
+				this.fields = sanitizeFields(rawFields, inputDerived);
 				this.fieldsAvailable = true;
 				this.fieldsDirty = false;
 			} else {
@@ -1659,7 +1659,7 @@ public class JRT {
 
 		private Object getField(int fieldIndex) {
 			if (fieldIndex == 0) {
-				return getRecordText();
+				return inputDerived ? new StrNum(getRecordText(), decimalSeparator) : getRecordText();
 			}
 			ensureFieldsMaterialized();
 			int zeroBasedIndex = fieldIndex - 1;
@@ -1669,16 +1669,23 @@ public class JRT {
 			return fields.get(zeroBasedIndex);
 		}
 
-		private void setField(int zeroBasedIndex, String value) {
+		private void setField(int zeroBasedIndex, Object value) {
 			ensureFieldsMaterialized();
-			fields.set(zeroBasedIndex, value);
+			fields.set(zeroBasedIndex, normalizeFieldValue(value));
 			markRecordTextDirty();
 		}
 
-		private void addField(String value) {
+		private void addField(Object value) {
 			ensureFieldsMaterialized();
-			fields.add(value);
+			fields.add(normalizeFieldValue(value));
 			markRecordTextDirty();
+		}
+
+		private Object normalizeFieldValue(Object value) {
+			if (value == null || value instanceof UninitializedObject) {
+				return "";
+			}
+			return value;
 		}
 
 		private void removeField(int zeroBasedIndex) {
@@ -1713,7 +1720,7 @@ public class JRT {
 			List<String> rawFields = source.getFields();
 			fieldsLoadedFromSource = true;
 			if (rawFields != null) {
-				fields = sanitizeFields(rawFields);
+				fields = sanitizeFields(rawFields, true);
 				fieldsAvailable = true;
 				fieldsDirty = false;
 			}
@@ -1926,6 +1933,7 @@ public class JRT {
 			return false;
 		} else {
 			jrtInputString = inputLine;
+			recordState = new RecordState(inputLine, null, true);
 			this.nr++;
 			return true;
 		}
@@ -1963,6 +1971,7 @@ public class JRT {
 			return false;
 		} else {
 			jrtInputString = inputLine;
+			recordState = new RecordState(inputLine, null, true);
 			this.nr++;
 			return true;
 		}

@@ -300,7 +300,7 @@ public class AVM implements VariableManager, Closeable {
 			exitCode = 0;
 			throw new IllegalStateException("eval(AwkExpression) cannot execute EXIT opcodes.", e);
 		}
-		return operandStack.isEmpty() ? null : pop();
+		return operandStack.isEmpty() ? null : JRT.toJavaScalar(pop());
 	}
 
 	/**
@@ -1371,7 +1371,7 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = value
 					Object fieldNumObj = pop();
 					long fieldNum = JRT.parseFieldNumber(fieldNumObj);
-					String value = pop().toString();
+					Object value = pop();
 					push(value); // leave the result on the stack
 					if (fieldNum == 0) {
 						jrt.setInputLine(value);
@@ -2072,7 +2072,7 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case GETLINE_INPUT_TO_TARGET: {
 					applyInputSourceFilelistAssignmentsIfNeeded();
-					String input = jrt.consumeInputToTarget(resolvedInputSource);
+					Object input = jrt.consumeInputToTarget(resolvedInputSource);
 					if (input != null) {
 						push(1);
 						push(input);

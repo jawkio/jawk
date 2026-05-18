@@ -63,6 +63,9 @@ public class JRTHotPathBenchmark {
 	private Object zeroLong;
 	private Object zeroDouble;
 	private Object zeroString;
+	private Object zeroStrNum;
+	private Object nonZeroStrNum;
+	private Object nonNumericStrNum;
 	private Object uninitialized;
 	private double integralDouble;
 	private double fractionalDouble;
@@ -87,6 +90,9 @@ public class JRTHotPathBenchmark {
 		this.zeroLong = Long.valueOf(0L);
 		this.zeroDouble = Double.valueOf(0.0D);
 		this.zeroString = "0";
+		this.zeroStrNum = new StrNum("0");
+		this.nonZeroStrNum = new StrNum("123");
+		this.nonNumericStrNum = new StrNum("2x");
 		this.uninitialized = new UninitializedObject();
 		this.integralDouble = 123456789D;
 		this.fractionalDouble = 123456.75D;
@@ -164,6 +170,17 @@ public class JRTHotPathBenchmark {
 	@Benchmark
 	public double toDoubleNonNumericString() {
 		return JRT.toDouble(this.nonNumericString);
+	}
+
+	/**
+	 * Measures {@link JRT#toDouble(Object)} for an input-derived numeric-prefix
+	 * string.
+	 *
+	 * @return converted value
+	 */
+	@Benchmark
+	public double toDoubleStrNumNumericPrefix() {
+		return JRT.toDouble(this.nonNumericStrNum);
 	}
 
 	/**
@@ -334,6 +351,37 @@ public class JRTHotPathBenchmark {
 	@Benchmark
 	public boolean toBooleanStringZero() {
 		return this.jrt.toBoolean(this.zeroString);
+	}
+
+	/**
+	 * Measures {@link JRT#toBoolean(Object)} for an input-derived zero string.
+	 *
+	 * @return converted value
+	 */
+	@Benchmark
+	public boolean toBooleanStrNumZero() {
+		return this.jrt.toBoolean(this.zeroStrNum);
+	}
+
+	/**
+	 * Measures {@link JRT#toBoolean(Object)} for an input-derived non-zero string.
+	 *
+	 * @return converted value
+	 */
+	@Benchmark
+	public boolean toBooleanStrNumNonZero() {
+		return this.jrt.toBoolean(this.nonZeroStrNum);
+	}
+
+	/**
+	 * Measures {@link JRT#toBoolean(Object)} for an input-derived nonnumeric
+	 * string.
+	 *
+	 * @return converted value
+	 */
+	@Benchmark
+	public boolean toBooleanStrNumNonNumeric() {
+		return this.jrt.toBoolean(this.nonNumericStrNum);
 	}
 
 	/**

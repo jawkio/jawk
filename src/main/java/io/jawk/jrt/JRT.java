@@ -93,7 +93,7 @@ public class JRT {
 	/** PrintStream used for command error output */
 	private PrintStream error;
 	// Last input line consumed for getline-style transport.
-	private String inputLine = null;
+	private Object inputLine = null;
 	// Current record state ($0, $1, $2, ...).
 	private RecordState recordState;
 	// The currently active InputSource (set during consumeInput calls).
@@ -110,7 +110,7 @@ public class JRT {
 	private long fnr; // file record number
 	private int rstart; // last match start (1-based)
 	private int rlength; // last match length
-	private String filename; // current input filename (or empty for stdin/pipe)
+	private Object filename; // current input filename scalar (or empty for stdin/pipe)
 	private String fs; // field separator
 	private String rs; // record separator (regexp)
 	private String ofs; // output field separator
@@ -373,7 +373,7 @@ public class JRT {
 				continue;
 			}
 			if ("FILENAME".equals(name)) {
-				setFILENAMEViaJrt(value == null ? "" : value.toString());
+				setFILENAMEViaJrt(value);
 				continue;
 			}
 			if ("NF".equals(name)) {
@@ -427,7 +427,7 @@ public class JRT {
 			} else if ("SUBSEP".equals(name)) {
 				setSUBSEP(value);
 			} else if ("FILENAME".equals(name)) {
-				setFILENAMEViaJrt(value == null ? "" : value.toString());
+				setFILENAMEViaJrt(value);
 			} else if ("NF".equals(name)) {
 				setNF(value);
 			} else if ("NR".equals(name)) {
@@ -454,7 +454,7 @@ public class JRT {
 	public static void assignEnvironmentVariables(AssocArray aa) {
 		Map<String, String> env = System.getenv();
 		for (Map.Entry<String, String> var : env.entrySet()) {
-			aa.put(var.getKey(), var.getValue());
+			aa.put(var.getKey(), new StrNum(var.getValue()));
 		}
 	}
 
@@ -532,6 +532,13 @@ public class JRT {
 
 		if (o instanceof Character) {
 			return (double) ((Character) o).charValue();
+		}
+
+		if (o instanceof StrNum) {
+			StrNum strNum = (StrNum) o;
+			if (strNum.isNumber()) {
+				return strNum.doubleValue();
+			}
 		}
 
 		// Try to convert the string to a number.
@@ -724,7 +731,16 @@ public class JRT {
 	 * @return plain Java scalar value
 	 */
 	public static Object toJavaScalar(Object value) {
-		return value instanceof StrNum ? value.toString() : value;
+		if (value instanceof StrNum) {
+			return value.toString();
+		}
+		if (value instanceof Double || value instanceof Float) {
+			double number = ((Number) value).doubleValue();
+			if (isActuallyLong(number)) {
+				return Long.valueOf((long) Math.rint(number));
+			}
+		}
+		return value;
 	}
 
 	static boolean isParseableNumber(String value, char decimalSeparator) {
@@ -780,10 +796,6 @@ public class JRT {
 		return index == length;
 	}
 
-	static double parseDoubleForComparison(String value, char decimalSeparator) {
-		return Double.parseDouble(normalizeNumberForComparison(value, decimalSeparator));
-	}
-
 	static String normalizeNumberForComparison(String value, char decimalSeparator) {
 		return decimalSeparator == '.' ? value : value.replace(decimalSeparator, '.');
 	}
@@ -793,31 +805,14 @@ public class JRT {
 	 * one plus a given object. For Integers and Doubles,
 	 * this is similar to o+1. For Strings, attempts are
 	 * made to convert it to a double first. If the
-	 * String does not represent a valid Double, 1 is returned.
+	 * String does not contain a numeric prefix, 1 is returned.
 	 *
 	 * @param o The object to increase.
-	 * @return o+1 if o is an Integer or Double object, or
-	 *         if o is a String object and represents a double.
-	 *         Otherwise, 1 is returned. If the return value
-	 *         is an integer, an Integer object is returned.
-	 *         Otherwise, a Double object is returned.
+	 * @return {@code o + 1} if o is numeric or contains a numeric prefix;
+	 *         otherwise, {@code 1.0}
 	 */
 	public static Object inc(Object o) {
-		double ans;
-		if (o instanceof Number) {
-			ans = ((Number) o).doubleValue() + 1;
-		} else {
-			try {
-				ans = Double.parseDouble(o.toString()) + 1;
-			} catch (NumberFormatException nfe) {
-				ans = 1;
-			}
-		}
-		if (isActuallyLong(ans)) {
-			return (long) Math.rint(ans);
-		} else {
-			return ans;
-		}
+		return toDouble(o) + 1;
 	}
 
 	/**
@@ -825,31 +820,14 @@ public class JRT {
 	 * one minus a given object. For Integers and Doubles,
 	 * this is similar to o-1. For Strings, attempts are
 	 * made to convert it to a double first. If the
-	 * String does not represent a valid Double, -1 is returned.
+	 * String does not contain a numeric prefix, -1 is returned.
 	 *
 	 * @param o The object to increase.
-	 * @return o-1 if o is an Integer or Double object, or
-	 *         if o is a String object and represents a double.
-	 *         Otherwise, -1 is returned. If the return value
-	 *         is an integer, an Integer object is returned.
-	 *         Otherwise, a Double object is returned.
+	 * @return {@code o - 1} if o is numeric or contains a numeric prefix;
+	 *         otherwise, {@code -1.0}
 	 */
 	public static Object dec(Object o) {
-		double ans;
-		if (o instanceof Number) {
-			ans = ((Number) o).doubleValue() - 1;
-		} else {
-			try {
-				ans = Double.parseDouble(o.toString()) - 1;
-			} catch (NumberFormatException nfe) {
-				ans = 1;
-			}
-		}
-		if (isActuallyLong(ans)) {
-			return (long) Math.rint(ans);
-		} else {
-			return ans;
-		}
+		return toDouble(o) - 1;
 	}
 
 	// non-static to reference "inputLine"
@@ -947,11 +925,12 @@ public class JRT {
 		return arrayMap;
 	}
 
-	private static int splitWorker(Enumeration<Object> e, Map<Object, Object> array) {
+	private int splitWorker(Enumeration<Object> e, Map<Object, Object> array) {
 		int cnt = 0;
 		array.clear();
 		while (e.hasMoreElements()) {
-			array.put(Long.valueOf(++cnt), e.nextElement());
+			Object value = e.nextElement();
+			array.put(Long.valueOf(++cnt), toInputScalar(value));
 		}
 		array.put(0L, Long.valueOf(cnt));
 		return cnt;
@@ -982,7 +961,7 @@ public class JRT {
 		if (recordState != null) {
 			return recordState.getField(0);
 		}
-		return inputLine == null ? null : new StrNum(inputLine, decimalSeparator);
+		return inputLine;
 	}
 
 	/**
@@ -1193,7 +1172,7 @@ public class JRT {
 	 *
 	 * @return current FILENAME (empty string for stdin/pipe)
 	 */
-	public String getFILENAME() {
+	public Object getFILENAME() {
 		return filename == null ? "" : filename;
 	}
 
@@ -1202,8 +1181,8 @@ public class JRT {
 	 *
 	 * @param name file name to set
 	 */
-	public void setFILENAMEViaJrt(String name) {
-		this.filename = name == null ? "" : name;
+	public void setFILENAMEViaJrt(Object name) {
+		this.filename = normalizeRecordValue(name);
 	}
 
 	/**
@@ -1301,23 +1280,38 @@ public class JRT {
 	 * Setter for the field <code>inputLine</code>.
 	 * </p>
 	 *
-	 * @param inputLine input value
+	 * @param inputLineParam input value
 	 */
-	public void setInputLine(Object inputLine) {
-		String inputText = inputLine == null ? "" : inputLine.toString();
-		this.inputLine = inputText;
-		recordState = new RecordState(inputText, null, false);
+	public void setInputLine(Object inputLineParam) {
+		Object inputValue = normalizeRecordValue(inputLineParam);
+		this.inputLine = inputValue;
+		recordState = new RecordState(inputValue, null);
 	}
 
 	/**
-	 * Assigns {@code $0} from a getline result and initializes {@code $1..$NF}.
+	 * Creates an input-derived AWK scalar value.
 	 *
-	 * @param value getline result assigned to {@code $0}
+	 * @param value input text
+	 * @return input-derived scalar value
 	 */
-	public void assignInputLineFromGetline(Object value) {
-		String inputValue = value == null ? "" : value.toString();
-		inputLine = inputValue;
-		recordState = new RecordState(inputValue, null, true);
+	public Object toInputScalar(Object value) {
+		if (value instanceof String) {
+			return new StrNum((String) value, decimalSeparator);
+		}
+		if (value instanceof StrNum) {
+			return value;
+		}
+		if (value == null || value instanceof UninitializedObject) {
+			return new StrNum("", decimalSeparator);
+		}
+		return new StrNum(value.toString(), decimalSeparator);
+	}
+
+	private static Object normalizeRecordValue(Object value) {
+		if (value == null || value instanceof UninitializedObject) {
+			return "";
+		}
+		return value;
 	}
 
 	/**
@@ -1394,7 +1388,7 @@ public class JRT {
 	 * @param preFields current fields where index {@code 0} is {@code $1}
 	 */
 	protected void initializeInputFields(String record, List<String> preFields) {
-		recordState = new RecordState(record, preFields, true);
+		recordState = new RecordState(toInputScalar(record), preFields);
 	}
 
 	/**
@@ -1501,7 +1495,7 @@ public class JRT {
 	protected void rebuildDollarZeroFromFields() {
 		if (recordState != null) {
 			recordState.markRecordTextDirty();
-			inputLine = recordState.getRecordText();
+			inputLine = recordState.getField(0);
 		}
 	}
 
@@ -1513,7 +1507,7 @@ public class JRT {
 
 	private RecordState ensureRecordStateForTextMutation() {
 		if (recordState == null) {
-			recordState = new RecordState(inputLine == null ? "" : inputLine, null, false);
+			recordState = new RecordState(inputLine, null);
 		}
 		return recordState;
 	}
@@ -1524,11 +1518,11 @@ public class JRT {
 		return state;
 	}
 
-	private List<Object> sanitizeFields(List<String> rawFields, boolean inputDerived) {
+	private List<Object> sanitizeFields(List<String> rawFields) {
 		List<Object> copy = new ArrayList<Object>(rawFields.size());
 		for (String field : rawFields) {
 			String value = field == null ? "" : field;
-			copy.add(inputDerived ? new StrNum(value, decimalSeparator) : value);
+			copy.add(new StrNum(value, decimalSeparator));
 		}
 		return copy;
 	}
@@ -1576,8 +1570,8 @@ public class JRT {
 
 		private final String fieldSeparatorAtRead;
 		private final InputSource source;
-		private final boolean inputDerived;
 		private String recordText;
+		private Object recordScalar;
 		private List<Object> fields;
 		private boolean recordTextAvailable;
 		private boolean fieldsAvailable;
@@ -1587,26 +1581,27 @@ public class JRT {
 		private boolean fieldsLoadedFromSource;
 
 		private RecordState(InputSource source) {
-			this(null, null, source, true);
+			this(null, null, source);
 		}
 
-		private RecordState(String recordText, List<String> rawFields, boolean inputDerived) {
-			this(recordText, rawFields, null, inputDerived);
+		private RecordState(Object recordValue, List<String> rawFields) {
+			this(recordValue, rawFields, null);
 		}
 
-		private RecordState(String recordText, List<String> rawFields, InputSource source, boolean inputDerived) {
+		private RecordState(Object recordValue, List<String> rawFields, InputSource source) {
 			this.fieldSeparatorAtRead = fs;
 			this.source = source;
-			this.inputDerived = inputDerived;
-			if (recordText != null) {
-				this.recordText = recordText;
+			if (recordValue != null) {
+				this.recordScalar = normalizeRecordValue(recordValue);
+				this.recordText = this.recordScalar.toString();
 				this.recordTextAvailable = true;
 			} else if (rawFields == null && source == null) {
+				this.recordScalar = "";
 				this.recordText = "";
 				this.recordTextAvailable = true;
 			}
 			if (rawFields != null) {
-				this.fields = sanitizeFields(rawFields, inputDerived);
+				this.fields = sanitizeFields(rawFields);
 				this.fieldsAvailable = true;
 				this.fieldsDirty = false;
 			} else {
@@ -1635,6 +1630,7 @@ public class JRT {
 			if (!recordTextAvailable || recordTextDirty) {
 				if (recordTextDirty) {
 					recordText = rebuildRecordTextFromFields(fields);
+					recordScalar = recordText;
 				} else {
 					loadRecordTextFromSource();
 					if (!recordTextAvailable) {
@@ -1644,6 +1640,7 @@ public class JRT {
 									"InputSource must provide record text, fields, or both after nextRecord()");
 						}
 						recordText = joinFieldsWithLiteralSeparator(fields, fieldSeparatorAtRead);
+						recordScalar = new StrNum(recordText, decimalSeparator);
 					}
 				}
 				recordTextAvailable = true;
@@ -1659,7 +1656,11 @@ public class JRT {
 
 		private Object getField(int fieldIndex) {
 			if (fieldIndex == 0) {
-				return inputDerived ? new StrNum(getRecordText(), decimalSeparator) : getRecordText();
+				String value = getRecordText();
+				if (recordScalar == null) {
+					recordScalar = value;
+				}
+				return recordScalar;
 			}
 			ensureFieldsMaterialized();
 			int zeroBasedIndex = fieldIndex - 1;
@@ -1697,6 +1698,7 @@ public class JRT {
 		private void markRecordTextDirty() {
 			recordTextDirty = true;
 			recordTextAvailable = fieldsAvailable;
+			recordScalar = null;
 		}
 
 		private void materialize() {
@@ -1710,6 +1712,9 @@ public class JRT {
 			}
 			recordText = source.getRecordText();
 			recordTextAvailable = recordText != null;
+			if (recordTextAvailable) {
+				recordScalar = new StrNum(recordText, decimalSeparator);
+			}
 			recordTextLoadedFromSource = true;
 		}
 
@@ -1720,7 +1725,7 @@ public class JRT {
 			List<String> rawFields = source.getFields();
 			fieldsLoadedFromSource = true;
 			if (rawFields != null) {
-				fields = sanitizeFields(rawFields, true);
+				fields = sanitizeFields(rawFields);
 				fieldsAvailable = true;
 				fieldsDirty = false;
 			}
@@ -1928,12 +1933,13 @@ public class JRT {
 			}
 		}
 
-		inputLine = pr.readRecord();
-		if (inputLine == null) {
+		String recordText = pr.readRecord();
+		if (recordText == null) {
 			return false;
 		} else {
-			jrtInputString = inputLine;
-			recordState = new RecordState(inputLine, null, true);
+			jrtInputString = recordText;
+			inputLine = toInputScalar(recordText);
+			recordState = new RecordState(inputLine, null);
 			this.nr++;
 			return true;
 		}
@@ -1966,12 +1972,13 @@ public class JRT {
 	 */
 	public boolean jrtConsumeCommandInput(String cmd) throws IOException {
 		CommandInputState commandInput = getOrCreateCommandInputState(cmd);
-		inputLine = commandInput.reader.readRecord();
-		if (inputLine == null) {
+		String recordText = commandInput.reader.readRecord();
+		if (recordText == null) {
 			return false;
 		} else {
-			jrtInputString = inputLine;
-			recordState = new RecordState(inputLine, null, true);
+			jrtInputString = recordText;
+			inputLine = toInputScalar(recordText);
+			recordState = new RecordState(inputLine, null);
 			this.nr++;
 			return true;
 		}

@@ -23,8 +23,12 @@ package io.jawk;
  */
 
 import static io.jawk.AwkTestSupport.awkTest;
+import static io.jawk.AwkTestSupport.cliTest;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import io.jawk.ext.StdinExtension;
 import io.jawk.util.AwkSettings;
 import org.junit.Test;
 
@@ -120,6 +124,60 @@ public class StrNumSemanticsTest {
 	}
 
 	@Test
+	public void testAssignedDollarZeroPreservesAssignedAttribute() throws Exception {
+		awkTest("assigned dollar zero preserves assigned attribute")
+				.script("{ $0 = $1; print($0 < 10); $0 = 3.00; print($0 < 10); $0 = \"3.00\"; print($0 < 10) }")
+				.stdin("9\n")
+				.expectLines("1", "1", "0")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testArgvValuesAreInputDerived() throws Exception {
+		awkTest("ARGV values are input-derived")
+				.script("BEGIN { $0 = ARGV[1]; print($0 < 10); print($1 < 10); exit }")
+				.operand("9")
+				.expectLines("1", "1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testSplitCreatesNumericStringElements() throws Exception {
+		awkTest("split array elements are numeric strings")
+				.script("BEGIN { split(\"9 9a\", a); print(a[1] < 10); print(a[2] < 10) }")
+				.expectLines("1", "0")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testCommandLineVariableAssignmentsAreInputDerived() throws Exception {
+		cliTest("CLI variable assignments are numeric strings")
+				.preassign("x", "9")
+				.script("BEGIN { print(x < 10) }")
+				.expectLines("1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testFilelistVariableAssignmentsAreInputDerived() throws Exception {
+		awkTest("filelist variable assignments are numeric strings")
+				.script("{ print(x < 10); exit }")
+				.operand("x=9")
+				.stdin("ignored\n")
+				.expectLines("1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testProgrammaticStringPreassignmentIsInputDerived() throws Exception {
+		awkTest("programmatic string preassignments are numeric strings")
+				.preassign("x", "9")
+				.script("BEGIN { print(x < 10) }")
+				.expectLines("1")
+				.runAndAssert();
+	}
+
+	@Test
 	public void testStrNumComparisonUsesRuntimeLocale() throws Exception {
 		AwkSettings settings = new AwkSettings();
 		settings.setLocale(Locale.FRANCE);
@@ -138,6 +196,17 @@ public class StrNumSemanticsTest {
 				.script("{ print($1 ? \"true\" : \"false\") }")
 				.stdin("0\n2\n2a\n")
 				.expectLines("false", "true", "true")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testStdinExtensionInputUsesStrNumAttribute() throws Exception {
+		StdinExtension stdin = new StdinExtension(new ByteArrayInputStream("9\n0\n".getBytes(StandardCharsets.UTF_8)));
+
+		awkTest("stdin extension records are input-derived")
+				.withExtensions(stdin)
+				.script("BEGIN { StdinGetline(); print($0 < 10); StdinGetline(); print($0 ? \"true\" : \"false\") }")
+				.expectLines("1", "false")
 				.runAndAssert();
 	}
 }

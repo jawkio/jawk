@@ -55,10 +55,11 @@ final class StrNum {
 	}
 
 	private double parseDoubleValue() {
+		String normalizedValue = JRT.normalizeNumberForComparison(value, decimalSeparator);
 		try {
-			return new BigDecimal(JRT.normalizeNumberForComparison(value, decimalSeparator)).doubleValue();
+			return Double.parseDouble(normalizedValue);
 		} catch (NumberFormatException nfe) {
-			return JRT.parseDoubleForComparison(value, decimalSeparator);
+			return new BigDecimal(normalizedValue).doubleValue();
 		}
 	}
 

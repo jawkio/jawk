@@ -229,7 +229,7 @@ public class StreamInputSource implements InputSource, Closeable {
 	 * @return {@code ARGC} converted to an {@code int}
 	 */
 	private int getArgCount() {
-		long raw = JRT.toLong(vm.getARGC());
+		double raw = JRT.toDouble(vm.getARGC());
 		if (raw <= 0) {
 			return 0;
 		}
@@ -326,7 +326,7 @@ public class StreamInputSource implements InputSource, Closeable {
 					partitioningReader = new PartitioningReader(
 							new InputStreamReader(defaultInput, StandardCharsets.UTF_8),
 							jrt.getRSString());
-					jrt.setFILENAMEViaJrt("");
+					jrt.setFILENAMEViaJrt(jrt.toInputScalar(""));
 					return true;
 				}
 				closeCurrentReaderIfFileStream();
@@ -341,7 +341,7 @@ public class StreamInputSource implements InputSource, Closeable {
 					partitioningReader = new PartitioningReader(
 							new InputStreamReader(defaultInput, StandardCharsets.UTF_8),
 							jrt.getRSString());
-					jrt.setFILENAMEViaJrt("");
+					jrt.setFILENAMEViaJrt(jrt.toInputScalar(""));
 					return true;
 				}
 				if (partitioningReader != null) {
@@ -353,7 +353,7 @@ public class StreamInputSource implements InputSource, Closeable {
 						new InputStreamReader(new FileInputStream(arg), StandardCharsets.UTF_8),
 						jrt.getRSString(),
 						true);
-				jrt.setFILENAMEViaJrt(arg);
+				jrt.setFILENAMEViaJrt(jrt.toInputScalar(arg));
 				jrt.setFNR(0L);
 				ready = true;
 			}
@@ -404,16 +404,6 @@ public class StreamInputSource implements InputSource, Closeable {
 		}
 		String name = nameValue.substring(0, eqIdx);
 		String value = nameValue.substring(eqIdx + 1);
-		Object obj;
-		try {
-			obj = Integer.parseInt(value);
-		} catch (NumberFormatException nfe) {
-			try {
-				obj = Double.parseDouble(value);
-			} catch (NumberFormatException nfe2) {
-				obj = value;
-			}
-		}
-		vm.assignVariable(name, obj);
+		vm.assignVariable(name, jrt.toInputScalar(value));
 	}
 }

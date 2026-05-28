@@ -79,7 +79,16 @@ public interface AssocArray extends Map<Object, Object> {
 		if (key == null || key instanceof UninitializedObject) {
 			return "";
 		}
-		return key instanceof StrNum ? key.toString() : key;
+		if (key instanceof StrNum) {
+			return key.toString();
+		}
+		if (key instanceof Double || key instanceof Float) {
+			double numericKey = ((Number) key).doubleValue();
+			if (JRT.isActuallyLong(numericKey)) {
+				return Long.valueOf((long) Math.rint(numericKey));
+			}
+		}
+		return key;
 	}
 
 	/**

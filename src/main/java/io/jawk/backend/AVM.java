@@ -773,7 +773,7 @@ public class AVM implements VariableManager, Closeable {
 			Integer offsetObj = globalVariableOffsets.get(key);
 			Boolean arrayObj = globalVariableArrays.get(key);
 			if (offsetObj != null) {
-				Object obj = normalizeVariableValue(entry.getValue());
+				Object obj = normalizeExternalVariableValue(entry.getValue());
 				if (arrayObj.booleanValue()) {
 					if (obj instanceof Map) {
 						runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
@@ -857,7 +857,7 @@ public class AVM implements VariableManager, Closeable {
 			String name = entry.getKey();
 			if (isPersistentEligibleGlobal(name)) {
 				validateSeededGlobalName(name);
-				Object value = normalizeVariableValue(entry.getValue());
+				Object value = normalizeExternalVariableValue(entry.getValue());
 				validateSeededGlobalValue(name, value);
 				basePersistentSeeds.put(name, value);
 			}
@@ -882,7 +882,7 @@ public class AVM implements VariableManager, Closeable {
 				String name = entry.getKey();
 				if (isPersistentEligibleGlobal(name)) {
 					validateSeededGlobalName(name);
-					Object value = normalizeVariableValue(entry.getValue());
+					Object value = normalizeExternalVariableValue(entry.getValue());
 					validateSeededGlobalValue(name, value);
 					executionUserSeeds.put(name, value);
 				}
@@ -986,26 +986,7 @@ public class AVM implements VariableManager, Closeable {
 		}
 		String name = nameValue.substring(0, eqIdx);
 		String value = nameValue.substring(eqIdx + 1);
-		return new NameValueAssignment(name, coerceVariableAssignmentValue(value));
-	}
-
-	/**
-	 * Coerces a runtime assignment value using the same scalar rules as the
-	 * existing command-line handling: integer first, then double, then string.
-	 *
-	 * @param value raw text to coerce
-	 * @return coerced scalar value
-	 */
-	private Object coerceVariableAssignmentValue(String value) {
-		try {
-			return Integer.parseInt(value);
-		} catch (NumberFormatException nfe) {
-			try {
-				return Double.parseDouble(value);
-			} catch (NumberFormatException nfe2) {
-				return value;
-			}
-		}
+		return new NameValueAssignment(name, jrt.toInputScalar(value));
 	}
 
 	/**
@@ -1164,22 +1145,14 @@ public class AVM implements VariableManager, Closeable {
 					// stack[0] = item to numerically negate
 
 					double d = JRT.toDouble(pop());
-					if (JRT.isActuallyLong(d)) {
-						push((long) -Math.rint(d));
-					} else {
-						push(-d);
-					}
+					push(-d);
 					position.next();
 					break;
 				}
 				case UNARY_PLUS: {
 					// stack[0] = item to convert to a number
 					double d = JRT.toDouble(pop());
-					if (JRT.isActuallyLong(d)) {
-						push((long) Math.rint(d));
-					} else {
-						push(d);
-					}
+					push(d);
 					position.next();
 					break;
 				}
@@ -1296,11 +1269,7 @@ public class AVM implements VariableManager, Closeable {
 						throw new Error("Invalid op code here: " + opcode);
 					}
 
-					if (JRT.isActuallyLong(newVal)) {
-						assignArray(offset, arrIdx, (long) Math.rint(newVal), isGlobal);
-					} else {
-						assignArray(offset, arrIdx, newVal, isGlobal);
-					}
+					assignArray(offset, arrIdx, newVal, isGlobal);
 					position.next();
 					break;
 				}
@@ -1349,18 +1318,14 @@ public class AVM implements VariableManager, Closeable {
 						throw new Error("Invalid op code here: " + opcode);
 					}
 
-					if (JRT.isActuallyLong(newVal)) {
-						assignMapElement(array, arrIdx, (long) Math.rint(newVal));
-					} else {
-						assignMapElement(array, arrIdx, newVal);
-					}
+					assignMapElement(array, arrIdx, newVal);
 					position.next();
 					break;
 				}
 
 				case ASSIGN_AS_INPUT: {
 					// stack[0] = value
-					jrt.assignInputLineFromGetline(pop());
+					jrt.setInputLine(pop());
 					push(jrt.getInputLine());
 					position.next();
 					break;
@@ -1424,14 +1389,8 @@ public class AVM implements VariableManager, Closeable {
 					default:
 						throw new Error("Invalid opcode here: " + opcode);
 					}
-					if (JRT.isActuallyLong(ans)) {
-						long integral = (long) Math.rint(ans);
-						push(integral);
-						runtimeStack.setVariable(offset, integral, isGlobal);
-					} else {
-						push(ans);
-						runtimeStack.setVariable(offset, ans, isGlobal);
-					}
+					push(ans);
+					runtimeStack.setVariable(offset, ans, isGlobal);
 					position.next();
 					break;
 				}
@@ -1526,11 +1485,7 @@ public class AVM implements VariableManager, Closeable {
 					checkScalar(key);
 					Object o = aa.get(key);
 					double ans = JRT.toDouble(o) + 1;
-					if (JRT.isActuallyLong(ans)) {
-						aa.put(key, (long) Math.rint(ans));
-					} else {
-						aa.put(key, ans);
-					}
+					aa.put(key, ans);
 					position.next();
 					break;
 				}
@@ -1545,11 +1500,7 @@ public class AVM implements VariableManager, Closeable {
 					checkScalar(key);
 					Object o = aa.get(key);
 					double ans = JRT.toDouble(o) - 1;
-					if (JRT.isActuallyLong(ans)) {
-						aa.put(key, (long) Math.rint(ans));
-					} else {
-						aa.put(key, ans);
-					}
+					aa.put(key, ans);
 					position.next();
 					break;
 				}
@@ -1561,11 +1512,7 @@ public class AVM implements VariableManager, Closeable {
 					Map<Object, Object> aa = toMap(pop());
 					Object o = aa.get(key);
 					double ans = JRT.toDouble(o) + 1;
-					if (JRT.isActuallyLong(ans)) {
-						aa.put(key, (long) Math.rint(ans));
-					} else {
-						aa.put(key, ans);
-					}
+					aa.put(key, ans);
 					position.next();
 					break;
 				}
@@ -1577,11 +1524,7 @@ public class AVM implements VariableManager, Closeable {
 					Map<Object, Object> aa = toMap(pop());
 					Object o = aa.get(key);
 					double ans = JRT.toDouble(o) - 1;
-					if (JRT.isActuallyLong(ans)) {
-						aa.put(key, (long) Math.rint(ans));
-					} else {
-						aa.put(key, ans);
-					}
+					aa.put(key, ans);
 					position.next();
 					break;
 				}
@@ -1594,11 +1537,7 @@ public class AVM implements VariableManager, Closeable {
 					double num = original + 1;
 					setNumOnJRT(fieldnum, num);
 
-					if (JRT.isActuallyLong(original)) {
-						push((long) Math.rint(original));
-					} else {
-						push(Double.valueOf(original));
-					}
+					push(Double.valueOf(original));
 
 					position.next();
 					break;
@@ -1613,11 +1552,7 @@ public class AVM implements VariableManager, Closeable {
 					double num = original - 1;
 					setNumOnJRT(fieldnum, num);
 
-					if (JRT.isActuallyLong(original)) {
-						push((long) Math.rint(original));
-					} else {
-						push(Double.valueOf(original));
-					}
+					push(Double.valueOf(original));
 
 					position.next();
 					break;
@@ -1892,11 +1827,7 @@ public class AVM implements VariableManager, Closeable {
 					double d1 = JRT.toDouble(o1);
 					double d2 = JRT.toDouble(o2);
 					double ans = d1 + d2;
-					if (JRT.isActuallyLong(ans)) {
-						push((long) Math.rint(ans));
-					} else {
-						push(ans);
-					}
+					push(ans);
 					position.next();
 					break;
 				}
@@ -1908,11 +1839,7 @@ public class AVM implements VariableManager, Closeable {
 					double d1 = JRT.toDouble(o1);
 					double d2 = JRT.toDouble(o2);
 					double ans = d1 - d2;
-					if (JRT.isActuallyLong(ans)) {
-						push((long) Math.rint(ans));
-					} else {
-						push(ans);
-					}
+					push(ans);
 					position.next();
 					break;
 				}
@@ -1924,11 +1851,7 @@ public class AVM implements VariableManager, Closeable {
 					double d1 = JRT.toDouble(o1);
 					double d2 = JRT.toDouble(o2);
 					double ans = d1 * d2;
-					if (JRT.isActuallyLong(ans)) {
-						push((long) Math.rint(ans));
-					} else {
-						push(ans);
-					}
+					push(ans);
 					position.next();
 					break;
 				}
@@ -1940,11 +1863,7 @@ public class AVM implements VariableManager, Closeable {
 					double d1 = JRT.toDouble(o1);
 					double d2 = JRT.toDouble(o2);
 					double ans = d1 / d2;
-					if (JRT.isActuallyLong(ans)) {
-						push((long) Math.rint(ans));
-					} else {
-						push(ans);
-					}
+					push(ans);
 					position.next();
 					break;
 				}
@@ -1956,11 +1875,7 @@ public class AVM implements VariableManager, Closeable {
 					double d1 = JRT.toDouble(o1);
 					double d2 = JRT.toDouble(o2);
 					double ans = d1 % d2;
-					if (JRT.isActuallyLong(ans)) {
-						push((long) Math.rint(ans));
-					} else {
-						push(ans);
-					}
+					push(ans);
 					position.next();
 					break;
 				}
@@ -1972,11 +1887,7 @@ public class AVM implements VariableManager, Closeable {
 					double d1 = JRT.toDouble(o1);
 					double d2 = JRT.toDouble(o2);
 					double ans = Math.pow(d1, d2);
-					if (JRT.isActuallyLong(ans)) {
-						push((long) Math.rint(ans));
-					} else {
-						push(ans);
-					}
+					push(ans);
 					position.next();
 					break;
 				}
@@ -2117,7 +2028,7 @@ public class AVM implements VariableManager, Closeable {
 					// set the initial variables
 					Map<String, String> env = System.getenv();
 					for (Map.Entry<String, String> var : env.entrySet()) {
-						assignArray(environOffset, var.getKey(), var.getValue(), true);
+						assignArray(environOffset, var.getKey(), jrt.toInputScalar(var.getValue()), true);
 						pop(); // clean up the stack after the assignment
 					}
 					position.next();
@@ -2144,7 +2055,7 @@ public class AVM implements VariableManager, Closeable {
 					pop();
 					for (int i = 1; i < argc; i++) {
 						// assignArray(argvOffset, i+1, arguments.get(i), true);
-						assignArray(argvOffset, i, arguments.get(i - 1), true);
+						assignArray(argvOffset, i, jrt.toInputScalar(arguments.get(i - 1)), true);
 						pop(); // clean up the stack after the assignment
 					}
 					position.next();
@@ -2537,8 +2448,8 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case ASSIGN_FILENAME: {
 					Object v = pop();
-					jrt.setFILENAMEViaJrt(v == null ? "" : v.toString());
-					push(v == null ? "" : v.toString());
+					jrt.setFILENAMEViaJrt(v);
+					push(v == null ? "" : v);
 					position.next();
 					break;
 				}
@@ -2830,7 +2741,8 @@ public class AVM implements VariableManager, Closeable {
 		assocArray.clear();
 		long cnt = 0;
 		while (tokenizer.hasMoreElements()) {
-			assocArray.put(++cnt, tokenizer.nextElement());
+			Object value = tokenizer.nextElement();
+			assocArray.put(++cnt, jrt.toInputScalar(value));
 		}
 		push(cnt);
 	}
@@ -3020,16 +2932,11 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	private void setNumOnJRT(long fieldNum, double num) {
-		String numString;
-		if (JRT.isActuallyLong(num)) {
-			numString = Long.toString((long) Math.rint(num));
-		} else {
-			numString = Double.toString(num);
-		}
+		String numString = jrt.toAwkString(Double.valueOf(num));
 
 		// same code as ASSIGN_AS_INPUT_FIELD
 		if (fieldNum == 0) {
-			jrt.setInputLine(numString.toString());
+			jrt.setInputLine(numString);
 			jrt.jrtParseFields();
 		} else {
 			jrt.jrtSetInputField(numString, fieldNum);
@@ -3190,7 +3097,7 @@ public class AVM implements VariableManager, Closeable {
 		// When offsets are not available yet, treat the assignment as part of this
 		// AVM's baseline initial-variable snapshot.
 		if (globalVariableOffsets == null || globalVariableArrays == null) {
-			Object normalized = normalizeVariableValue(obj);
+			Object normalized = normalizeExternalVariableValue(obj);
 			baseInitialVariables.put(name, normalized);
 			if (JRT.isJrtManagedSpecialVariable(name)) {
 				baseSpecialVariables.put(name, normalized);
@@ -3207,7 +3114,7 @@ public class AVM implements VariableManager, Closeable {
 		Boolean arrayObj = globalVariableArrays.get(name);
 
 		if (offsetObj != null) {
-			Object normalized = normalizeVariableValue(obj);
+			Object normalized = normalizeExternalVariableValue(obj);
 			if (arrayObj.booleanValue()) {
 				if (normalized instanceof Map) {
 					runtimeStack.setFilelistVariable(offsetObj.intValue(), normalized);
@@ -3219,7 +3126,7 @@ public class AVM implements VariableManager, Closeable {
 				runtimeStack.setFilelistVariable(offsetObj.intValue(), normalized);
 			}
 		} else if (runtimeStack.hasGlobalVariable(name)) {
-			Object normalized = normalizeVariableValue(obj);
+			Object normalized = normalizeExternalVariableValue(obj);
 			runtimeStack.setGlobalVariable(name, normalized);
 		}
 	}
@@ -3277,7 +3184,7 @@ public class AVM implements VariableManager, Closeable {
 	/** {@inheritDoc} */
 	@Override
 	public void setFILENAME(String filename) {
-		jrt.setFILENAMEViaJrt(filename);
+		jrt.setFILENAMEViaJrt(jrt.toInputScalar(filename));
 	}
 
 	/** {@inheritDoc} */
@@ -3287,7 +3194,7 @@ public class AVM implements VariableManager, Closeable {
 			Map<Object, Object> argv = newAwkArray();
 			argv.put(0L, "jawk");
 			for (int i = 0; i < arguments.size(); i++) {
-				argv.put(Long.valueOf(i + 1L), arguments.get(i));
+				argv.put(Long.valueOf(i + 1L), jrt.toInputScalar(arguments.get(i)));
 			}
 			return argv;
 		}
@@ -3384,7 +3291,13 @@ public class AVM implements VariableManager, Closeable {
 		return nested;
 	}
 
-	private Object normalizeVariableValue(Object value) {
+	private Object normalizeExternalVariableValue(Object value) {
+		if (value instanceof String) {
+			return jrt.toInputScalar(value);
+		}
+		if (!(value instanceof Map) && !(value instanceof List)) {
+			return value;
+		}
 		return AssocArray.normalizeValue(value, sortedArrayKeys);
 	}
 

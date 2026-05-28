@@ -173,6 +173,17 @@ public class JRTHotPathBenchmark {
 	}
 
 	/**
+	 * Measures {@link JRT#toDouble(Object)} for an input-derived fully numeric
+	 * string.
+	 *
+	 * @return converted value
+	 */
+	@Benchmark
+	public double toDoubleStrNumNumeric() {
+		return JRT.toDouble(this.nonZeroStrNum);
+	}
+
+	/**
 	 * Measures {@link JRT#toDouble(Object)} for an input-derived numeric-prefix
 	 * string.
 	 *

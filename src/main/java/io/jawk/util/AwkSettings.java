@@ -162,19 +162,8 @@ public class AwkSettings {
 		int equalsIdx = keyValue.indexOf('=');
 		String name = keyValue.substring(0, equalsIdx);
 		String valueString = keyValue.substring(equalsIdx + 1);
-		Object value;
-		// deduce type
-		try {
-			value = Integer.parseInt(valueString);
-		} catch (NumberFormatException nfe) {
-			try {
-				value = Double.parseDouble(valueString);
-			} catch (NumberFormatException nfe2) {
-				value = valueString;
-			}
-		}
 		// note: can overwrite previously defined variables
-		putVariable(name, value);
+		putVariable(name, valueString);
 	}
 
 	/**

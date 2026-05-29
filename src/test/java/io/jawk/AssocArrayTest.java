@@ -298,8 +298,8 @@ public class AssocArrayTest {
 		assertFalse(data.containsKey("old"));
 		assertFalse(data.containsKey(1));
 		assertFalse(data.containsKey(2));
-		assertEquals("alpha", data.get(1L));
-		assertEquals("beta", data.get(2L));
+		assertEquals("alpha", data.get(1L).toString());
+		assertEquals("beta", data.get(2L).toString());
 	}
 
 	@Test

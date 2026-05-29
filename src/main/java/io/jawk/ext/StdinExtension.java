@@ -258,7 +258,7 @@ public class StdinExtension extends AbstractExtension implements JawkExtension {
 				isEof = true;
 				return 0;
 			}
-			getJrt().setInputLine((String) lineObj);
+			getJrt().setInputLine(getJrt().toInputScalar((String) lineObj));
 			getJrt().jrtParseFields();
 			return 1;
 		} catch (InterruptedException ie) {

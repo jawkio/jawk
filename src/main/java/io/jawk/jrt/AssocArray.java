@@ -69,13 +69,26 @@ public interface AssocArray extends Map<Object, Object> {
 
 	/**
 	 * Converts a key to the canonical form expected by AWK: {@code null} and
-	 * {@link UninitializedObject} map to the empty string.
+	 * {@link UninitializedObject} map to the empty string, and internal input
+	 * strings map to their string value.
 	 *
 	 * @param key the raw key
 	 * @return the normalized key, never {@code null}
 	 */
 	static Object normalizeKey(Object key) {
-		return (key == null || key instanceof UninitializedObject) ? "" : key;
+		if (key == null || key instanceof UninitializedObject) {
+			return "";
+		}
+		if (key instanceof StrNum) {
+			return key.toString();
+		}
+		if (key instanceof Double || key instanceof Float) {
+			double numericKey = ((Number) key).doubleValue();
+			if (JRT.isActuallyLong(numericKey)) {
+				return Long.valueOf((long) Math.rint(numericKey));
+			}
+		}
+		return key;
 	}
 
 	/**
@@ -109,11 +122,7 @@ public interface AssocArray extends Map<Object, Object> {
 	 * @return {@code true} if the key (or its numeric equivalent) is present
 	 */
 	default boolean isIn(Object key) {
-		if (key == null || key instanceof UninitializedObject) {
-// According to AWK semantics, an uninitialized index
-// evaluates to the empty string, not numeric zero
-			key = "";
-		}
+		key = normalizeKey(key);
 		if (containsKey(key)) {
 			return true;
 		}

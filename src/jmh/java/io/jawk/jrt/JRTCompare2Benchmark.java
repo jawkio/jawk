@@ -57,10 +57,14 @@ public class JRTCompare2Benchmark {
 	private Object stringLeft;
 	private Object stringRightEqual;
 	private Object stringRightGreater;
-	private Object numericStringLeft;
-	private Object numericStringRightEqual;
-	private Object numericStringRightGreater;
+	private Object plainNumericStringLeft;
+	private Object plainNumericStringRightEqual;
+	private Object plainNumericStringRightGreater;
 	private Object nonNumericString;
+	private Object strNumLeft;
+	private Object strNumRightEqual;
+	private Object strNumRightGreater;
+	private Object nonNumericStrNum;
 
 	/**
 	 * Initializes benchmark operands as mutable state fields so the benchmark body
@@ -78,10 +82,14 @@ public class JRTCompare2Benchmark {
 		this.stringLeft = "alpha";
 		this.stringRightEqual = "alpha";
 		this.stringRightGreater = "bravo";
-		this.numericStringLeft = "123";
-		this.numericStringRightEqual = "123.0";
-		this.numericStringRightGreater = "456";
+		this.plainNumericStringLeft = "123";
+		this.plainNumericStringRightEqual = "123.0";
+		this.plainNumericStringRightGreater = "456";
 		this.nonNumericString = "2x";
+		this.strNumLeft = new StrNum("123");
+		this.strNumRightEqual = new StrNum("123.0");
+		this.strNumRightGreater = new StrNum("456");
+		this.nonNumericStrNum = new StrNum("2x");
 	}
 
 	/**
@@ -155,33 +163,66 @@ public class JRTCompare2Benchmark {
 	}
 
 	/**
-	 * Measures equality for two numeric string operands.
+	 * Measures equality for two plain numeric-looking {@link String} operands.
 	 *
 	 * @return the comparison result
 	 */
 	@Benchmark
-	public boolean numericStringEquals() {
-		return JRT.compare2(this.numericStringLeft, this.numericStringRightEqual, 0);
+	public boolean plainNumericStringEquals() {
+		return JRT.compare2(this.plainNumericStringLeft, this.plainNumericStringRightEqual, 0);
 	}
 
 	/**
-	 * Measures less-than comparison for two numeric string operands.
+	 * Measures less-than comparison for two plain numeric-looking {@link String}
+	 * operands.
 	 *
 	 * @return the comparison result
 	 */
 	@Benchmark
-	public boolean numericStringLessThan() {
-		return JRT.compare2(this.numericStringLeft, this.numericStringRightGreater, -1);
+	public boolean plainNumericStringLessThan() {
+		return JRT.compare2(this.plainNumericStringLeft, this.plainNumericStringRightGreater, -1);
 	}
 
 	/**
-	 * Measures equality for a boxed {@link Long} and a numeric string operand.
+	 * Measures equality for a boxed {@link Long} and a plain numeric-looking
+	 * {@link String} operand.
 	 *
 	 * @return the comparison result
 	 */
 	@Benchmark
-	public boolean mixedLongNumericStringEquals() {
-		return JRT.compare2(this.longLeft, this.numericStringRightEqual, 0);
+	public boolean mixedLongPlainNumericStringEquals() {
+		return JRT.compare2(this.longLeft, this.plainNumericStringRightEqual, 0);
+	}
+
+	/**
+	 * Measures equality for two input-derived numeric string operands.
+	 *
+	 * @return the comparison result
+	 */
+	@Benchmark
+	public boolean strNumEquals() {
+		return JRT.compare2(this.strNumLeft, this.strNumRightEqual, 0);
+	}
+
+	/**
+	 * Measures less-than comparison for two input-derived numeric string operands.
+	 *
+	 * @return the comparison result
+	 */
+	@Benchmark
+	public boolean strNumLessThan() {
+		return JRT.compare2(this.strNumLeft, this.strNumRightGreater, -1);
+	}
+
+	/**
+	 * Measures equality for a boxed {@link Long} and an input-derived numeric
+	 * string operand.
+	 *
+	 * @return the comparison result
+	 */
+	@Benchmark
+	public boolean mixedLongStrNumEquals() {
+		return JRT.compare2(this.longLeft, this.strNumRightEqual, 0);
 	}
 
 	/**
@@ -193,5 +234,16 @@ public class JRTCompare2Benchmark {
 	@Benchmark
 	public boolean mixedLongNonNumericStringLessThan() {
 		return JRT.compare2(this.longLeft, this.nonNumericString, -1);
+	}
+
+	/**
+	 * Measures fallback string comparison for a numeric operand and a nonnumeric
+	 * input-derived string.
+	 *
+	 * @return the comparison result
+	 */
+	@Benchmark
+	public boolean mixedLongNonNumericStrNumLessThan() {
+		return JRT.compare2(this.longLeft, this.nonNumericStrNum, -1);
 	}
 }

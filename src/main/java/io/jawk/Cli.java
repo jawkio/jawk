@@ -382,17 +382,7 @@ public final class Cli {
 		}
 		String name = m.group(1);
 		String valueString = m.group(2);
-		Object value;
-		try {
-			value = Integer.parseInt(valueString);
-		} catch (NumberFormatException nfe) {
-			try {
-				value = Double.parseDouble(valueString);
-			} catch (NumberFormatException nfe2) {
-				value = valueString;
-			}
-		}
-		settings.putVariable(name, value);
+		settings.putVariable(name, valueString);
 	}
 
 	/**

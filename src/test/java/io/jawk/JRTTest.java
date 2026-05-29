@@ -127,22 +127,22 @@ public class JRTTest {
 	}
 
 	@Test
-	public void testCompare2NumericStrings() {
-		assertTrue(JRT.compare2("3", "3.0", 0));
+	public void testCompare2PlainStrings() {
+		assertFalse(JRT.compare2("3", "3.0", 0));
 		assertTrue(JRT.compare2("3", "4.0", -1));
 		assertTrue(JRT.compare2("4.0", "3", 1));
-		assertTrue(JRT.compare2("1e2", "100", 0));
-		assertTrue(JRT.compare2("+.5", "0.5", 0));
-		assertTrue(JRT.compare2("5.", "5.0", 0));
-		assertTrue(JRT.compare2("-1E+2", "-100", 0));
+		assertFalse(JRT.compare2("1e2", "100", 0));
+		assertFalse(JRT.compare2("+.5", "0.5", 0));
+		assertFalse(JRT.compare2("5.", "5.0", 0));
+		assertFalse(JRT.compare2("-1E+2", "-100", 0));
 		assertFalse(JRT.compare2("1e2147483649", "2", 0));
 		assertTrue(JRT.compare2("1e2147483649", "2", -1));
 	}
 
 	@Test
 	public void testCompare2MixedNumberAndString() {
-		assertTrue(JRT.compare2(3L, "3.0", 0));
-		assertTrue(JRT.compare2("3.0", 3L, 0));
+		assertFalse(JRT.compare2(3L, "3.0", 0));
+		assertFalse(JRT.compare2("3.0", 3L, 0));
 		assertTrue(JRT.compare2(3L, "4", -1));
 		assertTrue(JRT.compare2("4", 3L, 1));
 	}
@@ -221,8 +221,8 @@ public class JRTTest {
 		int n = jrt.split(map, "a b");
 		assertEquals(2, n);
 		assertEquals(2L, map.get(0L));
-		assertEquals("a", map.get(1L));
-		assertEquals("b", map.get(2L));
+		assertEquals("a", map.get(1L).toString());
+		assertEquals("b", map.get(2L).toString());
 		assertFalse(map.containsKey(1));
 	}
 
@@ -232,9 +232,37 @@ public class JRTTest {
 		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
 		int n = jrt.split("[ \t]+", aa, " 9853   shen");
 		assertEquals(3, n);
-		assertEquals("", aa.get(1));
-		assertEquals("9853", aa.get(2));
-		assertEquals("shen", aa.get(3));
+		assertEquals("", aa.get(1).toString());
+		assertEquals("9853", aa.get(2).toString());
+		assertEquals("shen", aa.get(3).toString());
+	}
+
+	@Test
+	public void testInputDerivedDollarZeroScalarIsCachedUntilRecordChanges() {
+		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
+		jrt.setFS(" ");
+		jrt.setInputLine(jrt.toInputScalar("9 10"));
+
+		Object firstRead = jrt.getInputLine();
+		assertSame(firstRead, jrt.getInputLine());
+
+		jrt.jrtSetInputField("8", 1);
+
+		Object changedRead = jrt.getInputLine();
+		assertNotSame(firstRead, changedRead);
+		assertSame(changedRead, jrt.getInputLine());
+		assertEquals("8 10", changedRead.toString());
+	}
+
+	@Test
+	public void testFilenamePreservesScalarAttribute() {
+		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
+
+		jrt.setFILENAMEViaJrt(jrt.toInputScalar("9"));
+		assertTrue(JRT.compare2(jrt.getFILENAME(), Long.valueOf(10L), -1));
+
+		jrt.setFILENAMEViaJrt("9");
+		assertFalse(JRT.compare2(jrt.getFILENAME(), Long.valueOf(10L), -1));
 	}
 
 	@Test

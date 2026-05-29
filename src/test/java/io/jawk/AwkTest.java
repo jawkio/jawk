@@ -478,7 +478,11 @@ public class AwkTest {
 
 	@Test
 	public void testAtan2ArgumentsLeftAssociativity() throws Exception {
-		assertEquals("atan2 arguments must be eval'ed from left to right", 0.0, AWK.eval("atan2(a++, a++)"));
+		AwkTestSupport
+				.awkTest("atan2 arguments left to right")
+				.script("BEGIN { print atan2(a++, a++) }")
+				.expect("0\n")
+				.runAndAssert();
 	}
 
 	@Test

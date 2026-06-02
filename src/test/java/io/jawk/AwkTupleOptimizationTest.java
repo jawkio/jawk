@@ -140,6 +140,51 @@ public class AwkTupleOptimizationTest {
 	}
 
 	@Test
+	public void foldsScalarAssignmentPopIntoNonPushingAssignment() throws Exception {
+		String script = "BEGIN { a = -2; b = 2; c = 4; print a + b + c }\n";
+		AwkTestSupport
+				.awkTest("folds scalar assignment pop")
+				.script(script)
+				.expect("4\n")
+				.runAndAssert();
+
+		AwkProgram tuples = new Awk().compile(script);
+		assertFalse(
+				"ASSIGN followed by POP should be folded",
+				hasAdjacentOpcodes(tuples, Opcode.ASSIGN, Opcode.POP));
+		assertEquals("Expected one non-pushing assignment per statement", 3, countOpcode(tuples, Opcode.ASSIGN_NOPUSH));
+	}
+
+	@Test
+	public void keepsScalarAssignmentPushWhenResultIsUsed() throws Exception {
+		String script = "BEGIN { print (a = 7) + 1 }\n";
+		AwkTestSupport
+				.awkTest("assignment expression pushes result")
+				.script(script)
+				.expect("8\n")
+				.runAndAssert();
+
+		AwkProgram tuples = new Awk().compile(script);
+		assertEquals("Assignment expression should still push its result", 1, countOpcode(tuples, Opcode.ASSIGN));
+		assertEquals("Expression assignment should not use ASSIGN_NOPUSH", 0, countOpcode(tuples, Opcode.ASSIGN_NOPUSH));
+	}
+
+	@Test
+	public void keepsAssignmentPopWhenPopIsBranchTarget() throws Exception {
+		String script = "BEGIN { cond = 1; cond ? (a = 1) : (b = 2); print a + 0, b + 0 }\n";
+		AwkTestSupport
+				.awkTest("keeps branch-target assignment pop")
+				.script(script)
+				.expect("1 0\n")
+				.runAndAssert();
+
+		AwkProgram tuples = new Awk().compile(script);
+		assertTrue(
+				"ASSIGN followed by targeted POP should not be folded",
+				hasAddressTargetWithPredecessor(tuples, Opcode.ASSIGN, Opcode.POP));
+	}
+
+	@Test
 	public void compilesGetlineIntoVariableWithDedicatedTargetOpcode() throws Exception {
 		String script = "{ getline line; print line; exit }\n";
 		AwkProgram tuples = new Awk().compile(script);
@@ -472,6 +517,57 @@ public class AwkTupleOptimizationTest {
 			tracker.next();
 		}
 		return opcodes;
+	}
+
+	private static boolean hasAdjacentOpcodes(AwkProgram tuples, Opcode first, Opcode second) {
+		Opcode previous = null;
+		PositionTracker tracker = rawTuples(tuples).top();
+		while (!tracker.isEOF()) {
+			Opcode current = tracker.opcode();
+			if (previous == first && current == second) {
+				return true;
+			}
+			previous = current;
+			tracker.next();
+		}
+		return false;
+	}
+
+	private static boolean hasAddressTargetWithPredecessor(AwkProgram tuples, Opcode predecessor, Opcode target) {
+		Set<Integer> targetIndexes = new HashSet<>();
+		PositionTracker tracker = rawTuples(tuples).top();
+		while (!tracker.isEOF()) {
+			Address address = tracker.current().getAddress();
+			if (address != null) {
+				targetIndexes.add(Integer.valueOf(address.index()));
+			}
+			tracker.next();
+		}
+
+		tracker = rawTuples(tuples).top();
+		Opcode previous = null;
+		while (!tracker.isEOF()) {
+			if (targetIndexes.contains(Integer.valueOf(tracker.currentIndex()))
+					&& previous == predecessor
+					&& tracker.opcode() == target) {
+				return true;
+			}
+			previous = tracker.opcode();
+			tracker.next();
+		}
+		return false;
+	}
+
+	private static int countOpcode(AwkProgram tuples, Opcode opcode) {
+		int count = 0;
+		PositionTracker tracker = rawTuples(tuples).top();
+		while (!tracker.isEOF()) {
+			if (tracker.opcode() == opcode) {
+				count++;
+			}
+			tracker.next();
+		}
+		return count;
 	}
 
 	private static String dumpTuples(AwkProgram tuples) throws Exception {

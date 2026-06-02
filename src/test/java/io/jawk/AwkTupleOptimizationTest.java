@@ -170,6 +170,21 @@ public class AwkTupleOptimizationTest {
 	}
 
 	@Test
+	public void keepsAssignmentPopWhenPopIsBranchTarget() throws Exception {
+		String script = "BEGIN { cond = 1; cond ? (a = 1) : (b = 2); print a + 0, b + 0 }\n";
+		AwkTestSupport
+				.awkTest("keeps branch-target assignment pop")
+				.script(script)
+				.expect("1 0\n")
+				.runAndAssert();
+
+		AwkProgram tuples = new Awk().compile(script);
+		assertTrue(
+				"ASSIGN followed by targeted POP should not be folded",
+				hasAdjacentOpcodes(tuples, Opcode.ASSIGN, Opcode.POP));
+	}
+
+	@Test
 	public void compilesGetlineIntoVariableWithDedicatedTargetOpcode() throws Exception {
 		String script = "{ getline line; print line; exit }\n";
 		AwkProgram tuples = new Awk().compile(script);

@@ -1882,6 +1882,7 @@ public class AwkTuples implements Serializable {
 		int[] indexMapping = new int[originalSize];
 		Arrays.fill(indexMapping, -1);
 		java.util.List<Tuple> optimizedQueue = new ArrayList<Tuple>(originalSize);
+		boolean[] addressTargets = addressTargets(original, originalSize);
 
 		boolean modified = false;
 		int oldIndex = 0;
@@ -1890,11 +1891,14 @@ public class AwkTuples implements Serializable {
 			Tuple tuple = original.get(oldIndex);
 			if (tuple.getOpcode() == Opcode.ASSIGN && (oldIndex + 1) < originalSize) {
 				Tuple nextTuple = original.get(oldIndex + 1);
-				if (nextTuple.getOpcode() == Opcode.POP) {
-					// Statement assignments compile as ASSIGN followed by POP because
-					// ASSIGN normally leaves the assigned value on the stack for
-					// expression contexts such as print (a = 1). When the result is
-					// discarded immediately, replace both opcodes with ASSIGN_NOPUSH.
+				// Statement assignments compile as ASSIGN followed by POP because
+				// ASSIGN normally leaves the assigned value on the stack for
+				// expression contexts such as print (a = 1). When the result is
+				// discarded immediately, replace both opcodes with ASSIGN_NOPUSH
+				// unless the POP itself is a branch target. Branches that land on
+				// the POP must continue to skip the assignment and only discard the
+				// already-computed expression result.
+				if (nextTuple.getOpcode() == Opcode.POP && !addressTargets[oldIndex + 1]) {
 					Tuple replacement = createAssignNoPush(tuple);
 					optimizedQueue.add(replacement);
 					mapFoldedRange(indexMapping, oldIndex, 2, newIndex);
@@ -1981,6 +1985,20 @@ public class AwkTuples implements Serializable {
 
 		remapAddresses(indexMapping);
 		return true;
+	}
+
+	private boolean[] addressTargets(java.util.List<Tuple> tuples, int tupleCount) {
+		boolean[] targets = new boolean[tupleCount];
+		for (Tuple tuple : tuples) {
+			Address address = tuple.getAddress();
+			if (address != null) {
+				int index = address.index();
+				if (index >= 0 && index < tupleCount) {
+					targets[index] = true;
+				}
+			}
+		}
+		return targets;
 	}
 
 	private void mapFoldedRange(int[] indexMapping, int startIndex, int length, int newIndex) {

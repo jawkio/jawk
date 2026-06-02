@@ -32,6 +32,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -69,7 +70,7 @@ public class AwkTuples implements Serializable {
 	 * can be serialized and patched efficiently. A linked list would make every
 	 * lookup O(n) and complicate address reassignment.
 	 */
-	private java.util.List<Tuple> queue = new ArrayList<Tuple>(100) {
+	private List<Tuple> queue = new ArrayList<Tuple>(100) {
 		private static final long serialVersionUID = -6334362156408598578L;
 
 		@Override
@@ -1878,10 +1879,10 @@ public class AwkTuples implements Serializable {
 			return false;
 		}
 
-		java.util.List<Tuple> original = new ArrayList<Tuple>(queue);
+		List<Tuple> original = new ArrayList<Tuple>(queue);
 		int[] indexMapping = new int[originalSize];
 		Arrays.fill(indexMapping, -1);
-		java.util.List<Tuple> optimizedQueue = new ArrayList<Tuple>(originalSize);
+		List<Tuple> optimizedQueue = new ArrayList<Tuple>(originalSize);
 		boolean[] isAddressTarget = addressTargets(original, originalSize);
 
 		boolean modified = false;
@@ -1889,6 +1890,25 @@ public class AwkTuples implements Serializable {
 		int newIndex = 0;
 		while (oldIndex < originalSize) {
 			Tuple tuple = original.get(oldIndex);
+			// If an earlier rewrite already happened in this pass, wait for the
+			// next pass before collapsing concat runs. That gives literal folding
+			// priority so fully constant chains become one PUSH_STRING instead of a
+			// partially folded PUSH_STRING plus MULTI_CONCAT.
+			ConcatRun concatRun = !modified ? concatRun(original, isAddressTarget, oldIndex) : null;
+			if (concatRun != null) {
+				// Chained concatenations compile as a run of binary CONCAT tuples
+				// after all operands have been pushed. Collapse that postfix run into
+				// one counted MULTI_CONCAT, e.g. CONCAT, CONCAT, CONCAT ->
+				// MULTI_CONCAT 4.
+				Tuple replacement = createMultiConcat(concatRun.itemCount, tuple.getLineNumber());
+				optimizedQueue.add(replacement);
+				mapFoldedRange(indexMapping, oldIndex, concatRun.tupleCount, newIndex);
+				oldIndex += concatRun.tupleCount;
+				newIndex++;
+				modified = true;
+				continue;
+			}
+
 			if (tuple.getOpcode() == Opcode.ASSIGN && (oldIndex + 1) < originalSize) {
 				Tuple nextTuple = original.get(oldIndex + 1);
 				// Statement assignments compile as ASSIGN followed by POP because
@@ -1987,7 +2007,7 @@ public class AwkTuples implements Serializable {
 		return true;
 	}
 
-	private boolean[] addressTargets(java.util.List<Tuple> tuples, int tupleCount) {
+	private boolean[] addressTargets(List<Tuple> tuples, int tupleCount) {
 		boolean[] targets = new boolean[tupleCount];
 		for (Tuple tuple : tuples) {
 			Address address = tuple.getAddress();
@@ -2005,6 +2025,29 @@ public class AwkTuples implements Serializable {
 		for (int idx = 0; idx < length; idx++) {
 			indexMapping[startIndex + idx] = newIndex;
 		}
+	}
+
+	private ConcatRun concatRun(List<Tuple> original, boolean[] isAddressTarget, int oldIndex) {
+		Tuple tuple = original.get(oldIndex);
+		if (tuple.getOpcode() != Opcode.CONCAT) {
+			return null;
+		}
+
+		int itemCount = 2;
+		int tupleCount = 1;
+		int currentIndex = oldIndex + 1;
+		while (currentIndex < original.size()
+				&& original.get(currentIndex).getOpcode() == Opcode.CONCAT
+				&& !isAddressTarget[currentIndex]) {
+			itemCount++;
+			tupleCount++;
+			currentIndex++;
+		}
+
+		if (tupleCount < 2) {
+			return null;
+		}
+		return new ConcatRun(tupleCount, itemCount);
 	}
 
 	private Object literalValue(Tuple tuple) {
@@ -2160,6 +2203,22 @@ public class AwkTuples implements Serializable {
 		Tuple tuple = new Tuple.InputFieldTuple(fieldIndex);
 		tuple.setLineNumber(lineNumber);
 		return tuple;
+	}
+
+	private Tuple createMultiConcat(int itemCount, int lineNumber) {
+		Tuple tuple = new Tuple.CountTuple(Opcode.MULTI_CONCAT, itemCount);
+		tuple.setLineNumber(lineNumber);
+		return tuple;
+	}
+
+	private static final class ConcatRun {
+		private final int tupleCount;
+		private final int itemCount;
+
+		private ConcatRun(int tupleCount, int itemCount) {
+			this.tupleCount = tupleCount;
+			this.itemCount = itemCount;
+		}
 	}
 
 	private void remapAddresses(int[] indexMapping) {

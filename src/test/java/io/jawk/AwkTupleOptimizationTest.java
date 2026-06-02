@@ -136,7 +136,58 @@ public class AwkTupleOptimizationTest {
 		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
 		assertFalse("Literal concatenation should eliminate CONCAT tuple", opcodes.contains(Opcode.CONCAT));
+		assertFalse("Literal concatenation should eliminate MULTI_CONCAT tuple", opcodes.contains(Opcode.MULTI_CONCAT));
 		assertTrue("Expected folded literal push of foobar", hasLiteralPush(tuples, "foobar"));
+	}
+
+	@Test
+	public void foldsChainedLiteralStringConcatenation() throws Exception {
+		String script = "BEGIN { print \"foo\" \"bar\" \"baz\" \"qux\" }\n";
+		AwkTestSupport
+				.awkTest("folds chained literal string concatenation")
+				.script(script)
+				.expect("foobarbazqux\n")
+				.runAndAssert();
+
+		AwkProgram tuples = new Awk().compile(script);
+		List<Opcode> opcodes = collectOpcodes(tuples);
+		assertFalse("Chained literal concatenation should eliminate CONCAT tuple", opcodes.contains(Opcode.CONCAT));
+		assertFalse(
+				"Chained literal concatenation should eliminate MULTI_CONCAT tuple",
+				opcodes.contains(Opcode.MULTI_CONCAT));
+		assertTrue("Expected folded literal push of foobarbazqux", hasLiteralPush(tuples, "foobarbazqux"));
+	}
+
+	@Test
+	public void optimizesChainedStringConcatenationAsSingleMultiConcat() throws Exception {
+		String script = "BEGIN { s1 = \"alpha\"; s2 = \"beta\"; print s1 \"-\" s2 \":\" }\n";
+		AwkTestSupport
+				.awkTest("counted chained string concatenation")
+				.script(script)
+				.expect("alpha-beta:\n")
+				.runAndAssert();
+
+		AwkProgram tuples = new Awk().compile(script);
+		assertEquals(
+				"Expected one counted MULTI_CONCAT for the mixed chain",
+				1,
+				countOpcodeWithCount(tuples, Opcode.MULTI_CONCAT, 4));
+		assertEquals("Optimized mixed chain should not keep binary CONCAT tuples", 0, countOpcode(tuples, Opcode.CONCAT));
+	}
+
+	@Test
+	public void keepsParserConcatenationBinaryWhenOptimizationDisabled() throws Exception {
+		String script = "BEGIN { s1 = \"alpha\"; s2 = \"beta\"; print s1 \"-\" s2 \":\" }\n";
+		AwkProgram tuples = new Awk().compile(script, true);
+
+		assertEquals(
+				"Unoptimized parser output should keep one binary CONCAT per expression pair",
+				3,
+				countOpcode(tuples, Opcode.CONCAT));
+		assertEquals(
+				"Unoptimized parser output should not emit counted chain MULTI_CONCAT",
+				0,
+				countOpcode(tuples, Opcode.MULTI_CONCAT));
 	}
 
 	@Test
@@ -204,6 +255,11 @@ public class AwkTupleOptimizationTest {
 		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
 		assertTrue("Numeric literal concatenation should preserve CONCAT tuple", opcodes.contains(Opcode.CONCAT));
+		assertEquals("Numeric literal concatenation should remain binary", 1, countOpcode(tuples, Opcode.CONCAT));
+		assertEquals(
+				"Binary numeric literal concatenation should not use MULTI_CONCAT",
+				0,
+				countOpcode(tuples, Opcode.MULTI_CONCAT));
 		assertFalse("Optimizer should not fold numeric/string concatenation", hasLiteralPush(tuples, "1x"));
 	}
 
@@ -563,6 +619,20 @@ public class AwkTupleOptimizationTest {
 		PositionTracker tracker = rawTuples(tuples).top();
 		while (!tracker.isEOF()) {
 			if (tracker.opcode() == opcode) {
+				count++;
+			}
+			tracker.next();
+		}
+		return count;
+	}
+
+	private static int countOpcodeWithCount(AwkProgram tuples, Opcode opcode, long expectedCount) {
+		int count = 0;
+		PositionTracker tracker = rawTuples(tuples).top();
+		while (!tracker.isEOF()) {
+			if (tracker.opcode() == opcode
+					&& tracker.current() instanceof Tuple.CountTuple
+					&& ((Tuple.CountTuple) tracker.current()).getCount() == expectedCount) {
 				count++;
 			}
 			tracker.next();

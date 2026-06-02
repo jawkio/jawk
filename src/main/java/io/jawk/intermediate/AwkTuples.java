@@ -1860,6 +1860,9 @@ public class AwkTuples implements Serializable {
 	}
 
 	private boolean peepholeOptimize() {
+		// Keep running the local rewrite pass because one fold can expose another.
+		// Example: PUSH 1, PUSH 2, ADD, NEGATE first becomes PUSH 3, NEGATE and
+		// only the next pass can fold it to PUSH -3.
 		boolean modified = false;
 		boolean passModified;
 		do {
@@ -1885,11 +1888,31 @@ public class AwkTuples implements Serializable {
 		int newIndex = 0;
 		while (oldIndex < originalSize) {
 			Tuple tuple = original.get(oldIndex);
+			if (tuple.getOpcode() == Opcode.ASSIGN && (oldIndex + 1) < originalSize) {
+				Tuple nextTuple = original.get(oldIndex + 1);
+				if (nextTuple.getOpcode() == Opcode.POP) {
+					// Statement assignments compile as ASSIGN followed by POP because
+					// ASSIGN normally leaves the assigned value on the stack for
+					// expression contexts such as print (a = 1). When the result is
+					// discarded immediately, replace both opcodes with ASSIGN_NOPUSH.
+					Tuple replacement = createAssignNoPush(tuple);
+					optimizedQueue.add(replacement);
+					mapFoldedRange(indexMapping, oldIndex, 2, newIndex);
+					oldIndex += 2;
+					newIndex++;
+					modified = true;
+					continue;
+				}
+			}
+
 			Object literal = literalValue(tuple);
 			if (literal != null) {
 				if ((oldIndex + 1) < originalSize) {
 					Tuple nextTuple = original.get(oldIndex + 1);
 					if (nextTuple.getOpcode() == Opcode.GET_INPUT_FIELD) {
+						// Replace PUSH literal + GET_INPUT_FIELD with the constant-field
+						// opcode so $1, $2, etc. do not need a stack round trip for the
+						// field index.
 						long fieldIndex = JRT.toLong(literal);
 						Tuple replacement = createGetInputFieldConst(
 								fieldIndex,
@@ -1909,6 +1932,9 @@ public class AwkTuples implements Serializable {
 					if (secondLiteral != null) {
 						Object folded = foldBinary(literal, secondLiteral, opTuple);
 						if (folded != null) {
+							// Fold two literal pushes followed by a pure binary operator
+							// into a single literal push, e.g. PUSH 1, PUSH 2, ADD ->
+							// PUSH 3.
 							Tuple replacement = createLiteralPush(folded, tuple.getLineNumber());
 							optimizedQueue.add(replacement);
 							mapFoldedRange(indexMapping, oldIndex, 3, newIndex);
@@ -1923,6 +1949,8 @@ public class AwkTuples implements Serializable {
 					Tuple opTuple = original.get(oldIndex + 1);
 					Object folded = foldUnary(literal, opTuple);
 					if (folded != null) {
+						// Fold one literal push followed by a pure unary operator into a
+						// single literal push, e.g. PUSH 5, NEGATE -> PUSH -5.
 						Tuple replacement = createLiteralPush(folded, tuple.getLineNumber());
 						optimizedQueue.add(replacement);
 						mapFoldedRange(indexMapping, oldIndex, 2, newIndex);
@@ -2098,6 +2126,16 @@ public class AwkTuples implements Serializable {
 		}
 		tuple.setLineNumber(lineNumber);
 		return tuple;
+	}
+
+	private Tuple createAssignNoPush(Tuple tuple) {
+		Tuple.VariableTuple variableTuple = (Tuple.VariableTuple) tuple;
+		Tuple replacement = new Tuple.VariableTuple(
+				Opcode.ASSIGN_NOPUSH,
+				variableTuple.getVariableOffset(),
+				variableTuple.isGlobal());
+		replacement.setLineNumber(tuple.getLineNumber());
+		return replacement;
 	}
 
 	private Tuple createGetInputFieldConst(long fieldIndex, int lineNumber) {
@@ -2548,6 +2586,7 @@ public class AwkTuples implements Serializable {
 	private boolean requiresEvalGlobalFrame(Opcode opcode) {
 		switch (opcode) {
 		case ASSIGN:
+		case ASSIGN_NOPUSH:
 		case ASSIGN_ARRAY:
 		case DEREFERENCE:
 		case PLUS_EQ:

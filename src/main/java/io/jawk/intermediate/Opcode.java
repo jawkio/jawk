@@ -197,8 +197,8 @@ public enum Opcode {
 	 */
 	CONCAT,
 	/**
-	 * Assigns the top-of-stack to a variable. The contents of the stack
-	 * are unaffected.
+	 * Assigns the top-of-stack to a variable and pushes the assigned value back
+	 * onto the stack.
 	 * <p>
 	 * Argument 1: offset of the particular variable into the variable manager<br/>
 	 * Argument 2: whether the variable is global or local
@@ -207,6 +207,17 @@ public enum Opcode {
 	 * Stack after: x ...
 	 */
 	ASSIGN,
+	/**
+	 * Assigns the top-of-stack to a variable without pushing the assigned value
+	 * back onto the stack.
+	 * <p>
+	 * Argument 1: offset of the particular variable into the variable manager<br/>
+	 * Argument 2: whether the variable is global or local
+	 * <p>
+	 * Stack before: x ...<br/>
+	 * Stack after: ...
+	 */
+	ASSIGN_NOPUSH,
 	/**
 	 * Assigns an item to an array element. The item remains on the stack.
 	 * <p>

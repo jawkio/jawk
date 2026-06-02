@@ -140,6 +140,36 @@ public class AwkTupleOptimizationTest {
 	}
 
 	@Test
+	public void foldsScalarAssignmentPopIntoNonPushingAssignment() throws Exception {
+		String script = "BEGIN { a = -2; b = 2; c = 4; print a + b + c }\n";
+		AwkTestSupport
+				.awkTest("folds scalar assignment pop")
+				.script(script)
+				.expect("4\n")
+				.runAndAssert();
+
+		AwkProgram tuples = new Awk().compile(script);
+		assertFalse(
+				"ASSIGN followed by POP should be folded",
+				hasAdjacentOpcodes(tuples, Opcode.ASSIGN, Opcode.POP));
+		assertEquals("Expected one non-pushing assignment per statement", 3, countOpcode(tuples, Opcode.ASSIGN_NOPUSH));
+	}
+
+	@Test
+	public void keepsScalarAssignmentPushWhenResultIsUsed() throws Exception {
+		String script = "BEGIN { print (a = 7) + 1 }\n";
+		AwkTestSupport
+				.awkTest("assignment expression pushes result")
+				.script(script)
+				.expect("8\n")
+				.runAndAssert();
+
+		AwkProgram tuples = new Awk().compile(script);
+		assertEquals("Assignment expression should still push its result", 1, countOpcode(tuples, Opcode.ASSIGN));
+		assertEquals("Expression assignment should not use ASSIGN_NOPUSH", 0, countOpcode(tuples, Opcode.ASSIGN_NOPUSH));
+	}
+
+	@Test
 	public void compilesGetlineIntoVariableWithDedicatedTargetOpcode() throws Exception {
 		String script = "{ getline line; print line; exit }\n";
 		AwkProgram tuples = new Awk().compile(script);
@@ -472,6 +502,32 @@ public class AwkTupleOptimizationTest {
 			tracker.next();
 		}
 		return opcodes;
+	}
+
+	private static boolean hasAdjacentOpcodes(AwkProgram tuples, Opcode first, Opcode second) {
+		Opcode previous = null;
+		PositionTracker tracker = rawTuples(tuples).top();
+		while (!tracker.isEOF()) {
+			Opcode current = tracker.opcode();
+			if (previous == first && current == second) {
+				return true;
+			}
+			previous = current;
+			tracker.next();
+		}
+		return false;
+	}
+
+	private static int countOpcode(AwkProgram tuples, Opcode opcode) {
+		int count = 0;
+		PositionTracker tracker = rawTuples(tuples).top();
+		while (!tracker.isEOF()) {
+			if (tracker.opcode() == opcode) {
+				count++;
+			}
+			tracker.next();
+		}
+		return count;
 	}
 
 	private static String dumpTuples(AwkProgram tuples) throws Exception {

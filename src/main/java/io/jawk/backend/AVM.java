@@ -1177,13 +1177,19 @@ public class AVM implements VariableManager, Closeable {
 					position.next();
 					break;
 				}
-				case ASSIGN: {
+				case ASSIGN:
+				case ASSIGN_NOPUSH: {
 					// arg[0] = offset
 					// arg[1] = isGlobal
 					// stack[0] = value
 					VariableTuple variableTuple = (VariableTuple) tuple;
 					Object value = pop();
-					assign(variableTuple.getVariableOffset(), value, variableTuple.isGlobal(), position);
+					assign(
+							variableTuple.getVariableOffset(),
+							value,
+							variableTuple.isGlobal(),
+							position,
+							opcode == Opcode.ASSIGN);
 					position.next();
 					break;
 				}
@@ -2040,8 +2046,7 @@ public class AVM implements VariableManager, Closeable {
 					argcOffset = offsetTuple.getValue();
 					// assign(argcOffset, arguments.size(), true, position); // true = global
 					// +1 to include the "jawk" program name (ARGV[0])
-					assign(argcOffset, arguments.size() + 1, true, position); // true = global
-					pop(); // clean up the stack after the assignment
+					assign(argcOffset, arguments.size() + 1, true, position, false); // true = global
 					position.next();
 					break;
 				}
@@ -2691,8 +2696,7 @@ public class AVM implements VariableManager, Closeable {
 
 	private void execSubForVariable(SubstitutionVariableTuple tuple, PositionTracker position) {
 		String newString = execSubOrGSub(tuple.isGlobalSubstitution());
-		assign(tuple.getVariableOffset(), newString, tuple.isGlobal(), position);
-		pop();
+		assign(tuple.getVariableOffset(), newString, tuple.isGlobal(), position, false);
 	}
 
 	private void execSubForArrayReference(SubstitutionVariableTuple tuple) {
@@ -2984,12 +2988,14 @@ public class AVM implements VariableManager, Closeable {
 	/**
 	 * Awk variable assignment functionality.
 	 */
-	private void assign(long l, Object value, boolean isGlobal, PositionTracker position) {
+	private void assign(long l, Object value, boolean isGlobal, PositionTracker position, boolean push) {
 		// check if curr value already refers to an array
 		if (runtimeStack.getVariable(l, isGlobal) instanceof Map) {
 			throw new AwkRuntimeException(position.lineNumber(), "cannot assign anything to an unindexed associative array");
 		}
-		push(value);
+		if (push) {
+			push(value);
+		}
 		runtimeStack.setVariable(l, value, isGlobal);
 		// When specials are compiled correctly, they use ASSIGN_* and skip this path.
 	}

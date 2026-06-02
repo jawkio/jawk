@@ -2029,7 +2029,7 @@ public class AwkTuples implements Serializable {
 
 	private ConcatRun concatRun(List<Tuple> original, boolean[] isAddressTarget, int oldIndex) {
 		Tuple tuple = original.get(oldIndex);
-		if (tuple.getOpcode() != Opcode.CONCAT) {
+		if (tuple.getOpcode() != Opcode.CONCAT || isAddressTarget[oldIndex]) {
 			return null;
 		}
 

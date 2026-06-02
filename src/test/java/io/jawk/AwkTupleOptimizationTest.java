@@ -191,6 +191,30 @@ public class AwkTupleOptimizationTest {
 	}
 
 	@Test
+	public void keepsConcatRunWhenFirstConcatIsBranchTarget() {
+		AwkTuples tuples = new AwkTuples();
+		tuples.pushSourceLineNumber(1);
+		Address concatTarget = tuples.createAddress("concat-target");
+
+		tuples.dereference(1, false, true);
+		tuples.ifFalse(concatTarget);
+		tuples.dereference(2, false, true);
+		tuples.dereference(3, false, true);
+		tuples.address(concatTarget);
+		tuples.concat();
+		tuples.dereference(4, false, true);
+		tuples.concat();
+
+		tuples.optimize();
+
+		assertEquals("Targeted CONCAT run should remain binary", 2, countOpcode(tuples, Opcode.CONCAT));
+		assertEquals(
+				"Targeted CONCAT run should not be folded into MULTI_CONCAT",
+				0,
+				countOpcode(tuples, Opcode.MULTI_CONCAT));
+	}
+
+	@Test
 	public void foldsScalarAssignmentPopIntoNonPushingAssignment() throws Exception {
 		String script = "BEGIN { a = -2; b = 2; c = 4; print a + b + c }\n";
 		AwkTestSupport
@@ -615,8 +639,12 @@ public class AwkTupleOptimizationTest {
 	}
 
 	private static int countOpcode(AwkProgram tuples, Opcode opcode) {
+		return countOpcode(rawTuples(tuples), opcode);
+	}
+
+	private static int countOpcode(AwkTuples tuples, Opcode opcode) {
 		int count = 0;
-		PositionTracker tracker = rawTuples(tuples).top();
+		PositionTracker tracker = tuples.top();
 		while (!tracker.isEOF()) {
 			if (tracker.opcode() == opcode) {
 				count++;

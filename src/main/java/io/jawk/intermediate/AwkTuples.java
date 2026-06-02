@@ -1882,7 +1882,7 @@ public class AwkTuples implements Serializable {
 		int[] indexMapping = new int[originalSize];
 		Arrays.fill(indexMapping, -1);
 		java.util.List<Tuple> optimizedQueue = new ArrayList<Tuple>(originalSize);
-		boolean[] addressTargets = addressTargets(original, originalSize);
+		boolean[] isAddressTarget = addressTargets(original, originalSize);
 
 		boolean modified = false;
 		int oldIndex = 0;
@@ -1898,7 +1898,7 @@ public class AwkTuples implements Serializable {
 				// unless the POP itself is a branch target. Branches that land on
 				// the POP must continue to skip the assignment and only discard the
 				// already-computed expression result.
-				if (nextTuple.getOpcode() == Opcode.POP && !addressTargets[oldIndex + 1]) {
+				if (nextTuple.getOpcode() == Opcode.POP && !isAddressTarget[oldIndex + 1]) {
 					Tuple replacement = createAssignNoPush(tuple);
 					optimizedQueue.add(replacement);
 					mapFoldedRange(indexMapping, oldIndex, 2, newIndex);

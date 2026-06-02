@@ -181,7 +181,7 @@ public class AwkTupleOptimizationTest {
 		AwkProgram tuples = new Awk().compile(script);
 		assertTrue(
 				"ASSIGN followed by targeted POP should not be folded",
-				hasAdjacentOpcodes(tuples, Opcode.ASSIGN, Opcode.POP));
+				hasAddressTargetWithPredecessor(tuples, Opcode.ASSIGN, Opcode.POP));
 	}
 
 	@Test
@@ -528,6 +528,31 @@ public class AwkTupleOptimizationTest {
 				return true;
 			}
 			previous = current;
+			tracker.next();
+		}
+		return false;
+	}
+
+	private static boolean hasAddressTargetWithPredecessor(AwkProgram tuples, Opcode predecessor, Opcode target) {
+		Set<Integer> targetIndexes = new HashSet<>();
+		PositionTracker tracker = rawTuples(tuples).top();
+		while (!tracker.isEOF()) {
+			Address address = tracker.current().getAddress();
+			if (address != null) {
+				targetIndexes.add(Integer.valueOf(address.index()));
+			}
+			tracker.next();
+		}
+
+		tracker = rawTuples(tuples).top();
+		Opcode previous = null;
+		while (!tracker.isEOF()) {
+			if (targetIndexes.contains(Integer.valueOf(tracker.currentIndex()))
+					&& previous == predecessor
+					&& tracker.opcode() == target) {
+				return true;
+			}
+			previous = tracker.opcode();
 			tracker.next();
 		}
 		return false;

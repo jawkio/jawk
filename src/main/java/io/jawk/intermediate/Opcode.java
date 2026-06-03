@@ -197,8 +197,9 @@ public enum Opcode {
 	 */
 	CONCAT,
 	/**
-	 * Pops and concatenates N strings from the top-of-stack; pushes the result onto
-	 * the stack. The number of items is passed in as a tuple argument.
+	 * Pops and concatenates N values from the top-of-stack after AWK string
+	 * conversion; pushes the result onto the stack. The number of items is passed
+	 * in as a tuple argument.
 	 * <p>
 	 * Argument: # of items (N)
 	 * <p>

@@ -1177,6 +1177,29 @@ public class AVM implements VariableManager, Closeable {
 					position.next();
 					break;
 				}
+				case MULTI_CONCAT: {
+					// arg[0] = number of stack items to concatenate
+					// stack[0] = last concatenation operand
+					CountTuple countTuple = (CountTuple) tuple;
+					int count = (int) countTuple.getCount();
+					// Store String references so appends run left-to-right. Converting
+					// operands to char[] would copy them once before StringBuilder
+					// copies them again, and front-inserting would shift existing
+					// content on each operand.
+					String[] values = new String[count];
+					int resultLength = 0;
+					for (int i = count - 1; i >= 0; i--) {
+						values[i] = jrt.toAwkString(pop());
+						resultLength += values[i].length();
+					}
+					StringBuilder resultString = new StringBuilder(resultLength);
+					for (String value : values) {
+						resultString.append(value);
+					}
+					push(resultString.toString());
+					position.next();
+					break;
+				}
 				case ASSIGN:
 				case ASSIGN_NOPUSH: {
 					// arg[0] = offset

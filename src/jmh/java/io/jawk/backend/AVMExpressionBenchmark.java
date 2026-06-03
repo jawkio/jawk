@@ -61,6 +61,9 @@ public class AVMExpressionBenchmark {
 	private AwkExpression fieldConcatenation;
 	private AwkExpression fieldRegexMatch;
 	private AwkExpression multiStringConcatenation;
+	private AwkExpression constantStringConcatenation;
+	private AwkExpression stringConstantStringConstantConcatenation;
+	private AwkExpression fourStringConcatenation;
 	private AwkExpression mixedExpression;
 
 	/**
@@ -78,6 +81,9 @@ public class AVMExpressionBenchmark {
 		this.fieldConcatenation = awk.compileExpression("$1 \" test\"");
 		this.fieldRegexMatch = awk.compileExpression("$1 ~ /test/");
 		this.multiStringConcatenation = awk.compileExpression("$1 \" test1\" \" test2\" \" test3\"");
+		this.constantStringConcatenation = awk.compileExpression("\"constant\" \"constant\" \"constant\" \"constant\"");
+		this.stringConstantStringConstantConcatenation = awk.compileExpression("$1 \"constant\" $2 \"constant\"");
+		this.fourStringConcatenation = awk.compileExpression("$1 $2 $3 $4");
 		this.mixedExpression = awk.compileExpression("($1 + $2) \":\" ($3 ~ /test/) \":\" $4");
 		this.avm = new AVM(new AwkSettings(), Collections.emptyMap());
 		this.avm.prepareForEval("42 3.14 test-value suffix");
@@ -157,6 +163,40 @@ public class AVMExpressionBenchmark {
 	@Benchmark
 	public Object multiStringConcatenation() throws IOException {
 		return this.avm.eval(this.multiStringConcatenation);
+	}
+
+	/**
+	 * Measures the optimized constant-folded case for four constant string
+	 * operands.
+	 *
+	 * @return expression result
+	 * @throws IOException if input preparation or evaluation fails
+	 */
+	@Benchmark
+	public Object constantStringConcatenation() throws IOException {
+		return this.avm.eval(this.constantStringConcatenation);
+	}
+
+	/**
+	 * Measures alternating field and constant string concatenation.
+	 *
+	 * @return expression result
+	 * @throws IOException if input preparation or evaluation fails
+	 */
+	@Benchmark
+	public Object stringConstantStringConstantConcatenation() throws IOException {
+		return this.avm.eval(this.stringConstantStringConstantConcatenation);
+	}
+
+	/**
+	 * Measures concatenation of four field string operands.
+	 *
+	 * @return expression result
+	 * @throws IOException if input preparation or evaluation fails
+	 */
+	@Benchmark
+	public Object fourStringConcatenation() throws IOException {
+		return this.avm.eval(this.fourStringConcatenation);
 	}
 
 	/**

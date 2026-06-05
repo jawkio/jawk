@@ -265,7 +265,7 @@ jobs:
 
       - name: Create pull request for next development version
         if: always() && steps.release.outcome == 'success'
-        uses: devops-infra/action-pull-request@v1.2.1
+        uses: devops-infra/action-pull-request@v1.2.3
         with:
           github_token: ${{ github.token }}
           source_branch: release/v${{ inputs.releaseVersion }}

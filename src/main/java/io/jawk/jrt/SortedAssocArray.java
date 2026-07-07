@@ -83,7 +83,7 @@ public class SortedAssocArray extends TreeMap<Object, Object> implements AssocAr
 			}
 			key = lKey;
 		}
-		result = BLANK;
+		result = UNTYPED;
 		super.put(key, result);
 		return result;
 	}

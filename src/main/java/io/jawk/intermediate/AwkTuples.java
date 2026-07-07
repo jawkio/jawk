@@ -376,6 +376,22 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
+	 * Emits a variable read that does not assign a blank value when the variable
+	 * is still untyped.
+	 * <p>
+	 * This is used by extension functions such as gawk's {@code typeof()} that
+	 * need the current lvalue state, not AWK's normal scalar autovivification side
+	 * effect.
+	 * </p>
+	 *
+	 * @param offset variable offset
+	 * @param isGlobal whether the variable is global
+	 */
+	public void peekDereference(int offset, boolean isGlobal) {
+		queue.add(new Tuple.VariableTuple(Opcode.PEEK_DEREFERENCE, offset, isGlobal));
+	}
+
+	/**
 	 * <p>
 	 * plusEq.
 	 * </p>
@@ -1081,6 +1097,14 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
+	 * Peeks at a stack-provided associative-array element, preserving missing
+	 * entries as {@code null}.
+	 */
+	public void peekArrayElementRaw() {
+		queue.add(new Tuple.NoOperandTuple(Opcode.PEEK_ARRAY_ELEMENT_RAW));
+	}
+
+	/**
 	 * Dereferences an associative-array element as a nested array, creating it if
 	 * needed.
 	 */
@@ -1554,6 +1578,32 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
+	 * Emits a function call tuple that prints a runtime warning before invoking
+	 * the function.
+	 *
+	 * @param addressSupplier supplier resolving the function's entry point
+	 * @param funcName function name
+	 * @param numFormalParams formal parameter count
+	 * @param numActualParams actual parameter count to pass at runtime
+	 * @param runtimeWarning warning text to print before the call
+	 */
+	public void callFunction(
+			Supplier<Address> addressSupplier,
+			String funcName,
+			int numFormalParams,
+			int numActualParams,
+			String runtimeWarning) {
+		queue
+				.add(
+						new Tuple.CallFunctionTuple(
+								addressSupplier,
+								funcName,
+								numFormalParams,
+								numActualParams,
+								runtimeWarning));
+	}
+
+	/**
 	 * <p>
 	 * setReturnResult.
 	 * </p>
@@ -1721,6 +1771,18 @@ public class AwkTuples implements Serializable {
 	 */
 	public void extension(ExtensionFunction function, int paramCount, boolean isInitial) {
 		queue.add(new Tuple.ExtensionTuple(function, paramCount, isInitial));
+	}
+
+	/**
+	 * Emits an extension call tuple with an optional warning to print at runtime.
+	 *
+	 * @param function extension function metadata
+	 * @param paramCount number of parameters on the stack
+	 * @param isInitial whether this is the first extension in a chained call
+	 * @param runtimeWarning warning text to print before invocation
+	 */
+	public void extension(ExtensionFunction function, int paramCount, boolean isInitial, String runtimeWarning) {
+		queue.add(new Tuple.ExtensionTuple(function, paramCount, isInitial, runtimeWarning));
 	}
 
 	/**

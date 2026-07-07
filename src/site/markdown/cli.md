@@ -121,6 +121,12 @@ $ java -jar jawk-${project.version}-standalone.jar -l stdin -f script.awk
 
 Jawk accepts the registered extension name, the simple class name, or the fully qualified class name. Additional extension classes can be placed on the JVM classpath before launching Jawk.
 
+When no `-l` option is given, Jawk enables the built-in [GNU Awk compatibility extension](extensions.html#gawk), which provides `asort()`, `typeof()`, and the other gawk builtins. Passing `-l` replaces that default set, so add `-l GawkExtension` when the script still needs the gawk functions:
+
+```shell-session
+$ java -jar jawk-${project.version}-standalone.jar -l GawkExtension -l stdin -f script.awk
+```
+
 ## Enable Sandbox Mode
 
 Use `-S` or `--sandbox` to switch to the sandboxed tuple compiler and runtime:

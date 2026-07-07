@@ -529,9 +529,23 @@ public final class AwkTestSupport {
 		private final List<String> argumentSpecs = new ArrayList<>();
 		private final Map<String, Object> assignments = new LinkedHashMap<>();
 		private final Map<String, String> environment = new LinkedHashMap<>();
+		private boolean redirectErrorStream;
 
 		private CliTestBuilder(String description) {
 			super(description);
+		}
+
+		/**
+		 * Merges the CLI's stderr into the captured stdout, like a shell
+		 * {@code 2>&1} redirection. Use this for cases whose expected transcript
+		 * interleaves warnings with regular output, such as the gawk suite's
+		 * {@code .ok} files.
+		 *
+		 * @return this builder for method chaining
+		 */
+		public CliTestBuilder redirectErrorStream() {
+			redirectErrorStream = true;
+			return this;
 		}
 
 		/**
@@ -604,7 +618,8 @@ public final class AwkTestSupport {
 					requiresPosix,
 					argumentSpecs,
 					assignments,
-					environment);
+					environment,
+					redirectErrorStream);
 		}
 	}
 
@@ -1091,6 +1106,7 @@ public final class AwkTestSupport {
 		private final List<String> argumentSpecs;
 		private final Map<String, Object> assignments;
 		private final Map<String, String> environment;
+		private final boolean redirectErrorStream;
 
 		CliTestCase(
 				TestLayout layout,
@@ -1100,11 +1116,13 @@ public final class AwkTestSupport {
 				boolean requiresPosix,
 				List<String> argumentSpecs,
 				Map<String, Object> assignments,
-				Map<String, String> environment) {
+				Map<String, String> environment,
+				boolean redirectErrorStream) {
 			super(layout, fileContents, operandSpecs, pathPlaceholders, requiresPosix);
 			this.argumentSpecs = new ArrayList<>(argumentSpecs);
 			this.assignments = new LinkedHashMap<>(assignments);
 			this.environment = new LinkedHashMap<>(environment);
+			this.redirectErrorStream = redirectErrorStream;
 		}
 
 		@Override
@@ -1119,10 +1137,14 @@ public final class AwkTestSupport {
 			for (Map.Entry<String, String> entry : environment.entrySet()) {
 				resolvedEnvironment.put(entry.getKey(), env.resolve(entry.getValue()));
 			}
+			PrintStream outStream = new PrintStream(outBytes, true, StandardCharsets.UTF_8.name());
+			PrintStream errStream = redirectErrorStream ?
+					outStream :
+					new PrintStream(errBytes, true, StandardCharsets.UTF_8.name());
 			Cli cli = new Cli(
 					in,
-					new PrintStream(outBytes, true, StandardCharsets.UTF_8.name()),
-					new PrintStream(errBytes, true, StandardCharsets.UTF_8.name()),
+					outStream,
+					errStream,
 					resolvedEnvironment);
 
 			List<String> args = new ArrayList<>();

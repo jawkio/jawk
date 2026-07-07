@@ -1,4 +1,4 @@
-package io.jawk.ext.annotations;
+package io.jawk.ext;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -22,32 +22,59 @@ package io.jawk.ext.annotations;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import java.util.Map;
-
 /**
- * Marks extension function arguments that must be evaluated and passed as
- * associative arrays backed by a {@link Map}.
- * <p>
- * On a Java parameter, this annotation marks the matching AWK argument
- * position. On a method, {@link #value()} names zero-based AWK argument
- * positions that cannot be expressed by a concrete Java parameter, typically
- * optional values consumed through {@code Object...}.
- * </p>
+ * Numeric value carrying gawk's boolean type attribute.
  */
-@Retention(RetentionPolicy.RUNTIME)
-@Target(
-{ ElementType.PARAMETER, ElementType.METHOD })
-public @interface JawkAssocArray {
+public final class GawkBool extends Number {
+
+	private static final long serialVersionUID = 1L;
+	private final boolean value;
 
 	/**
-	 * Zero-based AWK argument positions that must be associative arrays when this
-	 * annotation is placed on a method.
+	 * Creates a gawk boolean-number value.
 	 *
-	 * @return AWK argument positions requiring associative arrays
+	 * @param valueParam boolean value
 	 */
-	int[] value() default {};
+	public GawkBool(boolean valueParam) {
+		this.value = valueParam;
+	}
+
+	/**
+	 * Returns the boolean value.
+	 *
+	 * @return boolean value
+	 */
+	public boolean booleanValue() {
+		return value;
+	}
+
+	/** {@inheritDoc} */
+	@Override
+	public int intValue() {
+		return value ? 1 : 0;
+	}
+
+	/** {@inheritDoc} */
+	@Override
+	public long longValue() {
+		return value ? 1L : 0L;
+	}
+
+	/** {@inheritDoc} */
+	@Override
+	public float floatValue() {
+		return value ? 1.0F : 0.0F;
+	}
+
+	/** {@inheritDoc} */
+	@Override
+	public double doubleValue() {
+		return value ? 1.0D : 0.0D;
+	}
+
+	/** {@inheritDoc} */
+	@Override
+	public String toString() {
+		return value ? "1" : "0";
+	}
 }

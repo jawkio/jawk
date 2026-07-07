@@ -26,13 +26,29 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Pure regex replacement helpers used by the AVM.
+ * Pure regex replacement helpers used by the AVM and the gawk compatibility
+ * extension.
  */
-final class RegexRuntimeSupport {
+public final class RegexRuntimeSupport {
 
 	private RegexRuntimeSupport() {}
 
 	static String prepareReplacement(String awkRepl) {
+		return prepareReplacement(awkRepl, false);
+	}
+
+	/**
+	 * Converts an AWK replacement text into a Java {@link Matcher} replacement:
+	 * {@code &} becomes the whole match, {@code \&} a literal ampersand, and
+	 * {@code $} is escaped.
+	 *
+	 * @param awkRepl AWK replacement text
+	 * @param backreferences whether {@code \N} denotes capture group {@code N},
+	 *        as in gawk's {@code gensub()}; when {@code false}, {@code \N} stays
+	 *        literal as in {@code sub()} and {@code gsub()}
+	 * @return the equivalent Java replacement string
+	 */
+	public static String prepareReplacement(String awkRepl, boolean backreferences) {
 		if (awkRepl == null) {
 			return "";
 		}
@@ -45,7 +61,15 @@ final class RegexRuntimeSupport {
 		for (int i = 0; i < awkRepl.length(); i++) {
 			char c = awkRepl.charAt(i);
 
-			if (c == '\\' && i < awkRepl.length() - 1) {
+			if (c == '\\' && i == awkRepl.length() - 1) {
+				// In gensub mode a trailing backslash is a literal backslash;
+				// left bare it would make Matcher.appendReplacement throw. The
+				// sub()/gsub() mapping keeps its historical bare form.
+				javaRepl.append(backreferences ? "\\\\" : "\\");
+				continue;
+			}
+
+			if (c == '\\') {
 				i++;
 				c = awkRepl.charAt(i);
 				if (c == '&') {
@@ -53,6 +77,9 @@ final class RegexRuntimeSupport {
 					continue;
 				} else if (c == '\\') {
 					javaRepl.append("\\\\");
+					continue;
+				} else if (backreferences && Character.isDigit(c)) {
+					javaRepl.append('$').append(c);
 					continue;
 				}
 

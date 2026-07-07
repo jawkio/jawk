@@ -43,6 +43,11 @@ public final class ExtensionRegistry {
 
 	static {
 		registerBuiltin(
+				new GawkExtension(),
+				GawkExtension.class.getName(),
+				GawkExtension.class.getSimpleName(),
+				"GNU Awk Compatibility");
+		registerBuiltin(
 				StdinExtension.INSTANCE,
 				StdinExtension.class.getName(),
 				StdinExtension.class.getSimpleName(),

@@ -42,6 +42,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jawk.backend.AVM;
 import io.jawk.ext.ExtensionFunction;
 import io.jawk.ext.ExtensionRegistry;
+import io.jawk.ext.GawkExtension;
 import io.jawk.ext.JawkExtension;
 import io.jawk.frontend.AwkParser;
 import io.jawk.frontend.AstNode;
@@ -119,7 +120,7 @@ public class Awk {
 	private AstNode lastAst;
 
 	/**
-	 * Create a new instance of Awk without extensions.
+	 * Create a new instance of Awk with default extensions.
 	 */
 	public Awk() {
 		this(new AwkSettings());
@@ -131,7 +132,7 @@ public class Awk {
 	 * @param settings behavioral configuration for this engine
 	 */
 	public Awk(AwkSettings settings) {
-		this(ExtensionSetup.EMPTY, settings);
+		this(ExtensionSetup.createDefault(), settings);
 	}
 
 	/**
@@ -202,21 +203,21 @@ public class Awk {
 
 	static Map<String, ExtensionFunction> createExtensionFunctionMap(JawkExtension... extensions) {
 		if (extensions == null || extensions.length == 0) {
-			return ExtensionSetup.EMPTY.functions;
+			return ExtensionSetup.createDefault().functions;
 		}
 		return createExtensionFunctionMap(Arrays.asList(extensions));
 	}
 
 	static Map<String, JawkExtension> createExtensionInstanceMap(JawkExtension... extensions) {
 		if (extensions == null || extensions.length == 0) {
-			return ExtensionSetup.EMPTY.instances;
+			return ExtensionSetup.createDefault().instances;
 		}
 		return createExtensionInstanceMap(Arrays.asList(extensions));
 	}
 
 	private static ExtensionSetup createExtensionSetup(Collection<? extends JawkExtension> extensions) {
 		if (extensions == null || extensions.isEmpty()) {
-			return ExtensionSetup.EMPTY;
+			return ExtensionSetup.createDefault();
 		}
 		Map<String, ExtensionFunction> keywordMap = new LinkedHashMap<String, ExtensionFunction>();
 		Map<String, JawkExtension> instanceMap = new LinkedHashMap<String, JawkExtension>();
@@ -246,9 +247,15 @@ public class Awk {
 
 	private static final class ExtensionSetup {
 
-		private static final ExtensionSetup EMPTY = new ExtensionSetup(
-				Collections.<String, ExtensionFunction>emptyMap(),
-				Collections.<String, JawkExtension>emptyMap());
+		/*
+		 * Extensions keep per-engine runtime state (VariableManager, JRT), so the
+		 * default set must be a fresh instance per Awk engine, never a shared
+		 * singleton: two engines sharing one GawkExtension would clobber each
+		 * other's runtime bindings.
+		 */
+		private static ExtensionSetup createDefault() {
+			return createExtensionSetup(Collections.singletonList(new GawkExtension()));
+		}
 
 		private final Map<String, ExtensionFunction> functions;
 		private final Map<String, JawkExtension> instances;
@@ -958,7 +965,15 @@ public class Awk {
 			List<String> resolvedArguments = arguments == null ? Collections.<String>emptyList() : arguments;
 			try (AVM avm = createAvm(settings)) {
 				avm.setAwkSink(sink);
-				avm.setErrorStream(errorStream != null ? errorStream : sink.getPrintStream());
+				if (errorStream != null) {
+					avm.setErrorStream(errorStream);
+					avm.setWarningStream(errorStream);
+				} else {
+					// process stderr keeps its historical sink fallback, but
+					// warnings stay on System.err so they can never leak into
+					// the script output a host captures
+					avm.setErrorStream(sink.getPrintStream());
+				}
 				try {
 					InputSource resolvedSource;
 					if (inputSource != null) {

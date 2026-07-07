@@ -45,6 +45,7 @@ import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import io.jawk.ext.ExtensionRegistry;
+import io.jawk.ext.GawkExtension;
 import io.jawk.ext.JawkExtension;
 import io.jawk.ext.StdinExtension;
 import io.jawk.frontend.AstNode;
@@ -415,6 +416,11 @@ public final class Cli {
 			if (extension instanceof StdinExtension) {
 				extension = new StdinExtension(inputStream);
 			}
+			// Extensions keep per-engine runtime state (VariableManager, JRT),
+			// so never share the registry's instance across engines
+			if (extension instanceof GawkExtension) {
+				extension = new GawkExtension();
+			}
 			extensions.add(extension);
 		}
 
@@ -486,6 +492,7 @@ public final class Cli {
 		try (AVM avm = awk.createAvm(profiling)) {
 			avm.setAwkSink(sink);
 			avm.setErrorStream(err);
+			avm.setWarningStream(err);
 			if (memoryFile != null) {
 				restorePersistentMemoryIfPresent(avm, memoryFile);
 			}

@@ -60,7 +60,7 @@ public class HashAssocArray extends HashMap<Object, Object> implements AssocArra
 			}
 			key = lKey;
 		}
-		result = BLANK;
+		result = UNTYPED;
 		super.put(key, result);
 		return result;
 	}

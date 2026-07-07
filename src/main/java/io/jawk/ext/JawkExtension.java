@@ -23,6 +23,7 @@ package io.jawk.ext;
  */
 
 import java.util.Map;
+import io.jawk.backend.AVM;
 import io.jawk.jrt.JRT;
 import io.jawk.jrt.VariableManager;
 import io.jawk.util.AwkSettings;
@@ -78,6 +79,15 @@ public interface JawkExtension {
 	 * @param settings Reference to the settings
 	 */
 	void init(VariableManager vm, JRT jrt, AwkSettings settings);
+
+	/**
+	 * Called after the runtime global variable slots have been allocated and before
+	 * the first executable tuple runs.
+	 *
+	 * @param avm interpreter instance about to execute the tuple stream
+	 * @param jrt runtime services associated with {@code avm}
+	 */
+	default void beforeStart(AVM avm, JRT jrt) {}
 
 	/**
 	 * <p>

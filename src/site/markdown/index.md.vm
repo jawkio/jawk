@@ -108,6 +108,7 @@ Key Capabilities
 - CLI-compatible AWK execution with inline scripts, script files, operands, and input files
 - Java entry points for script execution, expression evaluation, tuple compilation, and repeated reuse
 - Structured input through `InputSource` for row-oriented or already-tokenized data
+- Gawk builtins enabled by default: `asort()`, `asorti()`, `typeof()`, `isarray()`, `mkbool()`, `gensub()`, and `PROCINFO["sorted_in"]`
 - Explicit extension loading through the Java API or the CLI
 - Tuple serialization for CLI precompilation and later loading
 - Sandbox-specific tuples and runtime components through `SandboxedAwk`
@@ -121,6 +122,14 @@ Jawk aims to be a practical AWK implementation for JVM environments, but it is n
 - `printf()` and `sprintf()` try to replicate C-style formatting but may have differences due to Java's formatting capabilities and limitations.
 - Some floating-point edge cases may differ due to Java's handling of floating-point arithmetic and representation.
 - Jawk resolves user-defined function calls during compilation. It does not defer all of that work to runtime.
+
+Jawk also follows gawk in several places where gawk departs from historical AWK:
+
+- A regexp literal used as an ordinary expression evaluates as `$0 ~ /re/`, per POSIX; `x = /re/` assigns 0 or 1, not the pattern text.
+- Typed regexp literals (`@/re/`) are accepted; `--posix` rejects them.
+- Because the [gawk compatibility extension](extensions.html#gawk) is enabled by default, `gensub`, `typeof`, `isarray`, `asort`, `asorti`, and `mkbool` are function names and can no longer be used as variables. Load an explicit extension list without `GawkExtension` to reclaim those identifiers.
+- Calling a user-defined function with more arguments than it declares is no longer a compile-time error: the extra expressions are evaluated and discarded, and a gawk-style warning is printed to stderr.
+- Assigning a scalar value to an array element (`a[1] = z`) types that element as a scalar; later using it as a subarray (`a[1][2] = 3`) is a runtime error, exactly as in gawk.
 
 History of Jawk
 ---------------

@@ -45,6 +45,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import io.jawk.Awk;
 import io.jawk.intermediate.UninitializedObject;
+import io.jawk.intermediate.UntypedObject;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 /**
@@ -92,6 +93,8 @@ public class JRT {
 	private AwkSink awkSink;
 	/** PrintStream used for command error output */
 	private PrintStream error;
+	/** PrintStream used for runtime warning messages, stderr by default. */
+	private PrintStream warning = System.err;
 	// Last input line consumed for getline-style transport.
 	private Object inputLine = null;
 	// Current record state ($0, $1, $2, ...).
@@ -220,6 +223,29 @@ public class JRT {
 	 */
 	public void setErrorStream(PrintStream errorStream) {
 		this.error = Objects.requireNonNull(errorStream, "errorStream");
+	}
+
+	/**
+	 * Sets the stream that receives runtime warning messages. Warnings default
+	 * to {@link System#err}, mirroring where gawk sends its diagnostics, and are
+	 * deliberately kept apart from the process-stderr stream so they can never
+	 * leak into a captured script output.
+	 *
+	 * @param warningStream stream to receive runtime warnings
+	 */
+	public void setWarningStream(PrintStream warningStream) {
+		this.warning = Objects.requireNonNull(warningStream, "warningStream");
+	}
+
+	/**
+	 * Prints a runtime warning message to the warning stream (stderr by
+	 * default), mirroring where gawk sends its diagnostics.
+	 *
+	 * @param message warning text to print
+	 */
+	public void printWarning(String message) {
+		warning.println(message);
+		warning.flush();
 	}
 
 	/**
@@ -505,6 +531,20 @@ public class JRT {
 	}
 
 	/**
+	 * Reads a map element without creating a missing entry.
+	 *
+	 * @param map map to inspect
+	 * @param key key to look up
+	 * @return stored value, or {@code null} when the key has never been created
+	 */
+	public static Object peekAwkValue(Map<Object, Object> map, Object key) {
+		if (containsAwkKey(map, key)) {
+			return map.get(AssocArray.normalizeKey(key));
+		}
+		return null;
+	}
+
+	/**
 	 * Convert Strings, Integers, and Doubles to Strings
 	 * based on the CONVFMT variable contents and the stored Locale.
 	 *
@@ -741,6 +781,28 @@ public class JRT {
 			}
 		}
 		return value;
+	}
+
+	/**
+	 * Returns whether the supplied value is an input-derived scalar that has a
+	 * numeric value.
+	 *
+	 * @param value value to inspect
+	 * @return {@code true} when {@code value} is an input numeric string
+	 */
+	public static boolean isInputScalarNumber(Object value) {
+		return value instanceof StrNum && ((StrNum) value).isNumber();
+	}
+
+	/**
+	 * Converts an untyped placeholder to AWK's assigned blank scalar value.
+	 *
+	 * @param value value to normalize for scalar assignment
+	 * @return assigned scalar blank when the value was untyped, otherwise the
+	 *         original value
+	 */
+	public static Object toAssignedScalar(Object value) {
+		return value instanceof UntypedObject ? BLANK : value;
 	}
 
 	static boolean isParseableNumber(String value, char decimalSeparator) {
@@ -1484,7 +1546,7 @@ public class JRT {
 			}
 		} else {
 			while (state.getNF() < fieldIndex) {
-				state.addField("");
+				state.addField(BLANK);
 			}
 			state.setField(fieldIndex - 1, valueObj);
 		}
@@ -1683,7 +1745,7 @@ public class JRT {
 		}
 
 		private Object normalizeFieldValue(Object value) {
-			if (value == null || value instanceof UninitializedObject) {
+			if (value == null) {
 				return "";
 			}
 			return value;

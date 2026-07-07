@@ -1,4 +1,4 @@
-package io.jawk.ext.annotations;
+package io.jawk.ext;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -22,32 +22,31 @@ package io.jawk.ext.annotations;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.util.Collection;
 import java.util.Map;
 
 /**
- * Marks extension function arguments that must be evaluated and passed as
- * associative arrays backed by a {@link Map}.
+ * Supplies the key traversal order used by {@code for (index in array)}
+ * statements.
  * <p>
- * On a Java parameter, this annotation marks the matching AWK argument
- * position. On a method, {@link #value()} names zero-based AWK argument
- * positions that cannot be expressed by a concrete Java parameter, typically
- * optional values consumed through {@code Object...}.
+ * The interpreter itself has no opinion about iteration order: it snapshots
+ * whatever collection this hook returns. Extensions that implement ordered
+ * traversal (such as the gawk compatibility extension honoring
+ * {@code PROCINFO["sorted_in"]}) register an instance from their
+ * {@code beforeStart} hook. Implementations that have no ordering to apply
+ * should return {@code array.keySet()} directly to avoid any extra copy.
  * </p>
  */
-@Retention(RetentionPolicy.RUNTIME)
-@Target(
-{ ElementType.PARAMETER, ElementType.METHOD })
-public @interface JawkAssocArray {
+@FunctionalInterface
+public interface ForInKeyOrder {
 
 	/**
-	 * Zero-based AWK argument positions that must be associative arrays when this
-	 * annotation is placed on a method.
+	 * Returns the keys of {@code array} in the order {@code for (index in array)}
+	 * should traverse them.
 	 *
-	 * @return AWK argument positions requiring associative arrays
+	 * @param array associative array about to be iterated
+	 * @return the keys in traversal order; the interpreter copies the returned
+	 *         collection before iterating
 	 */
-	int[] value() default {};
+	Collection<Object> order(Map<Object, Object> array);
 }

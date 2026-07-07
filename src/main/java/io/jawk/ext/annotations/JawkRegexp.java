@@ -26,28 +26,18 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.Map;
 
 /**
- * Marks extension function arguments that must be evaluated and passed as
- * associative arrays backed by a {@link Map}.
+ * Marks an extension function parameter that takes a regular expression, so a
+ * regexp literal ({@code /re/}) supplied at that position keeps its
+ * precompiled {@link java.util.regex.Pattern} instead of being evaluated as
+ * the boolean {@code $0 ~ /re/} expression.
  * <p>
- * On a Java parameter, this annotation marks the matching AWK argument
- * position. On a method, {@link #value()} names zero-based AWK argument
- * positions that cannot be expressed by a concrete Java parameter, typically
- * optional values consumed through {@code Object...}.
+ * Callers may also pass dynamic strings, so the annotated Java parameter must
+ * be declared as {@link Object} and the implementation should fall back to
+ * compiling the string form.
  * </p>
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(
-{ ElementType.PARAMETER, ElementType.METHOD })
-public @interface JawkAssocArray {
-
-	/**
-	 * Zero-based AWK argument positions that must be associative arrays when this
-	 * annotation is placed on a method.
-	 *
-	 * @return AWK argument positions requiring associative arrays
-	 */
-	int[] value() default {};
-}
+@Target(ElementType.PARAMETER)
+public @interface JawkRegexp {}

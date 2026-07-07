@@ -58,6 +58,8 @@ Construct it with extension instances when you want those functions available to
 Awk awk = new Awk(StdinExtension.INSTANCE, new MyExtension());
 ```
 
+A plain `new Awk()` enables the built-in [GNU Awk compatibility extension](extensions.html#gawk) (`asort()`, `typeof()`, and friends). Passing explicit extension instances replaces that default set, so include a `new GawkExtension()` in the list when the script still needs the gawk builtins.
+
 The dedicated [Writing Extensions](extensions-writing.html) guide covers how to write your own extensions to expose new functions, written in Java, to your AWK scripts.
 
 ## The Shortest Path: `script().execute()`

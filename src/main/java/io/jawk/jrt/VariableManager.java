@@ -111,6 +111,22 @@ public interface VariableManager {
 	Object getSUBSEP();
 
 	/**
+	 * Returns the current value of a named global variable or JRT-managed special
+	 * variable.
+	 * <p>
+	 * The default implementation returns {@code null}, so implementations that
+	 * predate this method keep compiling and behave as if every named variable
+	 * were unknown.
+	 * </p>
+	 *
+	 * @param name variable name
+	 * @return the variable value, or {@code null} when it is unknown or untyped
+	 */
+	default Object getVariable(String name) {
+		return null;
+	}
+
+	/**
 	 * Set the contents of the FILENAME variable.
 	 *
 	 * @param fileName File name

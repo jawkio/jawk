@@ -50,6 +50,7 @@ import io.jawk.AwkSandboxException;
 import io.jawk.ExitException;
 import io.jawk.ext.AbstractExtension;
 import io.jawk.ext.ExtensionFunction;
+import io.jawk.ext.ForInKeyOrder;
 import io.jawk.ext.JawkExtension;
 import io.jawk.intermediate.Address;
 import io.jawk.intermediate.Opcode;
@@ -71,6 +72,7 @@ import io.jawk.intermediate.Tuple.RegexTuple;
 import io.jawk.intermediate.Tuple.SubstitutionVariableTuple;
 import io.jawk.intermediate.Tuple.VariableTuple;
 import io.jawk.intermediate.UninitializedObject;
+import io.jawk.intermediate.UntypedObject;
 import io.jawk.jrt.AssocArray;
 import io.jawk.jrt.AwkRuntimeException;
 import io.jawk.jrt.AwkSink;
@@ -157,6 +159,9 @@ public class AVM implements VariableManager, Closeable {
 	private InputSource resolvedInputSource;
 	private AwkExpression installedEvalExpression;
 	private boolean mergedGlobalLayoutActive;
+
+	/** Optional extension-provided ordering for {@code for (index in array)} traversal. */
+	private ForInKeyOrder forInKeyOrder;
 
 	/**
 	 * Construct the interpreter.
@@ -259,6 +264,32 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	public void setErrorStream(PrintStream errorStream) {
 		jrt.setErrorStream(errorStream);
+	}
+
+	/**
+	 * Sets the stream that receives runtime warning messages (gawk-style
+	 * diagnostics). Warnings default to {@link System#err}.
+	 *
+	 * @param warningStream stream to receive runtime warnings
+	 */
+	public void setWarningStream(PrintStream warningStream) {
+		jrt.setWarningStream(warningStream);
+	}
+
+	/**
+	 * Registers the hook that decides the key traversal order of
+	 * {@code for (index in array)} statements.
+	 * <p>
+	 * When no hook is registered, iteration uses the array's natural key order.
+	 * Extensions typically register a hook from their {@code beforeStart}
+	 * method; the last registration wins.
+	 * </p>
+	 *
+	 * @param keyOrder traversal-order provider, or {@code null} to restore the
+	 *        natural key order
+	 */
+	public void setForInKeyOrder(ForInKeyOrder keyOrder) {
+		forInKeyOrder = keyOrder;
 	}
 
 	/**
@@ -1606,6 +1637,12 @@ public class AVM implements VariableManager, Closeable {
 					position.next();
 					break;
 				}
+				case PEEK_DEREFERENCE: {
+					VariableTuple variableTuple = (VariableTuple) tuple;
+					push(runtimeStack.getVariable(variableTuple.getVariableOffset(), variableTuple.isGlobal()));
+					position.next();
+					break;
+				}
 				case DEREF_ARRAY: {
 					// stack[0] = array index
 					Object idx = pop(); // idx
@@ -1636,6 +1673,15 @@ public class AVM implements VariableManager, Closeable {
 						Object value = map.get(idx);
 						push(value != null ? value : BLANK);
 					}
+					position.next();
+					break;
+				}
+				case PEEK_ARRAY_ELEMENT_RAW: {
+					// stack[0] = array index
+					Object idx = pop();
+					checkScalar(idx);
+					Map<Object, Object> map = toMap(pop());
+					push(JRT.peekAwkValue(map, idx));
 					position.next();
 					break;
 				}
@@ -1942,7 +1988,7 @@ public class AVM implements VariableManager, Closeable {
 					}
 					@SuppressWarnings("unchecked")
 					Map<Object, Object> map = (Map<Object, Object>) o;
-					push(new ArrayDeque<>(map.keySet()));
+					push(new ArrayDeque<>(forInKeyOrder == null ? map.keySet() : forInKeyOrder.order(map)));
 					position.next();
 					break;
 				}
@@ -2122,6 +2168,9 @@ public class AVM implements VariableManager, Closeable {
 					Address funcAddr = callTuple.getAddress();
 					long numFormalParams = callTuple.getNumFormalParams();
 					long numActualParams = callTuple.getNumActualParams();
+					if (callTuple.getRuntimeWarning() != null) {
+						jrt.printWarning(callTuple.getRuntimeWarning());
+					}
 					runtimeStack.pushFrame(numFormalParams, position.currentIndex());
 					// Arguments are stacked, so first in the stack is the last for the function
 					for (long i = numActualParams - 1; i >= 0; i--) {
@@ -2311,6 +2360,9 @@ public class AVM implements VariableManager, Closeable {
 					ExtensionFunction function = extensionTuple.getFunction();
 					long numArgs = extensionTuple.getArgCount();
 					boolean isInitial = extensionTuple.isInitial();
+					if (extensionTuple.getRuntimeWarning() != null) {
+						jrt.printWarning(extensionTuple.getRuntimeWarning());
+					}
 
 					Object[] args = new Object[(int) numArgs];
 					for (int i = (int) numArgs - 1; i >= 0; i--) {
@@ -2346,11 +2398,7 @@ public class AVM implements VariableManager, Closeable {
 					if (retval == null) {
 						retval = "";
 					} else
-						if (!(retval instanceof Integer
-								||
-								retval instanceof Long
-								||
-								retval instanceof Double
+						if (!(retval instanceof Number
 								||
 								retval instanceof String
 								||
@@ -2819,6 +2867,19 @@ public class AVM implements VariableManager, Closeable {
 			throw new IllegalStateException(
 					"AVM globals are already initialized for a different eval layout. Call prepareForEval(...) first.");
 		}
+		runBeforeStartHooks();
+	}
+
+	private void runBeforeStartHooks() {
+		if (extensionInstances.isEmpty()) {
+			return;
+		}
+		Set<JawkExtension> started = new LinkedHashSet<JawkExtension>();
+		for (JawkExtension extension : extensionInstances.values()) {
+			if (started.add(extension)) {
+				extension.beforeStart(this, jrt);
+			}
+		}
 	}
 
 	private void execApplySubsep(CountTuple tuple) {
@@ -3012,6 +3073,7 @@ public class AVM implements VariableManager, Closeable {
 	 * Awk variable assignment functionality.
 	 */
 	private void assign(long l, Object value, boolean isGlobal, PositionTracker position, boolean push) {
+		value = JRT.toAssignedScalar(value);
 		// check if curr value already refers to an array
 		if (runtimeStack.getVariable(l, isGlobal) instanceof Map) {
 			throw new AwkRuntimeException(position.lineNumber(), "cannot assign anything to an unindexed associative array");
@@ -3032,6 +3094,7 @@ public class AVM implements VariableManager, Closeable {
 
 	private void assignMapElement(Map<Object, Object> array, Object arrIdx, Object rhs) {
 		checkScalar(arrIdx);
+		rhs = JRT.toAssignedScalar(rhs);
 		array.put(arrIdx, rhs);
 		push(rhs);
 	}
@@ -3078,6 +3141,8 @@ public class AVM implements VariableManager, Closeable {
 		return jrt.getOFSVar();
 	}
 
+	/** {@inheritDoc} */
+	@Override
 	public final Object getORS() {
 		return jrt.getORSVar();
 	}
@@ -3086,6 +3151,77 @@ public class AVM implements VariableManager, Closeable {
 	@Override
 	public final Object getSUBSEP() {
 		return jrt.getSUBSEPVar();
+	}
+
+	/**
+	 * Returns the names of the global variables declared by the compiled
+	 * program.
+	 *
+	 * @return unmodifiable set of global variable names, empty when no program
+	 *         metadata is installed
+	 */
+	public Set<String> getGlobalVariableNames() {
+		return globalVariableOffsets == null ?
+				Collections.<String>emptySet() : Collections.unmodifiableSet(globalVariableOffsets.keySet());
+	}
+
+	/**
+	 * Returns the names of the user-defined functions of the compiled program.
+	 *
+	 * @return unmodifiable set of function names, empty when no program metadata
+	 *         is installed
+	 */
+	public Set<String> getFunctionNames() {
+		return functionNames == null ? Collections.<String>emptySet() : Collections.unmodifiableSet(functionNames);
+	}
+
+	/** {@inheritDoc} */
+	@Override
+	public final Object getVariable(String name) {
+		if (name == null) {
+			return null;
+		}
+		switch (name) {
+		case "FS":
+			return getFS();
+		case "RS":
+			return getRS();
+		case "OFS":
+			return getOFS();
+		case "ORS":
+			return getORS();
+		case "FILENAME":
+			return jrt.getFILENAME();
+		case "SUBSEP":
+			return getSUBSEP();
+		case "CONVFMT":
+			return getCONVFMT();
+		case "OFMT":
+			return jrt.getOFMTString();
+		case "NF":
+			return jrt.getNF();
+		case "NR":
+			return jrt.getNR();
+		case "FNR":
+			return jrt.getFNR();
+		case "RSTART":
+			return jrt.getRSTART();
+		case "RLENGTH":
+			return jrt.getRLENGTH();
+		default:
+			break;
+		}
+		if (globalVariableOffsets == null) {
+			return baseInitialVariables.get(name);
+		}
+		Integer offsetObj = globalVariableOffsets.get(name);
+		if (offsetObj != null) {
+			return runtimeStack.getVariable(offsetObj.intValue(), true);
+		}
+		// Variables supplied through -v or the Java API but never referenced in
+		// the script have no compiled offset; they are still observable (e.g.
+		// IGNORECASE read by the gawk extension).
+		return baseInitialVariables == null ? null : baseInitialVariables.get(name);
 	}
 
 	/**
@@ -3306,8 +3442,9 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	private Map<Object, Object> ensureArrayInArray(Map<Object, Object> map, Object key) {
 		checkScalar(key);
+		boolean existingKey = JRT.containsAwkKey(map, key);
 		Object value = JRT.getAwkValue(map, key);
-		if (value == null || value.equals(BLANK) || value instanceof UninitializedObject) {
+		if (!existingKey || value == null || value instanceof UntypedObject) {
 			Map<Object, Object> nested = newAwkArray();
 			map.put(key, nested);
 			return nested;

@@ -125,6 +125,7 @@ public class AwkParser {
 		BUILTIN_FUNC_NAME,
 
 		EXTENSION,
+		TYPED_REGEXP,
 
 		KW_FUNCTION,
 		KW_BEGIN,
@@ -580,6 +581,19 @@ public class AwkParser {
 		if (c == '$') {
 			read();
 			token = Token.DOLLAR;
+			return token;
+		}
+		if (c == '@') {
+			if (!allowArraysOfArrays) {
+				throw lexerException("Typed regular expressions are not supported in POSIX mode.");
+			}
+			read();
+			if (c != '/') {
+				throw lexerException("Invalid character (64): @");
+			}
+			read();
+			readRegexp();
+			token = Token.TYPED_REGEXP;
 			return token;
 		}
 		if (c == '~') {
@@ -1444,6 +1458,10 @@ public class AwkParser {
 			AST str = symbolTable.addSTRING(string.toString());
 			lexer();
 			return str;
+		} else if (token == Token.TYPED_REGEXP) {
+			AST regexpAst = symbolTable.addTYPED_REGEXP(regexp.toString());
+			lexer();
+			return regexpAst;
 		} else if (token == Token.KW_GETLINE) {
 			return GETLINE_EXPRESSION(null, allowComparison, allowInKeyword);
 		} else if (token == Token.DIVIDE || token == Token.DIV_EQ) {
@@ -2094,8 +2112,81 @@ public class AwkParser {
 			AwkTuples tuples,
 			FunctionCallParamListAst params,
 			Set<Integer> arrayParameterIndexes,
+			Set<Integer> rawValueParameterIndexes,
+			Set<Integer> literalRegexpIndexes,
 			int parameterIndex) {
 		if (params == null) {
+			return 0;
+		}
+		if (arrayParameterIndexes.contains(Integer.valueOf(parameterIndex))) {
+			populateArrayOperandTuples(
+					params.getAst1(),
+					tuples,
+					true,
+					"Parameter position " + (parameterIndex + 1) + " must be an array or subarray.");
+		} else if (literalRegexpIndexes.contains(Integer.valueOf(parameterIndex))) {
+			populateRawRegexpParameterTuples(params.getAst1(), tuples);
+		} else if (rawValueParameterIndexes.contains(Integer.valueOf(parameterIndex))) {
+			populateRawValueTuples(params.getAst1(), tuples);
+		} else {
+			params.getAst1().populateTuples(tuples);
+		}
+		if (params.getAst2() == null) {
+			return 1;
+		}
+		return 1 + populateActualParameters(
+				tuples,
+				(FunctionCallParamListAst) params.getAst2(),
+				arrayParameterIndexes,
+				rawValueParameterIndexes,
+				literalRegexpIndexes,
+				parameterIndex + 1);
+	}
+
+	private int populateActualParameters(
+			AwkTuples tuples,
+			FunctionCallParamListAst params,
+			int... literalRegexpIndexesParam) {
+		Set<Integer> literalRegexpIndexes = new HashSet<Integer>();
+		for (int idx : literalRegexpIndexesParam) {
+			literalRegexpIndexes.add(Integer.valueOf(idx));
+		}
+		return populateActualParameters(
+				tuples,
+				params,
+				Collections.<Integer>emptySet(),
+				Collections.<Integer>emptySet(),
+				literalRegexpIndexes,
+				0);
+	}
+
+	private int populateActualParametersUpTo(
+			AwkTuples tuples,
+			FunctionCallParamListAst params,
+			Set<Integer> arrayParameterIndexes,
+			int parameterIndex,
+			int maxParameterCount) {
+		/*
+		 * Gawk accepts extra user-function arguments with a runtime warning: the
+		 * callee has no local slots for them, but their expressions are still
+		 * evaluated for their side effects. Extra arguments are therefore emitted
+		 * followed by a POP, and only the formal parameter prefix is counted.
+		 */
+		if (params == null) {
+			return 0;
+		}
+		if (parameterIndex >= maxParameterCount) {
+			// Raw-value evaluation runs the expression's side effects but merely
+			// peeks at bare variables, so an untyped variable passed as an extra
+			// argument is not autovivified into an assigned scalar.
+			populateRawValueTuples(params.getAst1(), tuples);
+			tuples.pop();
+			populateActualParametersUpTo(
+					tuples,
+					(FunctionCallParamListAst) params.getAst2(),
+					arrayParameterIndexes,
+					parameterIndex + 1,
+					maxParameterCount);
 			return 0;
 		}
 		if (arrayParameterIndexes.contains(Integer.valueOf(parameterIndex))) {
@@ -2110,11 +2201,42 @@ public class AwkParser {
 		if (params.getAst2() == null) {
 			return 1;
 		}
-		return 1 + populateActualParameters(
+		return 1 + populateActualParametersUpTo(
 				tuples,
 				(FunctionCallParamListAst) params.getAst2(),
 				arrayParameterIndexes,
-				parameterIndex + 1);
+				parameterIndex + 1,
+				maxParameterCount);
+	}
+
+	private void populateRawValueTuples(AST valueAst, AwkTuples tuples) {
+		/*
+		 * typeof() and isarray() need to inspect an lvalue's current state. A
+		 * normal dereference autoconverts an untyped variable into AWK's assigned
+		 * blank scalar, which would erase the distinction gawk exposes.
+		 */
+		if (valueAst instanceof IDAst) {
+			IDAst idAst = (IDAst) valueAst;
+			if (SPECIAL_VAR_NAMES.containsKey(idAst.id) && !"ENVIRON".equals(idAst.id) && !"ARGV".equals(idAst.id)) {
+				idAst.populateTuples(tuples);
+			} else {
+				tuples.peekDereference(idAst.offset, idAst.isGlobal);
+			}
+			return;
+		}
+		if (valueAst instanceof ArrayReferenceAst) {
+			((ArrayReferenceAst) valueAst).populateRawValueTuples(tuples);
+			return;
+		}
+		valueAst.populateTuples(tuples);
+	}
+
+	private void populateRawRegexpParameterTuples(AST valueAst, AwkTuples tuples) {
+		if (valueAst instanceof RegexpAst) {
+			((RegexpAst) valueAst).populateRawRegexpTuples(tuples);
+			return;
+		}
+		valueAst.populateTuples(tuples);
 	}
 
 	private Set<Integer> collectArrayParameterIndexes(FunctionDefAst functionDefAst) {
@@ -2231,6 +2353,20 @@ public class AwkParser {
 
 		protected AST(int lineNo) {
 			this.lineNo = lineNo;
+		}
+
+		protected int getLineNo() {
+			return lineNo;
+		}
+
+		protected String getSourceDescription() {
+			return sourceDescription;
+		}
+
+		protected String sourceBasename() {
+			String source = getSourceDescription();
+			int slash = Math.max(source.lastIndexOf('/'), source.lastIndexOf('\\'));
+			return slash >= 0 ? source.substring(slash + 1) : source;
 		}
 
 		protected AST(AST ast1) {
@@ -3500,7 +3636,11 @@ public class AwkParser {
 			pushSourceLineNumber(tuples);
 
 			getAst1().populateTuples(tuples);
-			getAst2().populateTuples(tuples);
+			if (op == Token.MATCHES || op == Token.NOT_MATCHES) {
+				populateRawRegexpParameterTuples(getAst2(), tuples);
+			} else {
+				getAst2().populateTuples(tuples);
+			}
 			// 2 values on the stack
 
 			if (op == Token.EQ) {
@@ -3831,7 +3971,9 @@ public class AwkParser {
 		void checkActualToFormalParameters(AST actualParamList) {
 			AST aPtr = actualParamList;
 			FunctionDefParamListAst fPtr = (FunctionDefParamListAst) getAst1();
-			while (aPtr != null) {
+			// Extra actual parameters (accepted with a gawk-style runtime
+			// warning) have no formal counterpart to validate against.
+			while (aPtr != null && fPtr != null) {
 				// actual parameter
 				AST aparam = aPtr.getAst1();
 				// formal function parameter
@@ -3905,24 +4047,8 @@ public class AwkParser {
 			if (!functionProxy.isDefined()) {
 				throw new SemanticException("function " + functionProxy + " not defined");
 			}
-			int actualParamCountLocal;
-			if (getAst1() == null) {
-				actualParamCountLocal = 0;
-			} else {
-				actualParamCountLocal = actualParamCount();
-			}
 			int formalParamCount = functionProxy.getFunctionParamCount();
-			if (formalParamCount < actualParamCountLocal) {
-				throw new SemanticException(
-						"the "
-								+ functionProxy.getFunctionName()
-								+ " function"
-								+ " only accepts at most "
-								+ formalParamCount
-								+ " parameter(s), not "
-								+ actualParamCountLocal);
-			}
-			if (getAst1() != null) {
+			if (getAst1() != null && formalParamCount > 0) {
 				functionProxy.checkActualToFormalParameters(getAst1());
 			}
 		}
@@ -3938,26 +4064,26 @@ public class AwkParser {
 			if (getAst1() == null) {
 				actualParamCountLocal = 0;
 			} else {
-				actualParamCountLocal = populateActualParameters(
+				actualParamCountLocal = populateActualParametersUpTo(
 						tuples,
 						(FunctionCallParamListAst) getAst1(),
 						collectArrayParameterIndexes(functionProxy.functionDefAst),
-						0);
+						0,
+						functionProxy.getFunctionParamCount());
 			}
 			int formalParamCount = functionProxy.getFunctionParamCount();
-			if (formalParamCount < actualParamCountLocal) {
-				throw new SemanticException(
-						"the "
-								+ functionProxy.getFunctionName()
-								+ " function"
-								+ " only accepts at most "
-								+ formalParamCount
-								+ " parameter(s), not "
-								+ actualParamCountLocal);
-			}
 
-			functionProxy.checkActualToFormalParameters(getAst1());
-			tuples.callFunction(functionProxy, functionProxy.getFunctionName(), formalParamCount, actualParamCountLocal);
+			if (getAst1() != null && formalParamCount > 0) {
+				functionProxy.checkActualToFormalParameters(getAst1());
+			}
+			String runtimeWarning = actualParamCount() > formalParamCount ? extraArgumentWarning() : null;
+			tuples
+					.callFunction(
+							functionProxy,
+							functionProxy.getFunctionName(),
+							formalParamCount,
+							actualParamCountLocal,
+							runtimeWarning);
 			popSourceLineNumber(tuples);
 			return 1;
 		}
@@ -3971,6 +4097,27 @@ public class AwkParser {
 			}
 			return cnt;
 		}
+
+		private String extraArgumentWarning() {
+			return "gawk: "
+					+ sourceBasename()
+					+ ":"
+					+ warningLineNo()
+					+ ": warning: function `"
+					+ functionProxy.getFunctionName()
+					+ "' called with more arguments than declared";
+		}
+
+		private int warningLineNo() {
+			if (getAst1() instanceof FunctionCallParamListAst) {
+				AST firstParam = getAst1().getAst1();
+				if (firstParam != null) {
+					return firstParam.getLineNo();
+				}
+			}
+			return getLineNo();
+		}
+
 	}
 
 	private final class BuiltinFunctionCallAst extends ScalarExpressionAst {
@@ -4097,7 +4244,7 @@ public class AwkParser {
 				popSourceLineNumber(tuples);
 				return 1;
 			} else if (fIdx == BUILTIN_FUNC_NAMES.get("match")) {
-				int ast1Result = getAst1().populateTuples(tuples);
+				int ast1Result = populateActualParameters(tuples, (FunctionCallParamListAst) getAst1(), 1);
 				if (ast1Result != 2) {
 					throw new SemanticException("match requires 2 arguments");
 				}
@@ -4125,7 +4272,7 @@ public class AwkParser {
 					throw new SemanticException("sub requires 2 or 3 arguments, not " + numargs);
 				}
 
-				getAst1().getAst1().populateTuples(tuples);
+				populateRawRegexpParameterTuples(getAst1().getAst1(), tuples);
 				getAst1().getAst2().getAst1().populateTuples(tuples);
 				if (numargs == 3) {
 					AST targetAst = getAst1().getAst2().getAst2().getAst1();
@@ -4208,7 +4355,7 @@ public class AwkParser {
 						true,
 						"split's 2nd arg must be an array or subarray reference");
 				if (ast1Result == 3) {
-					getAst1().getAst2().getAst2().getAst1().populateTuples(tuples);
+					populateRawRegexpParameterTuples(getAst1().getAst2().getAst2().getAst1(), tuples);
 				}
 				tuples.split(ast1Result);
 				popSourceLineNumber(tuples);
@@ -4492,6 +4639,14 @@ public class AwkParser {
 			popSourceLineNumber(tuples);
 		}
 
+		private void populateRawValueTuples(AwkTuples tuples) {
+			pushSourceLineNumber(tuples);
+			populateContainerTuples(tuples);
+			getAst2().populateTuples(tuples);
+			tuples.peekArrayElementRaw();
+			popSourceLineNumber(tuples);
+		}
+
 		private void populateContainerTuples(AwkTuples tuples) {
 			if (getAst1() instanceof ArrayReferenceAst) {
 				((ArrayReferenceAst) getAst1()).populateArrayValueTuples(tuples, true);
@@ -4586,9 +4741,11 @@ public class AwkParser {
 	private final class RegexpAst extends ScalarExpressionAst {
 
 		private String regexpStr;
+		private boolean typed;
 
-		private RegexpAst(String regexpStr) {
+		private RegexpAst(String regexpStr, boolean typedParam) {
 			this.regexpStr = regexpStr;
+			this.typed = typedParam;
 		}
 
 		@Override
@@ -4599,8 +4756,19 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			tuples.regexp(regexpStr);
+			if (typed) {
+				tuples.regexp(regexpStr);
+			} else {
+				tuples.getInputField(0);
+				tuples.regexp(regexpStr);
+				tuples.matches();
+			}
 			popSourceLineNumber(tuples);
+			return 1;
+		}
+
+		private int populateRawRegexpTuples(AwkTuples tuples) {
+			tuples.regexp(regexpStr);
 			return 1;
 		}
 	}
@@ -4900,12 +5068,18 @@ public class AwkParser {
 			}
 
 			int[] reqArrayIdxs = function.collectAssocArrayIndexes(argCount);
+			int[] rawValueIdxs = function.collectRawValueIndexes(argCount);
 
 			int paramCount;
 			if (getAst1() == null) {
 				paramCount = 0;
 			} else {
 				Set<Integer> arrayIndexes = new HashSet<Integer>();
+				Set<Integer> rawValueIndexes = new HashSet<Integer>();
+				Set<Integer> literalRegexpIndexes = new HashSet<Integer>();
+				for (int idx : rawValueIdxs) {
+					rawValueIndexes.add(Integer.valueOf(idx));
+				}
 				for (int idx : reqArrayIdxs) {
 					AST paramAst = getParamAst((FunctionCallParamListAst) getAst1(), idx).getAst1();
 					if (paramAst instanceof IDAst) {
@@ -4924,11 +5098,16 @@ public class AwkParser {
 						arrayIndexes.add(Integer.valueOf(idx));
 					}
 				}
+				for (int idx : function.collectRegexpIndexes(argCount)) {
+					literalRegexpIndexes.add(Integer.valueOf(idx));
+				}
 
 				paramCount = populateActualParameters(
 						tuples,
 						(FunctionCallParamListAst) getAst1(),
 						arrayIndexes,
+						rawValueIndexes,
+						literalRegexpIndexes,
 						0);
 			}
 			// isInitial == true ::
@@ -4945,10 +5124,40 @@ public class AwkParser {
 			} else {
 				isInitial = true;
 			}
-			tuples.extension(function, paramCount, isInitial);
+			tuples.extension(function, paramCount, isInitial, runtimeWarning(argCount));
 			popSourceLineNumber(tuples);
 			// an extension always returns a value, even if it is blank/null
 			return 1;
+		}
+
+		private String runtimeWarning(int argCount) {
+			if (!"gensub".equals(function.getKeyword()) || argCount < 3 || !(getAst1() instanceof FunctionCallParamListAst)) {
+				return null;
+			}
+			AST howAst = getParamAst((FunctionCallParamListAst) getAst1(), 2).getAst1();
+			if (!(howAst instanceof StringAst)) {
+				return null;
+			}
+			String how = ((StringAst) howAst).value;
+			if (isGensubGlobalSelector(how) || isNumericString(how)) {
+				return null;
+			}
+			return "gawk: "
+					+ sourceBasename()
+					+ ":"
+					+ howAst.getLineNo()
+					+ ": warning: gensub: third argument `"
+					+ how
+					+ "' treated as 1";
+		}
+
+		private boolean isGensubGlobalSelector(String value) {
+			// gawk: any string beginning with 'g' or 'G' selects a global replacement
+			return value != null && !value.isEmpty() && (value.charAt(0) == 'g' || value.charAt(0) == 'G');
+		}
+
+		private boolean isNumericString(String value) {
+			return value != null && value.matches("[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?");
 		}
 
 		private AST getParamAst(FunctionCallParamListAst pAst, int pos) {
@@ -5456,7 +5665,11 @@ public class AwkParser {
 		}
 
 		AST addREGEXP(String localRegexp) {
-			return new RegexpAst(localRegexp);
+			return new RegexpAst(localRegexp, false);
+		}
+
+		AST addTYPED_REGEXP(String localRegexp) {
+			return new RegexpAst(localRegexp, true);
 		}
 	}
 

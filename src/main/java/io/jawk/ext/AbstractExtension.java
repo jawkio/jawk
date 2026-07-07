@@ -22,11 +22,16 @@ package io.jawk.ext;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import io.jawk.backend.AVM;
+import io.jawk.ext.annotations.JawkBeforeStart;
 import io.jawk.ext.annotations.JawkFunction;
 import io.jawk.jrt.IllegalAwkArgumentException;
 import io.jawk.jrt.JRT;
@@ -48,6 +53,7 @@ public abstract class AbstractExtension implements JawkExtension {
 	private VariableManager vm;
 	private AwkSettings settings;
 	private Map<String, ExtensionFunction> annotatedFunctions;
+	private List<Method> beforeStartMethods;
 
 	/** {@inheritDoc} */
 	@Override
@@ -135,6 +141,13 @@ public abstract class AbstractExtension implements JawkExtension {
 		return annotatedFunctions;
 	}
 
+	private List<Method> getBeforeStartMethods() {
+		if (beforeStartMethods == null) {
+			beforeStartMethods = Collections.unmodifiableList(scanBeforeStartMethods());
+		}
+		return beforeStartMethods;
+	}
+
 	private Map<String, ExtensionFunction> scanAnnotatedFunctions() {
 		Map<String, ExtensionFunction> discovered = new LinkedHashMap<String, ExtensionFunction>();
 		Class<? extends AbstractExtension> type = getClass();
@@ -153,9 +166,61 @@ public abstract class AbstractExtension implements JawkExtension {
 		return discovered;
 	}
 
+	private List<Method> scanBeforeStartMethods() {
+		List<Method> discovered = new ArrayList<Method>();
+		Class<? extends AbstractExtension> type = getClass();
+		for (Method method : type.getMethods()) {
+			if (!method.isAnnotationPresent(JawkBeforeStart.class)) {
+				continue;
+			}
+			if (java.lang.reflect.Modifier.isStatic(method.getModifiers())) {
+				throw new IllegalStateException(
+						"@" + JawkBeforeStart.class.getSimpleName()
+								+ " does not support static methods: " + method.toGenericString());
+			}
+			Class<?>[] parameterTypes = method.getParameterTypes();
+			if (method.getReturnType() != Void.TYPE
+					|| parameterTypes.length != 2
+					|| parameterTypes[0] != AVM.class
+					|| parameterTypes[1] != JRT.class) {
+				throw new IllegalStateException(
+						"@" + JawkBeforeStart.class.getSimpleName()
+								+ " method must declare void method(AVM, JRT): " + method.toGenericString());
+			}
+			method.setAccessible(true);
+			discovered.add(method);
+		}
+		return discovered;
+	}
+
 	/** {@inheritDoc} */
 	@Override
 	public Map<String, ExtensionFunction> getExtensionFunctions() {
 		return getAnnotatedFunctions();
+	}
+
+	/** {@inheritDoc} */
+	@Override
+	public void beforeStart(AVM avm, JRT runtime) {
+		for (Method method : getBeforeStartMethods()) {
+			try {
+				method.invoke(this, avm, runtime);
+			} catch (IllegalAccessException ex) {
+				throw new IllegalStateException(
+						"Unable to access extension before-start method " + method.toGenericString(),
+						ex);
+			} catch (InvocationTargetException ex) {
+				Throwable cause = ex.getCause();
+				if (cause instanceof RuntimeException) {
+					throw (RuntimeException) cause;
+				}
+				if (cause instanceof Error) {
+					throw (Error) cause;
+				}
+				throw new IllegalStateException(
+						"Extension before-start method failed: " + method.toGenericString(),
+						cause);
+			}
+		}
 	}
 }

@@ -291,6 +291,21 @@ public enum Opcode {
 	 */
 	DEREFERENCE,
 	/**
+	 * Obtains an item from the variable manager without assigning a blank value
+	 * when the variable is still untyped.
+	 * <p>
+	 * This differs from {@link #DEREFERENCE} only for introspection paths that
+	 * must observe an unassigned scalar-or-array state without changing it.
+	 * </p>
+	 * <p>
+	 * Argument 1: offset of the particular variable into the variable manager<br/>
+	 * Argument 2: whether the variable is global or local
+	 * <p>
+	 * Stack before: ...<br/>
+	 * Stack after: x ...
+	 */
+	PEEK_DEREFERENCE,
+	/**
 	 * Increase the contents of the variable by an adjustment value;
 	 * assigns the result to the variable and pushes the result onto the stack.
 	 * <p>
@@ -1475,7 +1490,16 @@ public enum Opcode {
 	 * Stack before: array-index associative-array ...<br/>
 	 * Stack after: item ...
 	 */
-	PEEK_ARRAY_ELEMENT;
+	PEEK_ARRAY_ELEMENT,
+
+	/**
+	 * Looks up an associative-array element without creating a blank entry when
+	 * the key is missing, preserving a never-created element as {@code null}.
+	 * <p>
+	 * Stack before: array-index associative-array ...<br/>
+	 * Stack after: item ...
+	 */
+	PEEK_ARRAY_ELEMENT_RAW;
 
 	private static final Opcode[] VALUES = values();
 

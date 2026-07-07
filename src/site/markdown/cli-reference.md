@@ -49,12 +49,12 @@ java -jar jawk-${project.version}-standalone.jar --list-ext
 >   - `-r` disables Jawk's default trapping of `IllegalFormatException` for `printf` and `sprintf`.
 >   - `--locale <locale>` sets the locale through `Locale.forLanguageTag(...)`.
 >   - `-t` keeps associative array keys sorted.
->   - `--posix` enforces POSIX-oriented compile-time behavior such as disabling gawk-style nested arrays.
+>   - `--posix` enforces POSIX-oriented compile-time behavior such as disabling gawk-style nested arrays and typed regexp literals (`@/re/`).
 >   - `JAWK_PERSISTENT_MEMORY` can also point at the persistent-memory file when you do not want to pass `--persist` explicitly. `--persist` wins when both are present.
 >
 > - Extensions and sandbox
 >
->   - `-l <extension>` or `--load <extension>` loads an extension by registered identifier, simple class name, or fully qualified class name.
+>   - `-l <extension>` or `--load <extension>` loads an extension by registered identifier, simple class name, or fully qualified class name. Passing `-l` replaces the default extension set (the gawk compatibility extension), so add `-l GawkExtension` when the script still needs the gawk builtins.
 >   - `--list-ext` prints the identifiers currently registered in `ExtensionRegistry` and exits. It must be used by itself.
 >   - `-S` or `--sandbox` compiles and runs the script with sandbox restrictions enabled.
 >

@@ -189,43 +189,66 @@ public class AwkParser {
 	}
 
 	/**
-	 * Built-in function token values.
-	 * Built-in function token values are distinguished
-	 * from lexer token values.
+	 * The AWK built-in functions.
+	 * Each constant carries the function name as it appears in AWK
+	 * source code, which may differ from the constant name itself
+	 * (e.g. {@link #INT} for the <code>int</code> function).
 	 */
-	private static int fIdx = 257;
-	/**
-	 * A mapping of built-in function names to their
-	 * function token values.
-	 * <p>
-	 * <strong>Note:</strong> these are not lexer token
-	 * values. Lexer token values are for keywords and
-	 * operators.
-	 */
-	private static final Map<String, Integer> BUILTIN_FUNC_NAMES = new HashMap<String, Integer>();
+	private enum BuiltinFunction {
 
-	static {
-		BUILTIN_FUNC_NAMES.put("atan2", fIdx++);
-		BUILTIN_FUNC_NAMES.put("close", fIdx++);
-		BUILTIN_FUNC_NAMES.put("cos", fIdx++);
-		BUILTIN_FUNC_NAMES.put("exp", fIdx++);
-		BUILTIN_FUNC_NAMES.put("index", fIdx++);
-		BUILTIN_FUNC_NAMES.put("int", fIdx++);
-		BUILTIN_FUNC_NAMES.put("length", fIdx++);
-		BUILTIN_FUNC_NAMES.put("log", fIdx++);
-		BUILTIN_FUNC_NAMES.put("match", fIdx++);
-		BUILTIN_FUNC_NAMES.put("rand", fIdx++);
-		BUILTIN_FUNC_NAMES.put("sin", fIdx++);
-		BUILTIN_FUNC_NAMES.put("split", fIdx++);
-		BUILTIN_FUNC_NAMES.put("sprintf", fIdx++);
-		BUILTIN_FUNC_NAMES.put("sqrt", fIdx++);
-		BUILTIN_FUNC_NAMES.put("srand", fIdx++);
-		BUILTIN_FUNC_NAMES.put("sub", fIdx++);
-		BUILTIN_FUNC_NAMES.put("gsub", fIdx++);
-		BUILTIN_FUNC_NAMES.put("substr", fIdx++);
-		BUILTIN_FUNC_NAMES.put("system", fIdx++);
-		BUILTIN_FUNC_NAMES.put("tolower", fIdx++);
-		BUILTIN_FUNC_NAMES.put("toupper", fIdx++);
+		ATAN2("atan2"),
+		CLOSE("close"),
+		COS("cos"),
+		EXP("exp"),
+		GSUB("gsub"),
+		INDEX("index"),
+		INT("int"),
+		LENGTH("length"),
+		LOG("log"),
+		MATCH("match"),
+		RAND("rand"),
+		SIN("sin"),
+		SPLIT("split"),
+		SPRINTF("sprintf"),
+		SQRT("sqrt"),
+		SRAND("srand"),
+		SUB("sub"),
+		SUBSTR("substr"),
+		SYSTEM("system"),
+		TOLOWER("tolower"),
+		TOUPPER("toupper");
+
+		/**
+		 * A mapping of built-in function names to their
+		 * enum constants, for name-based lookup.
+		 */
+		private static final Map<String, BuiltinFunction> BY_NAME = new HashMap<String, BuiltinFunction>();
+
+		static {
+			for (BuiltinFunction function : values()) {
+				BY_NAME.put(function.awkName, function);
+			}
+		}
+
+		/**
+		 * The name of the function as it appears in AWK source code.
+		 */
+		private final String awkName;
+
+		BuiltinFunction(String awkName) {
+			this.awkName = awkName;
+		}
+
+		/**
+		 * Resolves an AWK function name to its enum constant.
+		 *
+		 * @param name the function name as it appears in AWK source code
+		 * @return the matching constant, or <code>null</code> if the name
+		 *         does not denote a built-in function
+		 */
+		private static BuiltinFunction of(String name) {
+			return BY_NAME.get(name);
+		}
 	}
 
 	private static final int SP_IDX = 257;
@@ -801,8 +824,7 @@ public class AwkParser {
 				token = kwToken;
 				return token;
 			}
-			Integer builtinIdx = BUILTIN_FUNC_NAMES.get(text.toString());
-			if (builtinIdx != null) {
+			if (BuiltinFunction.of(text.toString()) != null) {
 				token = Token.BUILTIN_FUNC_NAME;
 				return token;
 			}
@@ -3975,291 +3997,319 @@ public class AwkParser {
 
 	private final class BuiltinFunctionCallAst extends ScalarExpressionAst {
 
-		private String id;
-		private int fIdx;
+		private final String id;
+		private final BuiltinFunction builtin;
 
 		private BuiltinFunctionCallAst(String id, AST params) {
 			super(params);
 			this.id = id;
-			this.fIdx = BUILTIN_FUNC_NAMES.get(id);
+			this.builtin = BuiltinFunction.of(id);
 		}
 
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (fIdx == BUILTIN_FUNC_NAMES.get("sprintf")) {
-				if (getAst1() == null) {
-					throw new SemanticException("sprintf requires at least 1 argument");
-				}
-				int ast1Result = getAst1().populateTuples(tuples);
-				if (ast1Result == 0) {
-					throw new SemanticException("sprintf requires at minimum 1 argument");
-				}
-				tuples.sprintf(ast1Result);
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("close")) {
-				if (getAst1() == null) {
-					throw new SemanticException("close requires 1 argument");
-				}
-				int ast1Result = getAst1().populateTuples(tuples);
-				if (ast1Result != 1) {
-					throw new SemanticException("close requires only 1 argument");
-				}
+			switch (builtin) {
+			case SPRINTF:
+				populateSprintfTuples(tuples);
+				break;
+			case CLOSE:
+				populateOneArgumentTuples(tuples, "close");
 				tuples.close();
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("length")) {
-				if (getAst1() == null) {
-					tuples.length(0);
-				} else {
-					int ast1Result = getAst1().populateTuples(tuples);
-					if (ast1Result != 1) {
-						throw new SemanticException("length requires at least one argument");
-					}
-					tuples.length(1);
-				}
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("srand")) {
-				if (getAst1() == null) {
-					tuples.srand(0);
-				} else {
-					int ast1Result = getAst1().populateTuples(tuples);
-					if (ast1Result != 1) {
-						throw new SemanticException("srand takes either 0 or one argument, not " + ast1Result);
-					}
-					tuples.srand(1);
-				}
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("rand")) {
+				break;
+			case LENGTH:
+				populateLengthTuples(tuples);
+				break;
+			case SRAND:
+				populateSrandTuples(tuples);
+				break;
+			case RAND:
 				if (getAst1() != null) {
 					throw new SemanticException("rand does not take arguments");
 				}
 				tuples.rand();
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("sqrt")) {
-				int ast1Result = getAst1().populateTuples(tuples);
-				if (ast1Result != 1) {
-					throw new SemanticException("sqrt requires only 1 argument");
-				}
+				break;
+			case SQRT:
+				populateArgumentsTuples(tuples, 1, "sqrt requires only 1 argument");
 				tuples.sqrt();
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("int")) {
-				int ast1Result = getAst1().populateTuples(tuples);
-				if (ast1Result != 1) {
-					throw new SemanticException("int requires only 1 argument");
-				}
+				break;
+			case INT:
+				populateArgumentsTuples(tuples, 1, "int requires only 1 argument");
 				tuples.intFunc();
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("log")) {
-				int ast1Result = getAst1().populateTuples(tuples);
-				if (ast1Result != 1) {
-					throw new SemanticException("log requires only 1 argument");
-				}
+				break;
+			case LOG:
+				populateArgumentsTuples(tuples, 1, "log requires only 1 argument");
 				tuples.log();
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("exp")) {
-				int ast1Result = getAst1().populateTuples(tuples);
-				if (ast1Result != 1) {
-					throw new SemanticException("exp requires only 1 argument");
-				}
+				break;
+			case EXP:
+				populateArgumentsTuples(tuples, 1, "exp requires only 1 argument");
 				tuples.exp();
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("sin")) {
-				int ast1Result = getAst1().populateTuples(tuples);
-				if (ast1Result != 1) {
-					throw new SemanticException("sin requires only 1 argument");
-				}
+				break;
+			case SIN:
+				populateArgumentsTuples(tuples, 1, "sin requires only 1 argument");
 				tuples.sin();
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("cos")) {
-				int ast1Result = getAst1().populateTuples(tuples);
-				if (ast1Result != 1) {
-					throw new SemanticException("cos requires only 1 argument");
-				}
+				break;
+			case COS:
+				populateArgumentsTuples(tuples, 1, "cos requires only 1 argument");
 				tuples.cos();
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("atan2")) {
-				int ast1Result = getAst1().populateTuples(tuples);
-				if (ast1Result != 2) {
-					throw new SemanticException("atan2 requires 2 arguments");
-				}
+				break;
+			case ATAN2:
+				populateArgumentsTuples(tuples, 2, "atan2 requires 2 arguments");
 				tuples.atan2();
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("match")) {
-				int ast1Result = getAst1().populateTuples(tuples);
-				if (ast1Result != 2) {
-					throw new SemanticException("match requires 2 arguments");
-				}
+				break;
+			case MATCH:
+				populateArgumentsTuples(tuples, 2, "match requires 2 arguments");
 				tuples.match();
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("index")) {
-				int ast1Result = getAst1().populateTuples(tuples);
-				if (ast1Result != 2) {
-					throw new SemanticException("index requires 2 arguments");
-				}
+				break;
+			case INDEX:
+				populateArgumentsTuples(tuples, 2, "index requires 2 arguments");
 				tuples.index();
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("sub") || fIdx == BUILTIN_FUNC_NAMES.get("gsub")) {
-				if (getAst1() == null || getAst1().getAst2() == null || getAst1().getAst2().getAst1() == null) {
-					throw new SemanticException("sub needs at least 2 arguments");
-				}
-				boolean isGsub = fIdx == BUILTIN_FUNC_NAMES.get("gsub");
-				int numargs = 0;
-				for (AST paramPtr = getAst1(); paramPtr != null; paramPtr = paramPtr.getAst2()) {
-					numargs++;
-				}
-				if (numargs != 2 && numargs != 3) {
-					throw new SemanticException("sub requires 2 or 3 arguments, not " + numargs);
-				}
-
-				getAst1().getAst1().populateTuples(tuples);
-				getAst1().getAst2().getAst1().populateTuples(tuples);
-				if (numargs == 3) {
-					AST targetAst = getAst1().getAst2().getAst2().getAst1();
-					if (targetAst instanceof ArrayReferenceAst) {
-						((ArrayReferenceAst) targetAst).populateTargetValueTuples(tuples);
-					} else {
-						targetAst.populateTuples(tuples);
-					}
-				}
-
-				// stack contains arg1,arg2[,arg3] - in that pop() order
-
-				if (numargs == 2) {
-					tuples.subForDollar0(isGsub);
-				} else if (numargs == 3) {
-					AST ptr = getAst1().getAst2().getAst2().getAst1();
-					if (ptr instanceof IDAst) {
-						IDAst idAst = (IDAst) ptr;
-						if (idAst.isArray()) {
-							throw new SemanticException("sub cannot accept an unindexed array as its 3rd argument");
-						}
-						idAst.setScalar(true);
-						tuples.subForVariable(idAst.offset, idAst.isGlobal, isGsub);
-					} else if (ptr instanceof ArrayReferenceAst) {
-						ArrayReferenceAst arrAst = (ArrayReferenceAst) ptr;
-						if (arrAst.getAst1() instanceof IDAst) {
-							IDAst idAst = (IDAst) arrAst.getAst1();
-							if (idAst.isScalar()) {
-								throw new SemanticException("Cannot use " + idAst + " as an array.");
-							}
-							idAst.setArray(true);
-						}
-						arrAst.populateTargetReferenceTuples(tuples);
-						tuples.subForMapReference(isGsub);
-					} else if (ptr instanceof DollarExpressionAst) {
-						// push the field ref
-						DollarExpressionAst dollarExpr = (DollarExpressionAst) ptr;
-						dollarExpr.getAst1().populateTuples(tuples);
-						tuples.subForDollarReference(isGsub);
-					} else {
-						throw new SemanticException(
-								"sub's 3rd argument must be either an id, an array reference, or an input field reference");
-					}
-				}
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("split")) {
-				// split can take 2 or 3 args:
-				// split (string, array [,fs])
-				// the 2nd argument is pass by reference, which is ok (?)
-
-				// funccallparamlist.funccallparamlist.idAst
-				if (getAst1() == null || getAst1().getAst2() == null || getAst1().getAst2().getAst1() == null) {
-					throw new SemanticException("split needs at least 2 arguments");
-				}
-				AST ptr = getAst1().getAst2().getAst1();
-				if (!(ptr instanceof IDAst) && !(ptr instanceof ArrayReferenceAst)) {
-					throw new SemanticException("split needs an array or subarray reference as its 2nd argument");
-				}
-				if (ptr instanceof IDAst) {
-					IDAst arrAst = (IDAst) ptr;
-					if (arrAst.isScalar()) {
-						throw new SemanticException("split's 2nd arg cannot be a scalar");
-					}
-					arrAst.setArray(true);
-				}
-
-				int ast1Result = 0;
-				for (AST paramPtr = getAst1(); paramPtr != null; paramPtr = paramPtr.getAst2()) {
-					ast1Result++;
-				}
-				if (ast1Result != 2 && ast1Result != 3) {
-					throw new SemanticException("split requires 2 or 3 arguments, not " + ast1Result);
-				}
-
-				getAst1().getAst1().populateTuples(tuples);
-				populateArrayOperandTuples(
-						ptr,
-						tuples,
-						true,
-						"split's 2nd arg must be an array or subarray reference");
-				if (ast1Result == 3) {
-					getAst1().getAst2().getAst2().getAst1().populateTuples(tuples);
-				}
-				tuples.split(ast1Result);
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("substr")) {
-				if (getAst1() == null) {
-					throw new SemanticException("substr requires at least 2 arguments");
-				}
-				int ast1Result = getAst1().populateTuples(tuples);
-				if (ast1Result != 2 && ast1Result != 3) {
-					throw new SemanticException("substr requires 2 or 3 arguments, not " + ast1Result);
-				}
-				tuples.substr(ast1Result);
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("tolower")) {
-				if (getAst1() == null) {
-					throw new SemanticException("tolower requires 1 argument");
-				}
-				int ast1Result = getAst1().populateTuples(tuples);
-				if (ast1Result != 1) {
-					throw new SemanticException("tolower requires only 1 argument");
-				}
+				break;
+			case SUB:
+			case GSUB:
+				populateSubTuples(tuples, builtin == BuiltinFunction.GSUB);
+				break;
+			case SPLIT:
+				populateSplitTuples(tuples);
+				break;
+			case SUBSTR:
+				populateSubstrTuples(tuples);
+				break;
+			case TOLOWER:
+				populateOneArgumentTuples(tuples, "tolower");
 				tuples.tolower();
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("toupper")) {
-				if (getAst1() == null) {
-					throw new SemanticException("toupper requires 1 argument");
-				}
-				int ast1Result = getAst1().populateTuples(tuples);
-				if (ast1Result != 1) {
-					throw new SemanticException("toupper requires only 1 argument");
-				}
+				break;
+			case TOUPPER:
+				populateOneArgumentTuples(tuples, "toupper");
 				tuples.toupper();
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (fIdx == BUILTIN_FUNC_NAMES.get("system")) {
-				if (getAst1() == null) {
-					throw new SemanticException("system requires 1 argument");
-				}
-				int ast1Result = getAst1().populateTuples(tuples);
-				if (ast1Result != 1) {
-					throw new SemanticException("system requires only 1 argument");
-				}
+				break;
+			case SYSTEM:
+				populateOneArgumentTuples(tuples, "system");
 				tuples.system();
-				popSourceLineNumber(tuples);
-				return 1;
-			} else {
+				break;
+			default:
 				throw new NotImplementedError("builtin: " + id);
 			}
+			popSourceLineNumber(tuples);
+			return 1;
+		}
+
+		/**
+		 * Populates the tuples of the argument list, validating that
+		 * it produces exactly the expected number of values on the stack.
+		 *
+		 * @param tuples the tuples to populate
+		 * @param expectedCount the exact number of arguments required
+		 * @param errorMessage the message of the {@link SemanticException}
+		 *        thrown when the argument count does not match
+		 */
+		private void populateArgumentsTuples(AwkTuples tuples, int expectedCount, String errorMessage) {
+			int ast1Result = getAst1().populateTuples(tuples);
+			if (ast1Result != expectedCount) {
+				throw new SemanticException(errorMessage);
+			}
+		}
+
+		/**
+		 * Populates the tuples of the argument list for a built-in function
+		 * taking exactly one argument, rejecting missing or extra arguments.
+		 *
+		 * @param tuples the tuples to populate
+		 * @param functionName the name of the built-in function, used in
+		 *        error messages
+		 */
+		private void populateOneArgumentTuples(AwkTuples tuples, String functionName) {
+			if (getAst1() == null) {
+				throw new SemanticException(functionName + " requires 1 argument");
+			}
+			int ast1Result = getAst1().populateTuples(tuples);
+			if (ast1Result != 1) {
+				throw new SemanticException(functionName + " requires only 1 argument");
+			}
+		}
+
+		/**
+		 * Populates the tuples for the <code>sprintf</code> built-in function.
+		 *
+		 * @param tuples the tuples to populate
+		 */
+		private void populateSprintfTuples(AwkTuples tuples) {
+			if (getAst1() == null) {
+				throw new SemanticException("sprintf requires at least 1 argument");
+			}
+			int ast1Result = getAst1().populateTuples(tuples);
+			if (ast1Result == 0) {
+				throw new SemanticException("sprintf requires at minimum 1 argument");
+			}
+			tuples.sprintf(ast1Result);
+		}
+
+		/**
+		 * Populates the tuples for the <code>length</code> built-in function,
+		 * which takes either no argument (implying $0) or one argument.
+		 *
+		 * @param tuples the tuples to populate
+		 */
+		private void populateLengthTuples(AwkTuples tuples) {
+			if (getAst1() == null) {
+				tuples.length(0);
+			} else {
+				int ast1Result = getAst1().populateTuples(tuples);
+				if (ast1Result != 1) {
+					throw new SemanticException("length requires at least one argument");
+				}
+				tuples.length(1);
+			}
+		}
+
+		/**
+		 * Populates the tuples for the <code>srand</code> built-in function,
+		 * which takes either no argument or one argument (the seed).
+		 *
+		 * @param tuples the tuples to populate
+		 */
+		private void populateSrandTuples(AwkTuples tuples) {
+			if (getAst1() == null) {
+				tuples.srand(0);
+			} else {
+				int ast1Result = getAst1().populateTuples(tuples);
+				if (ast1Result != 1) {
+					throw new SemanticException("srand takes either 0 or one argument, not " + ast1Result);
+				}
+				tuples.srand(1);
+			}
+		}
+
+		/**
+		 * Populates the tuples for the <code>sub</code> and <code>gsub</code>
+		 * built-in functions, which take 2 or 3 arguments; the optional 3rd
+		 * argument is the substitution target (a variable, an array element,
+		 * or an input field reference), defaulting to $0.
+		 *
+		 * @param tuples the tuples to populate
+		 * @param isGsub <code>true</code> for <code>gsub</code> (global
+		 *        substitution), <code>false</code> for <code>sub</code>
+		 */
+		private void populateSubTuples(AwkTuples tuples, boolean isGsub) {
+			if (getAst1() == null || getAst1().getAst2() == null || getAst1().getAst2().getAst1() == null) {
+				throw new SemanticException("sub needs at least 2 arguments");
+			}
+			int numargs = 0;
+			for (AST paramPtr = getAst1(); paramPtr != null; paramPtr = paramPtr.getAst2()) {
+				numargs++;
+			}
+			if (numargs != 2 && numargs != 3) {
+				throw new SemanticException("sub requires 2 or 3 arguments, not " + numargs);
+			}
+
+			getAst1().getAst1().populateTuples(tuples);
+			getAst1().getAst2().getAst1().populateTuples(tuples);
+			if (numargs == 3) {
+				AST targetAst = getAst1().getAst2().getAst2().getAst1();
+				if (targetAst instanceof ArrayReferenceAst) {
+					((ArrayReferenceAst) targetAst).populateTargetValueTuples(tuples);
+				} else {
+					targetAst.populateTuples(tuples);
+				}
+			}
+
+			// stack contains arg1,arg2[,arg3] - in that pop() order
+
+			if (numargs == 2) {
+				tuples.subForDollar0(isGsub);
+			} else if (numargs == 3) {
+				AST ptr = getAst1().getAst2().getAst2().getAst1();
+				if (ptr instanceof IDAst) {
+					IDAst idAst = (IDAst) ptr;
+					if (idAst.isArray()) {
+						throw new SemanticException("sub cannot accept an unindexed array as its 3rd argument");
+					}
+					idAst.setScalar(true);
+					tuples.subForVariable(idAst.offset, idAst.isGlobal, isGsub);
+				} else if (ptr instanceof ArrayReferenceAst) {
+					ArrayReferenceAst arrAst = (ArrayReferenceAst) ptr;
+					if (arrAst.getAst1() instanceof IDAst) {
+						IDAst idAst = (IDAst) arrAst.getAst1();
+						if (idAst.isScalar()) {
+							throw new SemanticException("Cannot use " + idAst + " as an array.");
+						}
+						idAst.setArray(true);
+					}
+					arrAst.populateTargetReferenceTuples(tuples);
+					tuples.subForMapReference(isGsub);
+				} else if (ptr instanceof DollarExpressionAst) {
+					// push the field ref
+					DollarExpressionAst dollarExpr = (DollarExpressionAst) ptr;
+					dollarExpr.getAst1().populateTuples(tuples);
+					tuples.subForDollarReference(isGsub);
+				} else {
+					throw new SemanticException(
+							"sub's 3rd argument must be either an id, an array reference, or an input field reference");
+				}
+			}
+		}
+
+		/**
+		 * Populates the tuples for the <code>split</code> built-in function.
+		 *
+		 * @param tuples the tuples to populate
+		 */
+		private void populateSplitTuples(AwkTuples tuples) {
+			// split can take 2 or 3 args:
+			// split (string, array [,fs])
+			// the 2nd argument is pass by reference, which is ok (?)
+
+			// funccallparamlist.funccallparamlist.idAst
+			if (getAst1() == null || getAst1().getAst2() == null || getAst1().getAst2().getAst1() == null) {
+				throw new SemanticException("split needs at least 2 arguments");
+			}
+			AST ptr = getAst1().getAst2().getAst1();
+			if (!(ptr instanceof IDAst) && !(ptr instanceof ArrayReferenceAst)) {
+				throw new SemanticException("split needs an array or subarray reference as its 2nd argument");
+			}
+			if (ptr instanceof IDAst) {
+				IDAst arrAst = (IDAst) ptr;
+				if (arrAst.isScalar()) {
+					throw new SemanticException("split's 2nd arg cannot be a scalar");
+				}
+				arrAst.setArray(true);
+			}
+
+			int ast1Result = 0;
+			for (AST paramPtr = getAst1(); paramPtr != null; paramPtr = paramPtr.getAst2()) {
+				ast1Result++;
+			}
+			if (ast1Result != 2 && ast1Result != 3) {
+				throw new SemanticException("split requires 2 or 3 arguments, not " + ast1Result);
+			}
+
+			getAst1().getAst1().populateTuples(tuples);
+			populateArrayOperandTuples(
+					ptr,
+					tuples,
+					true,
+					"split's 2nd arg must be an array or subarray reference");
+			if (ast1Result == 3) {
+				getAst1().getAst2().getAst2().getAst1().populateTuples(tuples);
+			}
+			tuples.split(ast1Result);
+		}
+
+		/**
+		 * Populates the tuples for the <code>substr</code> built-in function,
+		 * which takes 2 or 3 arguments.
+		 *
+		 * @param tuples the tuples to populate
+		 */
+		private void populateSubstrTuples(AwkTuples tuples) {
+			if (getAst1() == null) {
+				throw new SemanticException("substr requires at least 2 arguments");
+			}
+			int ast1Result = getAst1().populateTuples(tuples);
+			if (ast1Result != 2 && ast1Result != 3) {
+				throw new SemanticException("substr requires 2 or 3 arguments, not " + ast1Result);
+			}
+			tuples.substr(ast1Result);
 		}
 	}
 

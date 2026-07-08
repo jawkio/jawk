@@ -2715,6 +2715,7 @@ public class AwkTuples implements Serializable {
 		case ASSIGN_NOPUSH:
 		case ASSIGN_ARRAY:
 		case DEREFERENCE:
+		case PEEK_DEREFERENCE:
 		case PLUS_EQ:
 		case MINUS_EQ:
 		case MULT_EQ:
@@ -2728,6 +2729,9 @@ public class AwkTuples implements Serializable {
 		case MOD_EQ_ARRAY:
 		case POW_EQ_ARRAY:
 		case CALL_FUNCTION:
+			// extension calls read globals (e.g. IGNORECASE) and their
+			// beforeStart hooks assign gawk-owned arrays
+		case EXTENSION:
 		case SET_RETURN_RESULT:
 		case RETURN_FROM_FUNCTION:
 		case MATCH:

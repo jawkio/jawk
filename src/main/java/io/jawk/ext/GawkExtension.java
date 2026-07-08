@@ -248,6 +248,10 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	public String gensub(@JawkRegexp Object regexp, Object replacement, Object how, @JawkOptional Object target) {
 		Pattern pattern = regexp instanceof Pattern ?
 				(Pattern) regexp : Pattern.compile(toAwkString(regexp));
+		// gawk: a nonzero IGNORECASE makes all regexp operations case-insensitive
+		if (currentIgnoreCase() && (pattern.flags() & Pattern.CASE_INSENSITIVE) == 0) {
+			pattern = Pattern.compile(pattern.pattern(), pattern.flags() | Pattern.CASE_INSENSITIVE);
+		}
 		Object targetValue = target == null ? getJrt().getInputLine() : target;
 		Matcher matcher = pattern.matcher(toAwkString(targetValue));
 		String repl = RegexRuntimeSupport.prepareReplacement(toAwkString(replacement), true);

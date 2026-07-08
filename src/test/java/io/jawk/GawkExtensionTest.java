@@ -82,6 +82,29 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void gensubHonorsIgnoreCase() throws Exception {
+		AwkTestSupport
+				.awkTest("IGNORECASE makes gensub matching case-insensitive")
+				.script(
+						"BEGIN { "
+								+ "print gensub(/a/, \"x\", \"g\", \"A\"); "
+								+ "IGNORECASE = 1; "
+								+ "print gensub(/a/, \"x\", \"g\", \"A\") "
+								+ "}")
+				.expectLines("A", "x")
+				.runAndAssert();
+	}
+
+	@Test
+	public void rawValueExtensionCallsWorkInEvalExpressions() throws Exception {
+		// The eval optimizer must keep the global frame alive for raw
+		// dereferences and extension calls.
+		Awk awk = new Awk();
+		assertEquals("untyped", awk.eval("typeof(x)"));
+		assertEquals(1L, ((Number) awk.eval("isarray(x) + 1")).longValue());
+	}
+
+	@Test
 	public void gensubReplacesOnlyRequestedOccurrence() throws Exception {
 		AwkTestSupport
 				.awkTest("gensub numeric selector targets one occurrence")

@@ -1066,7 +1066,16 @@ public final class AwkTestSupport {
 
 		@Override
 		protected ActualResult execute(ExecutionEnvironment env) throws Exception {
-			Awk awk = customAwk != null ? customAwk : new Awk(extensions);
+			// Mirror the CLI: no explicit extensions means the default set (which
+			// includes the gawk builtins), while an explicit list is honored as-is.
+			Awk awk;
+			if (customAwk != null) {
+				awk = customAwk;
+			} else if (extensions.isEmpty()) {
+				awk = new Awk();
+			} else {
+				awk = new Awk(extensions);
+			}
 			StringBuilder out = new StringBuilder();
 			AwkProgram program;
 			if (scriptPath != null) {

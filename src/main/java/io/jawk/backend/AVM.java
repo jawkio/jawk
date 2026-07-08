@@ -1676,15 +1676,6 @@ public class AVM implements VariableManager, Closeable {
 					position.next();
 					break;
 				}
-				case PEEK_ARRAY_ELEMENT_RAW: {
-					// stack[0] = array index
-					Object idx = pop();
-					checkScalar(idx);
-					Map<Object, Object> map = toMap(pop());
-					push(JRT.peekAwkValue(map, idx));
-					position.next();
-					break;
-				}
 				case SRAND: {
 					// arg[0] = numArgs (where 0 = no args, anything else = one argument)
 					// stack[0] = seed (only if numArgs != 0)

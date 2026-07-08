@@ -1097,14 +1097,6 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
-	 * Peeks at a stack-provided associative-array element, preserving missing
-	 * entries as {@code null}.
-	 */
-	public void peekArrayElementRaw() {
-		queue.add(new Tuple.NoOperandTuple(Opcode.PEEK_ARRAY_ELEMENT_RAW));
-	}
-
-	/**
 	 * Dereferences an associative-array element as a nested array, creating it if
 	 * needed.
 	 */

@@ -22,6 +22,7 @@ package io.jawk;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
 
@@ -37,12 +38,23 @@ public class GawkExtensionTest {
 
 	@Test
 	public void defaultExtensionSetIsPerEngine() throws Exception {
-		Object first = Awk.createExtensionInstanceMap().get(GawkExtension.class.getName());
-		Object second = Awk.createExtensionInstanceMap().get(GawkExtension.class.getName());
+		Object first = new Awk().getExtensionInstances().get(GawkExtension.class.getName());
+		Object second = new Awk().getExtensionInstances().get(GawkExtension.class.getName());
 		assertNotSame(
 				"each engine must get its own GawkExtension instance",
 				first,
 				second);
+	}
+
+	@Test
+	public void explicitEmptyExtensionListReclaimsBuiltinNames() throws Exception {
+		// An explicit empty extension list must free gawk builtin identifiers
+		// such as typeof for use as ordinary variables.
+		StringBuilder out = new StringBuilder();
+		new Awk(java.util.Collections.<io.jawk.ext.JawkExtension>emptyList())
+				.script("BEGIN { typeof = 3; print typeof }")
+				.execute(out);
+		assertEquals("3\n", out.toString());
 	}
 
 	@Test
@@ -255,6 +267,32 @@ public class GawkExtensionTest {
 				.script("{ print typeof($1), typeof($2) }")
 				.stdin("3.14 text\n")
 				.expectLines("strnum string")
+				.runAndAssert();
+	}
+
+	@Test
+	public void typeofOnMissingElementCreatesItLikeGawk() throws Exception {
+		AwkTestSupport
+				.awkTest("typeof on a missing element brings it into existence")
+				.script(
+						"BEGIN { "
+								+ "t = typeof(a[1]); present = (1 in a); "
+								+ "print t, present "
+								+ "}")
+				.expectLines("untyped 1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void isarrayOnMissingElementCreatesItLikeGawk() throws Exception {
+		AwkTestSupport
+				.awkTest("isarray on a missing element brings it into existence")
+				.script(
+						"BEGIN { "
+								+ "r = isarray(a[1]); present = (1 in a); "
+								+ "print r, present "
+								+ "}")
+				.expectLines("0 1")
 				.runAndAssert();
 	}
 

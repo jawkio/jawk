@@ -2212,8 +2212,13 @@ public class AwkParser {
 	private void populateRawValueTuples(AST valueAst, AwkTuples tuples) {
 		/*
 		 * typeof() and isarray() need to inspect an lvalue's current state. A
-		 * normal dereference autoconverts an untyped variable into AWK's assigned
-		 * blank scalar, which would erase the distinction gawk exposes.
+		 * normal scalar dereference autoconverts an untyped variable into AWK's
+		 * assigned blank scalar, which would erase the distinction gawk exposes,
+		 * so scalar variables use a non-assigning peek instead.
+		 * Array elements need no special opcode: a normal element read already
+		 * returns the raw untyped marker for a missing element, and, as in gawk,
+		 * brings that element into existence so a later `in`, delete, or for-in
+		 * observes it.
 		 */
 		if (valueAst instanceof IDAst) {
 			IDAst idAst = (IDAst) valueAst;
@@ -2222,10 +2227,6 @@ public class AwkParser {
 			} else {
 				tuples.peekDereference(idAst.offset, idAst.isGlobal);
 			}
-			return;
-		}
-		if (valueAst instanceof ArrayReferenceAst) {
-			((ArrayReferenceAst) valueAst).populateRawValueTuples(tuples);
 			return;
 		}
 		valueAst.populateTuples(tuples);
@@ -4636,14 +4637,6 @@ public class AwkParser {
 			populateContainerTuples(tuples);
 			getAst2().populateTuples(tuples);
 			tuples.dereferenceArray();
-			popSourceLineNumber(tuples);
-		}
-
-		private void populateRawValueTuples(AwkTuples tuples) {
-			pushSourceLineNumber(tuples);
-			populateContainerTuples(tuples);
-			getAst2().populateTuples(tuples);
-			tuples.peekArrayElementRaw();
 			popSourceLineNumber(tuples);
 		}
 

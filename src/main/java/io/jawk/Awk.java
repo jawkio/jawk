@@ -202,22 +202,24 @@ public class Awk {
 	}
 
 	static Map<String, ExtensionFunction> createExtensionFunctionMap(JawkExtension... extensions) {
-		if (extensions == null || extensions.length == 0) {
-			return ExtensionSetup.createDefault().functions;
-		}
-		return createExtensionFunctionMap(Arrays.asList(extensions));
+		return createExtensionFunctionMap(
+				extensions == null ? Collections.<JawkExtension>emptyList() : Arrays.asList(extensions));
 	}
 
 	static Map<String, JawkExtension> createExtensionInstanceMap(JawkExtension... extensions) {
-		if (extensions == null || extensions.length == 0) {
-			return ExtensionSetup.createDefault().instances;
-		}
-		return createExtensionInstanceMap(Arrays.asList(extensions));
+		return createExtensionInstanceMap(
+				extensions == null ? Collections.<JawkExtension>emptyList() : Arrays.asList(extensions));
 	}
 
+	/*
+	 * An explicit extension list is honored verbatim, including an empty one:
+	 * a caller that passes no extensions gets none, which is the only way to
+	 * reclaim names such as gensub or typeof. The default set is installed only
+	 * by the no-argument constructors, which route through createDefault().
+	 */
 	private static ExtensionSetup createExtensionSetup(Collection<? extends JawkExtension> extensions) {
 		if (extensions == null || extensions.isEmpty()) {
-			return ExtensionSetup.createDefault();
+			return ExtensionSetup.EMPTY;
 		}
 		Map<String, ExtensionFunction> keywordMap = new LinkedHashMap<String, ExtensionFunction>();
 		Map<String, JawkExtension> instanceMap = new LinkedHashMap<String, JawkExtension>();
@@ -246,6 +248,10 @@ public class Awk {
 	}
 
 	private static final class ExtensionSetup {
+
+		private static final ExtensionSetup EMPTY = new ExtensionSetup(
+				Collections.<String, ExtensionFunction>emptyMap(),
+				Collections.<String, JawkExtension>emptyMap());
 
 		/*
 		 * Extensions keep per-engine runtime state (VariableManager, JRT), so the

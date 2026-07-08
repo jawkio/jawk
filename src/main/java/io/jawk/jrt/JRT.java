@@ -531,20 +531,6 @@ public class JRT {
 	}
 
 	/**
-	 * Reads a map element without creating a missing entry.
-	 *
-	 * @param map map to inspect
-	 * @param key key to look up
-	 * @return stored value, or {@code null} when the key has never been created
-	 */
-	public static Object peekAwkValue(Map<Object, Object> map, Object key) {
-		if (containsAwkKey(map, key)) {
-			return map.get(AssocArray.normalizeKey(key));
-		}
-		return null;
-	}
-
-	/**
 	 * Convert Strings, Integers, and Doubles to Strings
 	 * based on the CONVFMT variable contents and the stored Locale.
 	 *

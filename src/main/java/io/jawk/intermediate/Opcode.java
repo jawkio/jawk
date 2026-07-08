@@ -1490,16 +1490,7 @@ public enum Opcode {
 	 * Stack before: array-index associative-array ...<br/>
 	 * Stack after: item ...
 	 */
-	PEEK_ARRAY_ELEMENT,
-
-	/**
-	 * Looks up an associative-array element without creating a blank entry when
-	 * the key is missing, preserving a never-created element as {@code null}.
-	 * <p>
-	 * Stack before: array-index associative-array ...<br/>
-	 * Stack after: item ...
-	 */
-	PEEK_ARRAY_ELEMENT_RAW;
+	PEEK_ARRAY_ELEMENT;
 
 	private static final Opcode[] VALUES = values();
 

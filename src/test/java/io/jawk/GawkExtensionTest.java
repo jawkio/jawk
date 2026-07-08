@@ -101,6 +101,17 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void symtabSeesRuntimeManagedGlobals() throws Exception {
+		// ARGC/ARGV are populated before the beforeStart hooks run, so the
+		// SYMTAB snapshot must observe their real values.
+		AwkTestSupport
+				.awkTest("SYMTAB snapshots ARGC and ARGV after initialization")
+				.script("BEGIN { print SYMTAB[\"ARGC\"], SYMTAB[\"ARGV\"][0] }")
+				.expectLines("1 jawk")
+				.runAndAssert();
+	}
+
+	@Test
 	public void symtabAndFunctabExposeRealNames() throws Exception {
 		AwkTestSupport
 				.awkTest("SYMTAB and FUNCTAB hold real symbol names")

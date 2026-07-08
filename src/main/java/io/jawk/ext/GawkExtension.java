@@ -99,10 +99,12 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	private void materializeSymtab() {
 		if (shouldMaterialize("SYMTAB")) {
 			Map<Object, Object> symtab = JRT.createAwkMap(false);
-			for (String name : avm.getSpecialVariableNames()) {
+			for (String name : avm.getGlobalVariableNames()) {
 				symtab.put(name, avm.getVariable(name));
 			}
-			for (String name : avm.getGlobalVariableNames()) {
+			// specials last: their accessors are authoritative even when the
+			// name also has a (possibly not yet materialized) global slot
+			for (String name : avm.getSpecialVariableNames()) {
 				symtab.put(name, avm.getVariable(name));
 			}
 			getVm().assignVariable("SYMTAB", symtab);

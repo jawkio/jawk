@@ -32,119 +32,151 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Supplier;
 
 /**
  * Registry used by extensions and the CLI to expose ready-to-use extension
- * instances.
+ * factories.
+ * <p>
+ * Extensions carry per-engine runtime state (interpreter, JRT), so
+ * {@link #resolve(String)} returns a fresh instance for factory-registered
+ * extensions — never a shared one. Instances registered through
+ * {@link #register(String, JawkExtension)} are returned as-is; sharing them
+ * across engines is the caller's responsibility.
+ * </p>
  */
 public final class ExtensionRegistry {
 
-	private static final ConcurrentMap<String, JawkExtension> REGISTERED = new ConcurrentHashMap<String, JawkExtension>();
+	/** A registered extension: the factory producing instances plus its type for class-name lookups. */
+	private static final class Registration {
+
+		private final Supplier<JawkExtension> factory;
+		private final Class<? extends JawkExtension> type;
+
+		private Registration(Supplier<JawkExtension> factoryParam, Class<? extends JawkExtension> typeParam) {
+			this.factory = factoryParam;
+			this.type = typeParam;
+		}
+	}
+
+	private static final ConcurrentMap<String, Registration> REGISTERED = new ConcurrentHashMap<String, Registration>();
 
 	static {
 		registerBuiltin(
-				new GawkExtension(),
-				GawkExtension.class.getName(),
-				GawkExtension.class.getSimpleName(),
+				GawkExtension::new,
 				"GNU Awk Compatibility");
 		registerBuiltin(
-				StdinExtension.INSTANCE,
-				StdinExtension.class.getName(),
-				StdinExtension.class.getSimpleName(),
+				StdinExtension::new,
 				"Stdin Support");
 	}
 
 	private ExtensionRegistry() {}
 
 	/**
-	 * Registers an extension instance under the supplied name.
+	 * Registers an extension instance under the supplied name. The same
+	 * instance is returned by every {@link #resolve(String)} call; prefer
+	 * {@link #register(String, Supplier)} for stateful extensions that must not
+	 * be shared across engines.
 	 *
 	 * @param name identifying name
 	 * @param extension extension instance
 	 */
 	public static void register(String name, JawkExtension extension) {
+		Objects.requireNonNull(extension, "Extension instance must not be null");
+		requireName(name);
+		REGISTERED.put(name, new Registration(() -> extension, extension.getClass()));
+	}
+
+	/**
+	 * Registers an extension factory under the supplied name. Every
+	 * {@link #resolve(String)} call returns a freshly created instance, so
+	 * per-engine extension state is never shared.
+	 *
+	 * @param name identifying name
+	 * @param factory factory producing extension instances
+	 */
+	public static void register(String name, Supplier<JawkExtension> factory) {
+		Objects.requireNonNull(factory, "Extension factory must not be null");
+		requireName(name);
+		JawkExtension probe = Objects.requireNonNull(factory.get(), "Extension factory must not produce null");
+		REGISTERED.put(name, new Registration(factory, probe.getClass()));
+	}
+
+	private static void requireName(String name) {
 		Objects.requireNonNull(name, "Extension name must not be null");
 		if (name.isEmpty()) {
 			throw new IllegalArgumentException("Extension name must not be empty");
 		}
-		REGISTERED.put(name, Objects.requireNonNull(extension, "Extension instance must not be null"));
 	}
 
-	private static void registerBuiltin(JawkExtension extension, String... identifiers) {
-		Objects.requireNonNull(extension, "Extension instance must not be null");
-		if (identifiers != null) {
-			for (String identifier : identifiers) {
-				if (identifier != null && !identifier.isEmpty()) {
-					JawkExtension existing = REGISTERED.putIfAbsent(identifier, extension);
-					if (existing != null && existing != extension) {
-						throw new IllegalStateException(
-								"Extension identifier '" + identifier + "' already mapped to "
-										+ existing.getClass().getName());
-					}
-				}
-			}
+	private static void registerBuiltin(Supplier<JawkExtension> factory, String... extraIdentifiers) {
+		JawkExtension probe = factory.get();
+		Registration registration = new Registration(factory, probe.getClass());
+		putIfAbsentOrFail(probe.getClass().getName(), registration);
+		putIfAbsentOrFail(probe.getClass().getSimpleName(), registration);
+		putIfAbsentOrFail(probe.getExtensionName(), registration);
+		for (String identifier : extraIdentifiers) {
+			putIfAbsentOrFail(identifier, registration);
 		}
-		String name = extension.getExtensionName();
-		if (name != null && !name.isEmpty()) {
-			JawkExtension existing = REGISTERED.putIfAbsent(name, extension);
-			if (existing != null && existing != extension) {
-				throw new IllegalStateException(
-						"Extension name '" + name + "' already mapped to "
-								+ existing.getClass().getName());
-			}
+	}
+
+	private static void putIfAbsentOrFail(String identifier, Registration registration) {
+		if (identifier == null || identifier.isEmpty()) {
+			return;
+		}
+		Registration existing = REGISTERED.putIfAbsent(identifier, registration);
+		if (existing != null && existing.type != registration.type) {
+			throw new IllegalStateException(
+					"Extension identifier '" + identifier + "' already mapped to " + existing.type.getName());
 		}
 	}
 
 	/**
-	 * Returns a snapshot of all registered extensions sorted by name.
+	 * Returns a snapshot of all registered extensions sorted by name. Each
+	 * factory-registered entry maps to a freshly created instance.
 	 *
 	 * @return immutable view of registered extensions
 	 */
 	public static Map<String, JawkExtension> listExtensions() {
-		List<Map.Entry<String, JawkExtension>> entries = new ArrayList<Map.Entry<String, JawkExtension>>(
+		List<Map.Entry<String, Registration>> entries = new ArrayList<Map.Entry<String, Registration>>(
 				REGISTERED.entrySet());
 		Collections.sort(entries, Comparator.comparing(Map.Entry::getKey, String.CASE_INSENSITIVE_ORDER));
 		Map<String, JawkExtension> snapshot = new LinkedHashMap<String, JawkExtension>();
-		for (Map.Entry<String, JawkExtension> entry : entries) {
-			snapshot.put(entry.getKey(), entry.getValue());
+		for (Map.Entry<String, Registration> entry : entries) {
+			snapshot.put(entry.getKey(), entry.getValue().factory.get());
 		}
 		return Collections.unmodifiableMap(snapshot);
 	}
 
 	/**
-	 * Resolves an extension name to the registered instance. The lookup is
+	 * Resolves an extension name to an extension instance. The lookup is
 	 * case-insensitive and also supports class names. When the extension has not
 	 * yet been registered, the method attempts to load the class by name and
 	 * instantiate it.
 	 *
 	 * @param name name or class name of the extension
-	 * @return extension instance, or {@code null} when the name cannot be resolved
+	 * @return extension instance (freshly created for factory-registered
+	 *         extensions), or {@code null} when the name cannot be resolved
 	 */
 	public static JawkExtension resolve(String name) {
 		if (name == null || name.isEmpty()) {
 			return null;
 		}
-		JawkExtension extension = REGISTERED.get(name);
-		if (extension != null) {
-			return extension;
+		Registration registration = REGISTERED.get(name);
+		if (registration == null) {
+			registration = findCaseInsensitive(name);
 		}
-		extension = findCaseInsensitive(name);
-		if (extension != null) {
-			return extension;
+		if (registration == null) {
+			registration = findByClassName(name);
 		}
-		extension = findByClassName(name);
-		if (extension != null) {
-			return extension;
+		if (registration == null) {
+			registration = registerByClassName(name);
 		}
-		extension = instantiateByClassName(name);
-		if (extension != null) {
-			return extension;
-		}
-		return null;
+		return registration == null ? null : registration.factory.get();
 	}
 
-	private static JawkExtension findCaseInsensitive(String name) {
-		for (Map.Entry<String, JawkExtension> entry : REGISTERED.entrySet()) {
+	private static Registration findCaseInsensitive(String name) {
+		for (Map.Entry<String, Registration> entry : REGISTERED.entrySet()) {
 			if (entry.getKey().equalsIgnoreCase(name)) {
 				return entry.getValue();
 			}
@@ -152,61 +184,51 @@ public final class ExtensionRegistry {
 		return null;
 	}
 
-	private static JawkExtension findByClassName(String name) {
-		for (JawkExtension extension : REGISTERED.values()) {
-			Class<? extends JawkExtension> type = extension.getClass();
+	private static Registration findByClassName(String name) {
+		for (Registration registration : REGISTERED.values()) {
+			Class<? extends JawkExtension> type = registration.type;
 			if (type.getName().equals(name)
 					|| type.getSimpleName().equals(name)
 					|| type.getName().equalsIgnoreCase(name)
 					|| type.getSimpleName().equalsIgnoreCase(name)) {
-				return extension;
+				return registration;
 			}
 		}
 		return null;
 	}
 
-	private static JawkExtension instantiateByClassName(String name) {
+	private static Registration registerByClassName(String name) {
+		Class<? extends JawkExtension> type;
 		try {
 			Class<?> clazz = Class.forName(name);
 			if (!JawkExtension.class.isAssignableFrom(clazz)) {
 				return null;
 			}
-			JawkExtension created = clazz.asSubclass(JawkExtension.class).getDeclaredConstructor().newInstance();
-			JawkExtension instance = created;
-			String simpleName = clazz.getSimpleName();
-			if (!simpleName.isEmpty()) {
-				JawkExtension existing = REGISTERED.putIfAbsent(simpleName, created);
-				if (existing != null) {
-					instance = existing;
-				}
-			}
-			String extensionName = instance.getExtensionName();
-			if (extensionName != null && !extensionName.isEmpty()) {
-				JawkExtension existingByName = REGISTERED.putIfAbsent(extensionName, instance);
-				if (existingByName != null) {
-					instance = existingByName;
-					extensionName = instance.getExtensionName();
-				}
-			}
-			if (!simpleName.isEmpty()) {
-				REGISTERED.put(simpleName, instance);
-			}
-			if (extensionName != null && !extensionName.isEmpty()) {
-				REGISTERED.put(extensionName, instance);
-			}
-			register(name, instance);
-			return instance;
+			type = clazz.asSubclass(JawkExtension.class);
 		} catch (ClassNotFoundException ex) {
 			return null;
+		}
+		Supplier<JawkExtension> factory = () -> instantiate(type);
+		// probe once to validate instantiation and learn the extension name
+		JawkExtension probe = factory.get();
+		Registration registration = new Registration(factory, type);
+		putIfAbsentOrFail(type.getSimpleName(), registration);
+		putIfAbsentOrFail(probe.getExtensionName(), registration);
+		putIfAbsentOrFail(name, registration);
+		return registration;
+	}
+
+	private static JawkExtension instantiate(Class<? extends JawkExtension> type) {
+		try {
+			return type.getDeclaredConstructor().newInstance();
 		} catch (InstantiationException | IllegalAccessException | NoSuchMethodException e) {
-			throw new IllegalStateException("Cannot instantiate extension " + name, e);
+			throw new IllegalStateException("Cannot instantiate extension " + type.getName(), e);
 		} catch (InvocationTargetException e) {
 			Throwable cause = e.getCause();
 			if (cause instanceof RuntimeException) {
 				throw (RuntimeException) cause;
 			}
-			throw new IllegalStateException("Cannot instantiate extension " + name, cause);
+			throw new IllegalStateException("Cannot instantiate extension " + type.getName(), cause);
 		}
 	}
-
 }

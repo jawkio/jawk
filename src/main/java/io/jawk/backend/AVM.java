@@ -2095,42 +2095,21 @@ public class AVM implements VariableManager, Closeable {
 					break;
 				}
 				case ENVIRON_OFFSET: {
-					// stack[0] = offset
-					//// assignArray(offset, arrIdx, newstring, isGlobal);
-					LongTuple offsetTuple = (LongTuple) tuple;
-					environOffset = offsetTuple.getValue();
-					// set the initial variables
-					Map<String, String> env = System.getenv();
-					for (Map.Entry<String, String> var : env.entrySet()) {
-						assignArray(environOffset, var.getKey(), jrt.toInputScalar(var.getValue()), true);
-						pop(); // clean up the stack after the assignment
-					}
+					// arg[0] = offset; already populated from SET_NUM_GLOBALS so
+					// beforeStart hooks observe the real value
+					populateEnviron(((LongTuple) tuple).getValue());
 					position.next();
 					break;
 				}
 				case ARGC_OFFSET: {
-					// stack[0] = offset
-					LongTuple offsetTuple = (LongTuple) tuple;
-					argcOffset = offsetTuple.getValue();
-					// assign(argcOffset, arguments.size(), true, position); // true = global
-					// +1 to include the "jawk" program name (ARGV[0])
-					assign(argcOffset, arguments.size() + 1, true, position, false); // true = global
+					// arg[0] = offset; already populated from SET_NUM_GLOBALS
+					populateArgc(((LongTuple) tuple).getValue());
 					position.next();
 					break;
 				}
 				case ARGV_OFFSET: {
-					// stack[0] = offset
-					LongTuple offsetTuple = (LongTuple) tuple;
-					argvOffset = offsetTuple.getValue();
-					// consume argv (looping from 1 to argc)
-					int argc = (int) JRT.toDouble(runtimeStack.getVariable(argcOffset, true)); // true = global
-					assignArray(argvOffset, 0, "jawk", true);
-					pop();
-					for (int i = 1; i < argc; i++) {
-						// assignArray(argvOffset, i+1, arguments.get(i), true);
-						assignArray(argvOffset, i, jrt.toInputScalar(arguments.get(i - 1)), true);
-						pop(); // clean up the stack after the assignment
-					}
+					// arg[0] = offset; already populated from SET_NUM_GLOBALS
+					populateArgv(((LongTuple) tuple).getValue());
 					position.next();
 					break;
 				}
@@ -2204,6 +2183,35 @@ public class AVM implements VariableManager, Closeable {
 				case SET_NUM_GLOBALS: {
 					execSetNumGlobals((CountTuple) tuple);
 					position.next();
+					/*
+					 * The runtime-managed preamble (ENVIRON/ARGC/ARGV offsets) follows
+					 * immediately; consume it before running the beforeStart hooks so
+					 * they observe the real values (e.g. the gawk extension
+					 * snapshotting SYMTAB). Sandboxed programs deliberately omit some
+					 * of these tuples, which this loop honors by construction.
+					 */
+					boolean inPreamble = true;
+					while (inPreamble && !position.isEOF()) {
+						Tuple preambleTuple = position.current();
+						switch (preambleTuple.getOpcode()) {
+						case ENVIRON_OFFSET:
+							populateEnviron(((LongTuple) preambleTuple).getValue());
+							position.next();
+							break;
+						case ARGC_OFFSET:
+							populateArgc(((LongTuple) preambleTuple).getValue());
+							position.next();
+							break;
+						case ARGV_OFFSET:
+							populateArgv(((LongTuple) preambleTuple).getValue());
+							position.next();
+							break;
+						default:
+							inPreamble = false;
+							break;
+						}
+					}
+					runBeforeStartHooks();
 					break;
 				}
 				case CLOSE: {
@@ -2863,7 +2871,32 @@ public class AVM implements VariableManager, Closeable {
 			throw new IllegalStateException(
 					"AVM globals are already initialized for a different eval layout. Call prepareForEval(...) first.");
 		}
-		runBeforeStartHooks();
+	}
+
+	private void populateEnviron(long offset) {
+		environOffset = offset;
+		for (Map.Entry<String, String> var : System.getenv().entrySet()) {
+			assignArray(environOffset, var.getKey(), jrt.toInputScalar(var.getValue()), true);
+			pop(); // clean up the stack after the assignment
+		}
+	}
+
+	private void populateArgc(long offset) {
+		argcOffset = offset;
+		// +1 to include the "jawk" program name (ARGV[0])
+		runtimeStack.setVariable(argcOffset, JRT.toAssignedScalar(Integer.valueOf(arguments.size() + 1)), true);
+	}
+
+	private void populateArgv(long offset) {
+		argvOffset = offset;
+		// consume argv (looping from 1 to argc)
+		int argc = (int) JRT.toDouble(runtimeStack.getVariable(argcOffset, true)); // true = global
+		assignArray(argvOffset, 0, "jawk", true);
+		pop();
+		for (int i = 1; i < argc; i++) {
+			assignArray(argvOffset, i, jrt.toInputScalar(arguments.get(i - 1)), true);
+			pop(); // clean up the stack after the assignment
+		}
 	}
 
 	private void runBeforeStartHooks() {
@@ -3193,6 +3226,9 @@ public class AVM implements VariableManager, Closeable {
 		map.put("FNR", () -> jrt.getFNR());
 		map.put("RSTART", () -> jrt.getRSTART());
 		map.put("RLENGTH", () -> jrt.getRLENGTH());
+		// lazily-materialized globals answered through their synthetic accessors
+		map.put("ARGC", this::getARGC);
+		map.put("ARGV", this::getARGV);
 		return Collections.unmodifiableMap(map);
 	}
 

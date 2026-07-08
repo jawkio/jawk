@@ -496,13 +496,15 @@ public class Awk {
 		lastAst = null;
 		if (!scripts.isEmpty()) {
 			// Parse all script sources into a single AST
-			AwkParser parser = new AwkParser(this.extensionFunctions, settings.isAllowArraysOfArrays());
+			AwkParser parser = new AwkParser(this.extensionFunctions, settings.isPosix());
 			AstNode ast = parser.parse(scripts);
 			lastAst = ast;
 			if (ast != null) {
 				// Perform semantic checks twice to resolve forward references
 				ast.semanticAnalysis();
 				ast.semanticAnalysis();
+				// Record the primary source description for runtime diagnostics
+				tuples.setSourceDescription(scripts.get(0).getDescription());
 				// Build tuples from the AST
 				ast.populateTuples(tuples);
 				// Assign addresses and prepare tuples for interpretation
@@ -563,7 +565,7 @@ public class Awk {
 				new StringReader(expression));
 
 		// Parse the expression
-		AwkParser parser = new AwkParser(this.extensionFunctions, settings.isAllowArraysOfArrays());
+		AwkParser parser = new AwkParser(this.extensionFunctions, settings.isPosix());
 		AstNode ast = parser.parseExpression(expressionSource);
 
 		// Attempt to traverse the syntax tree and build

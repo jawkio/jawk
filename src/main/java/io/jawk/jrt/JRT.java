@@ -522,7 +522,7 @@ public class JRT {
 	 * @return the stored value, or the AWK blank value when no concrete value is
 	 *         present
 	 */
-	public static Object getAwkValue(Map<Object, Object> map, Object key) {
+	public static Object getAssocArrayValue(Map<Object, Object> map, Object key) {
 		if (map instanceof AssocArray) {
 			return map.get(key);
 		}
@@ -770,14 +770,14 @@ public class JRT {
 	}
 
 	/**
-	 * Returns whether the supplied value is an input-derived scalar that has a
-	 * numeric value.
+	 * Returns whether the supplied text parses as an AWK number under this
+	 * runtime's locale, as used for strnum recognition.
 	 *
-	 * @param value value to inspect
+	 * @param value text to test
 	 * @return {@code true} when {@code value} is an input numeric string
 	 */
-	public static boolean isInputScalarNumber(Object value) {
-		return value instanceof StrNum && ((StrNum) value).isNumber();
+	public boolean isParseableNumber(String value) {
+		return isParseableNumber(value, decimalSeparator);
 	}
 
 	/**

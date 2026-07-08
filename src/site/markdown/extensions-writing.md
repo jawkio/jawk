@@ -50,17 +50,21 @@ public int assocSize(@JawkAssocArray Map<Object, Object> array) {
 
 That metadata lets Jawk validate array-vs-scalar usage more accurately.
 
-When an array argument cannot be expressed as a dedicated Java parameter — typically an optional argument consumed through `Object...` — place `@JawkAssocArray` on the method instead and list the zero-based AWK argument positions that must be arrays:
+## Declare Optional Arguments with @JawkOptional
+
+Mark trailing parameters with `@JawkOptional` when the AWK caller may omit them; the Java method receives `null` in their place. Optional parameters must be the last declared parameters and cannot be combined with varargs. Other parameter annotations compose naturally, so an optional array argument keeps its `@JawkAssocArray` marker:
 
 ```java
 @JawkFunction("SortInto")
-@JawkAssocArray({ 1 })
-public long sortInto(@JawkAssocArray Map<Object, Object> source, Object... dest) {
-    // dest[0] (AWK argument position 1), when present, is guaranteed
-    // to be an associative array
+public long sortInto(
+        @JawkAssocArray Map<Object, Object> source,
+        @JawkOptional @JawkAssocArray Map<Object, Object> dest) {
+    // dest is null when the AWK caller passed a single argument
     ...
 }
 ```
+
+This is how the built-in gawk compatibility extension declares `asort(source [, dest [, how]])`.
 
 ## Receive Raw Values with @JawkRawValue
 

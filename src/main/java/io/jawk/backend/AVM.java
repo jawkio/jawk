@@ -41,6 +41,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -162,6 +163,12 @@ public class AVM implements VariableManager, Closeable {
 
 	/** Optional extension-provided ordering for {@code for (index in array)} traversal. */
 	private ForInKeyOrder forInKeyOrder;
+
+	/** Description of the primary script source, for runtime diagnostics. */
+	private String sourceDescription;
+
+	/** Script line of the extension call currently being dispatched. */
+	private int currentLineNumber;
 
 	/**
 	 * Construct the interpreter.
@@ -702,6 +709,7 @@ public class AVM implements VariableManager, Closeable {
 		globalVariableOffsets = compiledProgram.getGlobalVariableOffsetMap();
 		globalVariableArrays = compiledProgram.getGlobalVariableAarrayMap();
 		functionNames = compiledProgram.getFunctionNameSet();
+		sourceDescription = compiledProgram.getSourceDescription();
 	}
 
 	private void rebindResolvedInputSource(InputSource resolvedSource) {
@@ -1648,7 +1656,7 @@ public class AVM implements VariableManager, Closeable {
 					Object idx = pop(); // idx
 					checkScalar(idx);
 					Map<Object, Object> map = toMap(pop());
-					Object o = JRT.getAwkValue(map, idx);
+					Object o = JRT.getAssocArrayValue(map, idx);
 					push(o);
 					position.next();
 					break;
@@ -2159,9 +2167,6 @@ public class AVM implements VariableManager, Closeable {
 					Address funcAddr = callTuple.getAddress();
 					long numFormalParams = callTuple.getNumFormalParams();
 					long numActualParams = callTuple.getNumActualParams();
-					if (callTuple.getRuntimeWarning() != null) {
-						jrt.printWarning(callTuple.getRuntimeWarning());
-					}
 					runtimeStack.pushFrame(numFormalParams, position.currentIndex());
 					// Arguments are stacked, so first in the stack is the last for the function
 					for (long i = numActualParams - 1; i >= 0; i--) {
@@ -2176,6 +2181,11 @@ public class AVM implements VariableManager, Closeable {
 					// not needed for interpretation
 					// arg[0] = function name
 					// arg[1] = # of formal parameters
+					position.next();
+					break;
+				}
+				case WARNING: {
+					jrt.printWarning(((Tuple.WarningTuple) tuple).getMessage());
 					position.next();
 					break;
 				}
@@ -2351,9 +2361,8 @@ public class AVM implements VariableManager, Closeable {
 					ExtensionFunction function = extensionTuple.getFunction();
 					long numArgs = extensionTuple.getArgCount();
 					boolean isInitial = extensionTuple.isInitial();
-					if (extensionTuple.getRuntimeWarning() != null) {
-						jrt.printWarning(extensionTuple.getRuntimeWarning());
-					}
+					// let extensions report diagnostics at the call location
+					currentLineNumber = position.lineNumber();
 
 					Object[] args = new Object[(int) numArgs];
 					for (int i = (int) numArgs - 1; i >= 0; i--) {
@@ -2709,12 +2718,8 @@ public class AVM implements VariableManager, Closeable {
 		String ere = jrt.toAwkString(pop());
 		String s = jrt.toAwkString(pop());
 		int flags = 0;
-		if (globalVariableOffsets.containsKey("IGNORECASE")) {
-			Integer offsetObj = globalVariableOffsets.get("IGNORECASE");
-			Object ignorecase = runtimeStack.getVariable(offsetObj, true);
-			if (JRT.toDouble(ignorecase) != 0) {
-				flags |= Pattern.CASE_INSENSITIVE;
-			}
+		if (JRT.toDouble(getVariable("IGNORECASE")) != 0) {
+			flags |= Pattern.CASE_INSENSITIVE;
 		}
 		Pattern pattern = Pattern.compile(ere, flags);
 		Matcher matcher = pattern.matcher(s);
@@ -3166,41 +3171,50 @@ public class AVM implements VariableManager, Closeable {
 		return functionNames == null ? Collections.<String>emptySet() : Collections.unmodifiableSet(functionNames);
 	}
 
+	/**
+	 * The special variables this interpreter can answer by name, mapped to their
+	 * accessors. Single source of truth for {@link #getVariable(String)} and
+	 * {@link #getSpecialVariableNames()}.
+	 */
+	private final Map<String, Supplier<Object>> specialVariables = buildSpecialVariables();
+
+	private Map<String, Supplier<Object>> buildSpecialVariables() {
+		Map<String, Supplier<Object>> map = new LinkedHashMap<String, Supplier<Object>>();
+		map.put("FS", this::getFS);
+		map.put("RS", this::getRS);
+		map.put("OFS", this::getOFS);
+		map.put("ORS", this::getORS);
+		map.put("FILENAME", () -> jrt.getFILENAME());
+		map.put("SUBSEP", this::getSUBSEP);
+		map.put("CONVFMT", this::getCONVFMT);
+		map.put("OFMT", () -> jrt.getOFMTString());
+		map.put("NF", () -> jrt.getNF());
+		map.put("NR", () -> jrt.getNR());
+		map.put("FNR", () -> jrt.getFNR());
+		map.put("RSTART", () -> jrt.getRSTART());
+		map.put("RLENGTH", () -> jrt.getRLENGTH());
+		return Collections.unmodifiableMap(map);
+	}
+
+	/**
+	 * Returns the names of the special variables that
+	 * {@link #getVariable(String)} answers directly.
+	 *
+	 * @return unmodifiable set of special variable names
+	 */
+	public Set<String> getSpecialVariableNames() {
+		return specialVariables.keySet();
+	}
+
 	/** {@inheritDoc} */
 	@Override
 	public final Object getVariable(String name) {
 		if (name == null) {
 			return null;
 		}
-		switch (name) {
-		case "FS":
-			return getFS();
-		case "RS":
-			return getRS();
-		case "OFS":
-			return getOFS();
-		case "ORS":
-			return getORS();
-		case "FILENAME":
-			return jrt.getFILENAME();
-		case "SUBSEP":
-			return getSUBSEP();
-		case "CONVFMT":
-			return getCONVFMT();
-		case "OFMT":
-			return jrt.getOFMTString();
-		case "NF":
-			return jrt.getNF();
-		case "NR":
-			return jrt.getNR();
-		case "FNR":
-			return jrt.getFNR();
-		case "RSTART":
-			return jrt.getRSTART();
-		case "RLENGTH":
-			return jrt.getRLENGTH();
-		default:
-			break;
+		Supplier<Object> special = specialVariables.get(name);
+		if (special != null) {
+			return special.get();
 		}
 		if (globalVariableOffsets == null) {
 			return baseInitialVariables.get(name);
@@ -3213,6 +3227,26 @@ public class AVM implements VariableManager, Closeable {
 		// the script have no compiled offset; they are still observable (e.g.
 		// IGNORECASE read by the gawk extension).
 		return baseInitialVariables == null ? null : baseInitialVariables.get(name);
+	}
+
+	/**
+	 * Returns the description of the primary script source (typically its file
+	 * name), for extension-emitted diagnostics.
+	 *
+	 * @return script source description, or {@code null} when unknown
+	 */
+	public String getSourceDescription() {
+		return sourceDescription;
+	}
+
+	/**
+	 * Returns the script line of the extension call currently being dispatched,
+	 * for extension-emitted diagnostics.
+	 *
+	 * @return current script line number
+	 */
+	public int getCurrentLineNumber() {
+		return currentLineNumber;
 	}
 
 	/**
@@ -3434,7 +3468,7 @@ public class AVM implements VariableManager, Closeable {
 	private Map<Object, Object> ensureArrayInArray(Map<Object, Object> map, Object key) {
 		checkScalar(key);
 		boolean existingKey = JRT.containsAwkKey(map, key);
-		Object value = JRT.getAwkValue(map, key);
+		Object value = JRT.getAssocArrayValue(map, key);
 		if (!existingKey || value == null || value instanceof UntypedObject) {
 			Map<Object, Object> nested = newAwkArray();
 			map.put(key, nested);

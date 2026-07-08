@@ -22,6 +22,8 @@ package io.jawk.ext;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import java.io.File;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -31,17 +33,19 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jawk.backend.AVM;
 import io.jawk.backend.RegexRuntimeSupport;
 import io.jawk.ext.annotations.JawkAssocArray;
 import io.jawk.ext.annotations.JawkBeforeStart;
 import io.jawk.ext.annotations.JawkFunction;
+import io.jawk.ext.annotations.JawkOptional;
 import io.jawk.ext.annotations.JawkRawValue;
 import io.jawk.ext.annotations.JawkRegexp;
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.intermediate.UntypedObject;
-import io.jawk.jrt.IllegalAwkArgumentException;
 import io.jawk.jrt.JRT;
+import io.jawk.jrt.StrNum;
 
 /**
  * GNU awk compatibility extension for array sorting and type introspection.
@@ -66,38 +70,23 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		return "GawkExtension";
 	}
 
-	/**
-	 * Names of the special variables the interpreter can answer by name; these
-	 * appear in {@code SYMTAB} alongside the script's own globals, mirroring
-	 * gawk's symbol table.
-	 */
-	private static final String[] SPECIAL_VARIABLE_NAMES = {
-			"FS",
-			"RS",
-			"OFS",
-			"ORS",
-			"FILENAME",
-			"SUBSEP",
-			"CONVFMT",
-			"OFMT",
-			"NF",
-			"NR",
-			"FNR",
-			"RSTART",
-			"RLENGTH" };
+	/** Interpreter this per-engine extension instance is bound to. */
+	private AVM avm;
 
 	/**
 	 * Initializes gawk-owned global arrays for scripts that reference them, and
 	 * installs the {@code PROCINFO["sorted_in"]} traversal order for
 	 * {@code for-in} loops.
 	 *
-	 * @param avm interpreter about to execute
-	 * @param jrt runtime associated with {@code avm}
+	 * @param avmParam interpreter about to execute
+	 * @param jrt runtime associated with {@code avmParam}
 	 */
 	@JawkBeforeStart
-	public void initializeGawkVariables(AVM avm, JRT jrt) {
-		materializeSymtab(avm);
-		materializeFunctab(avm);
+	@SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "The extension is a per-engine instance deliberately bound to its interpreter")
+	public void initializeGawkVariables(AVM avmParam, JRT jrt) {
+		this.avm = avmParam;
+		materializeSymtab();
+		materializeFunctab();
 		avm.setForInKeyOrder(this::orderForInKeys);
 	}
 
@@ -107,18 +96,17 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * execution starts; unlike gawk's, the array is not a live view of the
 	 * symbol table.
 	 */
-	private void materializeSymtab(AVM avm) {
-		if (!avm.getGlobalVariableNames().contains("SYMTAB") || avm.getVariable("SYMTAB") != null) {
-			return;
+	private void materializeSymtab() {
+		if (shouldMaterialize("SYMTAB")) {
+			Map<Object, Object> symtab = JRT.createAwkMap(false);
+			for (String name : avm.getSpecialVariableNames()) {
+				symtab.put(name, avm.getVariable(name));
+			}
+			for (String name : avm.getGlobalVariableNames()) {
+				symtab.put(name, avm.getVariable(name));
+			}
+			getVm().assignVariable("SYMTAB", symtab);
 		}
-		Map<Object, Object> symtab = JRT.createAwkMap(false);
-		for (String name : SPECIAL_VARIABLE_NAMES) {
-			putSymbol(symtab, name, avm.getVariable(name));
-		}
-		for (String name : avm.getGlobalVariableNames()) {
-			putSymbol(symtab, name, avm.getVariable(name));
-		}
-		getVm().assignVariable("SYMTAB", symtab);
 	}
 
 	/**
@@ -126,22 +114,27 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * functions and this extension's own function keywords, mirroring gawk's
 	 * function table.
 	 */
-	private void materializeFunctab(AVM avm) {
-		if (!avm.getGlobalVariableNames().contains("FUNCTAB") || avm.getVariable("FUNCTAB") != null) {
-			return;
+	private void materializeFunctab() {
+		if (shouldMaterialize("FUNCTAB")) {
+			Map<Object, Object> functab = JRT.createAwkMap(false);
+			for (String name : avm.getFunctionNames()) {
+				functab.put(name, name);
+			}
+			for (String keyword : getExtensionFunctions().keySet()) {
+				functab.put(keyword, keyword);
+			}
+			getVm().assignVariable("FUNCTAB", functab);
 		}
-		Map<Object, Object> functab = JRT.createAwkMap(false);
-		for (String name : avm.getFunctionNames()) {
-			functab.put(name, name);
-		}
-		for (String keyword : getExtensionFunctions().keySet()) {
-			functab.put(keyword, keyword);
-		}
-		getVm().assignVariable("FUNCTAB", functab);
 	}
 
-	private static void putSymbol(Map<Object, Object> table, String name, Object value) {
-		table.put(name, value == null ? "" : value);
+	/**
+	 * A gawk-owned array is materialized only when the compiled program
+	 * references it by name (otherwise it has no variable slot and could never
+	 * be observed by the script) and no value was already supplied for it, for
+	 * example by the host through variable overrides.
+	 */
+	private boolean shouldMaterialize(String name) {
+		return avm.getGlobalVariableNames().contains(name) && avm.getVariable(name) == null;
 	}
 
 	/**
@@ -167,7 +160,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		if (!JRT.containsAwkKey(procinfoMap, "sorted_in")) {
 			return null;
 		}
-		return getJrt().toAwkString(JRT.getAwkValue(procinfoMap, "sorted_in"));
+		return getJrt().toAwkString(JRT.getAssocArrayValue(procinfoMap, "sorted_in"));
 	}
 
 	/**
@@ -178,10 +171,11 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * @return number of sorted elements
 	 */
 	@JawkFunction("asort")
-	@JawkAssocArray(
-	{ 1 })
-	public Long asort(@JawkAssocArray Map<Object, Object> source, Object... args) {
-		return sort(source, args, false);
+	public Long asort(
+			@JawkAssocArray Map<Object, Object> source,
+			@JawkOptional @JawkAssocArray Map<Object, Object> dest,
+			@JawkOptional Object how) {
+		return sort(source, dest, how, false);
 	}
 
 	/**
@@ -192,10 +186,11 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * @return number of sorted elements
 	 */
 	@JawkFunction("asorti")
-	@JawkAssocArray(
-	{ 1 })
-	public Long asorti(@JawkAssocArray Map<Object, Object> source, Object... args) {
-		return sort(source, args, true);
+	public Long asorti(
+			@JawkAssocArray Map<Object, Object> source,
+			@JawkOptional @JawkAssocArray Map<Object, Object> dest,
+			@JawkOptional Object how) {
+		return sort(source, dest, how, true);
 	}
 
 	/**
@@ -206,18 +201,11 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * @return gawk type name
 	 */
 	@JawkFunction("typeof")
-	@JawkAssocArray(
-	{ 1 })
-	public String typeof(@JawkRawValue Object value, Object... meta) {
-		if (meta.length > 1) {
-			throw new IllegalAwkArgumentException("typeof accepts one or two arguments");
-		}
-		if (meta.length == 1) {
-			@SuppressWarnings("unchecked")
-			Map<Object, Object> metadata = (Map<Object, Object>) meta[0];
-			metadata.clear();
+	public String typeof(@JawkRawValue Object value, @JawkOptional @JawkAssocArray Map<Object, Object> meta) {
+		if (meta != null) {
+			meta.clear();
 			if (value instanceof Map) {
-				metadata.put("array_type", arrayType((Map<?, ?>) value));
+				meta.put("array_type", arrayType((Map<?, ?>) value));
 			}
 		}
 		return typeOf(value);
@@ -251,23 +239,23 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * @param regexp regular expression
 	 * @param replacement replacement text
 	 * @param how occurrence selector or {@code g}
-	 * @param target optional target text; defaults to {@code $0}
+	 * @param target target text, or {@code null} to default to {@code $0}
 	 * @return substituted text
 	 */
 	@JawkFunction("gensub")
-	public String gensub(@JawkRegexp Object regexp, Object replacement, Object how, Object... target) {
-		if (target.length > 1) {
-			throw new IllegalAwkArgumentException("gensub accepts three or four arguments");
-		}
+	public String gensub(@JawkRegexp Object regexp, Object replacement, Object how, @JawkOptional Object target) {
 		Pattern pattern = regexp instanceof Pattern ?
 				(Pattern) regexp : Pattern.compile(toAwkString(regexp));
-		Object targetValue = target.length == 0 ? getJrt().getInputLine() : target[0];
+		Object targetValue = target == null ? getJrt().getInputLine() : target;
 		Matcher matcher = pattern.matcher(toAwkString(targetValue));
 		String repl = RegexRuntimeSupport.prepareReplacement(toAwkString(replacement), true);
 		String selector = toAwkString(how);
 		// gawk: any string beginning with 'g' or 'G' selects a global replacement
 		if (!selector.isEmpty() && (selector.charAt(0) == 'g' || selector.charAt(0) == 'G')) {
 			return matcher.replaceAll(repl);
+		}
+		if (!(how instanceof Number) && !getJrt().isParseableNumber(selector)) {
+			warnAtCurrentLine("gensub: third argument `%s' treated as 1", selector);
 		}
 		int occurrence = (int) JRT.toLong(how);
 		if (occurrence <= 1) {
@@ -284,6 +272,23 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		}
 		matcher.appendTail(result);
 		return result.toString();
+	}
+
+	/**
+	 * Prints a gawk-style diagnostic located at the extension call currently
+	 * being dispatched, e.g. {@code gawk: script.awk:4: warning: ...}.
+	 */
+	private void warnAtCurrentLine(String format, Object... args) {
+		String source = avm == null ? null : avm.getSourceDescription();
+		String basename = source == null ? "" : new File(source).getName();
+		getJrt()
+				.printWarning(
+						String
+								.format(
+										"gawk: %s:%d: warning: %s",
+										basename,
+										avm == null ? 0 : avm.getCurrentLineNumber(),
+										String.format(format, args)));
 	}
 
 	/**
@@ -305,24 +310,10 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		return keys;
 	}
 
-	private Long sort(Map<Object, Object> source, Object[] args, boolean indicesAsValues) {
-		if (args.length > 2) {
-			throw new IllegalAwkArgumentException(
-					(indicesAsValues ? "asorti" : "asort") + " accepts at most three arguments");
-		}
-		Map<Object, Object> destination = source;
-		String mode = indicesAsValues ? "@ind_type_asc" : VAL_TYPE_ASC;
-		if (args.length >= 1) {
-			if (!(args[0] instanceof Map)) {
-				throw new IllegalAwkArgumentException("2nd argument must be an array");
-			}
-			@SuppressWarnings("unchecked")
-			Map<Object, Object> dest = (Map<Object, Object>) args[0];
-			destination = dest;
-		}
-		if (args.length == 2) {
-			mode = toAwkString(args[1]);
-		}
+	private Long sort(Map<Object, Object> source, Map<Object, Object> dest, Object how, boolean indicesAsValues) {
+		Map<Object, Object> destination = dest == null ? source : dest;
+		String mode = how == null ?
+				(indicesAsValues ? "@ind_type_asc" : VAL_TYPE_ASC) : toAwkString(how);
 		List<SortEntry> entries = entries(source);
 		Collections.sort(entries, comparator(mode, getJrt(), currentIgnoreCase()));
 		destination.clear();
@@ -375,6 +366,22 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		return desc ? comparator.reversed() : comparator;
 	}
 
+	/*
+	 * The comparators below implement gawk's predefined sort orderings
+	 * (@ind_num_*, @val_str_*, @val_type_*, ...). They cannot reuse
+	 * JRT.compare2(): that method implements AWK's relational operators
+	 * (boolean outcome, strnum coercion rules), while these need a three-way
+	 * ordering that first RANKS values by gawk type (numbers < strings <
+	 * subarrays, in mode-specific order) and then compares within the rank
+	 * using a comparison FORCED by the mode (numeric or string), honoring
+	 * IGNORECASE for strings.
+	 */
+
+	/**
+	 * Type-aware ordering used by the {@code @..._type_...} modes and as gawk's
+	 * default: numbers and strnums first (compared numerically), then strings
+	 * (compared as text), then subarrays (mutually unordered).
+	 */
 	private static int compareByTypeThenValue(Object left, Object right, JRT jrt, boolean ignoreCase) {
 		int leftRank = typeRank(left);
 		int rightRank = typeRank(right);
@@ -390,6 +397,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		return compareStrings(left, right, jrt, ignoreCase);
 	}
 
+	/** Rank for type-aware ordering: 0 = number/strnum, 1 = string, 2 = subarray. */
 	private static int typeRank(Object value) {
 		if (value instanceof Number || isStrnum(value)) {
 			return 0;
@@ -400,6 +408,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		return 1;
 	}
 
+	/** Numeric three-way comparison; subarrays sort as 0 so ranking decides first. */
 	private static int compareNumbers(Object left, Object right) {
 		return Double.compare(numericSortValue(left), numericSortValue(right));
 	}
@@ -408,6 +417,10 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		return value instanceof Map ? 0.0D : JRT.toDouble(value);
 	}
 
+	/**
+	 * Ordering for {@code @val_num_...}: gawk groups non-numeric strings first
+	 * (compared as text), then numbers, then subarrays.
+	 */
 	private static int compareValueNumbers(Object left, Object right, JRT jrt, boolean ignoreCase) {
 		int leftRank = valueNumberRank(left);
 		int rightRank = valueNumberRank(right);
@@ -423,6 +436,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		return compareStrings(left, right, jrt, ignoreCase);
 	}
 
+	/** Rank for {@code @val_num_...}: 0 = non-numeric string, 1 = number/strnum, 2 = subarray. */
 	private static int valueNumberRank(Object value) {
 		if (value instanceof Map) {
 			return 2;
@@ -433,6 +447,10 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		return 0;
 	}
 
+	/**
+	 * Text three-way comparison through {@code toAwkString} (CONVFMT/locale),
+	 * folding case when {@code IGNORECASE} is set; subarrays sort last.
+	 */
 	private static int compareStrings(Object left, Object right, JRT jrt, boolean ignoreCase) {
 		if (left instanceof Map || right instanceof Map) {
 			if (left instanceof Map && right instanceof Map) {
@@ -449,6 +467,10 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		return leftString.compareTo(rightString);
 	}
 
+	/**
+	 * Ordering for {@code @val_str_...}: same type ranking as the type-aware
+	 * modes, but values compare as text even when they are numbers.
+	 */
 	private static int compareValueStrings(Object left, Object right, JRT jrt, boolean ignoreCase) {
 		int leftRank = typeRank(left);
 		int rightRank = typeRank(right);
@@ -484,8 +506,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	}
 
 	private static boolean isStrnum(Object value) {
-		// StrNum is package-private to jrt; keep extensions on the public helper.
-		return JRT.isInputScalarNumber(value);
+		return value instanceof StrNum && ((StrNum) value).isNumber();
 	}
 
 	private static String arrayType(Map<?, ?> map) {

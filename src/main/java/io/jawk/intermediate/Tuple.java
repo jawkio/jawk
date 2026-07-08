@@ -654,28 +654,17 @@ public abstract class Tuple implements Serializable {
 		private final String functionName;
 		private final long numFormalParams;
 		private final long numActualParams;
-		private final String runtimeWarning;
 
 		CallFunctionTuple(
 				Supplier<Address> addressSupplier,
 				String functionName,
 				long numFormalParams,
 				long numActualParams) {
-			this(addressSupplier, functionName, numFormalParams, numActualParams, null);
-		}
-
-		CallFunctionTuple(
-				Supplier<Address> addressSupplier,
-				String functionName,
-				long numFormalParams,
-				long numActualParams,
-				String runtimeWarning) {
 			super(Opcode.CALL_FUNCTION, null);
 			this.addressSupplier = addressSupplier;
 			this.functionName = functionName;
 			this.numFormalParams = numFormalParams;
 			this.numActualParams = numActualParams;
-			this.runtimeWarning = runtimeWarning;
 		}
 
 		@Override
@@ -722,21 +711,6 @@ public abstract class Tuple implements Serializable {
 			return numActualParams;
 		}
 
-		/**
-		 * Returns the runtime warning that should be emitted before this function
-		 * call, when any.
-		 * <p>
-		 * Gawk reports extra user-function arguments at the call site while still
-		 * running the program. Keeping the warning on the tuple lets the VM print
-		 * it in runtime order, after earlier output has already been produced.
-		 * </p>
-		 *
-		 * @return warning text, or {@code null} when no warning should be emitted
-		 */
-		public String getRuntimeWarning() {
-			return runtimeWarning;
-		}
-
 		@Override
 		public String toString() {
 			return getOpcode().name()
@@ -746,8 +720,7 @@ public abstract class Tuple implements Serializable {
 					+ ", "
 					+ numFormalParams
 					+ ", "
-					+ numActualParams
-					+ (runtimeWarning == null ? "" : stringArgument(runtimeWarning));
+					+ numActualParams;
 		}
 	}
 
@@ -759,18 +732,12 @@ public abstract class Tuple implements Serializable {
 		private final ExtensionFunction function;
 		private final long argCount;
 		private final boolean initial;
-		private final String runtimeWarning;
 
 		ExtensionTuple(ExtensionFunction function, long argCount, boolean initial) {
-			this(function, argCount, initial, null);
-		}
-
-		ExtensionTuple(ExtensionFunction function, long argCount, boolean initial, String runtimeWarningParam) {
 			super(Opcode.EXTENSION);
 			this.function = function;
 			this.argCount = argCount;
 			this.initial = initial;
-			this.runtimeWarning = runtimeWarningParam;
 		}
 
 		/**
@@ -800,16 +767,6 @@ public abstract class Tuple implements Serializable {
 			return initial;
 		}
 
-		/**
-		 * Returns the runtime warning that should be emitted before this extension
-		 * call, when any.
-		 *
-		 * @return warning text, or {@code null} when no warning should be emitted
-		 */
-		public String getRuntimeWarning() {
-			return runtimeWarning;
-		}
-
 		@Override
 		public String toString() {
 			return getOpcode().name()
@@ -818,8 +775,37 @@ public abstract class Tuple implements Serializable {
 					+ ", "
 					+ argCount
 					+ ", "
-					+ initial
-					+ (runtimeWarning == null ? "" : stringArgument(runtimeWarning));
+					+ initial;
+		}
+	}
+
+	/**
+	 * Tuple carrying a diagnostic message that the interpreter prints to the
+	 * warning stream when executed. The parser plants these before the
+	 * instruction they describe, so warnings appear in runtime order, exactly
+	 * where gawk would emit them.
+	 */
+	public static final class WarningTuple extends Tuple {
+		private static final long serialVersionUID = 1L;
+		private final String message;
+
+		WarningTuple(String message) {
+			super(Opcode.WARNING);
+			this.message = message;
+		}
+
+		/**
+		 * Returns the warning message to print.
+		 *
+		 * @return warning text
+		 */
+		public String getMessage() {
+			return message;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name() + stringArgument(message);
 		}
 	}
 }

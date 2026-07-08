@@ -1490,7 +1490,14 @@ public enum Opcode {
 	 * Stack before: array-index associative-array ...<br/>
 	 * Stack after: item ...
 	 */
-	PEEK_ARRAY_ELEMENT;
+	PEEK_ARRAY_ELEMENT,
+
+	/**
+	 * Prints a diagnostic message to the warning stream.
+	 * <p>
+	 * Stack unchanged.
+	 */
+	WARNING;
 
 	private static final Opcode[] VALUES = values();
 

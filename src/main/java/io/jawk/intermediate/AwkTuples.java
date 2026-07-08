@@ -55,6 +55,28 @@ public class AwkTuples implements Serializable {
 	/** Address manager */
 	private final AddressManager addressManager = new AddressManager();
 
+	/** Description of the primary script source, used for runtime diagnostics. */
+	private String sourceDescription;
+
+	/**
+	 * Records the description of the primary script source (typically its file
+	 * name) so runtime diagnostics can point at it.
+	 *
+	 * @param sourceDescriptionParam script source description
+	 */
+	public void setSourceDescription(String sourceDescriptionParam) {
+		this.sourceDescription = sourceDescriptionParam;
+	}
+
+	/**
+	 * Returns the description of the primary script source.
+	 *
+	 * @return script source description, or {@code null} when unknown
+	 */
+	public String getSourceDescription() {
+		return sourceDescription;
+	}
+
 	// made public to access static members of AwkTuples via Java Reflection
 
 	// made public to be accessable via Java Reflection
@@ -1570,29 +1592,14 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
-	 * Emits a function call tuple that prints a runtime warning before invoking
-	 * the function.
+	 * Emits a tuple that prints a diagnostic message to the warning stream when
+	 * executed. Planted by the parser just before the instruction it describes,
+	 * so the warning appears in runtime order, exactly where gawk emits it.
 	 *
-	 * @param addressSupplier supplier resolving the function's entry point
-	 * @param funcName function name
-	 * @param numFormalParams formal parameter count
-	 * @param numActualParams actual parameter count to pass at runtime
-	 * @param runtimeWarning warning text to print before the call
+	 * @param message warning text to print
 	 */
-	public void callFunction(
-			Supplier<Address> addressSupplier,
-			String funcName,
-			int numFormalParams,
-			int numActualParams,
-			String runtimeWarning) {
-		queue
-				.add(
-						new Tuple.CallFunctionTuple(
-								addressSupplier,
-								funcName,
-								numFormalParams,
-								numActualParams,
-								runtimeWarning));
+	public void warning(String message) {
+		queue.add(new Tuple.WarningTuple(message));
 	}
 
 	/**
@@ -1763,18 +1770,6 @@ public class AwkTuples implements Serializable {
 	 */
 	public void extension(ExtensionFunction function, int paramCount, boolean isInitial) {
 		queue.add(new Tuple.ExtensionTuple(function, paramCount, isInitial));
-	}
-
-	/**
-	 * Emits an extension call tuple with an optional warning to print at runtime.
-	 *
-	 * @param function extension function metadata
-	 * @param paramCount number of parameters on the stack
-	 * @param isInitial whether this is the first extension in a chained call
-	 * @param runtimeWarning warning text to print before invocation
-	 */
-	public void extension(ExtensionFunction function, int paramCount, boolean isInitial, String runtimeWarning) {
-		queue.add(new Tuple.ExtensionTuple(function, paramCount, isInitial, runtimeWarning));
 	}
 
 	/**

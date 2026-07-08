@@ -22,6 +22,7 @@ package io.jawk.frontend;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import java.io.File;
 import java.io.IOException;
 import java.io.LineNumberReader;
 import java.io.PrintStream;
@@ -268,7 +269,9 @@ public class AwkParser {
 	private final AwkSymbolTableImpl symbolTable = new AwkSymbolTableImpl();
 
 	private final Map<String, ExtensionFunction> extensions;
-	private final boolean allowArraysOfArrays;
+
+	/** POSIX compile-time mode: rejects gawk syntax such as arrays of arrays and typed regexps. */
+	private final boolean posix;
 
 	/**
 	 * <p>
@@ -276,10 +279,11 @@ public class AwkParser {
 	 * </p>
 	 *
 	 * @param extensions a {@link java.util.Map} object
+	 * @param posix {@code true} to enforce POSIX compile-time behavior
 	 */
-	public AwkParser(Map<String, ExtensionFunction> extensions, boolean allowArraysOfArrays) {
+	public AwkParser(Map<String, ExtensionFunction> extensions, boolean posix) {
 		this.extensions = extensions == null ? Collections.emptyMap() : new HashMap<>(extensions);
-		this.allowArraysOfArrays = allowArraysOfArrays;
+		this.posix = posix;
 	}
 
 	private List<ScriptSource> scriptSources;
@@ -584,7 +588,7 @@ public class AwkParser {
 			return token;
 		}
 		if (c == '@') {
-			if (!allowArraysOfArrays) {
+			if (posix) {
 				throw lexerException("Typed regular expressions are not supported in POSIX mode.");
 			}
 			read();
@@ -1549,7 +1553,7 @@ public class AwkParser {
 				params = null;
 			}
 
-			return new ExtensionAst(function, params);
+			return new ExtensionAst(function, params, extensionCallLineNumber(params));
 		} else if (idToken == Token.FUNC_ID || idToken == Token.BUILTIN_FUNC_NAME) {
 			AST params;
 			// length can take on the special form of no parens
@@ -1586,10 +1590,10 @@ public class AwkParser {
 			AST idxAst = ARRAY_INDEX(true, allowInKeyword);
 			lexer(Token.CLOSE_BRACKET);
 			AST arrayReference = symbolTable.addArrayReference(id, idxAst, arrayReferenceLineNo);
-			if (!allowArraysOfArrays && token == Token.OPEN_BRACKET) {
+			if (posix && token == Token.OPEN_BRACKET) {
 				throw parserException("Use [a,b,c,...] instead of [a][b][c]... for multi-dimensional arrays.");
 			}
-			while (allowArraysOfArrays && token == Token.OPEN_BRACKET) {
+			while (!posix && token == Token.OPEN_BRACKET) {
 				int nestedArrayReferenceLineNo = currentSourceLineNumber();
 				lexer();
 				idxAst = ARRAY_INDEX(true, allowInKeyword);
@@ -2099,7 +2103,7 @@ public class AwkParser {
 			return;
 		}
 		if (arrayAst instanceof ArrayReferenceAst) {
-			if (!allowArraysOfArrays) {
+			if (posix) {
 				arrayAst.throwSemanticException(errorMessage);
 			}
 			((ArrayReferenceAst) arrayAst).populateArrayValueTuples(tuples, createIfMissing);
@@ -2365,9 +2369,9 @@ public class AwkParser {
 		}
 
 		protected String sourceBasename() {
-			String source = getSourceDescription();
-			int slash = Math.max(source.lastIndexOf('/'), source.lastIndexOf('\\'));
-			return slash >= 0 ? source.substring(slash + 1) : source;
+			// File.getName is a pure string operation and, unlike java.nio.Path,
+			// never rejects non-path descriptions such as <command-line-supplied-script>
+			return new File(getSourceDescription()).getName();
 		}
 
 		protected AST(AST ast1) {
@@ -4077,14 +4081,16 @@ public class AwkParser {
 			if (getAst1() != null && formalParamCount > 0) {
 				functionProxy.checkActualToFormalParameters(getAst1());
 			}
-			String runtimeWarning = actualParamCount() > formalParamCount ? extraArgumentWarning() : null;
+			if (actualParamCount() > formalParamCount) {
+				// gawk accepts the call but reports it each time it runs
+				tuples.warning(extraArgumentWarning());
+			}
 			tuples
 					.callFunction(
 							functionProxy,
 							functionProxy.getFunctionName(),
 							formalParamCount,
-							actualParamCountLocal,
-							runtimeWarning);
+							actualParamCountLocal);
 			popSourceLineNumber(tuples);
 			return 1;
 		}
@@ -4100,13 +4106,12 @@ public class AwkParser {
 		}
 
 		private String extraArgumentWarning() {
-			return "gawk: "
-					+ sourceBasename()
-					+ ":"
-					+ warningLineNo()
-					+ ": warning: function `"
-					+ functionProxy.getFunctionName()
-					+ "' called with more arguments than declared";
+			return String
+					.format(
+							"gawk: %s:%d: warning: function `%s' called with more arguments than declared",
+							sourceBasename(),
+							warningLineNo(),
+							functionProxy.getFunctionName());
 		}
 
 		private int warningLineNo() {
@@ -5041,12 +5046,25 @@ public class AwkParser {
 	}
 
 	// we don't know if it is a scalar
+	/*
+	 * A call-expression node is normally stamped when it is reduced, after the
+	 * lexer may already have consumed the line terminator; the first argument
+	 * carries the line of the call site itself, which is what gawk-style
+	 * diagnostics report.
+	 */
+	private int extensionCallLineNumber(AST params) {
+		if (params != null && params.getAst1() != null) {
+			return params.getAst1().getLineNo();
+		}
+		return currentSourceLineNumber();
+	}
+
 	private final class ExtensionAst extends AST {
 
 		private final ExtensionFunction function;
 
-		private ExtensionAst(ExtensionFunction functionParam, AST paramAst) {
-			super(paramAst);
+		private ExtensionAst(ExtensionFunction functionParam, AST paramAst, int lineNoParam) {
+			super(lineNoParam, paramAst);
 			this.function = functionParam;
 		}
 
@@ -5117,40 +5135,10 @@ public class AwkParser {
 			} else {
 				isInitial = true;
 			}
-			tuples.extension(function, paramCount, isInitial, runtimeWarning(argCount));
+			tuples.extension(function, paramCount, isInitial);
 			popSourceLineNumber(tuples);
 			// an extension always returns a value, even if it is blank/null
 			return 1;
-		}
-
-		private String runtimeWarning(int argCount) {
-			if (!"gensub".equals(function.getKeyword()) || argCount < 3 || !(getAst1() instanceof FunctionCallParamListAst)) {
-				return null;
-			}
-			AST howAst = getParamAst((FunctionCallParamListAst) getAst1(), 2).getAst1();
-			if (!(howAst instanceof StringAst)) {
-				return null;
-			}
-			String how = ((StringAst) howAst).value;
-			if (isGensubGlobalSelector(how) || isNumericString(how)) {
-				return null;
-			}
-			return "gawk: "
-					+ sourceBasename()
-					+ ":"
-					+ howAst.getLineNo()
-					+ ": warning: gensub: third argument `"
-					+ how
-					+ "' treated as 1";
-		}
-
-		private boolean isGensubGlobalSelector(String value) {
-			// gawk: any string beginning with 'g' or 'G' selects a global replacement
-			return value != null && !value.isEmpty() && (value.charAt(0) == 'g' || value.charAt(0) == 'G');
-		}
-
-		private boolean isNumericString(String value) {
-			return value != null && value.matches("[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?");
 		}
 
 		private AST getParamAst(FunctionCallParamListAst pAst, int pos) {

@@ -77,7 +77,9 @@ public class HashAssocArray extends HashMap<Object, Object> implements AssocArra
 	public Object put(Object key, Object value) {
 		key = AssocArray.normalizeKey(key);
 		Long lKey = AssocArray.toLongKey(key);
-		return super.put(lKey != null ? lKey : key, value);
+		// null has no meaning in an AWK array: store the untyped marker so
+		// callers never have to special-case it
+		return super.put(lKey != null ? lKey : key, value == null ? UNTYPED : value);
 	}
 
 	/**

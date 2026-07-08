@@ -282,7 +282,7 @@ public final class Cli {
 					throw new IllegalArgumentException(POSIX_LOAD_CONFLICT_MESSAGE);
 				}
 				posixRequested = true;
-				settings.setAllowArraysOfArrays(false);
+				settings.setPosix(true);
 			} else if (arg.equals("--dump-syntax")) {
 // --dump-syntax : dump syntax tree to file
 				dumpSyntaxTree = true;

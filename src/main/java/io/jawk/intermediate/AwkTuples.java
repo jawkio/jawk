@@ -1390,6 +1390,32 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
+	 * Emits the tuple that runs the extension beforeStart hooks, placed at the
+	 * end of the preamble.
+	 */
+	public void beforeStartHooks() {
+		queue.add(new Tuple.NoOperandTuple(Opcode.BEFORE_START_HOOKS));
+	}
+
+	/**
+	 * Emits the tuple populating the SYMTAB array.
+	 *
+	 * @param offset offset of the SYMTAB global
+	 */
+	public void updateSymtab(int offset) {
+		queue.add(new Tuple.LongTuple(Opcode.UPDATE_SYMTAB, offset));
+	}
+
+	/**
+	 * Emits the tuple populating the FUNCTAB array.
+	 *
+	 * @param offset offset of the FUNCTAB global
+	 */
+	public void updateFunctab(int offset) {
+		queue.add(new Tuple.LongTuple(Opcode.UPDATE_FUNCTAB, offset));
+	}
+
+	/**
 	 * <p>
 	 * argcOffset.
 	 * </p>

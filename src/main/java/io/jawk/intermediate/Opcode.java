@@ -1513,7 +1513,34 @@ public enum Opcode {
 	 * <p>
 	 * Stack unchanged.
 	 */
-	WARNING;
+	WARNING,
+
+	/**
+	 * Runs the extension beforeStart hooks. Emitted by the parser at the end
+	 * of the preamble; executed at most once per AVM instance.
+	 * <p>
+	 * Stack unchanged.
+	 */
+	BEFORE_START_HOOKS,
+
+	/**
+	 * Populates the SYMTAB array with the names and values of the program's
+	 * symbols. Emitted only when the script references SYMTAB outside POSIX
+	 * mode.
+	 * <p>
+	 * Argument: offset of the SYMTAB global<br/>
+	 * Stack unchanged.
+	 */
+	UPDATE_SYMTAB,
+
+	/**
+	 * Populates the FUNCTAB array with the names of the program's functions.
+	 * Emitted only when the script references FUNCTAB outside POSIX mode.
+	 * <p>
+	 * Argument: offset of the FUNCTAB global<br/>
+	 * Stack unchanged.
+	 */
+	UPDATE_FUNCTAB;
 
 	private static final Opcode[] VALUES = values();
 

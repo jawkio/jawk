@@ -74,9 +74,9 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	private AVM avm;
 
 	/**
-	 * Initializes gawk-owned global arrays for scripts that reference them, and
-	 * installs the {@code PROCINFO["sorted_in"]} traversal order for
-	 * {@code for-in} loops.
+	 * Installs the {@code PROCINFO["sorted_in"]} traversal order for
+	 * {@code for-in} loops and binds this per-engine extension instance to its
+	 * interpreter. SYMTAB and FUNCTAB are populated by the interpreter itself.
 	 *
 	 * @param avmParam interpreter about to execute
 	 * @param jrt runtime associated with {@code avmParam}
@@ -85,58 +85,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	@SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "The extension is a per-engine instance deliberately bound to its interpreter")
 	public void initializeGawkVariables(AVM avmParam, JRT jrt) {
 		this.avm = avmParam;
-		materializeSymtab();
-		materializeFunctab();
 		avm.setForInKeyOrder(this::orderForInKeys);
-	}
-
-	/**
-	 * Populates {@code SYMTAB} with the names of the program's globals and the
-	 * interpreter's special variables. Values are a snapshot taken before
-	 * execution starts; unlike gawk's, the array is not a live view of the
-	 * symbol table.
-	 */
-	private void materializeSymtab() {
-		if (shouldMaterialize("SYMTAB")) {
-			Map<Object, Object> symtab = JRT.createAwkMap(false);
-			for (String name : avm.getGlobalVariableNames()) {
-				symtab.put(name, avm.getVariable(name));
-			}
-			// specials last: their accessors are authoritative even when the
-			// name also has a (possibly not yet materialized) global slot
-			for (String name : avm.getSpecialVariableNames()) {
-				symtab.put(name, avm.getVariable(name));
-			}
-			getVm().assignVariable("SYMTAB", symtab);
-		}
-	}
-
-	/**
-	 * Populates {@code FUNCTAB} with the names of the program's user-defined
-	 * functions and this extension's own function keywords, mirroring gawk's
-	 * function table.
-	 */
-	private void materializeFunctab() {
-		if (shouldMaterialize("FUNCTAB")) {
-			Map<Object, Object> functab = JRT.createAwkMap(false);
-			for (String name : avm.getFunctionNames()) {
-				functab.put(name, name);
-			}
-			for (String keyword : getExtensionFunctions().keySet()) {
-				functab.put(keyword, keyword);
-			}
-			getVm().assignVariable("FUNCTAB", functab);
-		}
-	}
-
-	/**
-	 * A gawk-owned array is materialized only when the compiled program
-	 * references it by name (otherwise it has no variable slot and could never
-	 * be observed by the script) and no value was already supplied for it, for
-	 * example by the host through variable overrides.
-	 */
-	private boolean shouldMaterialize(String name) {
-		return avm.getGlobalVariableNames().contains(name) && avm.getVariable(name) == null;
 	}
 
 	/**

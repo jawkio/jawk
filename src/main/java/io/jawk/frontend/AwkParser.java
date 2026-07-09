@@ -2809,20 +2809,28 @@ public class AwkParser {
 			tuples.setNumGlobals(symbolTable.numGlobals());
 
 			// Only ENVIRON/ARGC/ARGV remain regular globals. ENVIRON and ARGV
-			// are materialized only when the script references them, or when it
-			// references SYMTAB (whose snapshot exposes them); unreferenced ones
+			// are materialized only when the script references them, or when
+			// SYMTAB is active (its snapshot exposes them); unreferenced ones
 			// are answered by the synthetic accessors. ARGC is always
 			// materialized (a single cheap assignment): its slot must stay
 			// authoritative so ARGC=n command-line operand assignments affect
 			// input traversal.
-			boolean symtabReferenced = symbolTable.isGlobalReferenced("SYMTAB");
-			if (environAst.isReferenced() || symtabReferenced) {
+			boolean symtabActive = !posix && symbolTable.isGlobalReferenced("SYMTAB");
+			if (environAst.isReferenced() || symtabActive) {
 				tuples.environOffset(environAst.offset);
 			}
 			tuples.argcOffset(argcAst.offset);
-			if (argvAst.isReferenced() || symtabReferenced) {
+			if (argvAst.isReferenced() || symtabActive) {
 				tuples.argvOffset(argvAst.offset);
 			}
+			// SYMTAB and FUNCTAB are gawk extensions, not POSIX
+			if (symtabActive) {
+				tuples.updateSymtab(symbolTable.getID("SYMTAB").offset);
+			}
+			if (!posix && symbolTable.isGlobalReferenced("FUNCTAB")) {
+				tuples.updateFunctab(symbolTable.getID("FUNCTAB").offset);
+			}
+			tuples.beforeStartHooks();
 
 			Address exitAddr = tuples.createAddress("end blocks start address");
 			tuples.setExitAddress(exitAddr);
@@ -2941,9 +2949,17 @@ public class AwkParser {
 			tuples.markEvalTupleStream();
 			tuples.setNumGlobals(symbolTable.numGlobals());
 
-			if (environAst.isReferenced() || symbolTable.isGlobalReferenced("SYMTAB")) {
+			boolean evalSymtabActive = !posix && symbolTable.isGlobalReferenced("SYMTAB");
+			if (environAst.isReferenced() || evalSymtabActive) {
 				tuples.environOffset(environAst.offset);
 			}
+			if (evalSymtabActive) {
+				tuples.updateSymtab(symbolTable.getID("SYMTAB").offset);
+			}
+			if (!posix && symbolTable.isGlobalReferenced("FUNCTAB")) {
+				tuples.updateFunctab(symbolTable.getID("FUNCTAB").offset);
+			}
+			tuples.beforeStartHooks();
 
 			if (getAst1() != null) {
 				getAst1().populateTuples(tuples);

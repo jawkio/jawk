@@ -41,7 +41,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
-import java.util.function.Supplier;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -169,6 +169,12 @@ public class AVM implements VariableManager, Closeable {
 
 	/** Script line of the extension call currently being dispatched. */
 	private int currentLineNumber;
+
+	/** Whether the extension beforeStart hooks already ran for this AVM. */
+	private boolean beforeStartHooksExecuted;
+
+	/** Offset of a materialized SYMTAB array, for live operand-assignment updates. */
+	private long symtabOffset = NULL_OFFSET;
 
 	/**
 	 * Construct the interpreter.
@@ -2183,35 +2189,21 @@ public class AVM implements VariableManager, Closeable {
 				case SET_NUM_GLOBALS: {
 					execSetNumGlobals((CountTuple) tuple);
 					position.next();
-					/*
-					 * The runtime-managed preamble (ENVIRON/ARGC/ARGV offsets) follows
-					 * immediately; consume it before running the beforeStart hooks so
-					 * they observe the real values (e.g. the gawk extension
-					 * snapshotting SYMTAB). Sandboxed programs deliberately omit some
-					 * of these tuples, which this loop honors by construction.
-					 */
-					boolean inPreamble = true;
-					while (inPreamble && !position.isEOF()) {
-						Tuple preambleTuple = position.current();
-						switch (preambleTuple.getOpcode()) {
-						case ENVIRON_OFFSET:
-							populateEnviron(((LongTuple) preambleTuple).getValue());
-							position.next();
-							break;
-						case ARGC_OFFSET:
-							populateArgc(((LongTuple) preambleTuple).getValue());
-							position.next();
-							break;
-						case ARGV_OFFSET:
-							populateArgv(((LongTuple) preambleTuple).getValue());
-							position.next();
-							break;
-						default:
-							inPreamble = false;
-							break;
-						}
-					}
+					break;
+				}
+				case BEFORE_START_HOOKS: {
 					runBeforeStartHooks();
+					position.next();
+					break;
+				}
+				case UPDATE_SYMTAB: {
+					execUpdateSymtab(((LongTuple) tuple).getValue());
+					position.next();
+					break;
+				}
+				case UPDATE_FUNCTAB: {
+					execUpdateFunctab(((LongTuple) tuple).getValue());
+					position.next();
 					break;
 				}
 				case CLOSE: {
@@ -2912,15 +2904,88 @@ public class AVM implements VariableManager, Closeable {
 		}
 	}
 
+	/*
+	 * Extension initialization can be heavy, so the hooks run at most once per
+	 * AVM instance: a reused AVM (repeated executions, expression evaluations)
+	 * does not reinitialize its extensions.
+	 */
 	private void runBeforeStartHooks() {
-		if (extensionInstances.isEmpty()) {
+		if (beforeStartHooksExecuted || extensionInstances.isEmpty()) {
 			return;
 		}
+		beforeStartHooksExecuted = true;
 		Set<JawkExtension> started = new LinkedHashSet<JawkExtension>();
 		for (JawkExtension extension : extensionInstances.values()) {
 			if (started.add(extension)) {
 				extension.beforeStart(this, jrt);
 			}
+		}
+	}
+
+	/*
+	 * SYMTAB is a gawk extension mirroring the symbol table: the script's
+	 * globals, the JRT-managed specials, and host-supplied variables that have
+	 * no compiled slot. The parser emits UPDATE_SYMTAB only when the script
+	 * references SYMTAB outside POSIX mode. Values are a snapshot taken before
+	 * execution; command-line name=value operand assignments update the array
+	 * live, as in gawk.
+	 */
+	private void execUpdateSymtab(long offset) {
+		symtabOffset = offset;
+		if (runtimeStack.getVariable(offset, true) != null) {
+			// a host-supplied SYMTAB value wins
+			return;
+		}
+		Map<Object, Object> symtab = newAwkArray();
+		for (String name : baseInitialVariables.keySet()) {
+			symtab.put(name, getVariable(name));
+		}
+		for (String name : getGlobalVariableNames()) {
+			symtab.put(name, getVariable(name));
+		}
+		// specials last: their accessors are authoritative even when the name
+		// also has a (possibly not yet materialized) global slot
+		for (String name : getSpecialVariableNames()) {
+			symtab.put(name, getVariable(name));
+		}
+		runtimeStack.setVariable(offset, symtab, true);
+	}
+
+	/*
+	 * FUNCTAB is a gawk extension listing the names of the program's
+	 * user-defined functions and the loaded extensions' function keywords. The
+	 * parser emits UPDATE_FUNCTAB only when the script references FUNCTAB
+	 * outside POSIX mode.
+	 */
+	private void execUpdateFunctab(long offset) {
+		if (runtimeStack.getVariable(offset, true) != null) {
+			return;
+		}
+		Map<Object, Object> functab = newAwkArray();
+		for (String name : functionNames) {
+			functab.put(name, name);
+		}
+		Set<JawkExtension> seen = new LinkedHashSet<JawkExtension>();
+		for (JawkExtension extension : extensionInstances.values()) {
+			if (seen.add(extension)) {
+				for (String keyword : extension.getExtensionFunctions().keySet()) {
+					functab.put(keyword, keyword);
+				}
+			}
+		}
+		runtimeStack.setVariable(offset, functab, true);
+	}
+
+	/** Reflects a command-line variable assignment into a materialized SYMTAB. */
+	private void updateSymtabEntry(String name, Object value) {
+		if (symtabOffset == NULL_OFFSET) {
+			return;
+		}
+		Object symtab = runtimeStack.getVariable(symtabOffset, true);
+		if (symtab instanceof Map) {
+			@SuppressWarnings("unchecked")
+			Map<Object, Object> symtabMap = (Map<Object, Object>) symtab;
+			symtabMap.put(name, value);
 		}
 	}
 
@@ -3218,31 +3283,32 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	/**
-	 * The special variables this interpreter can answer by name, mapped to their
-	 * accessors. Single source of truth for {@link #getVariable(String)} and
+	 * The special variables the interpreter can answer by name, mapped to their
+	 * accessors. Static so that constructing an AVM allocates nothing for it;
+	 * single source of truth for {@link #getVariable(String)} and
 	 * {@link #getSpecialVariableNames()}.
 	 */
-	private final Map<String, Supplier<Object>> specialVariables = buildSpecialVariables();
+	private static final Map<String, Function<AVM, Object>> SPECIAL_VARIABLES = buildSpecialVariables();
 
-	private Map<String, Supplier<Object>> buildSpecialVariables() {
-		Map<String, Supplier<Object>> map = new LinkedHashMap<String, Supplier<Object>>();
-		map.put("FS", this::getFS);
-		map.put("RS", this::getRS);
-		map.put("OFS", this::getOFS);
-		map.put("ORS", this::getORS);
-		map.put("FILENAME", () -> jrt.getFILENAME());
-		map.put("SUBSEP", this::getSUBSEP);
-		map.put("CONVFMT", this::getCONVFMT);
-		map.put("OFMT", () -> jrt.getOFMTString());
-		map.put("NF", () -> jrt.getNF());
-		map.put("NR", () -> jrt.getNR());
-		map.put("FNR", () -> jrt.getFNR());
-		map.put("RSTART", () -> jrt.getRSTART());
-		map.put("RLENGTH", () -> jrt.getRLENGTH());
-		map.put("IGNORECASE", () -> jrt.getIGNORECASEVar());
+	private static Map<String, Function<AVM, Object>> buildSpecialVariables() {
+		Map<String, Function<AVM, Object>> map = new LinkedHashMap<String, Function<AVM, Object>>();
+		map.put("FS", AVM::getFS);
+		map.put("RS", AVM::getRS);
+		map.put("OFS", AVM::getOFS);
+		map.put("ORS", AVM::getORS);
+		map.put("FILENAME", avm -> avm.jrt.getFILENAME());
+		map.put("SUBSEP", AVM::getSUBSEP);
+		map.put("CONVFMT", AVM::getCONVFMT);
+		map.put("OFMT", avm -> avm.jrt.getOFMTString());
+		map.put("NF", avm -> avm.jrt.getNF());
+		map.put("NR", avm -> avm.jrt.getNR());
+		map.put("FNR", avm -> avm.jrt.getFNR());
+		map.put("RSTART", avm -> avm.jrt.getRSTART());
+		map.put("RLENGTH", avm -> avm.jrt.getRLENGTH());
+		map.put("IGNORECASE", avm -> avm.jrt.getIGNORECASEVar());
 		// lazily-materialized globals answered through their synthetic accessors
-		map.put("ARGC", this::getARGC);
-		map.put("ARGV", this::getARGV);
+		map.put("ARGC", AVM::getARGC);
+		map.put("ARGV", AVM::getARGV);
 		return Collections.unmodifiableMap(map);
 	}
 
@@ -3253,7 +3319,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @return unmodifiable set of special variable names
 	 */
 	public Set<String> getSpecialVariableNames() {
-		return specialVariables.keySet();
+		return SPECIAL_VARIABLES.keySet();
 	}
 
 	/** {@inheritDoc} */
@@ -3262,9 +3328,9 @@ public class AVM implements VariableManager, Closeable {
 		if (name == null) {
 			return null;
 		}
-		Supplier<Object> special = specialVariables.get(name);
+		Function<AVM, Object> special = SPECIAL_VARIABLES.get(name);
 		if (special != null) {
-			return special.get();
+			return special.apply(this);
 		}
 		if (globalVariableOffsets == null) {
 			return baseInitialVariables.get(name);
@@ -3329,6 +3395,8 @@ public class AVM implements VariableManager, Closeable {
 		} else if (runtimeStack.hasGlobalVariable(name)) {
 			runtimeStack.setGlobalVariable(name, obj);
 		}
+		// names without a compiled slot are still symbols: keep SYMTAB current
+		updateSymtabEntry(name, obj);
 	}
 
 	/** {@inheritDoc} */
@@ -3353,22 +3421,18 @@ public class AVM implements VariableManager, Closeable {
 		Integer offsetObj = globalVariableOffsets.get(name);
 		Boolean arrayObj = globalVariableArrays.get(name);
 
+		Object normalized = normalizeExternalVariableValue(obj);
 		if (offsetObj != null) {
-			Object normalized = normalizeExternalVariableValue(obj);
-			if (arrayObj.booleanValue()) {
-				if (normalized instanceof Map) {
-					runtimeStack.setFilelistVariable(offsetObj.intValue(), normalized);
-				} else {
-					throw new IllegalArgumentException(
-							"Cannot assign a scalar to a non-scalar variable (" + name + ").");
-				}
-			} else {
-				runtimeStack.setFilelistVariable(offsetObj.intValue(), normalized);
+			if (arrayObj.booleanValue() && !(normalized instanceof Map)) {
+				throw new IllegalArgumentException(
+						"Cannot assign a scalar to a non-scalar variable (" + name + ").");
 			}
+			runtimeStack.setFilelistVariable(offsetObj.intValue(), normalized);
 		} else if (runtimeStack.hasGlobalVariable(name)) {
-			Object normalized = normalizeExternalVariableValue(obj);
 			runtimeStack.setGlobalVariable(name, normalized);
 		}
+		// names without a compiled slot are still symbols: keep SYMTAB current
+		updateSymtabEntry(name, normalized);
 	}
 
 	private void applyInputSourceFilelistAssignmentsIfNeeded() {

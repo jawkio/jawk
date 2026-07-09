@@ -76,7 +76,7 @@ That keeps extension availability explicit and local to the embedding code.
 
 `asort()`, `asorti()`, and the `for (index in array)` statement honor `PROCINFO["sorted_in"]` with gawk's predefined comparison modes: `@unsorted`, `@ind_str_asc`, `@ind_num_asc`, `@val_str_asc`, `@val_num_asc`, `@val_type_asc`, and their `_desc` counterparts. String comparisons ignore case when `IGNORECASE` is non-zero.
 
-Scripts that reference `SYMTAB` or `FUNCTAB` get honest, Jawk-shaped content: `SYMTAB` holds the names of the program's globals and Jawk's special variables (as a snapshot taken before execution, not gawk's live view), and `FUNCTAB` holds the names of the program's user-defined functions plus this extension's function keywords. As in gawk, assigning a scalar to `SYMTAB` or `FUNCTAB` is a runtime error.
+Scripts that reference `SYMTAB` or `FUNCTAB` get honest, Jawk-shaped content, populated by the runtime itself (outside POSIX mode): `SYMTAB` holds the names of the program's globals, Jawk's special variables, and `-v`/host-supplied variables; `FUNCTAB` holds the names of the program's user-defined functions plus the loaded extensions' function keywords. Command-line `name=value` operand assignments update `SYMTAB` live, as in gawk; ordinary in-script assignments are not reflected (the array is a startup snapshot, not gawk's live view). As in gawk, assigning a scalar to `SYMTAB` or `FUNCTAB` is a runtime error.
 
 > [!NOTE]
 > Because these functions are registered by default, `gensub`, `typeof`, `isarray`, `asort`, `asorti`, and `mkbool` become reserved function names. A script that uses them as variable or function identifiers must be run with an explicit extension list that omits `GawkExtension`.

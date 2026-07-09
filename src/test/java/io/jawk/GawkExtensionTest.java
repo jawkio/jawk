@@ -184,6 +184,31 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void symtabReflectsInitialVariablesAndOperandAssignments() throws Exception {
+		// gawk parity: -v variables without a compiled slot appear in SYMTAB,
+		// and name=value operand assignments update it live between files.
+		AwkTestSupport
+				.cliTest("SYMTAB sees -v variables and live operand assignments")
+				.preassign("toto", "tata")
+				.file("f1", "a\n")
+				.file("f2", "b\n")
+				.script("{ print SYMTAB[\"toto\"], $1 }")
+				.operand("{{f1}}", "toto=titi", "{{f2}}")
+				.expectLines("tata a", "titi b")
+				.runAndAssert();
+	}
+
+	@Test
+	public void symtabAndFunctabAreNotMaterializedInPosixMode() throws Exception {
+		AwkTestSupport
+				.cliTest("POSIX mode leaves SYMTAB and FUNCTAB empty")
+				.argument("--posix")
+				.script("BEGIN { print length(SYMTAB), length(FUNCTAB) }")
+				.expectLines("0 0")
+				.runAndAssert();
+	}
+
+	@Test
 	public void symtabSeesRuntimeManagedGlobals() throws Exception {
 		// ARGC/ARGV are populated before the beforeStart hooks run, so the
 		// SYMTAB snapshot must observe their real values.

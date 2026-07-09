@@ -98,11 +98,11 @@ public final class RegexRuntimeSupport {
 		return javaRepl.toString();
 	}
 
-	static Integer replaceFirst(String origValue, String repl, String ere, StringBuffer sb) {
+	static Integer replaceFirst(String origValue, String repl, String ere, StringBuffer sb, int flags) {
 		String preparedReplacement = prepareReplacement(repl);
 		sb.setLength(0);
 
-		Pattern pattern = Pattern.compile(ere);
+		Pattern pattern = Pattern.compile(ere, flags);
 		Matcher matcher = pattern.matcher(origValue);
 		int count = 0;
 		if (matcher.find()) {
@@ -113,11 +113,11 @@ public final class RegexRuntimeSupport {
 		return Integer.valueOf(count);
 	}
 
-	static Integer replaceAll(String origValue, String repl, String ere, StringBuffer sb) {
+	static Integer replaceAll(String origValue, String repl, String ere, StringBuffer sb, int flags) {
 		sb.setLength(0);
 
 		String preparedReplacement = prepareReplacement(repl);
-		Pattern pattern = Pattern.compile(ere);
+		Pattern pattern = Pattern.compile(ere, flags);
 		Matcher matcher = pattern.matcher(origValue);
 		int count = 0;
 		while (matcher.find()) {

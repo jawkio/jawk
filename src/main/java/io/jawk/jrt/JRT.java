@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.HashSet;
 import java.util.IllegalFormatException;
 import java.util.List;
@@ -99,6 +100,8 @@ public class JRT {
 	private Object ignorecase = Long.valueOf(0L);
 	/** Precomputed truth of IGNORECASE, consulted by every regexp operation. */
 	private boolean ignoreCase;
+	/** Case-insensitive twins of precompiled patterns; created on first use. */
+	private Map<Pattern, Pattern> caseInsensitivePatterns;
 	// Last input line consumed for getline-style transport.
 	private Object inputLine = null;
 	// Current record state ($0, $1, $2, ...).
@@ -376,59 +379,63 @@ public class JRT {
 		for (Map.Entry<String, Object> var : initialVarMap.entrySet()) {
 			String name = var.getKey();
 			Object value = var.getValue();
-			if ("FS".equals(name)) {
-				setFS(value);
-				continue;
+			if (!applySpecialVariable(name, value)) {
+				vm.assignVariable(name, value);
 			}
-			if ("RS".equals(name)) {
-				setRS(value);
-				continue;
-			}
-			if ("OFS".equals(name)) {
-				setOFS(value);
-				continue;
-			}
-			if ("ORS".equals(name)) {
-				setORS(value);
-				continue;
-			}
-			if ("CONVFMT".equals(name)) {
-				setCONVFMT(value);
-				continue;
-			}
-			if ("OFMT".equals(name)) {
-				setOFMT(value);
-				continue;
-			}
-			if ("SUBSEP".equals(name)) {
-				setSUBSEP(value);
-				continue;
-			}
-			if ("FILENAME".equals(name)) {
-				setFILENAMEViaJrt(value);
-				continue;
-			}
-			if ("NF".equals(name)) {
-				setNF(value);
-				continue;
-			}
-			if ("NR".equals(name)) {
-				setNR(value);
-				continue;
-			}
-			if ("FNR".equals(name)) {
-				setFNR(value);
-				continue;
-			}
-			if ("ARGC".equals(name)) {
-				setARGC(value);
-				continue;
-			}
-			if ("IGNORECASE".equals(name)) {
-				setIGNORECASE(value);
-				continue;
-			}
-			vm.assignVariable(name, value);
+		}
+	}
+
+	/**
+	 * Applies the assignment of a single JRT-managed special variable.
+	 *
+	 * @param name variable name
+	 * @param value value to assign
+	 * @return {@code true} when the name was a JRT-managed special variable,
+	 *         {@code false} when the assignment was not handled
+	 */
+	public boolean applySpecialVariable(String name, Object value) {
+		switch (name) {
+		case "FS":
+			setFS(value);
+			return true;
+		case "RS":
+			setRS(value);
+			return true;
+		case "OFS":
+			setOFS(value);
+			return true;
+		case "ORS":
+			setORS(value);
+			return true;
+		case "CONVFMT":
+			setCONVFMT(value);
+			return true;
+		case "OFMT":
+			setOFMT(value);
+			return true;
+		case "SUBSEP":
+			setSUBSEP(value);
+			return true;
+		case "FILENAME":
+			setFILENAMEViaJrt(value);
+			return true;
+		case "NF":
+			setNF(value);
+			return true;
+		case "NR":
+			setNR(value);
+			return true;
+		case "FNR":
+			setFNR(value);
+			return true;
+		case "ARGC":
+			setARGC(value);
+			return true;
+		case "IGNORECASE":
+			setIGNORECASE(value);
+			return true;
+		default:
+			return false;
 		}
 	}
 
@@ -446,37 +453,9 @@ public class JRT {
 			return;
 		}
 		for (Map.Entry<String, Object> var : variableMap.entrySet()) {
-			String name = var.getKey();
-			Object value = var.getValue();
-			if ("FS".equals(name)) {
-				setFS(value);
-			} else if ("RS".equals(name)) {
-				setRS(value);
-			} else if ("OFS".equals(name)) {
-				setOFS(value);
-			} else if ("ORS".equals(name)) {
-				setORS(value);
-			} else if ("CONVFMT".equals(name)) {
-				setCONVFMT(value);
-			} else if ("OFMT".equals(name)) {
-				setOFMT(value);
-			} else if ("SUBSEP".equals(name)) {
-				setSUBSEP(value);
-			} else if ("FILENAME".equals(name)) {
-				setFILENAMEViaJrt(value);
-			} else if ("NF".equals(name)) {
-				setNF(value);
-			} else if ("NR".equals(name)) {
-				setNR(value);
-			} else if ("FNR".equals(name)) {
-				setFNR(value);
-			} else if ("ARGC".equals(name)) {
-				setARGC(value);
-			} else if ("IGNORECASE".equals(name)) {
-				setIGNORECASE(value);
-			}
 			// Non-special variables are skipped; they are assigned later
 			// via the tuple instruction stream
+			applySpecialVariable(var.getKey(), var.getValue());
 		}
 	}
 
@@ -929,8 +908,7 @@ public class JRT {
 			val = false;
 		} else if (o instanceof Pattern) {
 			// match against $0
-			// ...
-			Pattern pattern = (Pattern) o;
+			Pattern pattern = caseAwarePattern((Pattern) o);
 			Object inputField = jrtGetInputField(0);
 			String s = inputField instanceof UninitializedObject ? "" : inputField.toString();
 			Matcher matcher = pattern.matcher(s);
@@ -1122,7 +1100,9 @@ public class JRT {
 	 */
 	public void setIGNORECASE(Object value) {
 		this.ignorecase = value == null ? Long.valueOf(0L) : value;
-		this.ignoreCase = toDouble(this.ignorecase) != 0.0D;
+		// gawk: IGNORECASE is active when its value is "nonzero or non-null",
+		// i.e. regular AWK truthiness (strnum-aware), not numeric coercion
+		this.ignoreCase = toBoolean(this.ignorecase);
 	}
 
 	/**
@@ -1143,6 +1123,27 @@ public class JRT {
 	 */
 	public boolean isIgnoreCase() {
 		return ignoreCase;
+	}
+
+	/**
+	 * Returns the pattern itself, or its case-insensitive twin when
+	 * {@code IGNORECASE} is set. Twins are compiled once and cached, so
+	 * precompiled regexp constants stay cheap on the matching hot path.
+	 *
+	 * @param pattern base pattern
+	 * @return pattern honoring the current {@code IGNORECASE} setting
+	 */
+	public Pattern caseAwarePattern(Pattern pattern) {
+		if (!ignoreCase || (pattern.flags() & Pattern.CASE_INSENSITIVE) != 0) {
+			return pattern;
+		}
+		if (caseInsensitivePatterns == null) {
+			caseInsensitivePatterns = new IdentityHashMap<Pattern, Pattern>();
+		}
+		return caseInsensitivePatterns
+				.computeIfAbsent(
+						pattern,
+						base -> Pattern.compile(base.pattern(), base.flags() | Pattern.CASE_INSENSITIVE));
 	}
 
 	/**

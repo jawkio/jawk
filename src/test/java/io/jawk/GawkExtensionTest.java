@@ -141,6 +141,71 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void ignoreCaseUsesAwkTruthiness() throws Exception {
+		// gawk: IGNORECASE is active when "nonzero or non-null", so a
+		// non-numeric string is truthy.
+		AwkTestSupport
+				.awkTest("IGNORECASE follows AWK truthiness")
+				.script(
+						"BEGIN { "
+								+ "IGNORECASE = \"yes\"; print match(\"ABC\", \"b\"); "
+								+ "IGNORECASE = 0; print match(\"ABC\", \"b\") "
+								+ "}")
+				.expectLines("2", "0")
+				.runAndAssert();
+	}
+
+	@Test
+	public void ignoreCaseOperandAssignmentAppliesBetweenFiles() throws Exception {
+		AwkTestSupport
+				.cliTest("IGNORECASE=1 operand takes effect for later files")
+				.file("f1", "ABC\n")
+				.file("f2", "ABC\n")
+				.script("{ print match($0, \"b\") }")
+				.operand("{{f1}}", "IGNORECASE=1", "{{f2}}")
+				.expectLines("0", "2")
+				.runAndAssert();
+	}
+
+	@Test
+	public void fsOperandAssignmentAppliesBetweenFiles() throws Exception {
+		// JRT-managed specials assigned as command-line operands must reach
+		// the JRT, not a (nonexistent) global slot.
+		AwkTestSupport
+				.cliTest("FS=: operand takes effect for later files")
+				.file("f1", "a:b\n")
+				.script("{ print $2 }")
+				.operand("FS=:", "{{f1}}")
+				.expectLines("b")
+				.runAndAssert();
+	}
+
+	@Test
+	public void ignoreCaseAppliesToRegexpConstants() throws Exception {
+		// gawk applies IGNORECASE to regexp constants at runtime: patterns,
+		// match expressions, and sub/gsub.
+		AwkTestSupport
+				.awkTest("IGNORECASE affects precompiled regexp literals")
+				.script(
+						"BEGIN { IGNORECASE = 1; s = \"AAA\"; n = gsub(/a/, \"x\", s); print n, s } "
+								+ "/foo/ { print \"pattern\" } "
+								+ "$0 ~ /foo/ { print \"expr\" }")
+				.stdin("FOO\n")
+				.expectLines("3 xxx", "pattern", "expr")
+				.runAndAssert();
+	}
+
+	@Test
+	public void invalidSortModeIsFatal() throws Exception {
+		// gawk treats undefined sort comparison names as a fatal error
+		AwkTestSupport
+				.awkTest("invalid asort mode is rejected")
+				.script("BEGIN { a[1] = 2; asort(a, d, \"@bogus\") }")
+				.expectThrow(io.jawk.jrt.AwkRuntimeException.class)
+				.runAndAssert();
+	}
+
+	@Test
 	public void ignoreCaseIsLiveForMatchAndReadable() throws Exception {
 		AwkTestSupport
 				.awkTest("IGNORECASE assignment applies immediately and reads back")

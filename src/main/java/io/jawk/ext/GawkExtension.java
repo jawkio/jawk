@@ -28,8 +28,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,6 +46,7 @@ import io.jawk.ext.annotations.JawkRawValue;
 import io.jawk.ext.annotations.JawkRegexp;
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.intermediate.UntypedObject;
+import io.jawk.jrt.IllegalAwkArgumentException;
 import io.jawk.jrt.JRT;
 import io.jawk.jrt.StrNum;
 
@@ -98,8 +101,33 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		if (mode == null || mode.isEmpty() || mode.startsWith("@unsorted")) {
 			return map.keySet();
 		}
-		return sortedKeys(map, mode, getJrt(), currentIgnoreCase());
+		return sortedKeys(map, effectiveSortMode(mode, VAL_TYPE_ASC), getJrt(), currentIgnoreCase());
 	}
+
+	/*
+	 * Gawk also accepts the name of a user-defined comparison function, which
+	 * Jawk does not support: those fall back to the default ordering with a
+	 * one-time warning. Unknown @-modes are typos and stay fatal, as in gawk.
+	 */
+	private String effectiveSortMode(String mode, String defaultMode) {
+		if (mode.charAt(0) != '@') {
+			warnUnsupportedComparator(mode);
+			return defaultMode;
+		}
+		return mode;
+	}
+
+	private void warnUnsupportedComparator(String name) {
+		if (warnedComparators == null) {
+			warnedComparators = new HashSet<String>();
+		}
+		if (warnedComparators.add(name)) {
+			warnAtCurrentLine("sort comparison function `%s' is not supported; using default ordering", name);
+		}
+	}
+
+	/** Comparison-function names already warned about; created on first use. */
+	private Set<String> warnedComparators;
 
 	private String currentSortedIn() {
 		Object procinfo = getVm().getVariable("PROCINFO");
@@ -199,10 +227,8 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	public String gensub(@JawkRegexp Object regexp, Object replacement, Object how, @JawkOptional Object target) {
 		Pattern pattern = regexp instanceof Pattern ?
 				(Pattern) regexp : Pattern.compile(toAwkString(regexp));
-		// gawk: a nonzero IGNORECASE makes all regexp operations case-insensitive
-		if (currentIgnoreCase() && (pattern.flags() & Pattern.CASE_INSENSITIVE) == 0) {
-			pattern = Pattern.compile(pattern.pattern(), pattern.flags() | Pattern.CASE_INSENSITIVE);
-		}
+		// gawk: a truthy IGNORECASE makes all regexp operations case-insensitive
+		pattern = getJrt().caseAwarePattern(pattern);
 		Object targetValue = target == null ? getJrt().getInputLine() : target;
 		Matcher matcher = pattern.matcher(toAwkString(targetValue));
 		String repl = RegexRuntimeSupport.prepareReplacement(toAwkString(replacement), true);
@@ -269,8 +295,8 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 
 	private Long sort(Map<Object, Object> source, Map<Object, Object> dest, Object how, boolean indicesAsValues) {
 		Map<Object, Object> destination = dest == null ? source : dest;
-		String mode = how == null ?
-				(indicesAsValues ? "@ind_type_asc" : VAL_TYPE_ASC) : toAwkString(how);
+		String defaultMode = indicesAsValues ? "@ind_type_asc" : VAL_TYPE_ASC;
+		String mode = how == null ? defaultMode : effectiveSortMode(toAwkString(how), defaultMode);
 		List<SortEntry> entries = entries(source);
 		// @unsorted keeps the natural traversal order: no sorting at all
 		if (!mode.startsWith("@unsorted")) {
@@ -301,27 +327,43 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * both for asort()/asorti() and for the for-in traversal hook.
 	 */
 	private static Comparator<SortEntry> comparator(String mode, JRT jrt, boolean ignoreCase) {
-		boolean desc = mode != null && mode.endsWith("_desc");
 		String effectiveMode = mode == null || mode.isEmpty() ? VAL_TYPE_ASC : mode;
+		boolean desc = effectiveMode.endsWith("_desc");
 		Comparator<SortEntry> comparator;
 		/*
 		 * Gawk's predefined orderings first choose whether indexes or values are
 		 * compared, then choose numeric, string, or type-aware comparison. Arrays
 		 * are kept in a separate group because gawk does not stringify subarrays
-		 * during type-aware sorting.
+		 * during type-aware sorting. Unknown modes are fatal, as in gawk;
+		 * function-name comparators are not supported.
 		 */
-		if (effectiveMode.startsWith("@ind_num_")) {
+		switch (effectiveMode) {
+		case "@ind_num_asc":
+		case "@ind_num_desc":
 			comparator = (left, right) -> compareNumbers(left.index, right.index);
-		} else if (effectiveMode.startsWith("@ind_str_")) {
+			break;
+		case "@ind_str_asc":
+		case "@ind_str_desc":
 			comparator = (left, right) -> compareStrings(left.index, right.index, jrt, ignoreCase);
-		} else if (effectiveMode.startsWith("@ind_type_")) {
+			break;
+		case "@ind_type_asc":
+		case "@ind_type_desc":
 			comparator = (left, right) -> compareByTypeThenValue(left.index, right.index, jrt, ignoreCase);
-		} else if (effectiveMode.startsWith("@val_num_")) {
+			break;
+		case "@val_num_asc":
+		case "@val_num_desc":
 			comparator = (left, right) -> compareValueNumbers(left.value, right.value, jrt, ignoreCase);
-		} else if (effectiveMode.startsWith("@val_str_")) {
+			break;
+		case "@val_str_asc":
+		case "@val_str_desc":
 			comparator = (left, right) -> compareValueStrings(left.value, right.value, jrt, ignoreCase);
-		} else {
+			break;
+		case "@val_type_asc":
+		case "@val_type_desc":
 			comparator = (left, right) -> compareByTypeThenValue(left.value, right.value, jrt, ignoreCase);
+			break;
+		default:
+			throw new IllegalAwkArgumentException("Invalid sort comparison mode '" + effectiveMode + "'");
 		}
 		return desc ? comparator.reversed() : comparator;
 	}

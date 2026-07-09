@@ -681,6 +681,7 @@ public class AVM implements VariableManager, Closeable {
 		environOffset = NULL_OFFSET;
 		argcOffset = NULL_OFFSET;
 		argvOffset = NULL_OFFSET;
+		symtabOffset = NULL_OFFSET;
 		exitAddress = null;
 		withinEndBlocks = false;
 		exitCode = 0;
@@ -1884,7 +1885,7 @@ public class AVM implements VariableManager, Closeable {
 					String s = o1.toString();
 					// assume o2 is a regexp
 					if (o2 instanceof Pattern) {
-						Pattern p = (Pattern) o2;
+						Pattern p = jrt.caseAwarePattern((Pattern) o2);
 						Matcher m = p.matcher(s);
 						// m.matches() matches the ENTIRE string
 						// m.find() is more appropriate
@@ -1892,7 +1893,7 @@ public class AVM implements VariableManager, Closeable {
 						push(result ? 1 : 0);
 					} else {
 						String r = jrt.toAwkString(o2);
-						boolean result = Pattern.compile(r).matcher(s).find();
+						boolean result = Pattern.compile(r, regexpFlags()).matcher(s).find();
 						push(result ? 1 : 0);
 					}
 					position.next();
@@ -2725,13 +2726,15 @@ public class AVM implements VariableManager, Closeable {
 		}
 	}
 
+	/** Pattern flags implied by the current IGNORECASE setting. */
+	private int regexpFlags() {
+		return jrt.isIgnoreCase() ? Pattern.CASE_INSENSITIVE : 0;
+	}
+
 	private void execMatch() {
 		String ere = jrt.toAwkString(pop());
 		String s = jrt.toAwkString(pop());
-		int flags = 0;
-		if (jrt.isIgnoreCase()) {
-			flags |= Pattern.CASE_INSENSITIVE;
-		}
+		int flags = regexpFlags();
 		Pattern pattern = Pattern.compile(ere, flags);
 		Matcher matcher = pattern.matcher(s);
 		if (matcher.find()) {
@@ -3161,7 +3164,7 @@ public class AVM implements VariableManager, Closeable {
 	 * sub() functionality
 	 */
 	private String replaceFirst(String orig, String ere, String repl) {
-		push(RegexRuntimeSupport.replaceFirst(orig, repl, ere, replaceFirstSb));
+		push(RegexRuntimeSupport.replaceFirst(orig, repl, ere, replaceFirstSb, regexpFlags()));
 		return replaceFirstSb.toString();
 	}
 
@@ -3171,7 +3174,7 @@ public class AVM implements VariableManager, Closeable {
 	 * gsub() functionality
 	 */
 	private String replaceAll(String orig, String ere, String repl) {
-		push(RegexRuntimeSupport.replaceAll(orig, repl, ere, replaceAllSb));
+		push(RegexRuntimeSupport.replaceAll(orig, repl, ere, replaceAllSb, regexpFlags()));
 		return replaceAllSb.toString();
 	}
 
@@ -3412,6 +3415,12 @@ public class AVM implements VariableManager, Closeable {
 			throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + name + ").");
 		}
 
+		// see assignVariable: specials go to the JRT, ARGC to its slot
+		if (!"ARGC".equals(name) && jrt.applySpecialVariable(name, obj)) {
+			updateSymtabEntry(name, obj);
+			return;
+		}
+
 		Integer offsetObj = globalVariableOffsets.get(name);
 		Boolean arrayObj = globalVariableArrays.get(name);
 
@@ -3447,10 +3456,19 @@ public class AVM implements VariableManager, Closeable {
 			throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + name + ").");
 		}
 
+		Object normalized = normalizeExternalVariableValue(obj);
+		// Runtime assignments to JRT-managed specials (e.g. IGNORECASE=1 or
+		// FS=: between input files) must reach the JRT, not a global slot.
+		// ARGC is excluded: JRT.setARGC delegates back to this method, and its
+		// authoritative storage is the compiled slot below.
+		if (!"ARGC".equals(name) && jrt.applySpecialVariable(name, normalized)) {
+			updateSymtabEntry(name, normalized);
+			return;
+		}
+
 		Integer offsetObj = globalVariableOffsets.get(name);
 		Boolean arrayObj = globalVariableArrays.get(name);
 
-		Object normalized = normalizeExternalVariableValue(obj);
 		if (offsetObj != null) {
 			if (arrayObj.booleanValue() && !(normalized instanceof Map)) {
 				throw new IllegalArgumentException(

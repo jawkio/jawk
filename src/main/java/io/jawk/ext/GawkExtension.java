@@ -169,7 +169,8 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * Sorts an array by value, optionally writing the result to another array.
 	 *
 	 * @param source source array
-	 * @param args optional destination array and predefined sorting mode
+	 * @param dest destination array, or {@code null} to sort in place
+	 * @param how predefined sorting mode, or {@code null} for the default
 	 * @return number of sorted elements
 	 */
 	@JawkFunction("asort")
@@ -184,7 +185,8 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * Sorts an array by index, optionally writing the result to another array.
 	 *
 	 * @param source source array
-	 * @param args optional destination array and predefined sorting mode
+	 * @param dest destination array, or {@code null} to sort in place
+	 * @param how predefined sorting mode, or {@code null} for the default
 	 * @return number of sorted elements
 	 */
 	@JawkFunction("asorti")
@@ -331,7 +333,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	}
 
 	private boolean currentIgnoreCase() {
-		return JRT.toDouble(getVm().getVariable("IGNORECASE")) != 0.0D;
+		return getJrt().isIgnoreCase();
 	}
 
 	private static List<SortEntry> entries(Map<Object, Object> map) {

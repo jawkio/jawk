@@ -95,6 +95,10 @@ public class JRT {
 	private PrintStream error;
 	/** PrintStream used for runtime warning messages, stderr by default. */
 	private PrintStream warning = System.err;
+	/** Current IGNORECASE value, as assigned by the script or the host. */
+	private Object ignorecase = Long.valueOf(0L);
+	/** Precomputed truth of IGNORECASE, consulted by every regexp operation. */
+	private boolean ignoreCase;
 	// Last input line consumed for getline-style transport.
 	private Object inputLine = null;
 	// Current record state ($0, $1, $2, ...).
@@ -292,7 +296,8 @@ public class JRT {
 				|| "NF".equals(name)
 				|| "NR".equals(name)
 				|| "FNR".equals(name)
-				|| "ARGC".equals(name);
+				|| "ARGC".equals(name)
+				|| "IGNORECASE".equals(name);
 	}
 
 	/**
@@ -358,6 +363,7 @@ public class JRT {
 		setFNR(0);
 		setRSTART(0);
 		setRLENGTH(0);
+		setIGNORECASE(Long.valueOf(0L));
 	}
 
 	/**
@@ -418,6 +424,10 @@ public class JRT {
 				setARGC(value);
 				continue;
 			}
+			if ("IGNORECASE".equals(name)) {
+				setIGNORECASE(value);
+				continue;
+			}
 			vm.assignVariable(name, value);
 		}
 	}
@@ -425,7 +435,7 @@ public class JRT {
 	/**
 	 * Applies only the JRT-managed special variable assignments from the
 	 * supplied map (FS, RS, OFS, ORS, CONVFMT, OFMT, SUBSEP, FILENAME, NF,
-	 * NR, FNR, ARGC). Non-special variables are silently skipped because
+	 * NR, FNR, ARGC, IGNORECASE). Non-special variables are silently skipped because
 	 * they require the runtime stack to be fully initialized (which happens
 	 * during tuple execution).
 	 *
@@ -462,6 +472,8 @@ public class JRT {
 				setFNR(value);
 			} else if ("ARGC".equals(name)) {
 				setARGC(value);
+			} else if ("IGNORECASE".equals(name)) {
+				setIGNORECASE(value);
 			}
 			// Non-special variables are skipped; they are assigned later
 			// via the tuple instruction stream
@@ -1095,6 +1107,37 @@ public class JRT {
 	 */
 	public void setFS(Object value) {
 		this.fs = value == null ? "" : value.toString();
+	}
+
+	/**
+	 * Sets IGNORECASE, precomputing its truth value so regexp operations can
+	 * test a boolean instead of coercing the raw value on every match.
+	 *
+	 * @param value new IGNORECASE value
+	 */
+	public void setIGNORECASE(Object value) {
+		this.ignorecase = value == null ? Long.valueOf(0L) : value;
+		this.ignoreCase = toDouble(this.ignorecase) != 0.0D;
+	}
+
+	/**
+	 * Get IGNORECASE from the VariableManager.
+	 *
+	 * @return IGNORECASE value
+	 */
+	public Object getIGNORECASEVar() {
+		return ignorecase;
+	}
+
+	/**
+	 * Returns whether IGNORECASE is currently nonzero, making regexp
+	 * operations case-insensitive. The truth value is precomputed when
+	 * IGNORECASE is assigned.
+	 *
+	 * @return {@code true} when IGNORECASE is nonzero
+	 */
+	public boolean isIgnoreCase() {
+		return ignoreCase;
 	}
 
 	/**

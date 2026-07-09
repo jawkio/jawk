@@ -1493,6 +1493,22 @@ public enum Opcode {
 	PEEK_ARRAY_ELEMENT,
 
 	/**
+	 * Assigns the top of the stack to IGNORECASE, managed by the JRT.
+	 * <p>
+	 * Stack before: value ...<br/>
+	 * Stack after: value ...
+	 */
+	ASSIGN_IGNORECASE,
+
+	/**
+	 * Pushes the value of IGNORECASE, managed by the JRT.
+	 * <p>
+	 * Stack before: ...<br/>
+	 * Stack after: ignorecase-value ...
+	 */
+	PUSH_IGNORECASE,
+
+	/**
 	 * Prints a diagnostic message to the warning stream.
 	 * <p>
 	 * Stack unchanged.

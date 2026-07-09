@@ -2465,6 +2465,18 @@ public class AVM implements VariableManager, Closeable {
 					position.next();
 					break;
 				}
+				case ASSIGN_IGNORECASE: {
+					Object v = pop();
+					jrt.setIGNORECASE(v);
+					push(v);
+					position.next();
+					break;
+				}
+				case PUSH_IGNORECASE: {
+					push(jrt.getIGNORECASEVar());
+					position.next();
+					break;
+				}
 				case PUSH_FS: {
 					push(jrt.getFSVar());
 					position.next();
@@ -2726,7 +2738,7 @@ public class AVM implements VariableManager, Closeable {
 		String ere = jrt.toAwkString(pop());
 		String s = jrt.toAwkString(pop());
 		int flags = 0;
-		if (JRT.toDouble(getVariable("IGNORECASE")) != 0) {
+		if (jrt.isIgnoreCase()) {
 			flags |= Pattern.CASE_INSENSITIVE;
 		}
 		Pattern pattern = Pattern.compile(ere, flags);
@@ -2889,11 +2901,12 @@ public class AVM implements VariableManager, Closeable {
 
 	private void populateArgv(long offset) {
 		argvOffset = offset;
-		// consume argv (looping from 1 to argc)
-		int argc = (int) JRT.toDouble(runtimeStack.getVariable(argcOffset, true)); // true = global
+		// ARGV[0] is the program name, ARGV[1..n] the command-line arguments.
+		// The count comes straight from the argument list because ARGC may not
+		// be materialized when the script does not reference it.
 		assignArray(argvOffset, 0, "jawk", true);
 		pop();
-		for (int i = 1; i < argc; i++) {
+		for (int i = 1; i <= arguments.size(); i++) {
 			assignArray(argvOffset, i, jrt.toInputScalar(arguments.get(i - 1)), true);
 			pop(); // clean up the stack after the assignment
 		}
@@ -3226,6 +3239,7 @@ public class AVM implements VariableManager, Closeable {
 		map.put("FNR", () -> jrt.getFNR());
 		map.put("RSTART", () -> jrt.getRSTART());
 		map.put("RLENGTH", () -> jrt.getRLENGTH());
+		map.put("IGNORECASE", () -> jrt.getIGNORECASEVar());
 		// lazily-materialized globals answered through their synthetic accessors
 		map.put("ARGC", this::getARGC);
 		map.put("ARGV", this::getARGV);

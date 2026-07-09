@@ -127,6 +127,7 @@ Jawk also follows gawk in several places where gawk departs from historical AWK:
 
 - A regexp literal used as an ordinary expression evaluates as `$0 ~ /re/`, per POSIX; `x = /re/` assigns 0 or 1, not the pattern text.
 - Typed regexp literals (`@/re/`) are accepted; `--posix` rejects them.
+- `IGNORECASE` is a built-in special variable managed by the runtime, like `FS` or `RS`: a nonzero value makes regexp matching and gawk array sorting case-insensitive.
 - Because the [gawk compatibility extension](extensions.html#gawk) is enabled by default, `gensub`, `typeof`, `isarray`, `asort`, `asorti`, and `mkbool` are function names and can no longer be used as variables. Load an explicit extension list without `GawkExtension` to reclaim those identifiers.
 - Calling a user-defined function with more arguments than it declares is accepted: the extra expressions are evaluated and discarded, and a gawk-style warning is printed to stderr.
 - Assigning a scalar value to an array element (`a[1] = z`) types that element as a scalar; later using it as a subarray (`a[1][2] = 3`) is a runtime error, exactly as in gawk.

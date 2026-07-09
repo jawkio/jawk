@@ -23,6 +23,7 @@ package io.jawk;
  */
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
 
@@ -121,6 +122,65 @@ public class GawkExtensionTest {
 				.script("BEGIN { a[\"B\"] = 1; a[\"a\"] = 2; n = asorti(a, d); for (i = 1; i <= n; i++) print d[i] }")
 				.expectLines("a", "B")
 				.runAndAssert();
+	}
+
+	@Test
+	public void incrementAndDecrementWorkOnSpecialVariables() throws Exception {
+		// JRT-managed specials are read/written through dedicated opcodes, so
+		// ++/-- must route through them instead of the slot-based INC/DEC.
+		AwkTestSupport
+				.awkTest("prefix and postfix inc/dec apply to special variables")
+				.script(
+						"BEGIN { "
+								+ "NR = 5; print NR++, NR, ++NR, NR--, --NR; "
+								+ "for (IGNORECASE = 0; IGNORECASE < 2; IGNORECASE++) printf \"%d\", IGNORECASE; "
+								+ "print \"\" "
+								+ "}")
+				.expectLines("5 6 7 7 5", "01")
+				.runAndAssert();
+	}
+
+	@Test
+	public void ignoreCaseIsLiveForMatchAndReadable() throws Exception {
+		AwkTestSupport
+				.awkTest("IGNORECASE assignment applies immediately and reads back")
+				.script(
+						"BEGIN { "
+								+ "print match(\"ABC\", \"b\"); "
+								+ "IGNORECASE = 1; "
+								+ "print match(\"ABC\", \"b\"), IGNORECASE "
+								+ "}")
+				.expectLines("0", "2 1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void argvWorksWithoutReferencingArgc() throws Exception {
+		// ARGV population derives its count from the argument list itself and
+		// must not depend on the ARGC slot being materialized first.
+		AwkTestSupport
+				.cliTest("ARGV is populated even when ARGC is unreferenced")
+				.script("BEGIN { print ARGV[0] }")
+				.expectLines("jawk")
+				.runAndAssert();
+	}
+
+	@Test
+	public void runtimeManagedGlobalsAreMaterializedOnlyWhenNeeded() throws Exception {
+		String plain = tupleDump("BEGIN { x = 1 }");
+		assertFalse("unreferenced ENVIRON must not be materialized", plain.contains("ENVIRON_OFFSET"));
+		assertFalse("unreferenced ARGV must not be materialized", plain.contains("ARGV_OFFSET"));
+		// ARGC stays materialized: its slot drives ARGC=n operand assignments
+		String withSymtab = tupleDump("BEGIN { n = length(SYMTAB) }");
+		assertTrue("SYMTAB requires ENVIRON", withSymtab.contains("ENVIRON_OFFSET"));
+		assertTrue("SYMTAB requires ARGC", withSymtab.contains("ARGC_OFFSET"));
+		assertTrue("SYMTAB requires ARGV", withSymtab.contains("ARGV_OFFSET"));
+	}
+
+	private static String tupleDump(String script) throws Exception {
+		java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+		new Awk().compile(script).dump(new java.io.PrintStream(bytes, true, "UTF-8"));
+		return bytes.toString("UTF-8");
 	}
 
 	@Test

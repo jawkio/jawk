@@ -259,6 +259,7 @@ public class AwkParser {
 		SPECIAL_VAR_NAMES.put("ENVIRON", SP_IDX);
 		SPECIAL_VAR_NAMES.put("ARGC", SP_IDX);
 		SPECIAL_VAR_NAMES.put("ARGV", SP_IDX);
+		SPECIAL_VAR_NAMES.put("IGNORECASE", SP_IDX);
 	}
 
 	/**
@@ -2807,13 +2808,19 @@ public class AwkParser {
 			// (see above)!
 			tuples.setNumGlobals(symbolTable.numGlobals());
 
-			// Only ENVIRON/ARGC/ARGV remain regular globals.
-			// Always materialize ARGC; ARGV remains lazily materialized.
-			if (environAst.isReferenced()) {
+			// Only ENVIRON/ARGC/ARGV remain regular globals. ENVIRON and ARGV
+			// are materialized only when the script references them, or when it
+			// references SYMTAB (whose snapshot exposes them); unreferenced ones
+			// are answered by the synthetic accessors. ARGC is always
+			// materialized (a single cheap assignment): its slot must stay
+			// authoritative so ARGC=n command-line operand assignments affect
+			// input traversal.
+			boolean symtabReferenced = symbolTable.isGlobalReferenced("SYMTAB");
+			if (environAst.isReferenced() || symtabReferenced) {
 				tuples.environOffset(environAst.offset);
 			}
 			tuples.argcOffset(argcAst.offset);
-			if (argvAst.isReferenced()) {
+			if (argvAst.isReferenced() || symtabReferenced) {
 				tuples.argvOffset(argvAst.offset);
 			}
 
@@ -2934,7 +2941,7 @@ public class AwkParser {
 			tuples.markEvalTupleStream();
 			tuples.setNumGlobals(symbolTable.numGlobals());
 
-			if (environAst.isReferenced()) {
+			if (environAst.isReferenced() || symbolTable.isGlobalReferenced("SYMTAB")) {
 				tuples.environOffset(environAst.offset);
 			}
 
@@ -3496,102 +3503,12 @@ public class AwkParser {
 		}
 
 		private void pushSpecialThenSwap(AwkTuples tuples, String id) {
-			switch (id) {
-			case "NF":
-				tuples.pushNF();
-				break;
-			case "NR":
-				tuples.pushNR();
-				break;
-			case "FNR":
-				tuples.pushFNR();
-				break;
-			case "FS":
-				tuples.pushFS();
-				break;
-			case "RS":
-				tuples.pushRS();
-				break;
-			case "OFS":
-				tuples.pushOFS();
-				break;
-			case "ORS":
-				tuples.pushORS();
-				break;
-			case "RSTART":
-				tuples.pushRSTART();
-				break;
-			case "RLENGTH":
-				tuples.pushRLENGTH();
-				break;
-			case "FILENAME":
-				tuples.pushFILENAME();
-				break;
-			case "SUBSEP":
-				tuples.pushSUBSEP();
-				break;
-			case "CONVFMT":
-				tuples.pushCONVFMT();
-				break;
-			case "OFMT":
-				tuples.pushOFMT();
-				break;
-			case "ARGC":
-				tuples.pushARGC();
-				break;
-			default:
-				throw new Error("Unhandled special var: " + id);
-			}
+			pushSpecialVariable(tuples, id);
 			tuples.swap();
 		}
 
 		private void assignSpecial(AwkTuples tuples, String id) {
-			switch (id) {
-			case "NF":
-				tuples.assignNF();
-				break;
-			case "NR":
-				tuples.assignNR();
-				break;
-			case "FNR":
-				tuples.assignFNR();
-				break;
-			case "FS":
-				tuples.assignFS();
-				break;
-			case "RS":
-				tuples.assignRS();
-				break;
-			case "OFS":
-				tuples.assignOFS();
-				break;
-			case "ORS":
-				tuples.assignORS();
-				break;
-			case "RSTART":
-				tuples.assignRSTART();
-				break;
-			case "RLENGTH":
-				tuples.assignRLENGTH();
-				break;
-			case "FILENAME":
-				tuples.assignFILENAME();
-				break;
-			case "SUBSEP":
-				tuples.assignSUBSEP();
-				break;
-			case "CONVFMT":
-				tuples.assignCONVFMT();
-				break;
-			case "OFMT":
-				tuples.assignOFMT();
-				break;
-			case "ARGC":
-				tuples.assignARGC();
-				break;
-			default:
-				throw new Error("Unhandled special var: " + id);
-			}
+			assignSpecialVariable(tuples, id);
 		}
 	}
 
@@ -4511,52 +4428,7 @@ public class AwkParser {
 			pushSourceLineNumber(tuples);
 			if (SPECIAL_VAR_NAMES.containsKey(id) && !"ENVIRON".equals(id) && !"ARGV".equals(id)) {
 				// Use JRT-managed reads for specials
-				switch (id) {
-				case "NF":
-					tuples.pushNF();
-					break;
-				case "NR":
-					tuples.pushNR();
-					break;
-				case "FNR":
-					tuples.pushFNR();
-					break;
-				case "FS":
-					tuples.pushFS();
-					break;
-				case "RS":
-					tuples.pushRS();
-					break;
-				case "OFS":
-					tuples.pushOFS();
-					break;
-				case "ORS":
-					tuples.pushORS();
-					break;
-				case "RSTART":
-					tuples.pushRSTART();
-					break;
-				case "RLENGTH":
-					tuples.pushRLENGTH();
-					break;
-				case "FILENAME":
-					tuples.pushFILENAME();
-					break;
-				case "SUBSEP":
-					tuples.pushSUBSEP();
-					break;
-				case "CONVFMT":
-					tuples.pushCONVFMT();
-					break;
-				case "OFMT":
-					tuples.pushOFMT();
-					break;
-				case "ARGC":
-					tuples.pushARGC();
-					break;
-				default:
-					throw new Error("Unhandled special var: " + id);
-				}
+				pushSpecialVariable(tuples, id);
 			} else {
 				tuples.dereference(offset, isArray(), isGlobal);
 			}
@@ -4829,7 +4701,12 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (getAst1() instanceof IDAst) {
+			if (getAst1() instanceof IDAst && isJrtManagedSpecialName(((IDAst) getAst1()).id)) {
+				// the sequence already leaves the new value on the stack
+				populateSpecialIncDec(tuples, ((IDAst) getAst1()).id, true, false);
+				popSourceLineNumber(tuples);
+				return 1;
+			} else if (getAst1() instanceof IDAst) {
 				IDAst idAst = (IDAst) getAst1();
 				tuples.inc(idAst.offset, idAst.isGlobal);
 			} else if (getAst1() instanceof ArrayReferenceAst) {
@@ -4877,7 +4754,12 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (getAst1() instanceof IDAst) {
+			if (getAst1() instanceof IDAst && isJrtManagedSpecialName(((IDAst) getAst1()).id)) {
+				// the sequence already leaves the new value on the stack
+				populateSpecialIncDec(tuples, ((IDAst) getAst1()).id, false, false);
+				popSourceLineNumber(tuples);
+				return 1;
+			} else if (getAst1() instanceof IDAst) {
 				IDAst idAst = (IDAst) getAst1();
 				tuples.dec(idAst.offset, idAst.isGlobal);
 			} else if (getAst1() instanceof ArrayReferenceAst) {
@@ -4927,6 +4809,8 @@ public class AwkParser {
 				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
 				dollarExpr.getAst1().populateTuples(tuples);
 				tuples.incDollarRef();
+			} else if (getAst1() instanceof IDAst && isJrtManagedSpecialName(((IDAst) getAst1()).id)) {
+				populateSpecialIncDec(tuples, ((IDAst) getAst1()).id, true, true);
 			} else {
 				if (getAst1() instanceof ArrayReferenceAst) {
 					((ArrayReferenceAst) getAst1()).populateTargetValueTuples(tuples);
@@ -4966,6 +4850,11 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
+			if (getAst1() instanceof IDAst && isJrtManagedSpecialName(((IDAst) getAst1()).id)) {
+				populateSpecialIncDec(tuples, ((IDAst) getAst1()).id, false, true);
+				popSourceLineNumber(tuples);
+				return 1;
+			}
 			if (getAst1() instanceof ArrayReferenceAst) {
 				((ArrayReferenceAst) getAst1()).populateTargetValueTuples(tuples);
 				tuples.unaryPlus();
@@ -5046,6 +4935,144 @@ public class AwkParser {
 	}
 
 	// we don't know if it is a scalar
+	/**
+	 * Returns whether the identifier names a JRT-managed special variable,
+	 * read and written through dedicated opcodes instead of a global slot.
+	 */
+	private boolean isJrtManagedSpecialName(String id) {
+		return SPECIAL_VAR_NAMES.containsKey(id) && !"ENVIRON".equals(id) && !"ARGV".equals(id);
+	}
+
+	/** Emits the tuple pushing the value of a JRT-managed special variable. */
+	private void pushSpecialVariable(AwkTuples tuples, String id) {
+		switch (id) {
+		case "NF":
+			tuples.pushNF();
+			break;
+		case "NR":
+			tuples.pushNR();
+			break;
+		case "FNR":
+			tuples.pushFNR();
+			break;
+		case "FS":
+			tuples.pushFS();
+			break;
+		case "RS":
+			tuples.pushRS();
+			break;
+		case "OFS":
+			tuples.pushOFS();
+			break;
+		case "ORS":
+			tuples.pushORS();
+			break;
+		case "RSTART":
+			tuples.pushRSTART();
+			break;
+		case "RLENGTH":
+			tuples.pushRLENGTH();
+			break;
+		case "IGNORECASE":
+			tuples.pushIGNORECASE();
+			break;
+		case "FILENAME":
+			tuples.pushFILENAME();
+			break;
+		case "SUBSEP":
+			tuples.pushSUBSEP();
+			break;
+		case "CONVFMT":
+			tuples.pushCONVFMT();
+			break;
+		case "OFMT":
+			tuples.pushOFMT();
+			break;
+		case "ARGC":
+			tuples.pushARGC();
+			break;
+		default:
+			throw new Error("Unhandled special var: " + id);
+		}
+	}
+
+	/** Emits the tuple assigning the top of the stack to a JRT-managed special variable. */
+	private void assignSpecialVariable(AwkTuples tuples, String id) {
+		switch (id) {
+		case "NF":
+			tuples.assignNF();
+			break;
+		case "NR":
+			tuples.assignNR();
+			break;
+		case "FNR":
+			tuples.assignFNR();
+			break;
+		case "FS":
+			tuples.assignFS();
+			break;
+		case "RS":
+			tuples.assignRS();
+			break;
+		case "OFS":
+			tuples.assignOFS();
+			break;
+		case "ORS":
+			tuples.assignORS();
+			break;
+		case "RSTART":
+			tuples.assignRSTART();
+			break;
+		case "RLENGTH":
+			tuples.assignRLENGTH();
+			break;
+		case "IGNORECASE":
+			tuples.assignIGNORECASE();
+			break;
+		case "FILENAME":
+			tuples.assignFILENAME();
+			break;
+		case "SUBSEP":
+			tuples.assignSUBSEP();
+			break;
+		case "CONVFMT":
+			tuples.assignCONVFMT();
+			break;
+		case "OFMT":
+			tuples.assignOFMT();
+			break;
+		case "ARGC":
+			tuples.assignARGC();
+			break;
+		default:
+			throw new Error("Unhandled special var: " + id);
+		}
+	}
+
+	/*
+	 * Increments or decrements a JRT-managed special variable. Specials live in
+	 * the JRT rather than in a global slot, so the slot-based INC/DEC opcodes
+	 * cannot be used; the sequence below reads, adjusts, and assigns through
+	 * the special-variable opcodes, leaving the expression value (old value for
+	 * postfix, new value for prefix) on the stack.
+	 */
+	private void populateSpecialIncDec(AwkTuples tuples, String id, boolean increment, boolean postfix) {
+		pushSpecialVariable(tuples, id);
+		if (postfix) {
+			tuples.dup();
+		}
+		tuples.push(Long.valueOf(1L));
+		if (increment) {
+			tuples.add();
+		} else {
+			tuples.subtract();
+		}
+		assignSpecialVariable(tuples, id);
+		if (postfix) {
+			tuples.pop();
+		}
+	}
+
 	/*
 	 * A call-expression node is normally stamped when it is reduced, after the
 	 * lexer may already have consumed the line terminator; the first argument
@@ -5513,6 +5540,15 @@ public class AwkParser {
 				endAst = new EndAst();
 			}
 			return endAst;
+		}
+
+		/**
+		 * Returns whether the script references the named global variable,
+		 * without creating a symbol for it.
+		 */
+		private boolean isGlobalReferenced(String id) {
+			IDAst idAst = globalIds.get(id);
+			return idAst != null && idAst.isReferenced();
 		}
 
 		private IDAst getID(String id) {

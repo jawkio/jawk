@@ -1452,6 +1452,20 @@ public class AwkTuples implements Serializable {
 		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_FS));
 	}
 
+	/**
+	 * Emits a tuple pushing the value of IGNORECASE.
+	 */
+	public void pushIGNORECASE() {
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_IGNORECASE));
+	}
+
+	/**
+	 * Emits a tuple assigning the top of the stack to IGNORECASE.
+	 */
+	public void assignIGNORECASE() {
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_IGNORECASE));
+	}
+
 	/** Pushes the current value of {@code RS} onto the operand stack. */
 	public void pushRS() {
 		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_RS));

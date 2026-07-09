@@ -41,7 +41,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
-import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -2888,7 +2887,7 @@ public class AVM implements VariableManager, Closeable {
 	private void populateArgc(long offset) {
 		argcOffset = offset;
 		// +1 to include the "jawk" program name (ARGV[0])
-		runtimeStack.setVariable(argcOffset, JRT.toAssignedScalar(Integer.valueOf(arguments.size() + 1)), true);
+		runtimeStack.setVariable(argcOffset, Integer.valueOf(arguments.size() + 1), true);
 	}
 
 	private void populateArgv(long offset) {
@@ -3180,7 +3179,7 @@ public class AVM implements VariableManager, Closeable {
 	 * Awk variable assignment functionality.
 	 */
 	private void assign(long l, Object value, boolean isGlobal, PositionTracker position, boolean push) {
-		value = JRT.toAssignedScalar(value);
+		value = JRT.untypedToBlank(value);
 		// check if curr value already refers to an array
 		if (runtimeStack.getVariable(l, isGlobal) instanceof Map) {
 			throw new AwkRuntimeException(position.lineNumber(), "cannot assign anything to an unindexed associative array");
@@ -3201,7 +3200,7 @@ public class AVM implements VariableManager, Closeable {
 
 	private void assignMapElement(Map<Object, Object> array, Object arrIdx, Object rhs) {
 		checkScalar(arrIdx);
-		rhs = JRT.toAssignedScalar(rhs);
+		rhs = JRT.untypedToBlank(rhs);
 		array.put(arrIdx, rhs);
 		push(rhs);
 	}
@@ -3283,34 +3282,31 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	/**
-	 * The special variables the interpreter can answer by name, mapped to their
-	 * accessors. Static so that constructing an AVM allocates nothing for it;
-	 * single source of truth for {@link #getVariable(String)} and
-	 * {@link #getSpecialVariableNames()}.
+	 * The names of the special variables the interpreter answers by name.
+	 * Must stay in sync with the switch in {@link #getVariable(String)}; a
+	 * unit test verifies that every listed name is answered.
 	 */
-	private static final Map<String, Function<AVM, Object>> SPECIAL_VARIABLES = buildSpecialVariables();
-
-	private static Map<String, Function<AVM, Object>> buildSpecialVariables() {
-		Map<String, Function<AVM, Object>> map = new LinkedHashMap<String, Function<AVM, Object>>();
-		map.put("FS", AVM::getFS);
-		map.put("RS", AVM::getRS);
-		map.put("OFS", AVM::getOFS);
-		map.put("ORS", AVM::getORS);
-		map.put("FILENAME", avm -> avm.jrt.getFILENAME());
-		map.put("SUBSEP", AVM::getSUBSEP);
-		map.put("CONVFMT", AVM::getCONVFMT);
-		map.put("OFMT", avm -> avm.jrt.getOFMTString());
-		map.put("NF", avm -> avm.jrt.getNF());
-		map.put("NR", avm -> avm.jrt.getNR());
-		map.put("FNR", avm -> avm.jrt.getFNR());
-		map.put("RSTART", avm -> avm.jrt.getRSTART());
-		map.put("RLENGTH", avm -> avm.jrt.getRLENGTH());
-		map.put("IGNORECASE", avm -> avm.jrt.getIGNORECASEVar());
-		// lazily-materialized globals answered through their synthetic accessors
-		map.put("ARGC", AVM::getARGC);
-		map.put("ARGV", AVM::getARGV);
-		return Collections.unmodifiableMap(map);
-	}
+	private static final Set<String> SPECIAL_VARIABLE_NAMES = Collections
+			.unmodifiableSet(
+					new LinkedHashSet<String>(
+							Arrays
+									.asList(
+											"FS",
+											"RS",
+											"OFS",
+											"ORS",
+											"FILENAME",
+											"SUBSEP",
+											"CONVFMT",
+											"OFMT",
+											"NF",
+											"NR",
+											"FNR",
+											"RSTART",
+											"RLENGTH",
+											"IGNORECASE",
+											"ARGC",
+											"ARGV")));
 
 	/**
 	 * Returns the names of the special variables that
@@ -3319,7 +3315,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @return unmodifiable set of special variable names
 	 */
 	public Set<String> getSpecialVariableNames() {
-		return SPECIAL_VARIABLES.keySet();
+		return SPECIAL_VARIABLE_NAMES;
 	}
 
 	/** {@inheritDoc} */
@@ -3328,9 +3324,42 @@ public class AVM implements VariableManager, Closeable {
 		if (name == null) {
 			return null;
 		}
-		Function<AVM, Object> special = SPECIAL_VARIABLES.get(name);
-		if (special != null) {
-			return special.apply(this);
+		switch (name) {
+		case "FS":
+			return getFS();
+		case "RS":
+			return getRS();
+		case "OFS":
+			return getOFS();
+		case "ORS":
+			return getORS();
+		case "FILENAME":
+			return jrt.getFILENAME();
+		case "SUBSEP":
+			return getSUBSEP();
+		case "CONVFMT":
+			return getCONVFMT();
+		case "OFMT":
+			return jrt.getOFMTString();
+		case "NF":
+			return jrt.getNF();
+		case "NR":
+			return jrt.getNR();
+		case "FNR":
+			return jrt.getFNR();
+		case "RSTART":
+			return jrt.getRSTART();
+		case "RLENGTH":
+			return jrt.getRLENGTH();
+		case "IGNORECASE":
+			return jrt.getIGNORECASEVar();
+		// lazily-materialized globals answered through their synthetic accessors
+		case "ARGC":
+			return getARGC();
+		case "ARGV":
+			return getARGV();
+		default:
+			break;
 		}
 		if (globalVariableOffsets == null) {
 			return baseInitialVariables.get(name);

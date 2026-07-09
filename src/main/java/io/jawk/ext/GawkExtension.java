@@ -272,7 +272,10 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		String mode = how == null ?
 				(indicesAsValues ? "@ind_type_asc" : VAL_TYPE_ASC) : toAwkString(how);
 		List<SortEntry> entries = entries(source);
-		Collections.sort(entries, comparator(mode, getJrt(), currentIgnoreCase()));
+		// @unsorted keeps the natural traversal order: no sorting at all
+		if (!mode.startsWith("@unsorted")) {
+			Collections.sort(entries, comparator(mode, getJrt(), currentIgnoreCase()));
+		}
 		destination.clear();
 		long idx = 1L;
 		for (SortEntry entry : entries) {
@@ -293,6 +296,10 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		return entries;
 	}
 
+	/*
+	 * Callers handle @unsorted before reaching this point (no sort at all),
+	 * both for asort()/asorti() and for the for-in traversal hook.
+	 */
 	private static Comparator<SortEntry> comparator(String mode, JRT jrt, boolean ignoreCase) {
 		boolean desc = mode != null && mode.endsWith("_desc");
 		String effectiveMode = mode == null || mode.isEmpty() ? VAL_TYPE_ASC : mode;
@@ -303,11 +310,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		 * are kept in a separate group because gawk does not stringify subarrays
 		 * during type-aware sorting.
 		 */
-		if (effectiveMode.startsWith("@unsorted")) {
-			// Collections.sort is stable, so a constant comparator keeps the
-			// array's natural iteration order, as gawk documents for @unsorted.
-			comparator = (left, right) -> 0;
-		} else if (effectiveMode.startsWith("@ind_num_")) {
+		if (effectiveMode.startsWith("@ind_num_")) {
 			comparator = (left, right) -> compareNumbers(left.index, right.index);
 		} else if (effectiveMode.startsWith("@ind_str_")) {
 			comparator = (left, right) -> compareStrings(left.index, right.index, jrt, ignoreCase);

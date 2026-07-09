@@ -184,6 +184,30 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void everySpecialVariableNameIsAnsweredByGetVariable() throws Exception {
+		// getSpecialVariableNames() and the switch in AVM.getVariable() must
+		// stay in sync: every listed name must be answered with a value.
+		Awk awk = new Awk();
+		AwkProgram program = awk.compile("BEGIN { }");
+		try (io.jawk.backend.AVM avm = awk.createAvm()) {
+			avm
+					.execute(
+							program,
+							new io.jawk.jrt.StreamInputSource(
+									new java.io.ByteArrayInputStream(new byte[0]),
+									avm,
+									avm.getJrt()),
+							java.util.Collections.<String>emptyList(),
+							null);
+			for (String name : avm.getSpecialVariableNames()) {
+				assertTrue(
+						"getVariable must answer special variable " + name,
+						avm.getVariable(name) != null);
+			}
+		}
+	}
+
+	@Test
 	public void symtabReflectsInitialVariablesAndOperandAssignments() throws Exception {
 		// gawk parity: -v variables without a compiled slot appear in SYMTAB,
 		// and name=value operand assignments update it live between files.

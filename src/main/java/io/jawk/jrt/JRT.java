@@ -793,13 +793,18 @@ public class JRT {
 	}
 
 	/**
-	 * Converts an untyped placeholder to AWK's assigned blank scalar value.
+	 * Replaces the untyped marker by AWK's assigned blank scalar. Reading a
+	 * missing array element creates and returns the untyped marker (so
+	 * {@code typeof()} can see it), but an assignment must not propagate it:
+	 * after {@code x = a[missing]}, {@code x} is an assigned blank scalar
+	 * ({@code typeof(x) == "unassigned"}), exactly as in gawk. This is a single
+	 * {@code instanceof} on the assignment paths.
 	 *
-	 * @param value value to normalize for scalar assignment
-	 * @return assigned scalar blank when the value was untyped, otherwise the
-	 *         original value
+	 * @param value value about to be stored by an assignment
+	 * @return the assigned blank scalar when the value was the untyped marker,
+	 *         otherwise the original value
 	 */
-	public static Object toAssignedScalar(Object value) {
+	public static Object untypedToBlank(Object value) {
 		return value instanceof UntypedObject ? BLANK : value;
 	}
 

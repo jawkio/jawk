@@ -1893,7 +1893,7 @@ public class AVM implements VariableManager, Closeable {
 						push(result ? 1 : 0);
 					} else {
 						String r = jrt.toAwkString(o2);
-						boolean result = Pattern.compile(r, regexpFlags()).matcher(s).find();
+						boolean result = Pattern.compile(r, jrt.regexpFlags()).matcher(s).find();
 						push(result ? 1 : 0);
 					}
 					position.next();
@@ -2726,15 +2726,10 @@ public class AVM implements VariableManager, Closeable {
 		}
 	}
 
-	/** Pattern flags implied by the current IGNORECASE setting. */
-	private int regexpFlags() {
-		return jrt.isIgnoreCase() ? Pattern.CASE_INSENSITIVE : 0;
-	}
-
 	private void execMatch() {
 		String ere = jrt.toAwkString(pop());
 		String s = jrt.toAwkString(pop());
-		int flags = regexpFlags();
+		int flags = jrt.regexpFlags();
 		Pattern pattern = Pattern.compile(ere, flags);
 		Matcher matcher = pattern.matcher(s);
 		if (matcher.find()) {
@@ -2755,8 +2750,8 @@ public class AVM implements VariableManager, Closeable {
 		String repl = jrt.toAwkString(pop());
 		String ere = jrt.toAwkString(pop());
 		String orig = jrt.toAwkString(jrt.jrtGetInputField(0));
-		String newstring = isGsub ? replaceAll(orig, ere, repl) : replaceFirst(orig, ere, repl);
-		jrt.setInputLine(newstring);
+		push(isGsub ? jrt.replaceAll(orig, repl, ere) : jrt.replaceFirst(orig, repl, ere));
+		jrt.setInputLine(jrt.getReplaceResult());
 		jrt.jrtParseFields();
 	}
 
@@ -2766,7 +2761,8 @@ public class AVM implements VariableManager, Closeable {
 		String orig = jrt.toAwkString(pop());
 		String repl = jrt.toAwkString(pop());
 		String ere = jrt.toAwkString(pop());
-		String newstring = isGsub ? replaceAll(orig, ere, repl) : replaceFirst(orig, ere, repl);
+		push(isGsub ? jrt.replaceAll(orig, repl, ere) : jrt.replaceFirst(orig, repl, ere));
+		String newstring = jrt.getReplaceResult();
 		if (fieldNum == 0) {
 			jrt.setInputLine(newstring);
 			jrt.jrtParseFields();
@@ -3149,33 +3145,10 @@ public class AVM implements VariableManager, Closeable {
 		String orig = jrt.toAwkString(pop());
 		String repl = jrt.toAwkString(pop());
 		String ere = jrt.toAwkString(pop());
-		if (isGsub) {
-			newString = replaceAll(orig, ere, repl);
-		} else {
-			newString = replaceFirst(orig, ere, repl);
-		}
+		push(isGsub ? jrt.replaceAll(orig, repl, ere) : jrt.replaceFirst(orig, repl, ere));
+		newString = jrt.getReplaceResult();
 
 		return newString;
-	}
-
-	private StringBuffer replaceFirstSb = new StringBuffer();
-
-	/**
-	 * sub() functionality
-	 */
-	private String replaceFirst(String orig, String ere, String repl) {
-		push(RegexRuntimeSupport.replaceFirst(orig, repl, ere, replaceFirstSb, regexpFlags()));
-		return replaceFirstSb.toString();
-	}
-
-	private StringBuffer replaceAllSb = new StringBuffer();
-
-	/**
-	 * gsub() functionality
-	 */
-	private String replaceAll(String orig, String ere, String repl) {
-		push(RegexRuntimeSupport.replaceAll(orig, repl, ere, replaceAllSb, regexpFlags()));
-		return replaceAllSb.toString();
 	}
 
 	/**
@@ -3406,35 +3379,10 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	@SuppressWarnings("unused")
 	private void setFilelistVariable(String nameValue) {
+		// route through assignVariable so JRT-managed specials, global slots,
+		// and SYMTAB updates are handled in exactly one place
 		NameValueAssignment assignment = parseNameValueAssignment(nameValue);
-		String name = assignment.name;
-		Object obj = assignment.value;
-
-		// make sure we're not receiving funcname=value assignments
-		if (functionNames.contains(name)) {
-			throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + name + ").");
-		}
-
-		// see assignVariable: specials go to the JRT, ARGC to its slot
-		if (!"ARGC".equals(name) && jrt.applySpecialVariable(name, obj)) {
-			updateSymtabEntry(name, obj);
-			return;
-		}
-
-		Integer offsetObj = globalVariableOffsets.get(name);
-		Boolean arrayObj = globalVariableArrays.get(name);
-
-		if (offsetObj != null) {
-			if (arrayObj.booleanValue()) {
-				throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + name + ").");
-			} else {
-				runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
-			}
-		} else if (runtimeStack.hasGlobalVariable(name)) {
-			runtimeStack.setGlobalVariable(name, obj);
-		}
-		// names without a compiled slot are still symbols: keep SYMTAB current
-		updateSymtabEntry(name, obj);
+		assignVariable(assignment.name, assignment.value);
 	}
 
 	/** {@inheritDoc} */

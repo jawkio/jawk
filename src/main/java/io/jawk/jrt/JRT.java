@@ -102,6 +102,8 @@ public class JRT {
 	private boolean ignoreCase;
 	/** Case-insensitive twins of precompiled patterns; created on first use. */
 	private Map<Pattern, Pattern> caseInsensitivePatterns;
+	/** Reused buffer holding the result of the last sub()/gsub() replacement. */
+	private final StringBuffer replaceResult = new StringBuffer();
 	// Last input line consumed for getline-style transport.
 	private Object inputLine = null;
 	// Current record state ($0, $1, $2, ...).
@@ -1123,6 +1125,135 @@ public class JRT {
 	 */
 	public boolean isIgnoreCase() {
 		return ignoreCase;
+	}
+
+	/**
+	 * Returns the {@link Pattern} flags implied by the current
+	 * {@code IGNORECASE} setting; dynamic regexps should be compiled with
+	 * these flags.
+	 *
+	 * @return {@link Pattern#CASE_INSENSITIVE} when {@code IGNORECASE} is
+	 *         truthy, 0 otherwise
+	 */
+	public int regexpFlags() {
+		return ignoreCase ? Pattern.CASE_INSENSITIVE : 0;
+	}
+
+	/**
+	 * {@code sub()} functionality: replaces the first match of {@code ere} in
+	 * {@code orig} with {@code repl}, honoring {@code IGNORECASE}. The
+	 * substituted text is available through {@link #getReplaceResult()}.
+	 *
+	 * @param orig original text
+	 * @param repl AWK replacement text
+	 * @param ere regular expression
+	 * @return number of replacements performed (0 or 1)
+	 */
+	public int replaceFirst(String orig, String repl, String ere) {
+		replaceResult.setLength(0);
+		String preparedReplacement = prepareReplacement(repl, false);
+		Matcher matcher = Pattern.compile(ere, regexpFlags()).matcher(orig);
+		int count = 0;
+		if (matcher.find()) {
+			count++;
+			matcher.appendReplacement(replaceResult, preparedReplacement);
+		}
+		matcher.appendTail(replaceResult);
+		return count;
+	}
+
+	/**
+	 * {@code gsub()} functionality: replaces every match of {@code ere} in
+	 * {@code orig} with {@code repl}, honoring {@code IGNORECASE}. The
+	 * substituted text is available through {@link #getReplaceResult()}.
+	 *
+	 * @param orig original text
+	 * @param repl AWK replacement text
+	 * @param ere regular expression
+	 * @return number of replacements performed
+	 */
+	public int replaceAll(String orig, String repl, String ere) {
+		replaceResult.setLength(0);
+		String preparedReplacement = prepareReplacement(repl, false);
+		Matcher matcher = Pattern.compile(ere, regexpFlags()).matcher(orig);
+		int count = 0;
+		while (matcher.find()) {
+			count++;
+			matcher.appendReplacement(replaceResult, preparedReplacement);
+		}
+		matcher.appendTail(replaceResult);
+		return count;
+	}
+
+	/**
+	 * Returns the text produced by the last {@link #replaceFirst} or
+	 * {@link #replaceAll} call.
+	 *
+	 * @return substituted text
+	 */
+	public String getReplaceResult() {
+		return replaceResult.toString();
+	}
+
+	/**
+	 * Converts an AWK replacement text into a Java {@link Matcher} replacement:
+	 * {@code &} becomes the whole match, {@code \&} a literal ampersand, and
+	 * {@code $} is escaped.
+	 *
+	 * @param awkRepl AWK replacement text
+	 * @param backreferences whether {@code \N} denotes capture group {@code N},
+	 *        as in gawk's {@code gensub()}; when {@code false}, {@code \N} stays
+	 *        literal as in {@code sub()} and {@code gsub()}
+	 * @return the equivalent Java replacement string
+	 */
+	public static String prepareReplacement(String awkRepl, boolean backreferences) {
+		if (awkRepl == null) {
+			return "";
+		}
+
+		if ((awkRepl.indexOf('\\') == -1) && (awkRepl.indexOf('$') == -1) && (awkRepl.indexOf('&') == -1)) {
+			return awkRepl;
+		}
+
+		StringBuilder javaRepl = new StringBuilder();
+		for (int i = 0; i < awkRepl.length(); i++) {
+			char c = awkRepl.charAt(i);
+
+			if (c == '\\' && i == awkRepl.length() - 1) {
+				// In gensub mode a trailing backslash is a literal backslash;
+				// left bare it would make Matcher.appendReplacement throw. The
+				// sub()/gsub() mapping keeps its historical bare form.
+				javaRepl.append(backreferences ? "\\\\" : "\\");
+				continue;
+			}
+
+			if (c == '\\') {
+				i++;
+				c = awkRepl.charAt(i);
+				if (c == '&') {
+					javaRepl.append('&');
+					continue;
+				} else if (c == '\\') {
+					javaRepl.append("\\\\");
+					continue;
+				} else if (backreferences && Character.isDigit(c)) {
+					javaRepl.append('$').append(c);
+					continue;
+				}
+
+				javaRepl.append('\\');
+			}
+
+			if (c == '$') {
+				javaRepl.append("\\$");
+			} else if (c == '&') {
+				javaRepl.append("$0");
+			} else {
+				javaRepl.append(c);
+			}
+		}
+
+		return javaRepl.toString();
 	}
 
 	/**

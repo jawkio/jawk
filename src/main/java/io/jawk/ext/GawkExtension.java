@@ -37,7 +37,6 @@ import java.util.regex.Pattern;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jawk.backend.AVM;
-import io.jawk.backend.RegexRuntimeSupport;
 import io.jawk.ext.annotations.JawkAssocArray;
 import io.jawk.ext.annotations.JawkBeforeStart;
 import io.jawk.ext.annotations.JawkFunction;
@@ -231,7 +230,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		pattern = getJrt().caseAwarePattern(pattern);
 		Object targetValue = target == null ? getJrt().getInputLine() : target;
 		Matcher matcher = pattern.matcher(toAwkString(targetValue));
-		String repl = RegexRuntimeSupport.prepareReplacement(toAwkString(replacement), true);
+		String repl = JRT.prepareReplacement(toAwkString(replacement), true);
 		String selector = toAwkString(how);
 		// gawk: any string beginning with 'g' or 'G' selects a global replacement
 		if (!selector.isEmpty() && (selector.charAt(0) == 'g' || selector.charAt(0) == 'G')) {

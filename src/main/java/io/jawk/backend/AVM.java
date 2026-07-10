@@ -41,7 +41,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jawk.AwkExpression;
@@ -1877,25 +1876,11 @@ public class AVM implements VariableManager, Closeable {
 					break;
 				}
 				case MATCHES: {
-					// stack[0] = item2
-					// stack[1] = item1
+					// stack[0] = regexp (precompiled or dynamic)
+					// stack[1] = text
 					Object o2 = pop();
 					Object o1 = pop();
-					// use o1's string value
-					String s = o1.toString();
-					// assume o2 is a regexp
-					if (o2 instanceof Pattern) {
-						Pattern p = jrt.caseAwarePattern((Pattern) o2);
-						Matcher m = p.matcher(s);
-						// m.matches() matches the ENTIRE string
-						// m.find() is more appropriate
-						boolean result = m.find();
-						push(result ? 1 : 0);
-					} else {
-						String r = jrt.toAwkString(o2);
-						boolean result = Pattern.compile(r, jrt.regexpFlags()).matcher(s).find();
-						push(result ? 1 : 0);
-					}
+					push(jrt.matches(o1.toString(), o2) ? 1 : 0);
 					position.next();
 					break;
 				}
@@ -2729,20 +2714,7 @@ public class AVM implements VariableManager, Closeable {
 	private void execMatch() {
 		String ere = jrt.toAwkString(pop());
 		String s = jrt.toAwkString(pop());
-		int flags = jrt.regexpFlags();
-		Pattern pattern = Pattern.compile(ere, flags);
-		Matcher matcher = pattern.matcher(s);
-		if (matcher.find()) {
-			int start = matcher.start() + 1;
-			int len = matcher.end() - matcher.start();
-			jrt.setRSTART(start);
-			jrt.setRLENGTH(len);
-			push(start);
-		} else {
-			jrt.setRSTART(0);
-			jrt.setRLENGTH(-1);
-			push(0);
-		}
+		push(jrt.matchPosition(s, ere));
 	}
 
 	private void execSubForDollar0(BooleanTuple tuple) {

@@ -2227,7 +2227,7 @@ public class AwkParser {
 		 */
 		if (valueAst instanceof IDAst) {
 			IDAst idAst = (IDAst) valueAst;
-			if (SPECIAL_VAR_NAMES.containsKey(idAst.id) && !"ENVIRON".equals(idAst.id) && !"ARGV".equals(idAst.id)) {
+			if (isJrtManagedSpecialName(idAst.id)) {
 				idAst.populateTuples(tuples);
 			} else {
 				tuples.peekDereference(idAst.offset, idAst.isGlobal);
@@ -3394,9 +3394,7 @@ public class AwkParser {
 					throw new SemanticException("Cannot use " + idAst + " as a scalar. It is an array.");
 				}
 				idAst.setScalar(true);
-				boolean isSpecial = SPECIAL_VAR_NAMES.containsKey(idAst.id)
-						&& !"ENVIRON".equals(idAst.id)
-						&& !"ARGV".equals(idAst.id);
+				boolean isSpecial = isJrtManagedSpecialName(idAst.id);
 				if (isSpecial) {
 					// value is on stack from RHS
 					switch (op) {
@@ -4442,7 +4440,7 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (SPECIAL_VAR_NAMES.containsKey(id) && !"ENVIRON".equals(id) && !"ARGV".equals(id)) {
+			if (isJrtManagedSpecialName(id)) {
 				// Use JRT-managed reads for specials
 				pushSpecialVariable(tuples, id);
 			} else {
@@ -4954,6 +4952,11 @@ public class AwkParser {
 	/**
 	 * Returns whether the identifier names a JRT-managed special variable,
 	 * read and written through dedicated opcodes instead of a global slot.
+	 * ENVIRON and ARGV are excluded: they are special names but plain
+	 * slot-backed arrays, materialized by the preamble. SYMTAB and FUNCTAB
+	 * need no exclusion because they are not special names at all: they are
+	 * ordinary globals that the runtime populates when the script references
+	 * them.
 	 */
 	private boolean isJrtManagedSpecialName(String id) {
 		return SPECIAL_VAR_NAMES.containsKey(id) && !"ENVIRON".equals(id) && !"ARGV".equals(id);

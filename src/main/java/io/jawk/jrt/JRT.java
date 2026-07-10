@@ -1196,6 +1196,44 @@ public class JRT {
 	}
 
 	/**
+	 * Evaluates the AWK match operator ({@code text ~ regexp}), honoring
+	 * {@code IGNORECASE} for both precompiled regexp constants and dynamic
+	 * expressions.
+	 *
+	 * @param text text to match
+	 * @param regexp precompiled {@link Pattern} or dynamic regexp text
+	 * @return {@code true} when the regexp matches anywhere in the text
+	 */
+	public boolean matches(String text, Object regexp) {
+		if (regexp instanceof Pattern) {
+			// find(): AWK's ~ matches anywhere, not the entire string
+			return caseAwarePattern((Pattern) regexp).matcher(text).find();
+		}
+		return Pattern.compile(toAwkString(regexp), regexpFlags()).matcher(text).find();
+	}
+
+	/**
+	 * {@code match()} functionality: locates {@code ere} in {@code s} honoring
+	 * {@code IGNORECASE}, updating {@code RSTART} and {@code RLENGTH}.
+	 *
+	 * @param s text to search
+	 * @param ere regular expression
+	 * @return the match position ({@code RSTART}), or 0 when there is no match
+	 */
+	public int matchPosition(String s, String ere) {
+		Matcher matcher = Pattern.compile(ere, regexpFlags()).matcher(s);
+		if (matcher.find()) {
+			int start = matcher.start() + 1;
+			setRSTART(start);
+			setRLENGTH(matcher.end() - matcher.start());
+			return start;
+		}
+		setRSTART(0);
+		setRLENGTH(-1);
+		return 0;
+	}
+
+	/**
 	 * Converts an AWK replacement text into a Java {@link Matcher} replacement:
 	 * {@code &} becomes the whole match, {@code \&} a literal ampersand, and
 	 * {@code $} is escaped.
@@ -1258,8 +1296,10 @@ public class JRT {
 
 	/**
 	 * Returns the pattern itself, or its case-insensitive twin when
-	 * {@code IGNORECASE} is set. Twins are compiled once and cached, so
-	 * precompiled regexp constants stay cheap on the matching hot path.
+	 * {@code IGNORECASE} is set. Twins are compiled once and cached here:
+	 * the JDK's {@link Pattern#compile(String)} performs no caching of its
+	 * own (every call reparses the expression), so dropping this cache would
+	 * recompile the regexp on every record matched against a regexp constant.
 	 *
 	 * @param pattern base pattern
 	 * @return pattern honoring the current {@code IGNORECASE} setting

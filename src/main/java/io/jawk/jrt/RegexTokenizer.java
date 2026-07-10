@@ -23,6 +23,7 @@ package io.jawk.jrt;
  */
 
 import java.util.Enumeration;
+import java.util.regex.Pattern;
 
 /**
  * Similar to StringTokenizer, except that tokens are delimited
@@ -43,10 +44,33 @@ public class RegexTokenizer implements Enumeration<Object> {
 	 *        within the input string.
 	 */
 	public RegexTokenizer(String input, String delimitterRegexPattern) {
+		this(input, delimitterRegexPattern, 0);
+	}
+
+	/**
+	 * Construct a RegexTokenizer with explicit {@link Pattern} flags.
+	 *
+	 * @param input The input string to tokenize.
+	 * @param delimitterRegexPattern The regular expression delineating tokens
+	 *        within the input string.
+	 * @param flags {@link Pattern} compilation flags, such as
+	 *        {@link Pattern#CASE_INSENSITIVE}
+	 */
+	public RegexTokenizer(String input, String delimitterRegexPattern, int flags) {
+		this(input, Pattern.compile(delimitterRegexPattern, flags));
+	}
+
+	/**
+	 * Construct a RegexTokenizer around a precompiled pattern.
+	 *
+	 * @param input The input string to tokenize.
+	 * @param pattern The compiled delimiter pattern.
+	 */
+	public RegexTokenizer(String input, Pattern pattern) {
 		if (input.isEmpty()) {
 			array = new String[0];
 		} else {
-			array = input.split(delimitterRegexPattern, -1);
+			array = pattern.split(input, -1);
 		}
 	}
 

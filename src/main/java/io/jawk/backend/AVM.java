@@ -40,7 +40,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.StringTokenizer;
 import java.util.regex.Pattern;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jawk.AwkExpression;
@@ -77,13 +76,10 @@ import io.jawk.jrt.AwkRuntimeException;
 import io.jawk.jrt.AwkSink;
 import io.jawk.jrt.BlockManager;
 import io.jawk.jrt.BlockObject;
-import io.jawk.jrt.CharacterTokenizer;
 import io.jawk.jrt.ConditionPair;
 import io.jawk.jrt.InputSource;
 import io.jawk.jrt.StreamInputSource;
 import io.jawk.jrt.JRT;
-import io.jawk.jrt.RegexTokenizer;
-import io.jawk.jrt.SingleCharacterTokenizer;
 import io.jawk.jrt.VariableManager;
 import io.jawk.util.AwkSettings;
 import io.jawk.jrt.BSDRandom;
@@ -2765,11 +2761,13 @@ public class AVM implements VariableManager, Closeable {
 
 	private void execSplit(CountTuple tuple, PositionTracker position) {
 		long numArgs = tuple.getCount();
-		String fsString;
+		Object fs;
 		if (numArgs == 2) {
-			fsString = jrt.toAwkString(jrt.getFSVar());
+			fs = jrt.getFSVar();
 		} else if (numArgs == 3) {
-			fsString = jrt.toAwkString(pop());
+			// a regexp literal arrives precompiled and stays that way, so the
+			// tokenizer can honor IGNORECASE through the pattern-twin cache
+			fs = pop();
 		} else {
 			throw new Error("Invalid # of args. split() requires 2 or 3. Got: " + numArgs);
 		}
@@ -2778,16 +2776,7 @@ public class AVM implements VariableManager, Closeable {
 			throw new AwkRuntimeException(position.lineNumber(), o + " is not an array.");
 		}
 		String s = jrt.toAwkString(pop());
-		Enumeration<Object> tokenizer;
-		if (fsString.equals(" ")) {
-			tokenizer = new StringTokenizer(s);
-		} else if (fsString.length() == 1) {
-			tokenizer = new SingleCharacterTokenizer(s, fsString.charAt(0));
-		} else if (fsString.isEmpty()) {
-			tokenizer = new CharacterTokenizer(s);
-		} else {
-			tokenizer = new RegexTokenizer(s, fsString);
-		}
+		Enumeration<Object> tokenizer = jrt.splitTokenizer(s, fs);
 
 		@SuppressWarnings("unchecked")
 		Map<Object, Object> assocArray = (Map<Object, Object>) o;

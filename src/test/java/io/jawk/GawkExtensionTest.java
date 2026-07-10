@@ -196,6 +196,36 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void gensubMissingBackreferenceExpandsToEmpty() throws Exception {
+		// gawk substitutes an empty string for \N beyond the pattern's groups;
+		// a bare $N would make Java's Matcher throw
+		AwkTestSupport
+				.awkTest("gensub backreference beyond group count is empty")
+				.script(
+						"BEGIN { print \"x\" gensub(/a/, \"\\\\1\", \"g\", \"a\") \"y\"; print gensub(/(o)/, \"[\\\\1]\", \"g\", \"foo\") }")
+				.expectLines("xy", "f[o][o]")
+				.runAndAssert();
+	}
+
+	@Test
+	public void splitAndFieldSplittingHonorIgnoreCase() throws Exception {
+		AwkTestSupport
+				.awkTest("IGNORECASE applies to split() delimiters and FS")
+				.script(
+						"BEGIN { "
+								+ "n = split(\"aBa\", a, /b/); print n; "
+								+ "IGNORECASE = 1; "
+								+ "n = split(\"aBa\", a, /b/); print n, a[1], a[2]; "
+								+ "n = split(\"aXBa\", a, \"xb\"); print n; "
+								+ "FS = \"[bc]\" "
+								+ "} "
+								+ "{ print NF, $2 }")
+				.stdin("xByCz\n")
+				.expectLines("1", "2 a a", "2", "3 y")
+				.runAndAssert();
+	}
+
+	@Test
 	public void invalidSortModeIsFatal() throws Exception {
 		// gawk treats undefined sort comparison names as a fatal error
 		AwkTestSupport

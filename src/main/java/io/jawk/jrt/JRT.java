@@ -947,18 +947,7 @@ public class JRT {
 	 * @return The number of parts resulting from this split operation.
 	 */
 	public int split(Object fieldSeparator, Object array, Object string) {
-		String fsString = toAwkString(fieldSeparator);
-		if (fsString.equals(" ")) {
-			return splitWorker(new StringTokenizer(toAwkString(string)), toArrayMap(array));
-		} else if (fsString.equals("")) {
-			return splitWorker(new CharacterTokenizer(toAwkString(string)), toArrayMap(array));
-		} else if (fsString.length() == 1) {
-			return splitWorker(
-					new SingleCharacterTokenizer(toAwkString(string), fsString.charAt(0)),
-					toArrayMap(array));
-		} else {
-			return splitWorker(new RegexTokenizer(toAwkString(string), fsString), toArrayMap(array));
-		}
+		return splitWorker(splitTokenizer(toAwkString(string), fieldSeparator), toArrayMap(array));
 	}
 
 	private static Map<Object, Object> toArrayMap(Object array) {
@@ -1234,6 +1223,40 @@ public class JRT {
 	}
 
 	/**
+	 * Builds the tokenizer splitting {@code input} by the given separator,
+	 * following AWK field-splitting rules ({@code " "} splits on whitespace
+	 * runs, {@code ""} splits into characters, a single character is literal)
+	 * and honoring {@code IGNORECASE} for regexp separators. A precompiled
+	 * {@link Pattern} separator (a regexp literal) is used directly.
+	 *
+	 * @param input text to split
+	 * @param separator field separator: precompiled pattern or text
+	 * @return tokenizer producing the split parts
+	 */
+	public Enumeration<Object> splitTokenizer(String input, Object separator) {
+		if (separator instanceof Pattern) {
+			return new RegexTokenizer(input, caseAwarePattern((Pattern) separator));
+		}
+		String fsString = toAwkString(separator);
+		if (fsString.equals(" ")) {
+			return new StringTokenizer(input);
+		}
+		if (fsString.isEmpty()) {
+			return new CharacterTokenizer(input);
+		}
+		if (fsString.length() == 1) {
+			char fsChar = fsString.charAt(0);
+			if (ignoreCase && Character.isLetter(fsChar)) {
+				// a letter is regex-safe, so case-insensitive splitting can
+				// go through the regexp path
+				return new RegexTokenizer(input, fsString, Pattern.CASE_INSENSITIVE);
+			}
+			return new SingleCharacterTokenizer(input, fsChar);
+		}
+		return new RegexTokenizer(input, fsString, regexpFlags());
+	}
+
+	/**
 	 * Converts an AWK replacement text into a Java {@link Matcher} replacement:
 	 * {@code &} becomes the whole match, {@code \&} a literal ampersand, and
 	 * {@code $} is escaped.
@@ -1245,6 +1268,24 @@ public class JRT {
 	 * @return the equivalent Java replacement string
 	 */
 	public static String prepareReplacement(String awkRepl, boolean backreferences) {
+		return prepareReplacement(awkRepl, backreferences ? Integer.MAX_VALUE : -1);
+	}
+
+	/**
+	 * Converts an AWK replacement text into a Java {@link Matcher} replacement,
+	 * resolving gensub-style backreferences against a known number of capture
+	 * groups: {@code \N} beyond {@code maxGroup} is replaced by the empty
+	 * string, as gawk does, instead of producing a group reference that would
+	 * make the matcher throw.
+	 *
+	 * @param awkRepl AWK replacement text
+	 * @param maxGroup highest valid capture group number, or a negative value
+	 *        to disable backreferences entirely ({@code sub()}/{@code gsub()}
+	 *        semantics)
+	 * @return the equivalent Java replacement string
+	 */
+	public static String prepareReplacement(String awkRepl, int maxGroup) {
+		boolean backreferences = maxGroup >= 0;
 		if (awkRepl == null) {
 			return "";
 		}
@@ -1275,7 +1316,11 @@ public class JRT {
 					javaRepl.append("\\\\");
 					continue;
 				} else if (backreferences && Character.isDigit(c)) {
-					javaRepl.append('$').append(c);
+					if (c - '0' <= maxGroup) {
+						javaRepl.append('$').append(c);
+					}
+					// references beyond the pattern's groups expand to the
+					// empty string, as in gawk
 					continue;
 				}
 
@@ -1801,16 +1846,7 @@ public class JRT {
 			return fields;
 		}
 
-		Enumeration<Object> tokenizer;
-		if (fieldSeparator.equals(" ")) {
-			tokenizer = new StringTokenizer(recordText);
-		} else if (fieldSeparator.length() == 1) {
-			tokenizer = new SingleCharacterTokenizer(recordText, fieldSeparator.charAt(0));
-		} else if (fieldSeparator.equals("")) {
-			tokenizer = new CharacterTokenizer(recordText);
-		} else {
-			tokenizer = new RegexTokenizer(recordText, fieldSeparator);
-		}
+		Enumeration<Object> tokenizer = splitTokenizer(recordText, fieldSeparator);
 
 		while (tokenizer.hasMoreElements()) {
 			fields.add(new StrNum((String) tokenizer.nextElement(), decimalSeparator));

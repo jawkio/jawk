@@ -764,4 +764,34 @@ public class GawkExtensionTest {
 				.expectLines("1 0 number|bool number|bool")
 				.runAndAssert();
 	}
+
+	@Test
+	public void mkboolUsesAwkTruthiness() throws Exception {
+		// gawk applies ordinary AWK truth rules: any non-empty string
+		// constant (even "0") is true; a strnum is judged numerically
+		AwkTestSupport
+				.awkTest("mkbool follows AWK truthiness, not numeric coercion")
+				.script(
+						"{ s = mkbool($1); print s } "
+								+ "END { print mkbool(\"abc\"), mkbool(\"\"), mkbool(\"0\"), mkbool(0) }")
+				.stdin("0\n")
+				.expectLines("0", "1 0 1 0")
+				.runAndAssert();
+	}
+
+	@Test
+	public void asortiWritesIndicesAsStrings() throws Exception {
+		// gawk: the destination values of asorti() are strings even when the
+		// source index looks numeric
+		AwkTestSupport
+				.awkTest("asorti destination values are string-typed")
+				.script(
+						"BEGIN { "
+								+ "a[1] = \"x\"; a[\"b\"] = \"y\"; "
+								+ "n = asorti(a, d); "
+								+ "for (i = 1; i <= n; i++) print d[i], typeof(d[i]) "
+								+ "}")
+				.expectLines("1 string", "b string")
+				.runAndAssert();
+	}
 }

@@ -214,7 +214,9 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 */
 	@JawkFunction("mkbool")
 	public GawkBool mkbool(Object value) {
-		return new GawkBool(JRT.toDouble(value) != 0.0D);
+		// gawk applies ordinary AWK truthiness: a non-empty non-numeric
+		// string like "abc" is true, not numeric-coerced to 0
+		return new GawkBool(getJrt().toBoolean(value));
 	}
 
 	/**
@@ -315,7 +317,10 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		destination.clear();
 		long idx = 1L;
 		for (SortEntry entry : entries) {
-			destination.put(Long.valueOf(idx++), indicesAsValues ? entry.index : entry.value);
+			// asorti() writes indices as string values, as in gawk: the
+			// internal key object may be a Long for numeric-looking indexes
+			Object value = indicesAsValues ? getJrt().toAwkString(entry.index) : entry.value;
+			destination.put(Long.valueOf(idx++), value);
 		}
 		return Long.valueOf(entries.size());
 	}

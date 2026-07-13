@@ -435,6 +435,71 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void valueStringModeComparesAllValuesAsText() throws Exception {
+		// gawk's @val_str_* compares string representations regardless of the
+		// runtime type: no numbers-before-strings ranking
+		AwkTestSupport
+				.awkTest("@val_str_asc orders the number 2 after the string \"10\"")
+				.script(
+						"BEGIN { "
+								+ "a[1] = 2; a[2] = \"10\"; "
+								+ "n = asort(a, d, \"@val_str_asc\"); "
+								+ "for (i = 1; i <= n; i++) print d[i] "
+								+ "}")
+				.expectLines("10", "2")
+				.runAndAssert();
+	}
+
+	@Test
+	public void valueNumberModeCoercesStringsAndBreaksTiesAsText() throws Exception {
+		// gawk's @val_num_* coerces every scalar to a number (non-numeric
+		// strings count as 0) and breaks numeric ties with a string comparison
+		AwkTestSupport
+				.awkTest("@val_num_asc sorts string values numerically")
+				.script(
+						"BEGIN { "
+								+ "a[1] = \"10\"; a[2] = \"2\"; "
+								+ "n = asort(a, d, \"@val_num_asc\"); "
+								+ "print d[1], d[2]; "
+								+ "b[1] = \"abc\"; b[2] = 5; b[3] = 0; b[4] = \"zz\"; "
+								+ "n = asort(b, d2, \"@val_num_asc\"); "
+								+ "print d2[1], d2[2], d2[3], d2[4] "
+								+ "}")
+				.expectLines("2 10", "0 abc zz 5")
+				.runAndAssert();
+	}
+
+	@Test
+	public void emptySortModeMeansDefault() throws Exception {
+		AwkTestSupport
+				.awkTest("an empty third argument behaves like an omitted one")
+				.script(
+						"BEGIN { "
+								+ "a[1] = 2; a[2] = 1; "
+								+ "n = asort(a, d, \"\"); "
+								+ "print d[1], d[2] "
+								+ "}")
+				.expectLines("1 2")
+				.runAndAssert();
+	}
+
+	@Test
+	public void asortiDefaultsToStringIndexOrder() throws Exception {
+		// gawk's default for asorti() is @ind_str_asc: numeric-looking indexes
+		// stay in string order ("10" < "2")
+		AwkTestSupport
+				.awkTest("asorti default keeps string index order")
+				.script(
+						"BEGIN { "
+								+ "a[\"10\"] = 1; a[\"2\"] = 1; a[\"b\"] = 1; "
+								+ "n = asorti(a, d); "
+								+ "print d[1], d[2], d[3] "
+								+ "}")
+				.expectLines("10 2 b")
+				.runAndAssert();
+	}
+
+	@Test
 	public void forInHonorsProcinfoSortedIn() throws Exception {
 		AwkTestSupport
 				.awkTest("for-in traversal follows PROCINFO[\"sorted_in\"]")

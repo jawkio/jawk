@@ -109,6 +109,10 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * one-time warning. Unknown @-modes are typos and stay fatal, as in gawk.
 	 */
 	private String effectiveSortMode(String mode, String defaultMode) {
+		if (mode.isEmpty()) {
+			// gawk treats an empty mode like an omitted one
+			return defaultMode;
+		}
 		if (mode.charAt(0) != '@') {
 			warnUnsupportedComparator(mode);
 			return defaultMode;
@@ -294,7 +298,9 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 
 	private Long sort(Map<Object, Object> source, Map<Object, Object> dest, Object how, boolean indicesAsValues) {
 		Map<Object, Object> destination = dest == null ? source : dest;
-		String defaultMode = indicesAsValues ? "@ind_type_asc" : VAL_TYPE_ASC;
+		// gawk's defaults: value-type order for asort(), string index order
+		// for asorti() (indexes are strings, so no type ranking applies)
+		String defaultMode = indicesAsValues ? "@ind_str_asc" : VAL_TYPE_ASC;
 		String mode = how == null ? defaultMode : effectiveSortMode(toAwkString(how), defaultMode);
 		List<SortEntry> entries = entries(source);
 		// @unsorted keeps the natural traversal order: no sorting at all
@@ -325,8 +331,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * Callers handle @unsorted before reaching this point (no sort at all),
 	 * both for asort()/asorti() and for the for-in traversal hook.
 	 */
-	private static Comparator<SortEntry> comparator(String mode, JRT jrt, boolean ignoreCase) {
-		String effectiveMode = mode == null || mode.isEmpty() ? VAL_TYPE_ASC : mode;
+	private static Comparator<SortEntry> comparator(String effectiveMode, JRT jrt, boolean ignoreCase) {
 		boolean desc = effectiveMode.endsWith("_desc");
 		Comparator<SortEntry> comparator;
 		/*
@@ -355,7 +360,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 			break;
 		case "@val_str_asc":
 		case "@val_str_desc":
-			comparator = (left, right) -> compareValueStrings(left.value, right.value, jrt, ignoreCase);
+			comparator = (left, right) -> compareStrings(left.value, right.value, jrt, ignoreCase);
 			break;
 		case "@val_type_asc":
 		case "@val_type_desc":
@@ -419,33 +424,22 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	}
 
 	/**
-	 * Ordering for {@code @val_num_...}: gawk groups non-numeric strings first
-	 * (compared as text), then numbers, then subarrays.
+	 * Ordering for {@code @val_num_...}: gawk coerces every scalar to a number
+	 * (non-numeric strings count as 0), breaks numeric ties with a string
+	 * comparison, and sorts subarrays last.
 	 */
 	private static int compareValueNumbers(Object left, Object right, JRT jrt, boolean ignoreCase) {
-		int leftRank = valueNumberRank(left);
-		int rightRank = valueNumberRank(right);
-		if (leftRank != rightRank) {
-			return Integer.compare(leftRank, rightRank);
+		if (left instanceof Map || right instanceof Map) {
+			if (left instanceof Map && right instanceof Map) {
+				return 0;
+			}
+			return left instanceof Map ? 1 : -1;
 		}
-		if (left instanceof Map && right instanceof Map) {
-			return 0;
-		}
-		if (leftRank == 1) {
-			return compareNumbers(left, right);
+		int numeric = compareNumbers(left, right);
+		if (numeric != 0) {
+			return numeric;
 		}
 		return compareStrings(left, right, jrt, ignoreCase);
-	}
-
-	/** Rank for {@code @val_num_...}: 0 = non-numeric string, 1 = number/strnum, 2 = subarray. */
-	private static int valueNumberRank(Object value) {
-		if (value instanceof Map) {
-			return 2;
-		}
-		if (value instanceof Number || isStrnum(value)) {
-			return 1;
-		}
-		return 0;
 	}
 
 	/**
@@ -466,22 +460,6 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 			rightString = rightString.toLowerCase(java.util.Locale.ROOT);
 		}
 		return leftString.compareTo(rightString);
-	}
-
-	/**
-	 * Ordering for {@code @val_str_...}: same type ranking as the type-aware
-	 * modes, but values compare as text even when they are numbers.
-	 */
-	private static int compareValueStrings(Object left, Object right, JRT jrt, boolean ignoreCase) {
-		int leftRank = typeRank(left);
-		int rightRank = typeRank(right);
-		if (leftRank != rightRank) {
-			return Integer.compare(leftRank, rightRank);
-		}
-		if (left instanceof Map && right instanceof Map) {
-			return 0;
-		}
-		return compareStrings(left, right, jrt, ignoreCase);
 	}
 
 	private static String typeOf(Object value) {

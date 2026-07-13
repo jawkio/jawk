@@ -420,6 +420,29 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void perRunVariablesAreVisibleToSymtabAndExtensions() throws Exception {
+		// Per-run overrides without a compiled slot must be observable through
+		// SYMTAB and by-name lookups from extensions.
+		StringBuilder out = new StringBuilder();
+		new Awk()
+				.script("BEGIN { print SYMTAB[\"toto\"] }")
+				.variable("toto", "tata")
+				.execute(out);
+		assertEquals("tata\n", out.toString());
+
+		// a host-supplied PROCINFO drives for-in ordering even when the script
+		// never references PROCINFO itself
+		java.util.Map<String, Object> procinfo = new java.util.HashMap<String, Object>();
+		procinfo.put("sorted_in", "@ind_str_desc");
+		out.setLength(0);
+		new Awk()
+				.script("BEGIN { a[\"x\"] = 1; a[\"y\"] = 2; for (k in a) print k }")
+				.variable("PROCINFO", procinfo)
+				.execute(out);
+		assertEquals("y\nx\n", out.toString());
+	}
+
+	@Test
 	public void symtabExcludesTheMetaTablesThemselves() throws Exception {
 		// gawk keeps SYMTAB and FUNCTAB out of the SYMTAB snapshot
 		AwkTestSupport

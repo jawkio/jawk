@@ -2896,7 +2896,7 @@ public class AVM implements VariableManager, Closeable {
 			return;
 		}
 		Map<Object, Object> symtab = newAwkArray();
-		for (String name : baseInitialVariables.keySet()) {
+		for (String name : executionInitialVariables.keySet()) {
 			symtab.put(name, getVariable(name));
 		}
 		for (String name : getGlobalVariableNames()) {
@@ -3303,7 +3303,7 @@ public class AVM implements VariableManager, Closeable {
 			break;
 		}
 		if (globalVariableOffsets == null) {
-			return baseInitialVariables.get(name);
+			return executionInitialVariables.get(name);
 		}
 		Integer offsetObj = globalVariableOffsets.get(name);
 		if (offsetObj != null) {
@@ -3312,7 +3312,7 @@ public class AVM implements VariableManager, Closeable {
 		// Variables supplied through -v or the Java API but never referenced in
 		// the script have no compiled offset; they are still observable (e.g.
 		// IGNORECASE read by the gawk extension).
-		return baseInitialVariables == null ? null : baseInitialVariables.get(name);
+		return executionInitialVariables == null ? null : executionInitialVariables.get(name);
 	}
 
 	/**

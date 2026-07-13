@@ -121,6 +121,40 @@ public class AwkEvalTest {
 		assertEquals(1, awk.eval(expression, "a"));
 	}
 
+	/** Extension whose before-start hook reads and assigns variables by name. */
+	private static final class VariableProbingExtension extends io.jawk.ext.AbstractExtension {
+		private boolean hookRan;
+
+		@Override
+		public String getExtensionName() {
+			return "VariableProbingExtension";
+		}
+
+		@Override
+		public void beforeStart(AVM avm, JRT runtime) {
+			// exercise the by-name variable paths a hook may legitimately use,
+			// per the @JawkBeforeStart contract
+			avm.getVariable("someGlobal");
+			avm.assignVariable("someGlobal", "value");
+			hookRan = true;
+		}
+	}
+
+	@Test
+	public void testBeforeStartHooksAreSafeInFrameOptimizedEvalStreams() throws Exception {
+		// The eval optimizer may drop SET_NUM_GLOBALS from expressions with no
+		// compiled globals; the hooks that still run in the preamble must stay
+		// safe, because with no compiled slots every by-name variable path
+		// falls back to the initial-variables maps and never touches the frame.
+		VariableProbingExtension probe = new VariableProbingExtension();
+		Awk awk = new Awk(Collections.<io.jawk.ext.JawkExtension>singletonList(probe));
+		AwkExpression expression = awk.compileExpression("NF \":\" $2");
+
+		assertFalse(dumpTuples(expression).contains("SET_NUM_GLOBALS"));
+		assertEquals("3:b", awk.eval(expression, "a b c"));
+		assertTrue("the before-start hook must have run", probe.hookRan);
+	}
+
 	@Test
 	public void testCompileExpressionStatefulGlobalExpressionStartsWithoutGoto() throws Exception {
 		Awk awk = new Awk();

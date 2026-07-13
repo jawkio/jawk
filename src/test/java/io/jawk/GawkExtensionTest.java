@@ -30,6 +30,7 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 import io.jawk.ext.GawkExtension;
+import io.jawk.jrt.AwkRuntimeException;
 
 /**
  * Behavioral tests for the default gawk compatibility extension: asort(),
@@ -226,12 +227,55 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void gensubSelectorUsesAwkNumericCoercion() throws Exception {
+		// gawk converts the selector like any AWK number (" 2" is 2, "1e1" is
+		// 10) and warns "treated as 1" only when the result is below 1
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.cliTest("gensub occurrence selector follows AWK numeric conversion")
+				.script(
+						"BEGIN { "
+								+ "print gensub(/o/, \"0\", \"1e1\", \"foo\"); "
+								+ "print gensub(/o/, \"0\", \" 2\", \"foo\"); "
+								+ "print gensub(/o/, \"0\", \"abc\", \"foo\"); "
+								+ "print gensub(/o/, \"0\", 0, \"foo\") "
+								+ "}")
+				.expectLines("foo", "fo0", "f0o", "f0o")
+				.run();
+		result.assertExpected();
+		assertTrue(
+				"non-numeric selector must warn",
+				result.errorOutput().contains("third argument `abc' treated as 1"));
+		assertTrue(
+				"selector below 1 must warn",
+				result.errorOutput().contains("third argument `0' treated as 1"));
+		assertFalse(
+				"valid numeric selectors must not warn",
+				result.errorOutput().contains("` 2'"));
+	}
+
+	@Test
+	public void misspelledUnsortedModeIsFatal() throws Exception {
+		// only the exact "@unsorted" skips sorting; anything else with an
+		// @-prefix is an undefined comparison mode, fatal as in gawk
+		AwkTestSupport
+				.awkTest("@unsorted with a suffix is rejected")
+				.script("BEGIN { a[1] = 2; asort(a, d, \"@unsortedx\") }")
+				.expectThrow(AwkRuntimeException.class)
+				.runAndAssert();
+		AwkTestSupport
+				.awkTest("@unsorted with a suffix is rejected in for-in")
+				.script("BEGIN { a[1] = 2; PROCINFO[\"sorted_in\"] = \"@unsorted_asc\"; for (k in a) print k }")
+				.expectThrow(AwkRuntimeException.class)
+				.runAndAssert();
+	}
+
+	@Test
 	public void invalidSortModeIsFatal() throws Exception {
 		// gawk treats undefined sort comparison names as a fatal error
 		AwkTestSupport
 				.awkTest("invalid asort mode is rejected")
 				.script("BEGIN { a[1] = 2; asort(a, d, \"@bogus\") }")
-				.expectThrow(io.jawk.jrt.AwkRuntimeException.class)
+				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
 	}
 

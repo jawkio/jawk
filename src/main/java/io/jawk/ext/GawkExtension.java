@@ -97,7 +97,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 */
 	private Collection<Object> orderForInKeys(Map<Object, Object> map) {
 		String mode = currentSortedIn();
-		if (mode == null || mode.isEmpty() || mode.startsWith("@unsorted")) {
+		if (mode == null || mode.isEmpty() || "@unsorted".equals(mode)) {
 			return map.keySet();
 		}
 		return sortedKeys(map, effectiveSortMode(mode, VAL_TYPE_ASC), getJrt(), currentIgnoreCase());
@@ -240,11 +240,16 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		if (!selector.isEmpty() && (selector.charAt(0) == 'g' || selector.charAt(0) == 'G')) {
 			return matcher.replaceAll(repl);
 		}
-		if (!(how instanceof Number) && !getJrt().isParseableNumber(selector)) {
+		// gawk coerces the selector with AWK numeric conversion (so " 2" and
+		// "1e1" are the occurrences 2 and 10) and warns only when the result,
+		// truncated, is below 1
+		double selected = JRT.toDouble(how);
+		if (selected < 1.0D) {
 			warnAtCurrentLine("gensub: third argument `%s' treated as 1", selector);
+			selected = 1.0D;
 		}
-		int occurrence = (int) JRT.toLong(how);
-		if (occurrence <= 1) {
+		int occurrence = (int) selected;
+		if (occurrence == 1) {
 			return matcher.replaceFirst(repl);
 		}
 		StringBuffer result = new StringBuffer();
@@ -304,7 +309,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		String mode = how == null ? defaultMode : effectiveSortMode(toAwkString(how), defaultMode);
 		List<SortEntry> entries = entries(source);
 		// @unsorted keeps the natural traversal order: no sorting at all
-		if (!mode.startsWith("@unsorted")) {
+		if (!"@unsorted".equals(mode)) {
 			Collections.sort(entries, comparator(mode, getJrt(), currentIgnoreCase()));
 		}
 		destination.clear();

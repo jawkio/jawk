@@ -339,6 +339,42 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void symtabExcludesTheMetaTablesThemselves() throws Exception {
+		// gawk keeps SYMTAB and FUNCTAB out of the SYMTAB snapshot
+		AwkTestSupport
+				.awkTest("SYMTAB does not contain SYMTAB or FUNCTAB entries")
+				.script(
+						"function foo() { return 1 } "
+								+ "BEGIN { "
+								+ "x = (\"SYMTAB\" in SYMTAB); "
+								+ "y = (\"FUNCTAB\" in SYMTAB); "
+								+ "z = (\"foo\" in FUNCTAB); "
+								+ "print x, y, z "
+								+ "}")
+				.expectLines("0 0 1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void indexNumberModeBreaksTiesAsText() throws Exception {
+		// gawk's @ind_num_* breaks numeric ties (all non-numeric indexes
+		// coerce to 0) with a string comparison, so the order is
+		// deterministic regardless of insertion order
+		AwkTestSupport
+				.awkTest("@ind_num orders equal-valued indexes as text")
+				.script(
+						"BEGIN { "
+								+ "a[\"b\"] = 1; a[\"a\"] = 1; a[\"0\"] = 1; a[\"B\"] = 1; "
+								+ "n = asorti(a, d, \"@ind_num_asc\"); "
+								+ "print d[1], d[2], d[3], d[4]; "
+								+ "n = asorti(a, d, \"@ind_num_desc\"); "
+								+ "print d[1], d[2], d[3], d[4] "
+								+ "}")
+				.expectLines("0 B a b", "b a B 0")
+				.runAndAssert();
+	}
+
+	@Test
 	public void symtabAndFunctabExposeRealNames() throws Exception {
 		AwkTestSupport
 				.awkTest("SYMTAB and FUNCTAB hold real symbol names")

@@ -344,7 +344,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		switch (effectiveMode) {
 		case "@ind_num_asc":
 		case "@ind_num_desc":
-			comparator = (left, right) -> compareNumbers(left.index, right.index);
+			comparator = (left, right) -> compareNumericThenText(left.index, right.index, jrt, ignoreCase);
 			break;
 		case "@ind_str_asc":
 		case "@ind_str_desc":
@@ -356,7 +356,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 			break;
 		case "@val_num_asc":
 		case "@val_num_desc":
-			comparator = (left, right) -> compareValueNumbers(left.value, right.value, jrt, ignoreCase);
+			comparator = (left, right) -> compareNumericThenText(left.value, right.value, jrt, ignoreCase);
 			break;
 		case "@val_str_asc":
 		case "@val_str_desc":
@@ -424,11 +424,11 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	}
 
 	/**
-	 * Ordering for {@code @val_num_...}: gawk coerces every scalar to a number
-	 * (non-numeric strings count as 0), breaks numeric ties with a string
-	 * comparison, and sorts subarrays last.
+	 * Ordering for the {@code @..._num_...} modes: gawk coerces every scalar to
+	 * a number (non-numeric strings count as 0), breaks numeric ties with a
+	 * string comparison, and sorts subarrays last.
 	 */
-	private static int compareValueNumbers(Object left, Object right, JRT jrt, boolean ignoreCase) {
+	private static int compareNumericThenText(Object left, Object right, JRT jrt, boolean ignoreCase) {
 		if (left instanceof Map || right instanceof Map) {
 			if (left instanceof Map && right instanceof Map) {
 				return 0;

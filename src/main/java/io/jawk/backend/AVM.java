@@ -2900,6 +2900,10 @@ public class AVM implements VariableManager, Closeable {
 			symtab.put(name, getVariable(name));
 		}
 		for (String name : getGlobalVariableNames()) {
+			// gawk keeps the meta tables out of the symbol table snapshot
+			if ("SYMTAB".equals(name) || "FUNCTAB".equals(name)) {
+				continue;
+			}
 			symtab.put(name, getVariable(name));
 		}
 		// specials last: their accessors are authoritative even when the name

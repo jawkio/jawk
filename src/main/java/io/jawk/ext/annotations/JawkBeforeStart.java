@@ -31,6 +31,12 @@ import java.lang.annotation.Target;
  * Marks an extension method that should run after globals are allocated and
  * before tuple execution starts.
  * <p>
+ * The method runs once per interpreter instance, not once per execution:
+ * extension initialization may be heavy, and the {@code AVM}/{@code JRT} pair
+ * it binds to is stable for the lifetime of the engine. Use it to register
+ * runtime hooks and build one-time state, not to seed per-run globals.
+ * </p>
+ * <p>
  * Annotated methods must be instance methods that return {@code void} and
  * accept {@code (AVM, JRT)}.
  * </p>

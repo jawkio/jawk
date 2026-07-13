@@ -96,12 +96,12 @@ Declare the parameter as `Object` and fall back to compiling the string form, be
 
 ## Run Setup Code with @JawkBeforeStart
 
-Annotate an instance method with `@JawkBeforeStart` to run initialization after globals are allocated but before the script starts executing. The method must return `void` and accept `(AVM, JRT)`:
+Annotate an instance method with `@JawkBeforeStart` to run initialization after globals are allocated but before the script starts executing. The method runs **once per interpreter instance**, not once per execution: initialization may be heavy, and the `AVM`/`JRT` pair it receives stays the same for the lifetime of the engine. Use it to register runtime hooks and build one-time state; per-run globals are cleared between executions, so seed those from the extension functions themselves. The method must return `void` and accept `(AVM, JRT)`:
 
 ```java
 @JawkBeforeStart
 public void initialize(AVM avm, JRT jrt) {
-    // seed global variables, allocate arrays, etc.
+    // bind to the interpreter, register hooks, build one-time state
 }
 ```
 

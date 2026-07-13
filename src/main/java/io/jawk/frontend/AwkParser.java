@@ -5600,6 +5600,11 @@ public class AwkParser {
 			if (idAst == null) {
 				idAst = new IDAst(id, map == globalIds);
 				idAst.offset = map.size();
+				if (map == globalIds && !posix && ("SYMTAB".equals(id) || "FUNCTAB".equals(id))) {
+					// the runtime-provided meta tables are array-only, as in
+					// gawk: using them as scalars must fail like any array
+					idAst.setArray(true);
+				}
 				map.put(id, idAst);
 			}
 			return idAst;

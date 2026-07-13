@@ -1776,7 +1776,7 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = 1st arg to index() function
 					String s2 = jrt.toAwkString(pop());
 					String s1 = jrt.toAwkString(pop());
-					push(s1.indexOf(s2) + 1);
+					push(jrt.index(s1, s2));
 					position.next();
 					break;
 				}
@@ -1849,7 +1849,7 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = item1
 					Object o2 = pop();
 					Object o1 = pop();
-					push(JRT.compare2(o1, o2, 0) ? ONE : ZERO);
+					push(JRT.compare2(o1, o2, 0, jrt.isIgnoreCase()) ? ONE : ZERO);
 					position.next();
 					break;
 				}
@@ -1858,7 +1858,7 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = item1
 					Object o2 = pop();
 					Object o1 = pop();
-					push(JRT.compare2(o1, o2, -1) ? ONE : ZERO);
+					push(JRT.compare2(o1, o2, -1, jrt.isIgnoreCase()) ? ONE : ZERO);
 					position.next();
 					break;
 				}
@@ -1867,7 +1867,7 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = item1
 					Object o2 = pop();
 					Object o1 = pop();
-					push(JRT.compare2(o1, o2, 1) ? ONE : ZERO);
+					push(JRT.compare2(o1, o2, 1, jrt.isIgnoreCase()) ? ONE : ZERO);
 					position.next();
 					break;
 				}

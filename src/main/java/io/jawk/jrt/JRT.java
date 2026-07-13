@@ -674,6 +674,22 @@ public class JRT {
 	 * @return a boolean
 	 */
 	public static boolean compare2(Object o1, Object o2, int mode) {
+		return compare2(o1, o2, mode, false);
+	}
+
+	/**
+	 * Compares two objects like {@link #compare2(Object, Object, int)}, folding
+	 * case in string comparisons when {@code ignoreCase} is set: gawk's
+	 * {@code IGNORECASE} applies to string relational operators, not only to
+	 * regexp operations.
+	 *
+	 * @param o1 The 1st object.
+	 * @param o2 the 2nd object.
+	 * @param mode the comparison mode, as in {@link #compare2(Object, Object, int)}
+	 * @param ignoreCase whether string comparisons ignore case
+	 * @return a boolean
+	 */
+	public static boolean compare2(Object o1, Object o2, int mode, boolean ignoreCase) {
 		if (o1 instanceof Number && o2 instanceof Number) {
 			return compareNumbers(((Number) o1).doubleValue(), ((Number) o2).doubleValue(), mode);
 		}
@@ -701,12 +717,32 @@ public class JRT {
 		}
 
 		if (mode == 0) {
-			return o1String.equals(o2String);
-		} else if (mode < 0) {
-			return o1String.compareTo(o2String) < 0;
-		} else {
-			return o1String.compareTo(o2String) > 0;
+			return ignoreCase ? o1String.equalsIgnoreCase(o2String) : o1String.equals(o2String);
 		}
+		int comparison = ignoreCase ? o1String.compareToIgnoreCase(o2String) : o1String.compareTo(o2String);
+		return mode < 0 ? comparison < 0 : comparison > 0;
+	}
+
+	/**
+	 * Implements the {@code index()} builtin: the 1-based position of
+	 * {@code needle} within {@code haystack}, or 0 when absent, folding case
+	 * when {@code IGNORECASE} is set.
+	 *
+	 * @param haystack text to search
+	 * @param needle text to find
+	 * @return 1-based match position, 0 when not found
+	 */
+	public int index(String haystack, String needle) {
+		if (!ignoreCase) {
+			return haystack.indexOf(needle) + 1;
+		}
+		int max = haystack.length() - needle.length();
+		for (int i = 0; i <= max; i++) {
+			if (haystack.regionMatches(true, i, needle, 0, needle.length())) {
+				return i + 1;
+			}
+		}
+		return 0;
 	}
 
 	private static boolean isBlankOrZero(Object value, String stringValue) {

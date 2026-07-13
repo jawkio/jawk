@@ -2213,11 +2213,15 @@ public class AwkTuples implements Serializable {
 			return Double.valueOf(ans);
 		}
 		case CMP_EQ:
-			return JRT.compare2(left, right, 0) ? Long.valueOf(1L) : Long.valueOf(0L);
 		case CMP_LT:
-			return JRT.compare2(left, right, -1) ? Long.valueOf(1L) : Long.valueOf(0L);
 		case CMP_GT:
-			return JRT.compare2(left, right, 1) ? Long.valueOf(1L) : Long.valueOf(0L);
+			// only numeric comparisons are compile-time constants: string
+			// comparisons depend on the runtime IGNORECASE setting
+			if (!(left instanceof Number) || !(right instanceof Number)) {
+				return null;
+			}
+			return JRT.compare2(left, right, opcode == Opcode.CMP_EQ ? 0 : opcode == Opcode.CMP_LT ? -1 : 1) ?
+					Long.valueOf(1L) : Long.valueOf(0L);
 		case CONCAT:
 			if (left instanceof String && right instanceof String) {
 				return ((String) left) + ((String) right);

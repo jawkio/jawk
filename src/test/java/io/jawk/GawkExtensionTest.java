@@ -383,6 +383,43 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void ignoreCaseAppliesToComparisonsAndIndex() throws Exception {
+		// gawk's IGNORECASE covers string relational operators and index(),
+		// not just regexp operations; numeric (strnum) comparisons stay numeric
+		AwkTestSupport
+				.awkTest("IGNORECASE folds case in ==, < and index()")
+				.script(
+						"BEGIN { "
+								+ "IGNORECASE = 1; "
+								+ "eq = (\"a\" == \"A\"); ix = index(\"Ab\", \"a\"); lt = (\"B\" < \"a\"); "
+								+ "print eq, ix, lt; "
+								+ "IGNORECASE = 0; "
+								+ "eq = (\"a\" == \"A\"); ix = index(\"Ab\", \"a\"); lt = (\"B\" < \"a\"); "
+								+ "print eq, ix, lt "
+								+ "} "
+								+ "{ e = ($1 == $2); print e }")
+				.stdin("10 10.0\n")
+				.expectLines("1 1 0", "0 0 1", "1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void metaTablesCannotBeUsedAsScalars() throws Exception {
+		// gawk: fatal "attempt to use array `SYMTAB' in a scalar context"; the
+		// meta tables are array-typed from the moment they exist
+		AwkTestSupport
+				.awkTest("assigning a scalar to SYMTAB is a semantic error")
+				.script("BEGIN { SYMTAB = 1 }")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
+		AwkTestSupport
+				.awkTest("assigning a scalar to FUNCTAB is a semantic error")
+				.script("BEGIN { FUNCTAB = 1 }")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
+	}
+
+	@Test
 	public void symtabExcludesTheMetaTablesThemselves() throws Exception {
 		// gawk keeps SYMTAB and FUNCTAB out of the SYMTAB snapshot
 		AwkTestSupport

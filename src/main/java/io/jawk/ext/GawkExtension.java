@@ -56,6 +56,12 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 
 	private static final String VAL_TYPE_ASC = "@val_type_asc";
 
+	/** Interpreter this per-engine extension instance is bound to. */
+	private AVM avm;
+
+	/** Comparison-function names already warned about; created on first use. */
+	private Set<String> warnedComparators;
+
 	private static final class SortEntry {
 		private final Object index;
 		private final Object value;
@@ -72,9 +78,6 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		return "GawkExtension";
 	}
 
-	/** Interpreter this per-engine extension instance is bound to. */
-	private AVM avm;
-
 	/**
 	 * Installs the {@code PROCINFO["sorted_in"]} traversal order for
 	 * {@code for-in} loops and binds this per-engine extension instance to its
@@ -88,61 +91,6 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	public void initializeGawkVariables(AVM avmParam, JRT jrt) {
 		this.avm = avmParam;
 		avm.setForInKeyOrder(this::orderForInKeys);
-	}
-
-	/**
-	 * Returns the {@code for (index in array)} traversal order mandated by
-	 * {@code PROCINFO["sorted_in"]}, or the array's natural key order when no
-	 * sort mode is in effect.
-	 */
-	private Collection<Object> orderForInKeys(Map<Object, Object> map) {
-		String mode = currentSortedIn();
-		if (mode == null || mode.isEmpty() || "@unsorted".equals(mode)) {
-			return map.keySet();
-		}
-		return sortedKeys(map, effectiveSortMode(mode, VAL_TYPE_ASC), getJrt(), currentIgnoreCase());
-	}
-
-	/*
-	 * Gawk also accepts the name of a user-defined comparison function, which
-	 * Jawk does not support: those fall back to the default ordering with a
-	 * one-time warning. Unknown @-modes are typos and stay fatal, as in gawk.
-	 */
-	private String effectiveSortMode(String mode, String defaultMode) {
-		if (mode.isEmpty()) {
-			// gawk treats an empty mode like an omitted one
-			return defaultMode;
-		}
-		if (mode.charAt(0) != '@') {
-			warnUnsupportedComparator(mode);
-			return defaultMode;
-		}
-		return mode;
-	}
-
-	private void warnUnsupportedComparator(String name) {
-		if (warnedComparators == null) {
-			warnedComparators = new HashSet<String>();
-		}
-		if (warnedComparators.add(name)) {
-			warnAtCurrentLine("sort comparison function `%s' is not supported; using default ordering", name);
-		}
-	}
-
-	/** Comparison-function names already warned about; created on first use. */
-	private Set<String> warnedComparators;
-
-	private String currentSortedIn() {
-		Object procinfo = getVm().getVariable("PROCINFO");
-		if (!(procinfo instanceof Map)) {
-			return null;
-		}
-		@SuppressWarnings("unchecked")
-		Map<Object, Object> procinfoMap = (Map<Object, Object>) procinfo;
-		if (!JRT.containsAwkKey(procinfoMap, "sorted_in")) {
-			return null;
-		}
-		return getJrt().toAwkString(JRT.getAssocArrayValue(procinfoMap, "sorted_in"));
 	}
 
 	/**
@@ -285,22 +233,55 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	}
 
 	/**
-	 * Sorts and returns map keys according to a gawk predefined sort mode.
-	 *
-	 * @param map map whose keys should be sorted
-	 * @param mode predefined sort mode
-	 * @param jrt runtime used for AWK string conversion
-	 * @param ignoreCase whether string comparisons ignore case
-	 * @return sorted keys
+	 * Returns the {@code for (index in array)} traversal order mandated by
+	 * {@code PROCINFO["sorted_in"]}, or the array's natural key order when no
+	 * sort mode is in effect.
 	 */
-	private static List<Object> sortedKeys(Map<Object, Object> map, String mode, JRT jrt, boolean ignoreCase) {
-		List<SortEntry> entries = entries(map);
-		Collections.sort(entries, comparator(mode, jrt, ignoreCase));
-		List<Object> keys = new ArrayList<Object>();
-		for (SortEntry entry : entries) {
-			keys.add(entry.index);
+	private Collection<Object> orderForInKeys(Map<Object, Object> map) {
+		String mode = currentSortedIn();
+		if (mode == null || mode.isEmpty() || "@unsorted".equals(mode)) {
+			return map.keySet();
 		}
-		return keys;
+		return sortedKeys(map, effectiveSortMode(mode, VAL_TYPE_ASC), getJrt(), currentIgnoreCase());
+	}
+
+	private String currentSortedIn() {
+		Object procinfo = getVm().getVariable("PROCINFO");
+		if (!(procinfo instanceof Map)) {
+			return null;
+		}
+		@SuppressWarnings("unchecked")
+		Map<Object, Object> procinfoMap = (Map<Object, Object>) procinfo;
+		if (!JRT.containsAwkKey(procinfoMap, "sorted_in")) {
+			return null;
+		}
+		return getJrt().toAwkString(JRT.getAssocArrayValue(procinfoMap, "sorted_in"));
+	}
+
+	/*
+	 * Gawk also accepts the name of a user-defined comparison function, which
+	 * Jawk does not support: those fall back to the default ordering with a
+	 * one-time warning. Unknown @-modes are typos and stay fatal, as in gawk.
+	 */
+	private String effectiveSortMode(String mode, String defaultMode) {
+		if (mode.isEmpty()) {
+			// gawk treats an empty mode like an omitted one
+			return defaultMode;
+		}
+		if (mode.charAt(0) != '@') {
+			warnUnsupportedComparator(mode);
+			return defaultMode;
+		}
+		return mode;
+	}
+
+	private void warnUnsupportedComparator(String name) {
+		if (warnedComparators == null) {
+			warnedComparators = new HashSet<String>();
+		}
+		if (warnedComparators.add(name)) {
+			warnAtCurrentLine("sort comparison function `%s' is not supported; using default ordering", name);
+		}
 	}
 
 	private Long sort(Map<Object, Object> source, Map<Object, Object> dest, Object how, boolean indicesAsValues) {
@@ -325,16 +306,35 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		return Long.valueOf(entries.size());
 	}
 
-	private boolean currentIgnoreCase() {
-		return getJrt().isIgnoreCase();
+	/**
+	 * Sorts and returns map keys according to a gawk predefined sort mode.
+	 *
+	 * @param map map whose keys should be sorted
+	 * @param mode predefined sort mode
+	 * @param jrt runtime used for AWK string conversion
+	 * @param ignoreCase whether string comparisons ignore case
+	 * @return sorted keys
+	 */
+	private static List<Object> sortedKeys(Map<Object, Object> map, String mode, JRT jrt, boolean ignoreCase) {
+		List<SortEntry> entries = entries(map);
+		Collections.sort(entries, comparator(mode, jrt, ignoreCase));
+		List<Object> keys = new ArrayList<Object>(entries.size());
+		for (SortEntry entry : entries) {
+			keys.add(entry.index);
+		}
+		return keys;
 	}
 
 	private static List<SortEntry> entries(Map<Object, Object> map) {
-		List<SortEntry> entries = new ArrayList<SortEntry>();
+		List<SortEntry> entries = new ArrayList<SortEntry>(map.size());
 		for (Map.Entry<Object, Object> entry : map.entrySet()) {
 			entries.add(new SortEntry(entry.getKey(), entry.getValue()));
 		}
 		return entries;
+	}
+
+	private boolean currentIgnoreCase() {
+		return getJrt().isIgnoreCase();
 	}
 
 	/*
@@ -465,11 +465,9 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		}
 		String leftString = jrt.toAwkString(left);
 		String rightString = jrt.toAwkString(right);
-		if (ignoreCase) {
-			leftString = leftString.toLowerCase(java.util.Locale.ROOT);
-			rightString = rightString.toLowerCase(java.util.Locale.ROOT);
-		}
-		return leftString.compareTo(rightString);
+		// compareToIgnoreCase folds per character without allocating, applying
+		// the same rule as JRT.compare2 on string relational operators
+		return ignoreCase ? leftString.compareToIgnoreCase(rightString) : leftString.compareTo(rightString);
 	}
 
 	private static String typeOf(Object value) {

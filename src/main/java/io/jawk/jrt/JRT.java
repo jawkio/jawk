@@ -1175,16 +1175,7 @@ public class JRT {
 	 * @return number of replacements performed (0 or 1)
 	 */
 	public int replaceFirst(String orig, String repl, String ere) {
-		replaceResult.setLength(0);
-		String preparedReplacement = prepareReplacement(repl, false);
-		Matcher matcher = Pattern.compile(ere, regexpFlags()).matcher(orig);
-		int count = 0;
-		if (matcher.find()) {
-			count++;
-			matcher.appendReplacement(replaceResult, preparedReplacement);
-		}
-		matcher.appendTail(replaceResult);
-		return count;
+		return replace(orig, repl, ere, false);
 	}
 
 	/**
@@ -1198,6 +1189,10 @@ public class JRT {
 	 * @return number of replacements performed
 	 */
 	public int replaceAll(String orig, String repl, String ere) {
+		return replace(orig, repl, ere, true);
+	}
+
+	private int replace(String orig, String repl, String ere, boolean global) {
 		replaceResult.setLength(0);
 		String preparedReplacement = prepareReplacement(repl, false);
 		Matcher matcher = Pattern.compile(ere, regexpFlags()).matcher(orig);
@@ -1205,6 +1200,9 @@ public class JRT {
 		while (matcher.find()) {
 			count++;
 			matcher.appendReplacement(replaceResult, preparedReplacement);
+			if (!global) {
+				break;
+			}
 		}
 		matcher.appendTail(replaceResult);
 		return count;

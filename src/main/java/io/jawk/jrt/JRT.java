@@ -87,6 +87,14 @@ public class JRT {
 
 	private static final boolean IS_WINDOWS = System.getProperty("os.name").indexOf("Windows") >= 0;
 
+	/**
+	 * Ceiling for {@link #dynamicPatterns}: scripts can synthesize an unbounded
+	 * number of distinct dynamic regexps from input data, so the cache is dumped
+	 * wholesale when it fills instead of growing without bound. Real scripts use
+	 * a handful of dynamic regexps, so the limit is effectively never reached.
+	 */
+	private static final int DYNAMIC_PATTERN_CACHE_LIMIT = 256;
+
 	private final VariableManager vm;
 
 	private IoState ioState;
@@ -102,6 +110,8 @@ public class JRT {
 	private boolean ignoreCase;
 	/** Case-insensitive twins of precompiled patterns; created on first use. */
 	private Map<Pattern, Pattern> caseInsensitivePatterns;
+	/** Compiled dynamic (string) regexps, keyed by expression text; created on first use. */
+	private Map<String, Pattern> dynamicPatterns;
 	/** Reused buffer holding the result of the last sub()/gsub() replacement. */
 	private final StringBuffer replaceResult = new StringBuffer();
 	// Last input line consumed for getline-style transport.
@@ -293,19 +303,24 @@ public class JRT {
 	 * @return {@code true} when the variable is a JRT-managed special variable
 	 */
 	public static boolean isJrtManagedSpecialVariable(String name) {
-		return "FS".equals(name)
-				|| "RS".equals(name)
-				|| "OFS".equals(name)
-				|| "ORS".equals(name)
-				|| "CONVFMT".equals(name)
-				|| "OFMT".equals(name)
-				|| "SUBSEP".equals(name)
-				|| "FILENAME".equals(name)
-				|| "NF".equals(name)
-				|| "NR".equals(name)
-				|| "FNR".equals(name)
-				|| "ARGC".equals(name)
-				|| "IGNORECASE".equals(name);
+		switch (name) {
+		case "FS":
+		case "RS":
+		case "OFS":
+		case "ORS":
+		case "CONVFMT":
+		case "OFMT":
+		case "SUBSEP":
+		case "FILENAME":
+		case "NF":
+		case "NR":
+		case "FNR":
+		case "ARGC":
+		case "IGNORECASE":
+			return true;
+		default:
+			return false;
+		}
 	}
 
 	/**
@@ -1198,7 +1213,7 @@ public class JRT {
 	private int replace(String orig, String repl, String ere, boolean global) {
 		replaceResult.setLength(0);
 		String preparedReplacement = prepareReplacement(repl, false);
-		Matcher matcher = Pattern.compile(ere, regexpFlags()).matcher(orig);
+		Matcher matcher = dynamicPattern(ere).matcher(orig);
 		int count = 0;
 		while (matcher.find()) {
 			count++;
@@ -1235,7 +1250,7 @@ public class JRT {
 			// find(): AWK's ~ matches anywhere, not the entire string
 			return caseAwarePattern((Pattern) regexp).matcher(text).find();
 		}
-		return Pattern.compile(toAwkString(regexp), regexpFlags()).matcher(text).find();
+		return dynamicPattern(toAwkString(regexp)).matcher(text).find();
 	}
 
 	/**
@@ -1247,7 +1262,7 @@ public class JRT {
 	 * @return the match position ({@code RSTART}), or 0 when there is no match
 	 */
 	public int matchPosition(String s, String ere) {
-		Matcher matcher = Pattern.compile(ere, regexpFlags()).matcher(s);
+		Matcher matcher = dynamicPattern(ere).matcher(s);
 		if (matcher.find()) {
 			int start = matcher.start() + 1;
 			setRSTART(start);
@@ -1286,11 +1301,11 @@ public class JRT {
 			if (ignoreCase && Character.isLetter(fsChar)) {
 				// a letter is regex-safe, so case-insensitive splitting can
 				// go through the regexp path
-				return new RegexTokenizer(input, fsString, Pattern.CASE_INSENSITIVE);
+				return new RegexTokenizer(input, dynamicPattern(fsString));
 			}
 			return new SingleCharacterTokenizer(input, fsChar);
 		}
-		return new RegexTokenizer(input, fsString, regexpFlags());
+		return new RegexTokenizer(input, dynamicPattern(fsString));
 	}
 
 	/**
@@ -1397,6 +1412,35 @@ public class JRT {
 				.computeIfAbsent(
 						pattern,
 						base -> Pattern.compile(base.pattern(), base.flags() | Pattern.CASE_INSENSITIVE));
+	}
+
+	/**
+	 * Compiles a dynamic (string) regexp with the flags implied by the current
+	 * {@code IGNORECASE} setting, caching compiled patterns by expression text:
+	 * dynamic regexps are typically reused across records (for example a
+	 * {@code gsub(dynstr, ...)} loop), and the JDK's
+	 * {@link Pattern#compile(String, int)} reparses the expression on every
+	 * call. An entry compiled under a different {@code IGNORECASE} setting is
+	 * recompiled and replaced on access.
+	 *
+	 * @param ere dynamic regular expression text
+	 * @return the compiled pattern honoring the current {@code IGNORECASE}
+	 *         setting
+	 */
+	public Pattern dynamicPattern(String ere) {
+		if (dynamicPatterns == null) {
+			dynamicPatterns = new HashMap<String, Pattern>();
+		}
+		int flags = regexpFlags();
+		Pattern pattern = dynamicPatterns.get(ere);
+		if (pattern == null || pattern.flags() != flags) {
+			if (dynamicPatterns.size() >= DYNAMIC_PATTERN_CACHE_LIMIT) {
+				dynamicPatterns.clear();
+			}
+			pattern = Pattern.compile(ere, flags);
+			dynamicPatterns.put(ere, pattern);
+		}
+		return pattern;
 	}
 
 	/**

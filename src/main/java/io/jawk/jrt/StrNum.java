@@ -24,7 +24,14 @@ package io.jawk.jrt;
 
 import java.math.BigDecimal;
 
-final class StrNum {
+/**
+ * An input-derived scalar: text that may also act as a number, following
+ * POSIX "numeric string" (strnum) semantics. Input fields, {@code getline}
+ * results, {@code split()} pieces, and similar input-originated values are
+ * represented as instances of this class so comparisons and gawk's
+ * {@code typeof()} can distinguish them from plain string constants.
+ */
+public final class StrNum {
 
 	private final String value;
 	private final char decimalSeparator;
@@ -40,14 +47,25 @@ final class StrNum {
 		this.decimalSeparator = decimalSeparator;
 	}
 
-	boolean isNumber() {
+	/**
+	 * Returns whether this scalar's text parses as an AWK number, making it a
+	 * strnum.
+	 *
+	 * @return {@code true} when the text is a valid AWK number
+	 */
+	public boolean isNumber() {
 		if (numeric == null) {
 			numeric = Boolean.valueOf(JRT.isParseableNumber(value, decimalSeparator));
 		}
 		return numeric.booleanValue();
 	}
 
-	double doubleValue() {
+	/**
+	 * Returns this scalar's numeric value.
+	 *
+	 * @return the parsed numeric value
+	 */
+	public double doubleValue() {
 		if (numericValue == null) {
 			numericValue = Double.valueOf(parseDoubleValue());
 		}

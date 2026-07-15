@@ -26,13 +26,19 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.Map;
 
 /**
- * Marks an extension function parameter that must be evaluated and passed as
- * an associative array backed by a {@link Map}. Combine with
- * {@link JawkOptional} when the AWK caller may omit the array.
+ * Marks a trailing extension function parameter as optional: the AWK caller
+ * may omit it, in which case the Java method receives {@code null}.
+ * <p>
+ * Optional parameters must be the last declared parameters of the method
+ * (once a parameter is optional, all following parameters must be optional
+ * too), and cannot be combined with varargs. Other parameter annotations such
+ * as {@link JawkAssocArray} apply normally, so an optional associative-array
+ * parameter is declared as
+ * {@code @JawkOptional @JawkAssocArray Map<Object, Object> dest}.
+ * </p>
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.PARAMETER)
-public @interface JawkAssocArray {}
+public @interface JawkOptional {}

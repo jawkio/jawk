@@ -513,6 +513,7 @@ public class GawkExtensionIT extends AbstractGawkSuite {
 	public void test_gensub2() throws Exception {
 		AwkTestSupport
 				.cliTest("GAWK gensub2")
+				.redirectErrorStream()
 				.argument("-f", gawkFile("gensub2.awk"))
 				.expectLines(gawkPath("gensub2.ok"))
 				.expectExit(0)
@@ -1426,6 +1427,7 @@ public class GawkExtensionIT extends AbstractGawkSuite {
 	public void test_typeof2() throws Exception {
 		AwkTestSupport
 				.cliTest("GAWK typeof2")
+				.redirectErrorStream()
 				.argument("-f", gawkFile("typeof2.awk"))
 				.expectLines(gawkPath("typeof2.ok"))
 				.expectExit(0)

@@ -25,17 +25,22 @@ package io.jawk.ext;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 import io.jawk.ext.annotations.JawkAssocArray;
 import io.jawk.ext.annotations.JawkFunction;
+import io.jawk.ext.annotations.JawkOptional;
+import io.jawk.ext.annotations.JawkRawValue;
+import io.jawk.ext.annotations.JawkRegexp;
 import io.jawk.jrt.AssocArray;
 import io.jawk.jrt.IllegalAwkArgumentException;
 
@@ -71,6 +76,17 @@ public final class ExtensionFunction implements Serializable {
 	/** Whether the vararg component type must be an associative array. */
 	private final boolean varArgAssocArray;
 
+	/**
+	 * Explicit AWK argument positions that need raw, non-coercing evaluation.
+	 * Transient: annotation-derived metadata is recomputed from the resolved
+	 * {@link Method} after deserialization so that tuples files written by other
+	 * Jawk versions stay loadable.
+	 */
+	private transient int[] rawValueParameterIndexes;
+
+	/** AWK argument positions where regexp literals keep their precompiled pattern. */
+	private transient int[] regexpParameterIndexes;
+
 	ExtensionFunction(String keywordParam, Method methodParam) {
 		this.keyword = validateKeyword(keywordParam, methodParam);
 		this.declaringType = resolveDeclaringType(methodParam);
@@ -79,8 +95,52 @@ public final class ExtensionFunction implements Serializable {
 		this.method = prepareMethod(methodParam);
 		this.varArgs = methodParam.isVarArgs();
 		this.assocArrayParameters = inspectParameters(methodParam, methodParam.getParameters());
-		this.mandatoryParameterCount = varArgs ? assocArrayParameters.length - 1 : assocArrayParameters.length;
+		int optionalCount = scanOptionalParameterCount(methodParam, methodParam.getParameters());
+		this.mandatoryParameterCount = varArgs ?
+				assocArrayParameters.length - 1 : assocArrayParameters.length - optionalCount;
 		this.varArgAssocArray = varArgs && assocArrayParameters[assocArrayParameters.length - 1];
+		computeAnnotationMetadata(methodParam);
+	}
+
+	/**
+	 * Derives the argument-position metadata from the method's annotations.
+	 * Called from the constructor and again after deserialization, because this
+	 * metadata belongs to the class loaded in the current JVM, not to the
+	 * serialized stream.
+	 */
+	private void computeAnnotationMetadata(Method methodParam) {
+		this.rawValueParameterIndexes = scanObjectParameterIndexes(
+				methodParam,
+				methodParam.getParameters(),
+				JawkRawValue.class);
+		this.regexpParameterIndexes = scanObjectParameterIndexes(
+				methodParam,
+				methodParam.getParameters(),
+				JawkRegexp.class);
+	}
+
+	/*
+	 * Optional parameters let a fixed-signature method accept a shorter AWK
+	 * argument list; missing trailing arguments are passed as null. They must be
+	 * trailing and cannot be combined with varargs.
+	 */
+	private static int scanOptionalParameterCount(Method methodParam, Parameter[] parameters) {
+		int optionalCount = 0;
+		for (Parameter parameter : parameters) {
+			if (parameter.isAnnotationPresent(JawkOptional.class)) {
+				if (methodParam.isVarArgs()) {
+					throw new IllegalStateException(
+							"@" + JawkOptional.class.getSimpleName()
+									+ " cannot be combined with varargs: " + methodParam.toGenericString());
+				}
+				optionalCount++;
+			} else if (optionalCount > 0) {
+				throw new IllegalStateException(
+						"@" + JawkOptional.class.getSimpleName()
+								+ " parameters must be trailing: " + methodParam.toGenericString());
+			}
+		}
+		return optionalCount;
 	}
 
 	private static String validateKeyword(String keyword, Method method) {
@@ -114,6 +174,33 @@ public final class ExtensionFunction implements Serializable {
 		}
 		method.setAccessible(true);
 		return method;
+	}
+
+	/*
+	 * Raw-value and regexp markers change how the compiler evaluates the matching
+	 * AWK argument, so the annotated Java parameter must be able to receive any
+	 * runtime value (Pattern, Map, untyped placeholders, ...): plain Object.
+	 */
+	private static int[] scanObjectParameterIndexes(
+			Method methodParam,
+			Parameter[] parameters,
+			Class<? extends Annotation> annotationType) {
+		int count = 0;
+		int[] indexes = new int[parameters.length];
+		for (int idx = 0; idx < parameters.length; idx++) {
+			Parameter parameter = parameters[idx];
+			if (!parameter.isAnnotationPresent(annotationType)) {
+				continue;
+			}
+			if (parameter.isVarArgs() || parameter.getType() != Object.class) {
+				throw new IllegalStateException(
+						"Parameter " + idx + " of " + methodParam
+								+ " annotated with @" + annotationType.getSimpleName()
+								+ " must be a non-vararg " + Object.class.getName());
+			}
+			indexes[count++] = idx;
+		}
+		return Arrays.copyOf(indexes, count);
 	}
 
 	/**
@@ -181,6 +268,7 @@ public final class ExtensionFunction implements Serializable {
 		try {
 			Method resolved = declaringType.getDeclaredMethod(methodName, parameterTypes);
 			this.method = prepareMethod(resolved);
+			computeAnnotationMetadata(resolved);
 		} catch (NoSuchMethodException ex) {
 			throw new IllegalStateException(
 					"Unable to rehydrate extension method '" + methodName
@@ -251,7 +339,7 @@ public final class ExtensionFunction implements Serializable {
 	public int[] collectAssocArrayIndexes(int argCount) {
 		verifyArgCount(argCount);
 		List<Integer> indexes = new ArrayList<Integer>();
-		int upperBound = Math.min(argCount, mandatoryParameterCount);
+		int upperBound = Math.min(argCount, declaredParameterUpperBound());
 		for (int idx = 0; idx < upperBound; idx++) {
 			if (assocArrayParameters[idx]) {
 				indexes.add(Integer.valueOf(idx));
@@ -267,6 +355,35 @@ public final class ExtensionFunction implements Serializable {
 			result[idx] = indexes.get(idx).intValue();
 		}
 		return result;
+	}
+
+	/** Highest exclusive index of the declared (non-vararg) parameters. */
+	private int declaredParameterUpperBound() {
+		return varArgs ? mandatoryParameterCount : parameterTypes.length;
+	}
+
+	/**
+	 * Collects the indexes of arguments that should be evaluated without
+	 * autoconverting untyped values to assigned scalar blanks.
+	 *
+	 * @param argCount number of arguments supplied by the caller
+	 * @return indexes requiring raw value evaluation
+	 */
+	public int[] collectRawValueIndexes(int argCount) {
+		verifyArgCount(argCount);
+		return Arrays.stream(rawValueParameterIndexes).filter(idx -> idx < argCount).toArray();
+	}
+
+	/**
+	 * Collects the indexes of arguments where a regexp literal keeps its
+	 * precompiled pattern instead of being evaluated as {@code $0 ~ /re/}.
+	 *
+	 * @param argCount number of arguments supplied by the caller
+	 * @return indexes keeping regexp literals raw
+	 */
+	public int[] collectRegexpIndexes(int argCount) {
+		verifyArgCount(argCount);
+		return Arrays.stream(regexpParameterIndexes).filter(idx -> idx < argCount).toArray();
 	}
 
 	/**
@@ -311,15 +428,16 @@ public final class ExtensionFunction implements Serializable {
 
 	private Object[] prepareArguments(Object[] args) {
 		int argCount = args == null ? 0 : args.length;
-		if (argCount == 0) {
-			return varArgs ?
-					new Object[]
-					{ Array.newInstance(parameterTypes[parameterTypes.length - 1].getComponentType(), 0) } : new Object[0];
-		}
 		if (!varArgs) {
-			Object[] invocationArgs = new Object[argCount];
-			System.arraycopy(args, 0, invocationArgs, 0, argCount);
+			// Omitted optional trailing arguments are passed as null
+			Object[] invocationArgs = new Object[parameterTypes.length];
+			if (argCount > 0) {
+				System.arraycopy(args, 0, invocationArgs, 0, argCount);
+			}
 			return invocationArgs;
+		}
+		if (argCount == 0) {
+			return new Object[] { Array.newInstance(parameterTypes[parameterTypes.length - 1].getComponentType(), 0) };
 		}
 		Object[] invocationArgs = new Object[mandatoryParameterCount + 1];
 		for (int idx = 0; idx < mandatoryParameterCount; idx++) {
@@ -344,9 +462,12 @@ public final class ExtensionFunction implements Serializable {
 	 */
 	public void verifyArgCount(int argCount) {
 		if (!varArgs) {
-			if (argCount != mandatoryParameterCount) {
+			int maxCount = parameterTypes.length;
+			if (argCount < mandatoryParameterCount || argCount > maxCount) {
+				String expected = mandatoryParameterCount == maxCount ?
+						String.valueOf(maxCount) : mandatoryParameterCount + " to " + maxCount;
 				throw new IllegalAwkArgumentException(
-						"Extension function '" + keyword + "' expects " + mandatoryParameterCount
+						"Extension function '" + keyword + "' expects " + expected
 								+ " argument(s), not " + argCount);
 			}
 			return;
@@ -363,27 +484,24 @@ public final class ExtensionFunction implements Serializable {
 			return;
 		}
 		int argCount = args.length;
-		int upperBound = Math.min(argCount, mandatoryParameterCount);
+		int upperBound = Math.min(argCount, declaredParameterUpperBound());
 		for (int idx = 0; idx < upperBound; idx++) {
-			if (!assocArrayParameters[idx]) {
-				continue;
-			}
-			Object argument = args[idx];
-			if (!(argument instanceof Map)) {
-				throw new IllegalAwkArgumentException(
-						"Argument " + idx + " passed to extension function '" + keyword
-								+ "' must be an associative array");
+			if (assocArrayParameters[idx]) {
+				requireAssocArray(idx, args[idx]);
 			}
 		}
 		if (varArgs && varArgAssocArray) {
 			for (int idx = mandatoryParameterCount; idx < argCount; idx++) {
-				Object argument = args[idx];
-				if (!(argument instanceof Map)) {
-					throw new IllegalAwkArgumentException(
-							"Argument " + idx + " passed to extension function '" + keyword
-									+ "' must be an associative array");
-				}
+				requireAssocArray(idx, args[idx]);
 			}
+		}
+	}
+
+	private void requireAssocArray(int idx, Object arg) {
+		if (!(arg instanceof Map)) {
+			throw new IllegalAwkArgumentException(
+					"Argument " + idx + " passed to extension function '" + keyword
+							+ "' must be an associative array");
 		}
 	}
 }

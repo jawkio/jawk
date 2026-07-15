@@ -291,6 +291,21 @@ public enum Opcode {
 	 */
 	DEREFERENCE,
 	/**
+	 * Obtains an item from the variable manager without assigning a blank value
+	 * when the variable is still untyped.
+	 * <p>
+	 * This differs from {@link #DEREFERENCE} only for introspection paths that
+	 * must observe an unassigned scalar-or-array state without changing it.
+	 * </p>
+	 * <p>
+	 * Argument 1: offset of the particular variable into the variable manager<br/>
+	 * Argument 2: whether the variable is global or local
+	 * <p>
+	 * Stack before: ...<br/>
+	 * Stack after: x ...
+	 */
+	PEEK_DEREFERENCE,
+	/**
 	 * Increase the contents of the variable by an adjustment value;
 	 * assigns the result to the variable and pushes the result onto the stack.
 	 * <p>
@@ -1475,7 +1490,57 @@ public enum Opcode {
 	 * Stack before: array-index associative-array ...<br/>
 	 * Stack after: item ...
 	 */
-	PEEK_ARRAY_ELEMENT;
+	PEEK_ARRAY_ELEMENT,
+
+	/**
+	 * Assigns the top of the stack to IGNORECASE, managed by the JRT.
+	 * <p>
+	 * Stack before: value ...<br/>
+	 * Stack after: value ...
+	 */
+	ASSIGN_IGNORECASE,
+
+	/**
+	 * Pushes the value of IGNORECASE, managed by the JRT.
+	 * <p>
+	 * Stack before: ...<br/>
+	 * Stack after: ignorecase-value ...
+	 */
+	PUSH_IGNORECASE,
+
+	/**
+	 * Prints a diagnostic message to the warning stream.
+	 * <p>
+	 * Stack unchanged.
+	 */
+	WARNING,
+
+	/**
+	 * Runs the extension beforeStart hooks. Emitted by the parser at the end
+	 * of the preamble; executed at most once per AVM instance.
+	 * <p>
+	 * Stack unchanged.
+	 */
+	BEFORE_START_HOOKS,
+
+	/**
+	 * Populates the SYMTAB array with the names and values of the program's
+	 * symbols. Emitted only when the script references SYMTAB outside POSIX
+	 * mode.
+	 * <p>
+	 * Argument: offset of the SYMTAB global<br/>
+	 * Stack unchanged.
+	 */
+	UPDATE_SYMTAB,
+
+	/**
+	 * Populates the FUNCTAB array with the names of the program's functions.
+	 * Emitted only when the script references FUNCTAB outside POSIX mode.
+	 * <p>
+	 * Argument: offset of the FUNCTAB global<br/>
+	 * Stack unchanged.
+	 */
+	UPDATE_FUNCTAB;
 
 	private static final Opcode[] VALUES = values();
 

@@ -25,6 +25,7 @@ package io.jawk.jrt;
 import java.util.List;
 import java.util.Map;
 import io.jawk.intermediate.UninitializedObject;
+import io.jawk.intermediate.UntypedObject;
 
 /**
  * An AWK associative array.
@@ -62,6 +63,9 @@ public interface AssocArray extends Map<Object, Object> {
 
 	/** A blank (uninitialized) value shared across all AWK array accesses. */
 	UninitializedObject BLANK = new UninitializedObject();
+
+	/** An untyped value shared across newly referenced AWK array elements. */
+	UntypedObject UNTYPED = new UntypedObject();
 
 // -------------------------------------------------------------------------
 // Key-normalization helpers (used by concrete implementations)

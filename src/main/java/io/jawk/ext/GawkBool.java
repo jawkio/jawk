@@ -1,4 +1,4 @@
-package io.jawk.ext.annotations;
+package io.jawk.ext;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -22,17 +22,59 @@ package io.jawk.ext.annotations;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import java.util.Map;
-
 /**
- * Marks an extension function parameter that must be evaluated and passed as
- * an associative array backed by a {@link Map}. Combine with
- * {@link JawkOptional} when the AWK caller may omit the array.
+ * Numeric value carrying gawk's boolean type attribute.
  */
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.PARAMETER)
-public @interface JawkAssocArray {}
+public final class GawkBool extends Number {
+
+	private static final long serialVersionUID = 1L;
+	private final boolean value;
+
+	/**
+	 * Creates a gawk boolean-number value.
+	 *
+	 * @param valueParam boolean value
+	 */
+	public GawkBool(boolean valueParam) {
+		this.value = valueParam;
+	}
+
+	/**
+	 * Returns the boolean value.
+	 *
+	 * @return boolean value
+	 */
+	public boolean booleanValue() {
+		return value;
+	}
+
+	/** {@inheritDoc} */
+	@Override
+	public int intValue() {
+		return value ? 1 : 0;
+	}
+
+	/** {@inheritDoc} */
+	@Override
+	public long longValue() {
+		return value ? 1L : 0L;
+	}
+
+	/** {@inheritDoc} */
+	@Override
+	public float floatValue() {
+		return value ? 1.0F : 0.0F;
+	}
+
+	/** {@inheritDoc} */
+	@Override
+	public double doubleValue() {
+		return value ? 1.0D : 0.0D;
+	}
+
+	/** {@inheritDoc} */
+	@Override
+	public String toString() {
+		return value ? "1" : "0";
+	}
+}

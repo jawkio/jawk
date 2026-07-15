@@ -40,8 +40,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.StringTokenizer;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jawk.AwkExpression;
@@ -50,6 +48,7 @@ import io.jawk.AwkSandboxException;
 import io.jawk.ExitException;
 import io.jawk.ext.AbstractExtension;
 import io.jawk.ext.ExtensionFunction;
+import io.jawk.ext.ForInKeyOrder;
 import io.jawk.ext.JawkExtension;
 import io.jawk.intermediate.Address;
 import io.jawk.intermediate.Opcode;
@@ -71,18 +70,16 @@ import io.jawk.intermediate.Tuple.RegexTuple;
 import io.jawk.intermediate.Tuple.SubstitutionVariableTuple;
 import io.jawk.intermediate.Tuple.VariableTuple;
 import io.jawk.intermediate.UninitializedObject;
+import io.jawk.intermediate.UntypedObject;
 import io.jawk.jrt.AssocArray;
 import io.jawk.jrt.AwkRuntimeException;
 import io.jawk.jrt.AwkSink;
 import io.jawk.jrt.BlockManager;
 import io.jawk.jrt.BlockObject;
-import io.jawk.jrt.CharacterTokenizer;
 import io.jawk.jrt.ConditionPair;
 import io.jawk.jrt.InputSource;
 import io.jawk.jrt.StreamInputSource;
 import io.jawk.jrt.JRT;
-import io.jawk.jrt.RegexTokenizer;
-import io.jawk.jrt.SingleCharacterTokenizer;
 import io.jawk.jrt.VariableManager;
 import io.jawk.util.AwkSettings;
 import io.jawk.jrt.BSDRandom;
@@ -157,6 +154,21 @@ public class AVM implements VariableManager, Closeable {
 	private InputSource resolvedInputSource;
 	private AwkExpression installedEvalExpression;
 	private boolean mergedGlobalLayoutActive;
+
+	/** Optional extension-provided ordering for {@code for (index in array)} traversal. */
+	private ForInKeyOrder forInKeyOrder;
+
+	/** Description of the primary script source, for runtime diagnostics. */
+	private String sourceDescription;
+
+	/** Script line of the extension call currently being dispatched. */
+	private int currentLineNumber;
+
+	/** Whether the extension beforeStart hooks already ran for this AVM. */
+	private boolean beforeStartHooksExecuted;
+
+	/** Offset of a materialized SYMTAB array, for live operand-assignment updates. */
+	private long symtabOffset = NULL_OFFSET;
 
 	/**
 	 * Construct the interpreter.
@@ -259,6 +271,32 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	public void setErrorStream(PrintStream errorStream) {
 		jrt.setErrorStream(errorStream);
+	}
+
+	/**
+	 * Sets the stream that receives runtime warning messages (gawk-style
+	 * diagnostics). Warnings default to {@link System#err}.
+	 *
+	 * @param warningStream stream to receive runtime warnings
+	 */
+	public void setWarningStream(PrintStream warningStream) {
+		jrt.setWarningStream(warningStream);
+	}
+
+	/**
+	 * Registers the hook that decides the key traversal order of
+	 * {@code for (index in array)} statements.
+	 * <p>
+	 * When no hook is registered, iteration uses the array's natural key order.
+	 * Extensions typically register a hook from their {@code beforeStart}
+	 * method; the last registration wins.
+	 * </p>
+	 *
+	 * @param keyOrder traversal-order provider, or {@code null} to restore the
+	 *        natural key order
+	 */
+	public void setForInKeyOrder(ForInKeyOrder keyOrder) {
+		forInKeyOrder = keyOrder;
 	}
 
 	/**
@@ -638,6 +676,7 @@ public class AVM implements VariableManager, Closeable {
 		environOffset = NULL_OFFSET;
 		argcOffset = NULL_OFFSET;
 		argvOffset = NULL_OFFSET;
+		symtabOffset = NULL_OFFSET;
 		exitAddress = null;
 		withinEndBlocks = false;
 		exitCode = 0;
@@ -671,6 +710,7 @@ public class AVM implements VariableManager, Closeable {
 		globalVariableOffsets = compiledProgram.getGlobalVariableOffsetMap();
 		globalVariableArrays = compiledProgram.getGlobalVariableAarrayMap();
 		functionNames = compiledProgram.getFunctionNameSet();
+		sourceDescription = compiledProgram.getSourceDescription();
 	}
 
 	private void rebindResolvedInputSource(InputSource resolvedSource) {
@@ -1606,12 +1646,18 @@ public class AVM implements VariableManager, Closeable {
 					position.next();
 					break;
 				}
+				case PEEK_DEREFERENCE: {
+					VariableTuple variableTuple = (VariableTuple) tuple;
+					push(runtimeStack.getVariable(variableTuple.getVariableOffset(), variableTuple.isGlobal()));
+					position.next();
+					break;
+				}
 				case DEREF_ARRAY: {
 					// stack[0] = array index
 					Object idx = pop(); // idx
 					checkScalar(idx);
 					Map<Object, Object> map = toMap(pop());
-					Object o = JRT.getAwkValue(map, idx);
+					Object o = JRT.getAssocArrayValue(map, idx);
 					push(o);
 					position.next();
 					break;
@@ -1730,7 +1776,7 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = 1st arg to index() function
 					String s2 = jrt.toAwkString(pop());
 					String s1 = jrt.toAwkString(pop());
-					push(s1.indexOf(s2) + 1);
+					push(jrt.index(s1, s2));
 					position.next();
 					break;
 				}
@@ -1803,7 +1849,7 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = item1
 					Object o2 = pop();
 					Object o1 = pop();
-					push(JRT.compare2(o1, o2, 0) ? ONE : ZERO);
+					push(JRT.compare2(o1, o2, 0, jrt.isIgnoreCase()) ? ONE : ZERO);
 					position.next();
 					break;
 				}
@@ -1812,7 +1858,7 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = item1
 					Object o2 = pop();
 					Object o1 = pop();
-					push(JRT.compare2(o1, o2, -1) ? ONE : ZERO);
+					push(JRT.compare2(o1, o2, -1, jrt.isIgnoreCase()) ? ONE : ZERO);
 					position.next();
 					break;
 				}
@@ -1821,30 +1867,16 @@ public class AVM implements VariableManager, Closeable {
 					// stack[1] = item1
 					Object o2 = pop();
 					Object o1 = pop();
-					push(JRT.compare2(o1, o2, 1) ? ONE : ZERO);
+					push(JRT.compare2(o1, o2, 1, jrt.isIgnoreCase()) ? ONE : ZERO);
 					position.next();
 					break;
 				}
 				case MATCHES: {
-					// stack[0] = item2
-					// stack[1] = item1
+					// stack[0] = regexp (precompiled or dynamic)
+					// stack[1] = text
 					Object o2 = pop();
 					Object o1 = pop();
-					// use o1's string value
-					String s = o1.toString();
-					// assume o2 is a regexp
-					if (o2 instanceof Pattern) {
-						Pattern p = (Pattern) o2;
-						Matcher m = p.matcher(s);
-						// m.matches() matches the ENTIRE string
-						// m.find() is more appropriate
-						boolean result = m.find();
-						push(result ? 1 : 0);
-					} else {
-						String r = jrt.toAwkString(o2);
-						boolean result = Pattern.compile(r).matcher(s).find();
-						push(result ? 1 : 0);
-					}
+					push(jrt.matches(o1.toString(), o2) ? 1 : 0);
 					position.next();
 					break;
 				}
@@ -1942,7 +1974,7 @@ public class AVM implements VariableManager, Closeable {
 					}
 					@SuppressWarnings("unchecked")
 					Map<Object, Object> map = (Map<Object, Object>) o;
-					push(new ArrayDeque<>(map.keySet()));
+					push(new ArrayDeque<>(forInKeyOrder == null ? map.keySet() : forInKeyOrder.order(map)));
 					position.next();
 					break;
 				}
@@ -2050,42 +2082,21 @@ public class AVM implements VariableManager, Closeable {
 					break;
 				}
 				case ENVIRON_OFFSET: {
-					// stack[0] = offset
-					//// assignArray(offset, arrIdx, newstring, isGlobal);
-					LongTuple offsetTuple = (LongTuple) tuple;
-					environOffset = offsetTuple.getValue();
-					// set the initial variables
-					Map<String, String> env = System.getenv();
-					for (Map.Entry<String, String> var : env.entrySet()) {
-						assignArray(environOffset, var.getKey(), jrt.toInputScalar(var.getValue()), true);
-						pop(); // clean up the stack after the assignment
-					}
+					// arg[0] = offset; already populated from SET_NUM_GLOBALS so
+					// beforeStart hooks observe the real value
+					populateEnviron(((LongTuple) tuple).getValue());
 					position.next();
 					break;
 				}
 				case ARGC_OFFSET: {
-					// stack[0] = offset
-					LongTuple offsetTuple = (LongTuple) tuple;
-					argcOffset = offsetTuple.getValue();
-					// assign(argcOffset, arguments.size(), true, position); // true = global
-					// +1 to include the "jawk" program name (ARGV[0])
-					assign(argcOffset, arguments.size() + 1, true, position, false); // true = global
+					// arg[0] = offset; already populated from SET_NUM_GLOBALS
+					populateArgc(((LongTuple) tuple).getValue());
 					position.next();
 					break;
 				}
 				case ARGV_OFFSET: {
-					// stack[0] = offset
-					LongTuple offsetTuple = (LongTuple) tuple;
-					argvOffset = offsetTuple.getValue();
-					// consume argv (looping from 1 to argc)
-					int argc = (int) JRT.toDouble(runtimeStack.getVariable(argcOffset, true)); // true = global
-					assignArray(argvOffset, 0, "jawk", true);
-					pop();
-					for (int i = 1; i < argc; i++) {
-						// assignArray(argvOffset, i+1, arguments.get(i), true);
-						assignArray(argvOffset, i, jrt.toInputScalar(arguments.get(i - 1)), true);
-						pop(); // clean up the stack after the assignment
-					}
+					// arg[0] = offset; already populated from SET_NUM_GLOBALS
+					populateArgv(((LongTuple) tuple).getValue());
 					position.next();
 					break;
 				}
@@ -2139,6 +2150,11 @@ public class AVM implements VariableManager, Closeable {
 					position.next();
 					break;
 				}
+				case WARNING: {
+					jrt.printWarning(((Tuple.WarningTuple) tuple).getMessage());
+					position.next();
+					break;
+				}
 				case SET_RETURN_RESULT: {
 					// stack[0] = return result
 					runtimeStack.setReturnValue(pop());
@@ -2153,6 +2169,21 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case SET_NUM_GLOBALS: {
 					execSetNumGlobals((CountTuple) tuple);
+					position.next();
+					break;
+				}
+				case BEFORE_START_HOOKS: {
+					runBeforeStartHooks();
+					position.next();
+					break;
+				}
+				case UPDATE_SYMTAB: {
+					execUpdateSymtab(((LongTuple) tuple).getValue());
+					position.next();
+					break;
+				}
+				case UPDATE_FUNCTAB: {
+					execUpdateFunctab(((LongTuple) tuple).getValue());
 					position.next();
 					break;
 				}
@@ -2311,6 +2342,8 @@ public class AVM implements VariableManager, Closeable {
 					ExtensionFunction function = extensionTuple.getFunction();
 					long numArgs = extensionTuple.getArgCount();
 					boolean isInitial = extensionTuple.isInitial();
+					// let extensions report diagnostics at the call location
+					currentLineNumber = position.lineNumber();
 
 					Object[] args = new Object[(int) numArgs];
 					for (int i = (int) numArgs - 1; i >= 0; i--) {
@@ -2346,11 +2379,7 @@ public class AVM implements VariableManager, Closeable {
 					if (retval == null) {
 						retval = "";
 					} else
-						if (!(retval instanceof Integer
-								||
-								retval instanceof Long
-								||
-								retval instanceof Double
+						if (!(retval instanceof Number
 								||
 								retval instanceof String
 								||
@@ -2406,6 +2435,18 @@ public class AVM implements VariableManager, Closeable {
 					Object v = pop();
 					jrt.setFS(v);
 					push(v);
+					position.next();
+					break;
+				}
+				case ASSIGN_IGNORECASE: {
+					Object v = pop();
+					jrt.setIGNORECASE(v);
+					push(v);
+					position.next();
+					break;
+				}
+				case PUSH_IGNORECASE: {
+					push(jrt.getIGNORECASEVar());
 					position.next();
 					break;
 				}
@@ -2669,27 +2710,7 @@ public class AVM implements VariableManager, Closeable {
 	private void execMatch() {
 		String ere = jrt.toAwkString(pop());
 		String s = jrt.toAwkString(pop());
-		int flags = 0;
-		if (globalVariableOffsets.containsKey("IGNORECASE")) {
-			Integer offsetObj = globalVariableOffsets.get("IGNORECASE");
-			Object ignorecase = runtimeStack.getVariable(offsetObj, true);
-			if (JRT.toDouble(ignorecase) != 0) {
-				flags |= Pattern.CASE_INSENSITIVE;
-			}
-		}
-		Pattern pattern = Pattern.compile(ere, flags);
-		Matcher matcher = pattern.matcher(s);
-		if (matcher.find()) {
-			int start = matcher.start() + 1;
-			int len = matcher.end() - matcher.start();
-			jrt.setRSTART(start);
-			jrt.setRLENGTH(len);
-			push(start);
-		} else {
-			jrt.setRSTART(0);
-			jrt.setRLENGTH(-1);
-			push(0);
-		}
+		push(jrt.matchPosition(s, ere));
 	}
 
 	private void execSubForDollar0(BooleanTuple tuple) {
@@ -2697,8 +2718,8 @@ public class AVM implements VariableManager, Closeable {
 		String repl = jrt.toAwkString(pop());
 		String ere = jrt.toAwkString(pop());
 		String orig = jrt.toAwkString(jrt.jrtGetInputField(0));
-		String newstring = isGsub ? replaceAll(orig, ere, repl) : replaceFirst(orig, ere, repl);
-		jrt.setInputLine(newstring);
+		push(isGsub ? jrt.replaceAll(orig, repl, ere) : jrt.replaceFirst(orig, repl, ere));
+		jrt.setInputLine(jrt.getReplaceResult());
 		jrt.jrtParseFields();
 	}
 
@@ -2708,7 +2729,8 @@ public class AVM implements VariableManager, Closeable {
 		String orig = jrt.toAwkString(pop());
 		String repl = jrt.toAwkString(pop());
 		String ere = jrt.toAwkString(pop());
-		String newstring = isGsub ? replaceAll(orig, ere, repl) : replaceFirst(orig, ere, repl);
+		push(isGsub ? jrt.replaceAll(orig, repl, ere) : jrt.replaceFirst(orig, repl, ere));
+		String newstring = jrt.getReplaceResult();
 		if (fieldNum == 0) {
 			jrt.setInputLine(newstring);
 			jrt.jrtParseFields();
@@ -2739,11 +2761,13 @@ public class AVM implements VariableManager, Closeable {
 
 	private void execSplit(CountTuple tuple, PositionTracker position) {
 		long numArgs = tuple.getCount();
-		String fsString;
+		Object fs;
 		if (numArgs == 2) {
-			fsString = jrt.toAwkString(jrt.getFSVar());
+			fs = jrt.getFSVar();
 		} else if (numArgs == 3) {
-			fsString = jrt.toAwkString(pop());
+			// a regexp literal arrives precompiled and stays that way, so the
+			// tokenizer can honor IGNORECASE through the pattern-twin cache
+			fs = pop();
 		} else {
 			throw new Error("Invalid # of args. split() requires 2 or 3. Got: " + numArgs);
 		}
@@ -2752,16 +2776,7 @@ public class AVM implements VariableManager, Closeable {
 			throw new AwkRuntimeException(position.lineNumber(), o + " is not an array.");
 		}
 		String s = jrt.toAwkString(pop());
-		Enumeration<Object> tokenizer;
-		if (fsString.equals(" ")) {
-			tokenizer = new StringTokenizer(s);
-		} else if (fsString.length() == 1) {
-			tokenizer = new SingleCharacterTokenizer(s, fsString.charAt(0));
-		} else if (fsString.isEmpty()) {
-			tokenizer = new CharacterTokenizer(s);
-		} else {
-			tokenizer = new RegexTokenizer(s, fsString);
-		}
+		Enumeration<Object> tokenizer = jrt.splitTokenizer(s, fs);
 
 		@SuppressWarnings("unchecked")
 		Map<Object, Object> assocArray = (Map<Object, Object>) o;
@@ -2818,6 +2833,122 @@ public class AVM implements VariableManager, Closeable {
 		} else if (!hasCompatibleEvalGlobalLayout(numGlobals)) {
 			throw new IllegalStateException(
 					"AVM globals are already initialized for a different eval layout. Call prepareForEval(...) first.");
+		}
+	}
+
+	private void populateEnviron(long offset) {
+		environOffset = offset;
+		for (Map.Entry<String, String> var : System.getenv().entrySet()) {
+			assignArray(environOffset, var.getKey(), jrt.toInputScalar(var.getValue()), true);
+			pop(); // clean up the stack after the assignment
+		}
+	}
+
+	private void populateArgc(long offset) {
+		argcOffset = offset;
+		// +1 to include the "jawk" program name (ARGV[0])
+		runtimeStack.setVariable(argcOffset, Integer.valueOf(arguments.size() + 1), true);
+	}
+
+	private void populateArgv(long offset) {
+		argvOffset = offset;
+		// ARGV[0] is the program name, ARGV[1..n] the command-line arguments.
+		// The count comes straight from the argument list because ARGC may not
+		// be materialized when the script does not reference it.
+		assignArray(argvOffset, 0, "jawk", true);
+		pop();
+		for (int i = 1; i <= arguments.size(); i++) {
+			assignArray(argvOffset, i, jrt.toInputScalar(arguments.get(i - 1)), true);
+			pop(); // clean up the stack after the assignment
+		}
+	}
+
+	/*
+	 * Extension initialization can be heavy, so the hooks run at most once per
+	 * AVM instance: a reused AVM (repeated executions, expression evaluations)
+	 * does not reinitialize its extensions.
+	 */
+	private void runBeforeStartHooks() {
+		if (beforeStartHooksExecuted || extensionInstances.isEmpty()) {
+			return;
+		}
+		beforeStartHooksExecuted = true;
+		Set<JawkExtension> started = new LinkedHashSet<JawkExtension>();
+		for (JawkExtension extension : extensionInstances.values()) {
+			if (started.add(extension)) {
+				extension.beforeStart(this, jrt);
+			}
+		}
+	}
+
+	/*
+	 * SYMTAB is a gawk extension mirroring the symbol table: the script's
+	 * globals, the JRT-managed specials, and host-supplied variables that have
+	 * no compiled slot. The parser emits UPDATE_SYMTAB only when the script
+	 * references SYMTAB outside POSIX mode. Values are a snapshot taken before
+	 * execution; command-line name=value operand assignments update the array
+	 * live, as in gawk.
+	 */
+	private void execUpdateSymtab(long offset) {
+		symtabOffset = offset;
+		if (runtimeStack.getVariable(offset, true) != null) {
+			// a host-supplied SYMTAB value wins
+			return;
+		}
+		Map<Object, Object> symtab = newAwkArray();
+		for (String name : executionInitialVariables.keySet()) {
+			symtab.put(name, getVariable(name));
+		}
+		for (String name : getGlobalVariableNames()) {
+			// gawk keeps the meta tables out of the symbol table snapshot
+			if ("SYMTAB".equals(name) || "FUNCTAB".equals(name)) {
+				continue;
+			}
+			symtab.put(name, getVariable(name));
+		}
+		// specials last: their accessors are authoritative even when the name
+		// also has a (possibly not yet materialized) global slot
+		for (String name : getSpecialVariableNames()) {
+			symtab.put(name, getVariable(name));
+		}
+		runtimeStack.setVariable(offset, symtab, true);
+	}
+
+	/*
+	 * FUNCTAB is a gawk extension listing the names of the program's
+	 * user-defined functions and the loaded extensions' function keywords. The
+	 * parser emits UPDATE_FUNCTAB only when the script references FUNCTAB
+	 * outside POSIX mode.
+	 */
+	private void execUpdateFunctab(long offset) {
+		if (runtimeStack.getVariable(offset, true) != null) {
+			return;
+		}
+		Map<Object, Object> functab = newAwkArray();
+		for (String name : functionNames) {
+			functab.put(name, name);
+		}
+		Set<JawkExtension> seen = new LinkedHashSet<JawkExtension>();
+		for (JawkExtension extension : extensionInstances.values()) {
+			if (seen.add(extension)) {
+				for (String keyword : extension.getExtensionFunctions().keySet()) {
+					functab.put(keyword, keyword);
+				}
+			}
+		}
+		runtimeStack.setVariable(offset, functab, true);
+	}
+
+	/** Reflects a command-line variable assignment into a materialized SYMTAB. */
+	private void updateSymtabEntry(String name, Object value) {
+		if (symtabOffset == NULL_OFFSET) {
+			return;
+		}
+		Object symtab = runtimeStack.getVariable(symtabOffset, true);
+		if (symtab instanceof Map) {
+			@SuppressWarnings("unchecked")
+			Map<Object, Object> symtabMap = (Map<Object, Object>) symtab;
+			symtabMap.put(name, value);
 		}
 	}
 
@@ -2979,39 +3110,17 @@ public class AVM implements VariableManager, Closeable {
 		String orig = jrt.toAwkString(pop());
 		String repl = jrt.toAwkString(pop());
 		String ere = jrt.toAwkString(pop());
-		if (isGsub) {
-			newString = replaceAll(orig, ere, repl);
-		} else {
-			newString = replaceFirst(orig, ere, repl);
-		}
+		push(isGsub ? jrt.replaceAll(orig, repl, ere) : jrt.replaceFirst(orig, repl, ere));
+		newString = jrt.getReplaceResult();
 
 		return newString;
-	}
-
-	private StringBuffer replaceFirstSb = new StringBuffer();
-
-	/**
-	 * sub() functionality
-	 */
-	private String replaceFirst(String orig, String ere, String repl) {
-		push(RegexRuntimeSupport.replaceFirst(orig, repl, ere, replaceFirstSb));
-		return replaceFirstSb.toString();
-	}
-
-	private StringBuffer replaceAllSb = new StringBuffer();
-
-	/**
-	 * gsub() functionality
-	 */
-	private String replaceAll(String orig, String ere, String repl) {
-		push(RegexRuntimeSupport.replaceAll(orig, repl, ere, replaceAllSb));
-		return replaceAllSb.toString();
 	}
 
 	/**
 	 * Awk variable assignment functionality.
 	 */
 	private void assign(long l, Object value, boolean isGlobal, PositionTracker position, boolean push) {
+		value = JRT.untypedToBlank(value);
 		// check if curr value already refers to an array
 		if (runtimeStack.getVariable(l, isGlobal) instanceof Map) {
 			throw new AwkRuntimeException(position.lineNumber(), "cannot assign anything to an unindexed associative array");
@@ -3032,6 +3141,7 @@ public class AVM implements VariableManager, Closeable {
 
 	private void assignMapElement(Map<Object, Object> array, Object arrIdx, Object rhs) {
 		checkScalar(arrIdx);
+		rhs = JRT.untypedToBlank(rhs);
 		array.put(arrIdx, rhs);
 		push(rhs);
 	}
@@ -3078,6 +3188,8 @@ public class AVM implements VariableManager, Closeable {
 		return jrt.getOFSVar();
 	}
 
+	/** {@inheritDoc} */
+	@Override
 	public final Object getORS() {
 		return jrt.getORSVar();
 	}
@@ -3089,6 +3201,141 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	/**
+	 * Returns the names of the global variables declared by the compiled
+	 * program.
+	 *
+	 * @return unmodifiable set of global variable names, empty when no program
+	 *         metadata is installed
+	 */
+	public Set<String> getGlobalVariableNames() {
+		return globalVariableOffsets == null ?
+				Collections.<String>emptySet() : Collections.unmodifiableSet(globalVariableOffsets.keySet());
+	}
+
+	/**
+	 * Returns the names of the user-defined functions of the compiled program.
+	 *
+	 * @return unmodifiable set of function names, empty when no program metadata
+	 *         is installed
+	 */
+	public Set<String> getFunctionNames() {
+		return functionNames == null ? Collections.<String>emptySet() : Collections.unmodifiableSet(functionNames);
+	}
+
+	/**
+	 * The names of the special variables the interpreter answers by name.
+	 * Must stay in sync with the switch in {@link #getVariable(String)}; a
+	 * unit test verifies that every listed name is answered.
+	 */
+	private static final Set<String> SPECIAL_VARIABLE_NAMES = Collections
+			.unmodifiableSet(
+					new LinkedHashSet<String>(
+							Arrays
+									.asList(
+											"FS",
+											"RS",
+											"OFS",
+											"ORS",
+											"FILENAME",
+											"SUBSEP",
+											"CONVFMT",
+											"OFMT",
+											"NF",
+											"NR",
+											"FNR",
+											"RSTART",
+											"RLENGTH",
+											"IGNORECASE",
+											"ARGC",
+											"ARGV")));
+
+	/**
+	 * Returns the names of the special variables that
+	 * {@link #getVariable(String)} answers directly.
+	 *
+	 * @return unmodifiable set of special variable names
+	 */
+	public Set<String> getSpecialVariableNames() {
+		return SPECIAL_VARIABLE_NAMES;
+	}
+
+	/** {@inheritDoc} */
+	@Override
+	public final Object getVariable(String name) {
+		if (name == null) {
+			return null;
+		}
+		switch (name) {
+		case "FS":
+			return getFS();
+		case "RS":
+			return getRS();
+		case "OFS":
+			return getOFS();
+		case "ORS":
+			return getORS();
+		case "FILENAME":
+			return jrt.getFILENAME();
+		case "SUBSEP":
+			return getSUBSEP();
+		case "CONVFMT":
+			return getCONVFMT();
+		case "OFMT":
+			return jrt.getOFMTString();
+		case "NF":
+			return jrt.getNF();
+		case "NR":
+			return jrt.getNR();
+		case "FNR":
+			return jrt.getFNR();
+		case "RSTART":
+			return jrt.getRSTART();
+		case "RLENGTH":
+			return jrt.getRLENGTH();
+		case "IGNORECASE":
+			return jrt.getIGNORECASEVar();
+		// lazily-materialized globals answered through their synthetic accessors
+		case "ARGC":
+			return getARGC();
+		case "ARGV":
+			return getARGV();
+		default:
+			break;
+		}
+		if (globalVariableOffsets == null) {
+			return executionInitialVariables.get(name);
+		}
+		Integer offsetObj = globalVariableOffsets.get(name);
+		if (offsetObj != null) {
+			return runtimeStack.getVariable(offsetObj.intValue(), true);
+		}
+		// Variables supplied through -v or the Java API but never referenced in
+		// the script have no compiled offset; they are still observable (e.g.
+		// IGNORECASE read by the gawk extension).
+		return executionInitialVariables == null ? null : executionInitialVariables.get(name);
+	}
+
+	/**
+	 * Returns the description of the primary script source (typically its file
+	 * name), for extension-emitted diagnostics.
+	 *
+	 * @return script source description, or {@code null} when unknown
+	 */
+	public String getSourceDescription() {
+		return sourceDescription;
+	}
+
+	/**
+	 * Returns the script line of the extension call currently being dispatched,
+	 * for extension-emitted diagnostics.
+	 *
+	 * @return current script line number
+	 */
+	public int getCurrentLineNumber() {
+		return currentLineNumber;
+	}
+
+	/**
 	 * Performs the global variable assignment within the runtime environment.
 	 * These assignments come from the ARGV list (bounded by ARGC), which, in
 	 * turn, come from the command-line arguments passed into Awk.
@@ -3097,27 +3344,10 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	@SuppressWarnings("unused")
 	private void setFilelistVariable(String nameValue) {
+		// route through assignVariable so JRT-managed specials, global slots,
+		// and SYMTAB updates are handled in exactly one place
 		NameValueAssignment assignment = parseNameValueAssignment(nameValue);
-		String name = assignment.name;
-		Object obj = assignment.value;
-
-		// make sure we're not receiving funcname=value assignments
-		if (functionNames.contains(name)) {
-			throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + name + ").");
-		}
-
-		Integer offsetObj = globalVariableOffsets.get(name);
-		Boolean arrayObj = globalVariableArrays.get(name);
-
-		if (offsetObj != null) {
-			if (arrayObj.booleanValue()) {
-				throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + name + ").");
-			} else {
-				runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
-			}
-		} else if (runtimeStack.hasGlobalVariable(name)) {
-			runtimeStack.setGlobalVariable(name, obj);
-		}
+		assignVariable(assignment.name, assignment.value);
 	}
 
 	/** {@inheritDoc} */
@@ -3139,25 +3369,30 @@ public class AVM implements VariableManager, Closeable {
 			throw new IllegalArgumentException("Cannot assign a scalar to a function name (" + name + ").");
 		}
 
+		Object normalized = normalizeExternalVariableValue(obj);
+		// Runtime assignments to JRT-managed specials (e.g. IGNORECASE=1 or
+		// FS=: between input files) must reach the JRT, not a global slot.
+		// ARGC is excluded: JRT.setARGC delegates back to this method, and its
+		// authoritative storage is the compiled slot below.
+		if (!"ARGC".equals(name) && jrt.applySpecialVariable(name, normalized)) {
+			updateSymtabEntry(name, normalized);
+			return;
+		}
+
 		Integer offsetObj = globalVariableOffsets.get(name);
 		Boolean arrayObj = globalVariableArrays.get(name);
 
 		if (offsetObj != null) {
-			Object normalized = normalizeExternalVariableValue(obj);
-			if (arrayObj.booleanValue()) {
-				if (normalized instanceof Map) {
-					runtimeStack.setFilelistVariable(offsetObj.intValue(), normalized);
-				} else {
-					throw new IllegalArgumentException(
-							"Cannot assign a scalar to a non-scalar variable (" + name + ").");
-				}
-			} else {
-				runtimeStack.setFilelistVariable(offsetObj.intValue(), normalized);
+			if (arrayObj.booleanValue() && !(normalized instanceof Map)) {
+				throw new IllegalArgumentException(
+						"Cannot assign a scalar to a non-scalar variable (" + name + ").");
 			}
+			runtimeStack.setFilelistVariable(offsetObj.intValue(), normalized);
 		} else if (runtimeStack.hasGlobalVariable(name)) {
-			Object normalized = normalizeExternalVariableValue(obj);
 			runtimeStack.setGlobalVariable(name, normalized);
 		}
+		// names without a compiled slot are still symbols: keep SYMTAB current
+		updateSymtabEntry(name, normalized);
 	}
 
 	private void applyInputSourceFilelistAssignmentsIfNeeded() {
@@ -3306,8 +3541,9 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	private Map<Object, Object> ensureArrayInArray(Map<Object, Object> map, Object key) {
 		checkScalar(key);
-		Object value = JRT.getAwkValue(map, key);
-		if (value == null || value.equals(BLANK) || value instanceof UninitializedObject) {
+		boolean existingKey = JRT.containsAwkKey(map, key);
+		Object value = JRT.getAssocArrayValue(map, key);
+		if (!existingKey || value == null || value instanceof UntypedObject) {
 			Map<Object, Object> nested = newAwkArray();
 			map.put(key, nested);
 			return nested;

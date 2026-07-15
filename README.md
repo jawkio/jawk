@@ -8,6 +8,8 @@
 
 Jawk is a pure Java implementation of [AWK](https://en.wikipedia.org/wiki/AWK). You can run it as a CLI, embed it directly in Java applications, compile scripts to reusable tuples, evaluate AWK expressions, feed it structured input, load extensions explicitly, and enable a sandboxed runtime when you need tighter execution constraints.
 
+Gawk-specific builtins — `asort()`, `asorti()`, `typeof()`, `isarray()`, `mkbool()`, `gensub()`, and `PROCINFO["sorted_in"]`-controlled array traversal — are available by default through the built-in GNU Awk compatibility extension.
+
 ## CLI Example
 
 ```shell

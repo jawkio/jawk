@@ -22,6 +22,7 @@ package io.jawk;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 
 import java.util.Map;
@@ -38,15 +39,24 @@ public class AvailableExtensionsTest {
 	@Test
 	public void testListAvailableExtensions() {
 		Map<String, JawkExtension> ext = Awk.listAvailableExtensions();
-		assertSame(StdinExtension.INSTANCE, ext.get("stdin"));
+		assertSame(StdinExtension.class, ext.get("stdin").getClass());
 	}
 
 	@Test
 	public void testExtensionNames() {
 		Map<String, JawkExtension> ext = Awk.listAvailableExtensions();
-		assertSame(StdinExtension.INSTANCE, ext.get(StdinExtension.class.getSimpleName()));
-		assertSame(StdinExtension.INSTANCE, ext.get(StdinExtension.class.getName()));
-		assertSame(StdinExtension.INSTANCE, ext.get("Stdin Support"));
+		assertSame(StdinExtension.class, ext.get(StdinExtension.class.getSimpleName()).getClass());
+		assertSame(StdinExtension.class, ext.get(StdinExtension.class.getName()).getClass());
+		assertSame(StdinExtension.class, ext.get("Stdin Support").getClass());
+	}
+
+	@Test
+	public void testResolveReturnsFreshInstancesForBuiltins() {
+		// Extensions carry per-engine runtime state, so the registry must never
+		// hand the same built-in instance to two engines.
+		JawkExtension first = io.jawk.ext.ExtensionRegistry.resolve("GawkExtension");
+		JawkExtension second = io.jawk.ext.ExtensionRegistry.resolve("GawkExtension");
+		assertNotSame(first, second);
 	}
 
 	@Test

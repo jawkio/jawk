@@ -1,4 +1,4 @@
-package io.jawk.ext.annotations;
+package io.jawk.ext;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -22,17 +22,31 @@ package io.jawk.ext.annotations;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.util.Collection;
 import java.util.Map;
 
 /**
- * Marks an extension function parameter that must be evaluated and passed as
- * an associative array backed by a {@link Map}. Combine with
- * {@link JawkOptional} when the AWK caller may omit the array.
+ * Supplies the key traversal order used by {@code for (index in array)}
+ * statements.
+ * <p>
+ * The interpreter itself has no opinion about iteration order: it snapshots
+ * whatever collection this hook returns. Extensions that implement ordered
+ * traversal (such as the gawk compatibility extension honoring
+ * {@code PROCINFO["sorted_in"]}) register an instance from their
+ * {@code beforeStart} hook. Implementations that have no ordering to apply
+ * should return {@code array.keySet()} directly to avoid any extra copy.
+ * </p>
  */
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.PARAMETER)
-public @interface JawkAssocArray {}
+@FunctionalInterface
+public interface ForInKeyOrder {
+
+	/**
+	 * Returns the keys of {@code array} in the order {@code for (index in array)}
+	 * should traverse them.
+	 *
+	 * @param array associative array about to be iterated
+	 * @return the keys in traversal order; the interpreter copies the returned
+	 *         collection before iterating
+	 */
+	Collection<Object> order(Map<Object, Object> array);
+}

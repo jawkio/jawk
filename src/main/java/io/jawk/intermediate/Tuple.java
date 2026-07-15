@@ -769,7 +769,43 @@ public abstract class Tuple implements Serializable {
 
 		@Override
 		public String toString() {
-			return getOpcode().name() + ", " + function.getKeyword() + ", " + argCount + ", " + initial;
+			return getOpcode().name()
+					+ ", "
+					+ function.getKeyword()
+					+ ", "
+					+ argCount
+					+ ", "
+					+ initial;
+		}
+	}
+
+	/**
+	 * Tuple carrying a diagnostic message that the interpreter prints to the
+	 * warning stream when executed. The parser plants these before the
+	 * instruction they describe, so warnings appear in runtime order, exactly
+	 * where gawk would emit them.
+	 */
+	public static final class WarningTuple extends Tuple {
+		private static final long serialVersionUID = 1L;
+		private final String message;
+
+		WarningTuple(String message) {
+			super(Opcode.WARNING);
+			this.message = message;
+		}
+
+		/**
+		 * Returns the warning message to print.
+		 *
+		 * @return warning text
+		 */
+		public String getMessage() {
+			return message;
+		}
+
+		@Override
+		public String toString() {
+			return getOpcode().name() + stringArgument(message);
 		}
 	}
 }

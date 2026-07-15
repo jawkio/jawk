@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.HashSet;
 import java.util.IllegalFormatException;
 import java.util.List;
@@ -45,6 +46,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import io.jawk.Awk;
 import io.jawk.intermediate.UninitializedObject;
+import io.jawk.intermediate.UntypedObject;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 /**
@@ -92,6 +94,16 @@ public class JRT {
 	private AwkSink awkSink;
 	/** PrintStream used for command error output */
 	private PrintStream error;
+	/** PrintStream used for runtime warning messages, stderr by default. */
+	private PrintStream warning = System.err;
+	/** Current IGNORECASE value, as assigned by the script or the host. */
+	private Object ignorecase = Long.valueOf(0L);
+	/** Precomputed truth of IGNORECASE, consulted by every regexp operation. */
+	private boolean ignoreCase;
+	/** Case-insensitive twins of precompiled patterns; created on first use. */
+	private Map<Pattern, Pattern> caseInsensitivePatterns;
+	/** Reused buffer holding the result of the last sub()/gsub() replacement. */
+	private final StringBuffer replaceResult = new StringBuffer();
 	// Last input line consumed for getline-style transport.
 	private Object inputLine = null;
 	// Current record state ($0, $1, $2, ...).
@@ -223,6 +235,29 @@ public class JRT {
 	}
 
 	/**
+	 * Sets the stream that receives runtime warning messages. Warnings default
+	 * to {@link System#err}, mirroring where gawk sends its diagnostics, and are
+	 * deliberately kept apart from the process-stderr stream so they can never
+	 * leak into a captured script output.
+	 *
+	 * @param warningStream stream to receive runtime warnings
+	 */
+	public void setWarningStream(PrintStream warningStream) {
+		this.warning = Objects.requireNonNull(warningStream, "warningStream");
+	}
+
+	/**
+	 * Prints a runtime warning message to the warning stream (stderr by
+	 * default), mirroring where gawk sends its diagnostics.
+	 *
+	 * @param message warning text to print
+	 */
+	public void printWarning(String message) {
+		warning.println(message);
+		warning.flush();
+	}
+
+	/**
 	 * Returns the default output sink used by {@code print} and {@code printf}.
 	 *
 	 * @return the current AWK sink
@@ -266,7 +301,8 @@ public class JRT {
 				|| "NF".equals(name)
 				|| "NR".equals(name)
 				|| "FNR".equals(name)
-				|| "ARGC".equals(name);
+				|| "ARGC".equals(name)
+				|| "IGNORECASE".equals(name);
 	}
 
 	/**
@@ -332,6 +368,7 @@ public class JRT {
 		setFNR(0);
 		setRSTART(0);
 		setRLENGTH(0);
+		setIGNORECASE(Long.valueOf(0L));
 	}
 
 	/**
@@ -344,62 +381,70 @@ public class JRT {
 		for (Map.Entry<String, Object> var : initialVarMap.entrySet()) {
 			String name = var.getKey();
 			Object value = var.getValue();
-			if ("FS".equals(name)) {
-				setFS(value);
-				continue;
+			if (!applySpecialVariable(name, value)) {
+				vm.assignVariable(name, value);
 			}
-			if ("RS".equals(name)) {
-				setRS(value);
-				continue;
-			}
-			if ("OFS".equals(name)) {
-				setOFS(value);
-				continue;
-			}
-			if ("ORS".equals(name)) {
-				setORS(value);
-				continue;
-			}
-			if ("CONVFMT".equals(name)) {
-				setCONVFMT(value);
-				continue;
-			}
-			if ("OFMT".equals(name)) {
-				setOFMT(value);
-				continue;
-			}
-			if ("SUBSEP".equals(name)) {
-				setSUBSEP(value);
-				continue;
-			}
-			if ("FILENAME".equals(name)) {
-				setFILENAMEViaJrt(value);
-				continue;
-			}
-			if ("NF".equals(name)) {
-				setNF(value);
-				continue;
-			}
-			if ("NR".equals(name)) {
-				setNR(value);
-				continue;
-			}
-			if ("FNR".equals(name)) {
-				setFNR(value);
-				continue;
-			}
-			if ("ARGC".equals(name)) {
-				setARGC(value);
-				continue;
-			}
-			vm.assignVariable(name, value);
+		}
+	}
+
+	/**
+	 * Applies the assignment of a single JRT-managed special variable.
+	 *
+	 * @param name variable name
+	 * @param value value to assign
+	 * @return {@code true} when the name was a JRT-managed special variable,
+	 *         {@code false} when the assignment was not handled
+	 */
+	public boolean applySpecialVariable(String name, Object value) {
+		switch (name) {
+		case "FS":
+			setFS(value);
+			return true;
+		case "RS":
+			setRS(value);
+			return true;
+		case "OFS":
+			setOFS(value);
+			return true;
+		case "ORS":
+			setORS(value);
+			return true;
+		case "CONVFMT":
+			setCONVFMT(value);
+			return true;
+		case "OFMT":
+			setOFMT(value);
+			return true;
+		case "SUBSEP":
+			setSUBSEP(value);
+			return true;
+		case "FILENAME":
+			setFILENAMEViaJrt(value);
+			return true;
+		case "NF":
+			setNF(value);
+			return true;
+		case "NR":
+			setNR(value);
+			return true;
+		case "FNR":
+			setFNR(value);
+			return true;
+		case "ARGC":
+			setARGC(value);
+			return true;
+		case "IGNORECASE":
+			setIGNORECASE(value);
+			return true;
+		default:
+			return false;
 		}
 	}
 
 	/**
 	 * Applies only the JRT-managed special variable assignments from the
 	 * supplied map (FS, RS, OFS, ORS, CONVFMT, OFMT, SUBSEP, FILENAME, NF,
-	 * NR, FNR, ARGC). Non-special variables are silently skipped because
+	 * NR, FNR, ARGC, IGNORECASE). Non-special variables are silently skipped because
 	 * they require the runtime stack to be fully initialized (which happens
 	 * during tuple execution).
 	 *
@@ -410,35 +455,9 @@ public class JRT {
 			return;
 		}
 		for (Map.Entry<String, Object> var : variableMap.entrySet()) {
-			String name = var.getKey();
-			Object value = var.getValue();
-			if ("FS".equals(name)) {
-				setFS(value);
-			} else if ("RS".equals(name)) {
-				setRS(value);
-			} else if ("OFS".equals(name)) {
-				setOFS(value);
-			} else if ("ORS".equals(name)) {
-				setORS(value);
-			} else if ("CONVFMT".equals(name)) {
-				setCONVFMT(value);
-			} else if ("OFMT".equals(name)) {
-				setOFMT(value);
-			} else if ("SUBSEP".equals(name)) {
-				setSUBSEP(value);
-			} else if ("FILENAME".equals(name)) {
-				setFILENAMEViaJrt(value);
-			} else if ("NF".equals(name)) {
-				setNF(value);
-			} else if ("NR".equals(name)) {
-				setNR(value);
-			} else if ("FNR".equals(name)) {
-				setFNR(value);
-			} else if ("ARGC".equals(name)) {
-				setARGC(value);
-			}
 			// Non-special variables are skipped; they are assigned later
 			// via the tuple instruction stream
+			applySpecialVariable(var.getKey(), var.getValue());
 		}
 	}
 
@@ -496,7 +515,7 @@ public class JRT {
 	 * @return the stored value, or the AWK blank value when no concrete value is
 	 *         present
 	 */
-	public static Object getAwkValue(Map<Object, Object> map, Object key) {
+	public static Object getAssocArrayValue(Map<Object, Object> map, Object key) {
 		if (map instanceof AssocArray) {
 			return map.get(key);
 		}
@@ -655,6 +674,22 @@ public class JRT {
 	 * @return a boolean
 	 */
 	public static boolean compare2(Object o1, Object o2, int mode) {
+		return compare2(o1, o2, mode, false);
+	}
+
+	/**
+	 * Compares two objects like {@link #compare2(Object, Object, int)}, folding
+	 * case in string comparisons when {@code ignoreCase} is set: gawk's
+	 * {@code IGNORECASE} applies to string relational operators, not only to
+	 * regexp operations.
+	 *
+	 * @param o1 The 1st object.
+	 * @param o2 the 2nd object.
+	 * @param mode the comparison mode, as in {@link #compare2(Object, Object, int)}
+	 * @param ignoreCase whether string comparisons ignore case
+	 * @return a boolean
+	 */
+	public static boolean compare2(Object o1, Object o2, int mode, boolean ignoreCase) {
 		if (o1 instanceof Number && o2 instanceof Number) {
 			return compareNumbers(((Number) o1).doubleValue(), ((Number) o2).doubleValue(), mode);
 		}
@@ -682,12 +717,32 @@ public class JRT {
 		}
 
 		if (mode == 0) {
-			return o1String.equals(o2String);
-		} else if (mode < 0) {
-			return o1String.compareTo(o2String) < 0;
-		} else {
-			return o1String.compareTo(o2String) > 0;
+			return ignoreCase ? o1String.equalsIgnoreCase(o2String) : o1String.equals(o2String);
 		}
+		int comparison = ignoreCase ? o1String.compareToIgnoreCase(o2String) : o1String.compareTo(o2String);
+		return mode < 0 ? comparison < 0 : comparison > 0;
+	}
+
+	/**
+	 * Implements the {@code index()} builtin: the 1-based position of
+	 * {@code needle} within {@code haystack}, or 0 when absent, folding case
+	 * when {@code IGNORECASE} is set.
+	 *
+	 * @param haystack text to search
+	 * @param needle text to find
+	 * @return 1-based match position, 0 when not found
+	 */
+	public int index(String haystack, String needle) {
+		if (!ignoreCase) {
+			return haystack.indexOf(needle) + 1;
+		}
+		int max = haystack.length() - needle.length();
+		for (int i = 0; i <= max; i++) {
+			if (haystack.regionMatches(true, i, needle, 0, needle.length())) {
+				return i + 1;
+			}
+		}
+		return 0;
 	}
 
 	private static boolean isBlankOrZero(Object value, String stringValue) {
@@ -741,6 +796,33 @@ public class JRT {
 			}
 		}
 		return value;
+	}
+
+	/**
+	 * Returns whether the supplied text parses as an AWK number under this
+	 * runtime's locale, as used for strnum recognition.
+	 *
+	 * @param value text to test
+	 * @return {@code true} when {@code value} is an input numeric string
+	 */
+	public boolean isParseableNumber(String value) {
+		return isParseableNumber(value, decimalSeparator);
+	}
+
+	/**
+	 * Replaces the untyped marker by AWK's assigned blank scalar. Reading a
+	 * missing array element creates and returns the untyped marker (so
+	 * {@code typeof()} can see it), but an assignment must not propagate it:
+	 * after {@code x = a[missing]}, {@code x} is an assigned blank scalar
+	 * ({@code typeof(x) == "unassigned"}), exactly as in gawk. This is a single
+	 * {@code instanceof} on the assignment paths.
+	 *
+	 * @param value value about to be stored by an assignment
+	 * @return the assigned blank scalar when the value was the untyped marker,
+	 *         otherwise the original value
+	 */
+	public static Object untypedToBlank(Object value) {
+		return value instanceof UntypedObject ? BLANK : value;
 	}
 
 	static boolean isParseableNumber(String value, char decimalSeparator) {
@@ -864,8 +946,7 @@ public class JRT {
 			val = false;
 		} else if (o instanceof Pattern) {
 			// match against $0
-			// ...
-			Pattern pattern = (Pattern) o;
+			Pattern pattern = caseAwarePattern((Pattern) o);
 			Object inputField = jrtGetInputField(0);
 			String s = inputField instanceof UninitializedObject ? "" : inputField.toString();
 			Matcher matcher = pattern.matcher(s);
@@ -902,18 +983,7 @@ public class JRT {
 	 * @return The number of parts resulting from this split operation.
 	 */
 	public int split(Object fieldSeparator, Object array, Object string) {
-		String fsString = toAwkString(fieldSeparator);
-		if (fsString.equals(" ")) {
-			return splitWorker(new StringTokenizer(toAwkString(string)), toArrayMap(array));
-		} else if (fsString.equals("")) {
-			return splitWorker(new CharacterTokenizer(toAwkString(string)), toArrayMap(array));
-		} else if (fsString.length() == 1) {
-			return splitWorker(
-					new SingleCharacterTokenizer(toAwkString(string), fsString.charAt(0)),
-					toArrayMap(array));
-		} else {
-			return splitWorker(new RegexTokenizer(toAwkString(string), fsString), toArrayMap(array));
-		}
+		return splitWorker(splitTokenizer(toAwkString(string), fieldSeparator), toArrayMap(array));
 	}
 
 	private static Map<Object, Object> toArrayMap(Object array) {
@@ -1047,6 +1117,283 @@ public class JRT {
 	 */
 	public void setFS(Object value) {
 		this.fs = value == null ? "" : value.toString();
+	}
+
+	/**
+	 * Sets IGNORECASE, precomputing its truth value so regexp operations can
+	 * test a boolean instead of coercing the raw value on every match.
+	 *
+	 * @param value new IGNORECASE value
+	 */
+	public void setIGNORECASE(Object value) {
+		this.ignorecase = value == null ? Long.valueOf(0L) : value;
+		// gawk: IGNORECASE is active when its value is "nonzero or non-null",
+		// i.e. regular AWK truthiness (strnum-aware), not numeric coercion
+		this.ignoreCase = toBoolean(this.ignorecase);
+	}
+
+	/**
+	 * Get IGNORECASE from the VariableManager.
+	 *
+	 * @return IGNORECASE value
+	 */
+	public Object getIGNORECASEVar() {
+		return ignorecase;
+	}
+
+	/**
+	 * Returns whether IGNORECASE is currently nonzero, making regexp
+	 * operations case-insensitive. The truth value is precomputed when
+	 * IGNORECASE is assigned.
+	 *
+	 * @return {@code true} when IGNORECASE is nonzero
+	 */
+	public boolean isIgnoreCase() {
+		return ignoreCase;
+	}
+
+	/**
+	 * Returns the {@link Pattern} flags implied by the current
+	 * {@code IGNORECASE} setting; dynamic regexps should be compiled with
+	 * these flags.
+	 *
+	 * @return {@link Pattern#CASE_INSENSITIVE} when {@code IGNORECASE} is
+	 *         truthy, 0 otherwise
+	 */
+	public int regexpFlags() {
+		return ignoreCase ? Pattern.CASE_INSENSITIVE : 0;
+	}
+
+	/**
+	 * {@code sub()} functionality: replaces the first match of {@code ere} in
+	 * {@code orig} with {@code repl}, honoring {@code IGNORECASE}. The
+	 * substituted text is available through {@link #getReplaceResult()}.
+	 *
+	 * @param orig original text
+	 * @param repl AWK replacement text
+	 * @param ere regular expression
+	 * @return number of replacements performed (0 or 1)
+	 */
+	public int replaceFirst(String orig, String repl, String ere) {
+		return replace(orig, repl, ere, false);
+	}
+
+	/**
+	 * {@code gsub()} functionality: replaces every match of {@code ere} in
+	 * {@code orig} with {@code repl}, honoring {@code IGNORECASE}. The
+	 * substituted text is available through {@link #getReplaceResult()}.
+	 *
+	 * @param orig original text
+	 * @param repl AWK replacement text
+	 * @param ere regular expression
+	 * @return number of replacements performed
+	 */
+	public int replaceAll(String orig, String repl, String ere) {
+		return replace(orig, repl, ere, true);
+	}
+
+	private int replace(String orig, String repl, String ere, boolean global) {
+		replaceResult.setLength(0);
+		String preparedReplacement = prepareReplacement(repl, false);
+		Matcher matcher = Pattern.compile(ere, regexpFlags()).matcher(orig);
+		int count = 0;
+		while (matcher.find()) {
+			count++;
+			matcher.appendReplacement(replaceResult, preparedReplacement);
+			if (!global) {
+				break;
+			}
+		}
+		matcher.appendTail(replaceResult);
+		return count;
+	}
+
+	/**
+	 * Returns the text produced by the last {@link #replaceFirst} or
+	 * {@link #replaceAll} call.
+	 *
+	 * @return substituted text
+	 */
+	public String getReplaceResult() {
+		return replaceResult.toString();
+	}
+
+	/**
+	 * Evaluates the AWK match operator ({@code text ~ regexp}), honoring
+	 * {@code IGNORECASE} for both precompiled regexp constants and dynamic
+	 * expressions.
+	 *
+	 * @param text text to match
+	 * @param regexp precompiled {@link Pattern} or dynamic regexp text
+	 * @return {@code true} when the regexp matches anywhere in the text
+	 */
+	public boolean matches(String text, Object regexp) {
+		if (regexp instanceof Pattern) {
+			// find(): AWK's ~ matches anywhere, not the entire string
+			return caseAwarePattern((Pattern) regexp).matcher(text).find();
+		}
+		return Pattern.compile(toAwkString(regexp), regexpFlags()).matcher(text).find();
+	}
+
+	/**
+	 * {@code match()} functionality: locates {@code ere} in {@code s} honoring
+	 * {@code IGNORECASE}, updating {@code RSTART} and {@code RLENGTH}.
+	 *
+	 * @param s text to search
+	 * @param ere regular expression
+	 * @return the match position ({@code RSTART}), or 0 when there is no match
+	 */
+	public int matchPosition(String s, String ere) {
+		Matcher matcher = Pattern.compile(ere, regexpFlags()).matcher(s);
+		if (matcher.find()) {
+			int start = matcher.start() + 1;
+			setRSTART(start);
+			setRLENGTH(matcher.end() - matcher.start());
+			return start;
+		}
+		setRSTART(0);
+		setRLENGTH(-1);
+		return 0;
+	}
+
+	/**
+	 * Builds the tokenizer splitting {@code input} by the given separator,
+	 * following AWK field-splitting rules ({@code " "} splits on whitespace
+	 * runs, {@code ""} splits into characters, a single character is literal)
+	 * and honoring {@code IGNORECASE} for regexp separators. A precompiled
+	 * {@link Pattern} separator (a regexp literal) is used directly.
+	 *
+	 * @param input text to split
+	 * @param separator field separator: precompiled pattern or text
+	 * @return tokenizer producing the split parts
+	 */
+	public Enumeration<Object> splitTokenizer(String input, Object separator) {
+		if (separator instanceof Pattern) {
+			return new RegexTokenizer(input, caseAwarePattern((Pattern) separator));
+		}
+		String fsString = toAwkString(separator);
+		if (fsString.equals(" ")) {
+			return new StringTokenizer(input);
+		}
+		if (fsString.isEmpty()) {
+			return new CharacterTokenizer(input);
+		}
+		if (fsString.length() == 1) {
+			char fsChar = fsString.charAt(0);
+			if (ignoreCase && Character.isLetter(fsChar)) {
+				// a letter is regex-safe, so case-insensitive splitting can
+				// go through the regexp path
+				return new RegexTokenizer(input, fsString, Pattern.CASE_INSENSITIVE);
+			}
+			return new SingleCharacterTokenizer(input, fsChar);
+		}
+		return new RegexTokenizer(input, fsString, regexpFlags());
+	}
+
+	/**
+	 * Converts an AWK replacement text into a Java {@link Matcher} replacement:
+	 * {@code &} becomes the whole match, {@code \&} a literal ampersand, and
+	 * {@code $} is escaped.
+	 *
+	 * @param awkRepl AWK replacement text
+	 * @param backreferences whether {@code \N} denotes capture group {@code N},
+	 *        as in gawk's {@code gensub()}; when {@code false}, {@code \N} stays
+	 *        literal as in {@code sub()} and {@code gsub()}
+	 * @return the equivalent Java replacement string
+	 */
+	public static String prepareReplacement(String awkRepl, boolean backreferences) {
+		return prepareReplacement(awkRepl, backreferences ? Integer.MAX_VALUE : -1);
+	}
+
+	/**
+	 * Converts an AWK replacement text into a Java {@link Matcher} replacement,
+	 * resolving gensub-style backreferences against a known number of capture
+	 * groups: {@code \N} beyond {@code maxGroup} is replaced by the empty
+	 * string, as gawk does, instead of producing a group reference that would
+	 * make the matcher throw.
+	 *
+	 * @param awkRepl AWK replacement text
+	 * @param maxGroup highest valid capture group number, or a negative value
+	 *        to disable backreferences entirely ({@code sub()}/{@code gsub()}
+	 *        semantics)
+	 * @return the equivalent Java replacement string
+	 */
+	public static String prepareReplacement(String awkRepl, int maxGroup) {
+		boolean backreferences = maxGroup >= 0;
+		if (awkRepl == null) {
+			return "";
+		}
+
+		if ((awkRepl.indexOf('\\') == -1) && (awkRepl.indexOf('$') == -1) && (awkRepl.indexOf('&') == -1)) {
+			return awkRepl;
+		}
+
+		StringBuilder javaRepl = new StringBuilder();
+		for (int i = 0; i < awkRepl.length(); i++) {
+			char c = awkRepl.charAt(i);
+
+			if (c == '\\' && i == awkRepl.length() - 1) {
+				// In gensub mode a trailing backslash is a literal backslash;
+				// left bare it would make Matcher.appendReplacement throw. The
+				// sub()/gsub() mapping keeps its historical bare form.
+				javaRepl.append(backreferences ? "\\\\" : "\\");
+				continue;
+			}
+
+			if (c == '\\') {
+				i++;
+				c = awkRepl.charAt(i);
+				if (c == '&') {
+					javaRepl.append('&');
+					continue;
+				} else if (c == '\\') {
+					javaRepl.append("\\\\");
+					continue;
+				} else if (backreferences && Character.isDigit(c)) {
+					if (c - '0' <= maxGroup) {
+						javaRepl.append('$').append(c);
+					}
+					// references beyond the pattern's groups expand to the
+					// empty string, as in gawk
+					continue;
+				}
+
+				javaRepl.append('\\');
+			}
+
+			if (c == '$') {
+				javaRepl.append("\\$");
+			} else if (c == '&') {
+				javaRepl.append("$0");
+			} else {
+				javaRepl.append(c);
+			}
+		}
+
+		return javaRepl.toString();
+	}
+
+	/**
+	 * Returns the pattern itself, or its case-insensitive twin when
+	 * {@code IGNORECASE} is set. Twins are compiled once and cached here:
+	 * the JDK's {@link Pattern#compile(String)} performs no caching of its
+	 * own (every call reparses the expression), so dropping this cache would
+	 * recompile the regexp on every record matched against a regexp constant.
+	 *
+	 * @param pattern base pattern
+	 * @return pattern honoring the current {@code IGNORECASE} setting
+	 */
+	public Pattern caseAwarePattern(Pattern pattern) {
+		if (!ignoreCase || (pattern.flags() & Pattern.CASE_INSENSITIVE) != 0) {
+			return pattern;
+		}
+		if (caseInsensitivePatterns == null) {
+			caseInsensitivePatterns = new IdentityHashMap<Pattern, Pattern>();
+		}
+		return caseInsensitivePatterns
+				.computeIfAbsent(
+						pattern,
+						base -> Pattern.compile(base.pattern(), base.flags() | Pattern.CASE_INSENSITIVE));
 	}
 
 	/**
@@ -1484,7 +1831,7 @@ public class JRT {
 			}
 		} else {
 			while (state.getNF() < fieldIndex) {
-				state.addField("");
+				state.addField(BLANK);
 			}
 			state.setField(fieldIndex - 1, valueObj);
 		}
@@ -1533,16 +1880,7 @@ public class JRT {
 			return fields;
 		}
 
-		Enumeration<Object> tokenizer;
-		if (fieldSeparator.equals(" ")) {
-			tokenizer = new StringTokenizer(recordText);
-		} else if (fieldSeparator.length() == 1) {
-			tokenizer = new SingleCharacterTokenizer(recordText, fieldSeparator.charAt(0));
-		} else if (fieldSeparator.equals("")) {
-			tokenizer = new CharacterTokenizer(recordText);
-		} else {
-			tokenizer = new RegexTokenizer(recordText, fieldSeparator);
-		}
+		Enumeration<Object> tokenizer = splitTokenizer(recordText, fieldSeparator);
 
 		while (tokenizer.hasMoreElements()) {
 			fields.add(new StrNum((String) tokenizer.nextElement(), decimalSeparator));
@@ -1683,7 +2021,7 @@ public class JRT {
 		}
 
 		private Object normalizeFieldValue(Object value) {
-			if (value == null || value instanceof UninitializedObject) {
+			if (value == null) {
 				return "";
 			}
 			return value;

@@ -50,6 +50,76 @@ public int assocSize(@JawkAssocArray Map<Object, Object> array) {
 
 That metadata lets Jawk validate array-vs-scalar usage more accurately.
 
+## Declare Optional Arguments with @JawkOptional
+
+Mark trailing parameters with `@JawkOptional` when the AWK caller may omit them; the Java method receives `null` in their place. Optional parameters must be the last declared parameters and cannot be combined with varargs. Other parameter annotations compose naturally, so an optional array argument keeps its `@JawkAssocArray` marker:
+
+```java
+@JawkFunction("SortInto")
+public long sortInto(
+        @JawkAssocArray Map<Object, Object> source,
+        @JawkOptional @JawkAssocArray Map<Object, Object> dest) {
+    // dest is null when the AWK caller passed a single argument
+    ...
+}
+```
+
+This is how the built-in gawk compatibility extension declares `asort(source [, dest [, how]])`.
+
+## Receive Raw Values with @JawkRawValue
+
+By default, Jawk resolves every scalar argument to an assigned value before calling the extension. Type-introspection functions sometimes need to distinguish untyped variables, uninitialized values, or regexp constants from plain strings. Annotate those parameters with `@JawkRawValue` to receive the runtime object as-is. The parameter must be declared as `Object`, because the raw value can be an array, a pattern, or an internal placeholder:
+
+```java
+@JawkFunction("IsArray")
+public long isArray(@JawkRawValue Object value) {
+    return value instanceof Map ? 1L : 0L;
+}
+```
+
+This is how the built-in gawk compatibility extension implements `typeof()` and `isarray()`.
+
+## Keep Regexp Literals with @JawkRegexp
+
+An AWK regexp literal used as an ordinary expression evaluates to the boolean `$0 ~ /re/`. Functions that genuinely take a regular expression as an argument — like gawk's `gensub()` — should annotate that parameter with `@JawkRegexp`, so a literal `/re/` reaches the extension as a precompiled pattern instead:
+
+```java
+@JawkFunction("Highlight")
+public String highlight(@JawkRegexp Object regexp, String text) {
+    Pattern pattern = regexp instanceof Pattern ?
+            (Pattern) regexp : Pattern.compile(toAwkString(regexp));
+    ...
+}
+```
+
+Declare the parameter as `Object` and fall back to compiling the string form, because callers may also pass dynamic strings.
+
+## Run Setup Code with @JawkBeforeStart
+
+Annotate an instance method with `@JawkBeforeStart` to run initialization after globals are allocated but before the script starts executing. The method runs **once per interpreter instance**, not once per execution: initialization may be heavy, and the `AVM`/`JRT` pair it receives stays the same for the lifetime of the engine. Use it to register runtime hooks and build one-time state; per-run globals are cleared between executions, so seed those from the extension functions themselves. The method must return `void` and accept `(AVM, JRT)`:
+
+```java
+@JawkBeforeStart
+public void initialize(AVM avm, JRT jrt) {
+    // bind to the interpreter, register hooks, build one-time state
+}
+```
+
+This is also where an extension can register runtime hooks. For example, the gawk compatibility extension installs a `ForInKeyOrder` so `for (index in array)` follows `PROCINFO["sorted_in"]`:
+
+```java
+@JawkBeforeStart
+public void initialize(AVM avm, JRT jrt) {
+    avm.setForInKeyOrder(this::orderKeys);
+}
+
+private Collection<Object> orderKeys(Map<Object, Object> array) {
+    // return array.keySet() when no ordering applies — the interpreter
+    // copies the returned collection, so this path costs nothing extra
+    return sortIfNeeded(array);
+}
+```
+
 ## Registering Extensions
 
 There are two distinct registration paths:
@@ -111,9 +181,12 @@ Or expose it to the CLI after placing the class on the JVM classpath and registe
 
 ```shell-session
 $ java -cp my-extension.jar -jar jawk-${project.version}-standalone.jar --list-ext
-SampleExtension - com.company.my.SampleExtension
-sample - com.company.my.SampleExtension
+GawkExtension - io.jawk.ext.GawkExtension
+GNU Awk Compatibility - io.jawk.ext.GawkExtension
+io.jawk.ext.GawkExtension - io.jawk.ext.GawkExtension
 io.jawk.ext.StdinExtension - io.jawk.ext.StdinExtension
+sample - com.company.my.SampleExtension
+SampleExtension - com.company.my.SampleExtension
 stdin - io.jawk.ext.StdinExtension
 Stdin Support - io.jawk.ext.StdinExtension
 

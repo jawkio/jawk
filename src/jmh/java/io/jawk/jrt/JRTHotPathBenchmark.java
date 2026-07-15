@@ -462,6 +462,12 @@ public class JRTHotPathBenchmark {
 
 		/** {@inheritDoc} */
 		@Override
+		public Object getVariable(String name) {
+			return null;
+		}
+
+		/** {@inheritDoc} */
+		@Override
 		public Object getARGC() {
 			return this.argc;
 		}

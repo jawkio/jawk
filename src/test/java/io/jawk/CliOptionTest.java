@@ -155,7 +155,7 @@ public class CliOptionTest {
 		Cli cli = new Cli();
 		cli.parse(new String[] { "--posix", "{ print 1 }" });
 
-		assertFalse(cli.getSettings().isAllowArraysOfArrays());
+		assertTrue(cli.getSettings().isPosix());
 	}
 
 	@Test

@@ -42,6 +42,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jawk.backend.AVM;
 import io.jawk.ext.ExtensionFunction;
 import io.jawk.ext.ExtensionRegistry;
+import io.jawk.ext.GawkExtension;
 import io.jawk.ext.JawkExtension;
 import io.jawk.frontend.AwkParser;
 import io.jawk.frontend.AstNode;
@@ -119,7 +120,7 @@ public class Awk {
 	private AstNode lastAst;
 
 	/**
-	 * Create a new instance of Awk without extensions.
+	 * Create a new instance of Awk with default extensions.
 	 */
 	public Awk() {
 		this(new AwkSettings());
@@ -131,7 +132,7 @@ public class Awk {
 	 * @param settings behavioral configuration for this engine
 	 */
 	public Awk(AwkSettings settings) {
-		this(ExtensionSetup.EMPTY, settings);
+		this(ExtensionSetup.createDefault(), settings);
 	}
 
 	/**
@@ -201,19 +202,21 @@ public class Awk {
 	}
 
 	static Map<String, ExtensionFunction> createExtensionFunctionMap(JawkExtension... extensions) {
-		if (extensions == null || extensions.length == 0) {
-			return ExtensionSetup.EMPTY.functions;
-		}
-		return createExtensionFunctionMap(Arrays.asList(extensions));
+		return createExtensionFunctionMap(
+				extensions == null ? Collections.<JawkExtension>emptyList() : Arrays.asList(extensions));
 	}
 
 	static Map<String, JawkExtension> createExtensionInstanceMap(JawkExtension... extensions) {
-		if (extensions == null || extensions.length == 0) {
-			return ExtensionSetup.EMPTY.instances;
-		}
-		return createExtensionInstanceMap(Arrays.asList(extensions));
+		return createExtensionInstanceMap(
+				extensions == null ? Collections.<JawkExtension>emptyList() : Arrays.asList(extensions));
 	}
 
+	/*
+	 * An explicit extension list is honored verbatim, including an empty one:
+	 * a caller that passes no extensions gets none, which is the only way to
+	 * reclaim names such as gensub or typeof. The default set is installed only
+	 * by the no-argument constructors, which route through createDefault().
+	 */
 	private static ExtensionSetup createExtensionSetup(Collection<? extends JawkExtension> extensions) {
 		if (extensions == null || extensions.isEmpty()) {
 			return ExtensionSetup.EMPTY;
@@ -249,6 +252,16 @@ public class Awk {
 		private static final ExtensionSetup EMPTY = new ExtensionSetup(
 				Collections.<String, ExtensionFunction>emptyMap(),
 				Collections.<String, JawkExtension>emptyMap());
+
+		/*
+		 * Extensions keep per-engine runtime state (VariableManager, JRT), so the
+		 * default set must be a fresh instance per Awk engine, never a shared
+		 * singleton: two engines sharing one GawkExtension would clobber each
+		 * other's runtime bindings.
+		 */
+		private static ExtensionSetup createDefault() {
+			return createExtensionSetup(Collections.singletonList(new GawkExtension()));
+		}
 
 		private final Map<String, ExtensionFunction> functions;
 		private final Map<String, JawkExtension> instances;
@@ -483,13 +496,15 @@ public class Awk {
 		lastAst = null;
 		if (!scripts.isEmpty()) {
 			// Parse all script sources into a single AST
-			AwkParser parser = new AwkParser(this.extensionFunctions, settings.isAllowArraysOfArrays());
+			AwkParser parser = new AwkParser(this.extensionFunctions, settings.isPosix());
 			AstNode ast = parser.parse(scripts);
 			lastAst = ast;
 			if (ast != null) {
 				// Perform semantic checks twice to resolve forward references
 				ast.semanticAnalysis();
 				ast.semanticAnalysis();
+				// Record the primary source description for runtime diagnostics
+				tuples.setSourceDescription(scripts.get(0).getDescription());
 				// Build tuples from the AST
 				ast.populateTuples(tuples);
 				// Assign addresses and prepare tuples for interpretation
@@ -550,7 +565,7 @@ public class Awk {
 				new StringReader(expression));
 
 		// Parse the expression
-		AwkParser parser = new AwkParser(this.extensionFunctions, settings.isAllowArraysOfArrays());
+		AwkParser parser = new AwkParser(this.extensionFunctions, settings.isPosix());
 		AstNode ast = parser.parseExpression(expressionSource);
 
 		// Attempt to traverse the syntax tree and build
@@ -958,7 +973,15 @@ public class Awk {
 			List<String> resolvedArguments = arguments == null ? Collections.<String>emptyList() : arguments;
 			try (AVM avm = createAvm(settings)) {
 				avm.setAwkSink(sink);
-				avm.setErrorStream(errorStream != null ? errorStream : sink.getPrintStream());
+				if (errorStream != null) {
+					avm.setErrorStream(errorStream);
+					avm.setWarningStream(errorStream);
+				} else {
+					// process stderr keeps its historical sink fallback, but
+					// warnings stay on System.err so they can never leak into
+					// the script output a host captures
+					avm.setErrorStream(sink.getPrintStream());
+				}
 				try {
 					InputSource resolvedSource;
 					if (inputSource != null) {

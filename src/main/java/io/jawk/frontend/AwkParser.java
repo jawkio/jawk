@@ -22,6 +22,7 @@ package io.jawk.frontend;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import java.io.File;
 import java.io.IOException;
 import java.io.LineNumberReader;
 import java.io.PrintStream;
@@ -125,6 +126,7 @@ public class AwkParser {
 		BUILTIN_FUNC_NAME,
 
 		EXTENSION,
+		TYPED_REGEXP,
 
 		KW_FUNCTION,
 		KW_BEGIN,
@@ -280,6 +282,7 @@ public class AwkParser {
 		SPECIAL_VAR_NAMES.put("ENVIRON", SP_IDX);
 		SPECIAL_VAR_NAMES.put("ARGC", SP_IDX);
 		SPECIAL_VAR_NAMES.put("ARGV", SP_IDX);
+		SPECIAL_VAR_NAMES.put("IGNORECASE", SP_IDX);
 	}
 
 	/**
@@ -290,7 +293,9 @@ public class AwkParser {
 	private final AwkSymbolTableImpl symbolTable = new AwkSymbolTableImpl();
 
 	private final Map<String, ExtensionFunction> extensions;
-	private final boolean allowArraysOfArrays;
+
+	/** POSIX compile-time mode: rejects gawk syntax such as arrays of arrays and typed regexps. */
+	private final boolean posix;
 
 	/**
 	 * <p>
@@ -298,10 +303,11 @@ public class AwkParser {
 	 * </p>
 	 *
 	 * @param extensions a {@link java.util.Map} object
+	 * @param posix {@code true} to enforce POSIX compile-time behavior
 	 */
-	public AwkParser(Map<String, ExtensionFunction> extensions, boolean allowArraysOfArrays) {
+	public AwkParser(Map<String, ExtensionFunction> extensions, boolean posix) {
 		this.extensions = extensions == null ? Collections.emptyMap() : new HashMap<>(extensions);
-		this.allowArraysOfArrays = allowArraysOfArrays;
+		this.posix = posix;
 	}
 
 	private List<ScriptSource> scriptSources;
@@ -603,6 +609,19 @@ public class AwkParser {
 		if (c == '$') {
 			read();
 			token = Token.DOLLAR;
+			return token;
+		}
+		if (c == '@') {
+			if (posix) {
+				throw lexerException("Typed regular expressions are not supported in POSIX mode.");
+			}
+			read();
+			if (c != '/') {
+				throw lexerException("Invalid character (64): @");
+			}
+			read();
+			readRegexp();
+			token = Token.TYPED_REGEXP;
 			return token;
 		}
 		if (c == '~') {
@@ -1466,6 +1485,10 @@ public class AwkParser {
 			AST str = symbolTable.addSTRING(string.toString());
 			lexer();
 			return str;
+		} else if (token == Token.TYPED_REGEXP) {
+			AST regexpAst = symbolTable.addTYPED_REGEXP(regexp.toString());
+			lexer();
+			return regexpAst;
 		} else if (token == Token.KW_GETLINE) {
 			return GETLINE_EXPRESSION(null, allowComparison, allowInKeyword);
 		} else if (token == Token.DIVIDE || token == Token.DIV_EQ) {
@@ -1553,7 +1576,7 @@ public class AwkParser {
 				params = null;
 			}
 
-			return new ExtensionAst(function, params);
+			return new ExtensionAst(function, params, extensionCallLineNumber(params));
 		} else if (idToken == Token.FUNC_ID || idToken == Token.BUILTIN_FUNC_NAME) {
 			AST params;
 			// length can take on the special form of no parens
@@ -1590,10 +1613,10 @@ public class AwkParser {
 			AST idxAst = ARRAY_INDEX(true, allowInKeyword);
 			lexer(Token.CLOSE_BRACKET);
 			AST arrayReference = symbolTable.addArrayReference(id, idxAst, arrayReferenceLineNo);
-			if (!allowArraysOfArrays && token == Token.OPEN_BRACKET) {
+			if (posix && token == Token.OPEN_BRACKET) {
 				throw parserException("Use [a,b,c,...] instead of [a][b][c]... for multi-dimensional arrays.");
 			}
-			while (allowArraysOfArrays && token == Token.OPEN_BRACKET) {
+			while (!posix && token == Token.OPEN_BRACKET) {
 				int nestedArrayReferenceLineNo = currentSourceLineNumber();
 				lexer();
 				idxAst = ARRAY_INDEX(true, allowInKeyword);
@@ -2103,7 +2126,7 @@ public class AwkParser {
 			return;
 		}
 		if (arrayAst instanceof ArrayReferenceAst) {
-			if (!allowArraysOfArrays) {
+			if (posix) {
 				arrayAst.throwSemanticException(errorMessage);
 			}
 			((ArrayReferenceAst) arrayAst).populateArrayValueTuples(tuples, createIfMissing);
@@ -2116,8 +2139,81 @@ public class AwkParser {
 			AwkTuples tuples,
 			FunctionCallParamListAst params,
 			Set<Integer> arrayParameterIndexes,
+			Set<Integer> rawValueParameterIndexes,
+			Set<Integer> literalRegexpIndexes,
 			int parameterIndex) {
 		if (params == null) {
+			return 0;
+		}
+		if (arrayParameterIndexes.contains(Integer.valueOf(parameterIndex))) {
+			populateArrayOperandTuples(
+					params.getAst1(),
+					tuples,
+					true,
+					"Parameter position " + (parameterIndex + 1) + " must be an array or subarray.");
+		} else if (literalRegexpIndexes.contains(Integer.valueOf(parameterIndex))) {
+			populateRawRegexpParameterTuples(params.getAst1(), tuples);
+		} else if (rawValueParameterIndexes.contains(Integer.valueOf(parameterIndex))) {
+			populateRawValueTuples(params.getAst1(), tuples);
+		} else {
+			params.getAst1().populateTuples(tuples);
+		}
+		if (params.getAst2() == null) {
+			return 1;
+		}
+		return 1 + populateActualParameters(
+				tuples,
+				(FunctionCallParamListAst) params.getAst2(),
+				arrayParameterIndexes,
+				rawValueParameterIndexes,
+				literalRegexpIndexes,
+				parameterIndex + 1);
+	}
+
+	private int populateActualParameters(
+			AwkTuples tuples,
+			FunctionCallParamListAst params,
+			int... literalRegexpIndexesParam) {
+		Set<Integer> literalRegexpIndexes = new HashSet<Integer>();
+		for (int idx : literalRegexpIndexesParam) {
+			literalRegexpIndexes.add(Integer.valueOf(idx));
+		}
+		return populateActualParameters(
+				tuples,
+				params,
+				Collections.<Integer>emptySet(),
+				Collections.<Integer>emptySet(),
+				literalRegexpIndexes,
+				0);
+	}
+
+	private int populateActualParametersUpTo(
+			AwkTuples tuples,
+			FunctionCallParamListAst params,
+			Set<Integer> arrayParameterIndexes,
+			int parameterIndex,
+			int maxParameterCount) {
+		/*
+		 * Gawk accepts extra user-function arguments with a runtime warning: the
+		 * callee has no local slots for them, but their expressions are still
+		 * evaluated for their side effects. Extra arguments are therefore emitted
+		 * followed by a POP, and only the formal parameter prefix is counted.
+		 */
+		if (params == null) {
+			return 0;
+		}
+		if (parameterIndex >= maxParameterCount) {
+			// Raw-value evaluation runs the expression's side effects but merely
+			// peeks at bare variables, so an untyped variable passed as an extra
+			// argument is not autovivified into an assigned scalar.
+			populateRawValueTuples(params.getAst1(), tuples);
+			tuples.pop();
+			populateActualParametersUpTo(
+					tuples,
+					(FunctionCallParamListAst) params.getAst2(),
+					arrayParameterIndexes,
+					parameterIndex + 1,
+					maxParameterCount);
 			return 0;
 		}
 		if (arrayParameterIndexes.contains(Integer.valueOf(parameterIndex))) {
@@ -2132,11 +2228,43 @@ public class AwkParser {
 		if (params.getAst2() == null) {
 			return 1;
 		}
-		return 1 + populateActualParameters(
+		return 1 + populateActualParametersUpTo(
 				tuples,
 				(FunctionCallParamListAst) params.getAst2(),
 				arrayParameterIndexes,
-				parameterIndex + 1);
+				parameterIndex + 1,
+				maxParameterCount);
+	}
+
+	private void populateRawValueTuples(AST valueAst, AwkTuples tuples) {
+		/*
+		 * typeof() and isarray() need to inspect an lvalue's current state. A
+		 * normal scalar dereference autoconverts an untyped variable into AWK's
+		 * assigned blank scalar, which would erase the distinction gawk exposes,
+		 * so scalar variables use a non-assigning peek instead.
+		 * Array elements need no special opcode: a normal element read already
+		 * returns the raw untyped marker for a missing element, and, as in gawk,
+		 * brings that element into existence so a later `in`, delete, or for-in
+		 * observes it.
+		 */
+		if (valueAst instanceof IDAst) {
+			IDAst idAst = (IDAst) valueAst;
+			if (isJrtManagedSpecialName(idAst.id)) {
+				idAst.populateTuples(tuples);
+			} else {
+				tuples.peekDereference(idAst.offset, idAst.isGlobal);
+			}
+			return;
+		}
+		valueAst.populateTuples(tuples);
+	}
+
+	private void populateRawRegexpParameterTuples(AST valueAst, AwkTuples tuples) {
+		if (valueAst instanceof RegexpAst) {
+			((RegexpAst) valueAst).populateRawRegexpTuples(tuples);
+			return;
+		}
+		valueAst.populateTuples(tuples);
 	}
 
 	private Set<Integer> collectArrayParameterIndexes(FunctionDefAst functionDefAst) {
@@ -2253,6 +2381,20 @@ public class AwkParser {
 
 		protected AST(int lineNo) {
 			this.lineNo = lineNo;
+		}
+
+		protected int getLineNo() {
+			return lineNo;
+		}
+
+		protected String getSourceDescription() {
+			return sourceDescription;
+		}
+
+		protected String sourceBasename() {
+			// File.getName is a pure string operation and, unlike java.nio.Path,
+			// never rejects non-path descriptions such as <command-line-supplied-script>
+			return new File(getSourceDescription()).getName();
 		}
 
 		protected AST(AST ast1) {
@@ -2688,15 +2830,29 @@ public class AwkParser {
 			// (see above)!
 			tuples.setNumGlobals(symbolTable.numGlobals());
 
-			// Only ENVIRON/ARGC/ARGV remain regular globals.
-			// Always materialize ARGC; ARGV remains lazily materialized.
-			if (environAst.isReferenced()) {
+			// Only ENVIRON/ARGC/ARGV remain regular globals. ENVIRON and ARGV
+			// are materialized only when the script references them, or when
+			// SYMTAB is active (its snapshot exposes them); unreferenced ones
+			// are answered by the synthetic accessors. ARGC is always
+			// materialized (a single cheap assignment): its slot must stay
+			// authoritative so ARGC=n command-line operand assignments affect
+			// input traversal.
+			boolean symtabActive = !posix && symbolTable.isGlobalReferenced("SYMTAB");
+			if (environAst.isReferenced() || symtabActive) {
 				tuples.environOffset(environAst.offset);
 			}
 			tuples.argcOffset(argcAst.offset);
-			if (argvAst.isReferenced()) {
+			if (argvAst.isReferenced() || symtabActive) {
 				tuples.argvOffset(argvAst.offset);
 			}
+			// SYMTAB and FUNCTAB are gawk extensions, not POSIX
+			if (symtabActive) {
+				tuples.updateSymtab(symbolTable.getID("SYMTAB").offset);
+			}
+			if (!posix && symbolTable.isGlobalReferenced("FUNCTAB")) {
+				tuples.updateFunctab(symbolTable.getID("FUNCTAB").offset);
+			}
+			tuples.beforeStartHooks();
 
 			Address exitAddr = tuples.createAddress("end blocks start address");
 			tuples.setExitAddress(exitAddr);
@@ -2815,9 +2971,17 @@ public class AwkParser {
 			tuples.markEvalTupleStream();
 			tuples.setNumGlobals(symbolTable.numGlobals());
 
-			if (environAst.isReferenced()) {
+			boolean evalSymtabActive = !posix && symbolTable.isGlobalReferenced("SYMTAB");
+			if (environAst.isReferenced() || evalSymtabActive) {
 				tuples.environOffset(environAst.offset);
 			}
+			if (evalSymtabActive) {
+				tuples.updateSymtab(symbolTable.getID("SYMTAB").offset);
+			}
+			if (!posix && symbolTable.isGlobalReferenced("FUNCTAB")) {
+				tuples.updateFunctab(symbolTable.getID("FUNCTAB").offset);
+			}
+			tuples.beforeStartHooks();
 
 			if (getAst1() != null) {
 				getAst1().populateTuples(tuples);
@@ -3252,9 +3416,7 @@ public class AwkParser {
 					throw new SemanticException("Cannot use " + idAst + " as a scalar. It is an array.");
 				}
 				idAst.setScalar(true);
-				boolean isSpecial = SPECIAL_VAR_NAMES.containsKey(idAst.id)
-						&& !"ENVIRON".equals(idAst.id)
-						&& !"ARGV".equals(idAst.id);
+				boolean isSpecial = isJrtManagedSpecialName(idAst.id);
 				if (isSpecial) {
 					// value is on stack from RHS
 					switch (op) {
@@ -3377,102 +3539,12 @@ public class AwkParser {
 		}
 
 		private void pushSpecialThenSwap(AwkTuples tuples, String id) {
-			switch (id) {
-			case "NF":
-				tuples.pushNF();
-				break;
-			case "NR":
-				tuples.pushNR();
-				break;
-			case "FNR":
-				tuples.pushFNR();
-				break;
-			case "FS":
-				tuples.pushFS();
-				break;
-			case "RS":
-				tuples.pushRS();
-				break;
-			case "OFS":
-				tuples.pushOFS();
-				break;
-			case "ORS":
-				tuples.pushORS();
-				break;
-			case "RSTART":
-				tuples.pushRSTART();
-				break;
-			case "RLENGTH":
-				tuples.pushRLENGTH();
-				break;
-			case "FILENAME":
-				tuples.pushFILENAME();
-				break;
-			case "SUBSEP":
-				tuples.pushSUBSEP();
-				break;
-			case "CONVFMT":
-				tuples.pushCONVFMT();
-				break;
-			case "OFMT":
-				tuples.pushOFMT();
-				break;
-			case "ARGC":
-				tuples.pushARGC();
-				break;
-			default:
-				throw new Error("Unhandled special var: " + id);
-			}
+			pushSpecialVariable(tuples, id);
 			tuples.swap();
 		}
 
 		private void assignSpecial(AwkTuples tuples, String id) {
-			switch (id) {
-			case "NF":
-				tuples.assignNF();
-				break;
-			case "NR":
-				tuples.assignNR();
-				break;
-			case "FNR":
-				tuples.assignFNR();
-				break;
-			case "FS":
-				tuples.assignFS();
-				break;
-			case "RS":
-				tuples.assignRS();
-				break;
-			case "OFS":
-				tuples.assignOFS();
-				break;
-			case "ORS":
-				tuples.assignORS();
-				break;
-			case "RSTART":
-				tuples.assignRSTART();
-				break;
-			case "RLENGTH":
-				tuples.assignRLENGTH();
-				break;
-			case "FILENAME":
-				tuples.assignFILENAME();
-				break;
-			case "SUBSEP":
-				tuples.assignSUBSEP();
-				break;
-			case "CONVFMT":
-				tuples.assignCONVFMT();
-				break;
-			case "OFMT":
-				tuples.assignOFMT();
-				break;
-			case "ARGC":
-				tuples.assignARGC();
-				break;
-			default:
-				throw new Error("Unhandled special var: " + id);
-			}
+			assignSpecialVariable(tuples, id);
 		}
 	}
 
@@ -3522,7 +3594,11 @@ public class AwkParser {
 			pushSourceLineNumber(tuples);
 
 			getAst1().populateTuples(tuples);
-			getAst2().populateTuples(tuples);
+			if (op == Token.MATCHES || op == Token.NOT_MATCHES) {
+				populateRawRegexpParameterTuples(getAst2(), tuples);
+			} else {
+				getAst2().populateTuples(tuples);
+			}
 			// 2 values on the stack
 
 			if (op == Token.EQ) {
@@ -3853,7 +3929,9 @@ public class AwkParser {
 		void checkActualToFormalParameters(AST actualParamList) {
 			AST aPtr = actualParamList;
 			FunctionDefParamListAst fPtr = (FunctionDefParamListAst) getAst1();
-			while (aPtr != null) {
+			// Extra actual parameters (accepted with a gawk-style runtime
+			// warning) have no formal counterpart to validate against.
+			while (aPtr != null && fPtr != null) {
 				// actual parameter
 				AST aparam = aPtr.getAst1();
 				// formal function parameter
@@ -3927,24 +4005,8 @@ public class AwkParser {
 			if (!functionProxy.isDefined()) {
 				throw new SemanticException("function " + functionProxy + " not defined");
 			}
-			int actualParamCountLocal;
-			if (getAst1() == null) {
-				actualParamCountLocal = 0;
-			} else {
-				actualParamCountLocal = actualParamCount();
-			}
 			int formalParamCount = functionProxy.getFunctionParamCount();
-			if (formalParamCount < actualParamCountLocal) {
-				throw new SemanticException(
-						"the "
-								+ functionProxy.getFunctionName()
-								+ " function"
-								+ " only accepts at most "
-								+ formalParamCount
-								+ " parameter(s), not "
-								+ actualParamCountLocal);
-			}
-			if (getAst1() != null) {
+			if (getAst1() != null && formalParamCount > 0) {
 				functionProxy.checkActualToFormalParameters(getAst1());
 			}
 		}
@@ -3960,26 +4022,28 @@ public class AwkParser {
 			if (getAst1() == null) {
 				actualParamCountLocal = 0;
 			} else {
-				actualParamCountLocal = populateActualParameters(
+				actualParamCountLocal = populateActualParametersUpTo(
 						tuples,
 						(FunctionCallParamListAst) getAst1(),
 						collectArrayParameterIndexes(functionProxy.functionDefAst),
-						0);
+						0,
+						functionProxy.getFunctionParamCount());
 			}
 			int formalParamCount = functionProxy.getFunctionParamCount();
-			if (formalParamCount < actualParamCountLocal) {
-				throw new SemanticException(
-						"the "
-								+ functionProxy.getFunctionName()
-								+ " function"
-								+ " only accepts at most "
-								+ formalParamCount
-								+ " parameter(s), not "
-								+ actualParamCountLocal);
-			}
 
-			functionProxy.checkActualToFormalParameters(getAst1());
-			tuples.callFunction(functionProxy, functionProxy.getFunctionName(), formalParamCount, actualParamCountLocal);
+			if (getAst1() != null && formalParamCount > 0) {
+				functionProxy.checkActualToFormalParameters(getAst1());
+			}
+			if (actualParamCount() > formalParamCount) {
+				// gawk accepts the call but reports it each time it runs
+				tuples.warning(extraArgumentWarning());
+			}
+			tuples
+					.callFunction(
+							functionProxy,
+							functionProxy.getFunctionName(),
+							formalParamCount,
+							actualParamCountLocal);
 			popSourceLineNumber(tuples);
 			return 1;
 		}
@@ -3993,6 +4057,26 @@ public class AwkParser {
 			}
 			return cnt;
 		}
+
+		private String extraArgumentWarning() {
+			return String
+					.format(
+							"gawk: %s:%d: warning: function `%s' called with more arguments than declared",
+							sourceBasename(),
+							warningLineNo(),
+							functionProxy.getFunctionName());
+		}
+
+		private int warningLineNo() {
+			if (getAst1() instanceof FunctionCallParamListAst) {
+				AST firstParam = getAst1().getAst1();
+				if (firstParam != null) {
+					return firstParam.getLineNo();
+				}
+			}
+			return getLineNo();
+		}
+
 	}
 
 	private final class BuiltinFunctionCallAst extends ScalarExpressionAst {
@@ -4058,7 +4142,7 @@ public class AwkParser {
 				tuples.atan2();
 				break;
 			case MATCH:
-				populateArgumentsTuples(tuples, 2, "match requires 2 arguments");
+				populateMatchArgumentsTuples(tuples);
 				tuples.match();
 				break;
 			case INDEX:
@@ -4125,6 +4209,20 @@ public class AwkParser {
 			int ast1Result = getAst1().populateTuples(tuples);
 			if (ast1Result != 1) {
 				throw new SemanticException(functionName + " requires only 1 argument");
+			}
+		}
+
+		/**
+		 * Populates the tuples of the argument list for the <code>match</code>
+		 * built-in function, treating its 2nd argument as a literal regular
+		 * expression.
+		 *
+		 * @param tuples the tuples to populate
+		 */
+		private void populateMatchArgumentsTuples(AwkTuples tuples) {
+			int ast1Result = populateActualParameters(tuples, (FunctionCallParamListAst) getAst1(), 1);
+			if (ast1Result != 2) {
+				throw new SemanticException("match requires 2 arguments");
 			}
 		}
 
@@ -4202,7 +4300,7 @@ public class AwkParser {
 				throw new SemanticException("sub requires 2 or 3 arguments, not " + numargs);
 			}
 
-			getAst1().getAst1().populateTuples(tuples);
+			populateRawRegexpParameterTuples(getAst1().getAst1(), tuples);
 			getAst1().getAst2().getAst1().populateTuples(tuples);
 			if (numargs == 3) {
 				AST targetAst = getAst1().getAst2().getAst2().getAst1();
@@ -4290,7 +4388,7 @@ public class AwkParser {
 					true,
 					"split's 2nd arg must be an array or subarray reference");
 			if (ast1Result == 3) {
-				getAst1().getAst2().getAst2().getAst1().populateTuples(tuples);
+				populateRawRegexpParameterTuples(getAst1().getAst2().getAst2().getAst1(), tuples);
 			}
 			tuples.split(ast1Result);
 		}
@@ -4406,54 +4504,9 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (SPECIAL_VAR_NAMES.containsKey(id) && !"ENVIRON".equals(id) && !"ARGV".equals(id)) {
+			if (isJrtManagedSpecialName(id)) {
 				// Use JRT-managed reads for specials
-				switch (id) {
-				case "NF":
-					tuples.pushNF();
-					break;
-				case "NR":
-					tuples.pushNR();
-					break;
-				case "FNR":
-					tuples.pushFNR();
-					break;
-				case "FS":
-					tuples.pushFS();
-					break;
-				case "RS":
-					tuples.pushRS();
-					break;
-				case "OFS":
-					tuples.pushOFS();
-					break;
-				case "ORS":
-					tuples.pushORS();
-					break;
-				case "RSTART":
-					tuples.pushRSTART();
-					break;
-				case "RLENGTH":
-					tuples.pushRLENGTH();
-					break;
-				case "FILENAME":
-					tuples.pushFILENAME();
-					break;
-				case "SUBSEP":
-					tuples.pushSUBSEP();
-					break;
-				case "CONVFMT":
-					tuples.pushCONVFMT();
-					break;
-				case "OFMT":
-					tuples.pushOFMT();
-					break;
-				case "ARGC":
-					tuples.pushARGC();
-					break;
-				default:
-					throw new Error("Unhandled special var: " + id);
-				}
+				pushSpecialVariable(tuples, id);
 			} else {
 				tuples.dereference(offset, isArray(), isGlobal);
 			}
@@ -4636,9 +4689,11 @@ public class AwkParser {
 	private final class RegexpAst extends ScalarExpressionAst {
 
 		private String regexpStr;
+		private boolean typed;
 
-		private RegexpAst(String regexpStr) {
+		private RegexpAst(String regexpStr, boolean typedParam) {
 			this.regexpStr = regexpStr;
+			this.typed = typedParam;
 		}
 
 		@Override
@@ -4649,8 +4704,19 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			tuples.regexp(regexpStr);
+			if (typed) {
+				tuples.regexp(regexpStr);
+			} else {
+				tuples.getInputField(0);
+				tuples.regexp(regexpStr);
+				tuples.matches();
+			}
 			popSourceLineNumber(tuples);
+			return 1;
+		}
+
+		private int populateRawRegexpTuples(AwkTuples tuples) {
+			tuples.regexp(regexpStr);
 			return 1;
 		}
 	}
@@ -4713,7 +4779,12 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (getAst1() instanceof IDAst) {
+			if (getAst1() instanceof IDAst && isJrtManagedSpecialName(((IDAst) getAst1()).id)) {
+				// the sequence already leaves the new value on the stack
+				populateSpecialIncDec(tuples, ((IDAst) getAst1()).id, true, false);
+				popSourceLineNumber(tuples);
+				return 1;
+			} else if (getAst1() instanceof IDAst) {
 				IDAst idAst = (IDAst) getAst1();
 				tuples.inc(idAst.offset, idAst.isGlobal);
 			} else if (getAst1() instanceof ArrayReferenceAst) {
@@ -4761,7 +4832,12 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (getAst1() instanceof IDAst) {
+			if (getAst1() instanceof IDAst && isJrtManagedSpecialName(((IDAst) getAst1()).id)) {
+				// the sequence already leaves the new value on the stack
+				populateSpecialIncDec(tuples, ((IDAst) getAst1()).id, false, false);
+				popSourceLineNumber(tuples);
+				return 1;
+			} else if (getAst1() instanceof IDAst) {
 				IDAst idAst = (IDAst) getAst1();
 				tuples.dec(idAst.offset, idAst.isGlobal);
 			} else if (getAst1() instanceof ArrayReferenceAst) {
@@ -4811,6 +4887,8 @@ public class AwkParser {
 				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
 				dollarExpr.getAst1().populateTuples(tuples);
 				tuples.incDollarRef();
+			} else if (getAst1() instanceof IDAst && isJrtManagedSpecialName(((IDAst) getAst1()).id)) {
+				populateSpecialIncDec(tuples, ((IDAst) getAst1()).id, true, true);
 			} else {
 				if (getAst1() instanceof ArrayReferenceAst) {
 					((ArrayReferenceAst) getAst1()).populateTargetValueTuples(tuples);
@@ -4850,6 +4928,11 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
+			if (getAst1() instanceof IDAst && isJrtManagedSpecialName(((IDAst) getAst1()).id)) {
+				populateSpecialIncDec(tuples, ((IDAst) getAst1()).id, false, true);
+				popSourceLineNumber(tuples);
+				return 1;
+			}
 			if (getAst1() instanceof ArrayReferenceAst) {
 				((ArrayReferenceAst) getAst1()).populateTargetValueTuples(tuples);
 				tuples.unaryPlus();
@@ -4930,12 +5013,168 @@ public class AwkParser {
 	}
 
 	// we don't know if it is a scalar
+	/**
+	 * Returns whether the identifier names a JRT-managed special variable,
+	 * read and written through dedicated opcodes instead of a global slot.
+	 * ENVIRON and ARGV are excluded: they are special names but plain
+	 * slot-backed arrays, materialized by the preamble. SYMTAB and FUNCTAB
+	 * need no exclusion because they are not special names at all: they are
+	 * ordinary globals that the runtime populates when the script references
+	 * them.
+	 */
+	private boolean isJrtManagedSpecialName(String id) {
+		return SPECIAL_VAR_NAMES.containsKey(id) && !"ENVIRON".equals(id) && !"ARGV".equals(id);
+	}
+
+	/** Emits the tuple pushing the value of a JRT-managed special variable. */
+	private void pushSpecialVariable(AwkTuples tuples, String id) {
+		switch (id) {
+		case "NF":
+			tuples.pushNF();
+			break;
+		case "NR":
+			tuples.pushNR();
+			break;
+		case "FNR":
+			tuples.pushFNR();
+			break;
+		case "FS":
+			tuples.pushFS();
+			break;
+		case "RS":
+			tuples.pushRS();
+			break;
+		case "OFS":
+			tuples.pushOFS();
+			break;
+		case "ORS":
+			tuples.pushORS();
+			break;
+		case "RSTART":
+			tuples.pushRSTART();
+			break;
+		case "RLENGTH":
+			tuples.pushRLENGTH();
+			break;
+		case "IGNORECASE":
+			tuples.pushIGNORECASE();
+			break;
+		case "FILENAME":
+			tuples.pushFILENAME();
+			break;
+		case "SUBSEP":
+			tuples.pushSUBSEP();
+			break;
+		case "CONVFMT":
+			tuples.pushCONVFMT();
+			break;
+		case "OFMT":
+			tuples.pushOFMT();
+			break;
+		case "ARGC":
+			tuples.pushARGC();
+			break;
+		default:
+			throw new Error("Unhandled special var: " + id);
+		}
+	}
+
+	/** Emits the tuple assigning the top of the stack to a JRT-managed special variable. */
+	private void assignSpecialVariable(AwkTuples tuples, String id) {
+		switch (id) {
+		case "NF":
+			tuples.assignNF();
+			break;
+		case "NR":
+			tuples.assignNR();
+			break;
+		case "FNR":
+			tuples.assignFNR();
+			break;
+		case "FS":
+			tuples.assignFS();
+			break;
+		case "RS":
+			tuples.assignRS();
+			break;
+		case "OFS":
+			tuples.assignOFS();
+			break;
+		case "ORS":
+			tuples.assignORS();
+			break;
+		case "RSTART":
+			tuples.assignRSTART();
+			break;
+		case "RLENGTH":
+			tuples.assignRLENGTH();
+			break;
+		case "IGNORECASE":
+			tuples.assignIGNORECASE();
+			break;
+		case "FILENAME":
+			tuples.assignFILENAME();
+			break;
+		case "SUBSEP":
+			tuples.assignSUBSEP();
+			break;
+		case "CONVFMT":
+			tuples.assignCONVFMT();
+			break;
+		case "OFMT":
+			tuples.assignOFMT();
+			break;
+		case "ARGC":
+			tuples.assignARGC();
+			break;
+		default:
+			throw new Error("Unhandled special var: " + id);
+		}
+	}
+
+	/*
+	 * Increments or decrements a JRT-managed special variable. Specials live in
+	 * the JRT rather than in a global slot, so the slot-based INC/DEC opcodes
+	 * cannot be used; the sequence below reads, adjusts, and assigns through
+	 * the special-variable opcodes, leaving the expression value (old value for
+	 * postfix, new value for prefix) on the stack.
+	 */
+	private void populateSpecialIncDec(AwkTuples tuples, String id, boolean increment, boolean postfix) {
+		pushSpecialVariable(tuples, id);
+		if (postfix) {
+			tuples.dup();
+		}
+		tuples.push(Long.valueOf(1L));
+		if (increment) {
+			tuples.add();
+		} else {
+			tuples.subtract();
+		}
+		assignSpecialVariable(tuples, id);
+		if (postfix) {
+			tuples.pop();
+		}
+	}
+
+	/*
+	 * A call-expression node is normally stamped when it is reduced, after the
+	 * lexer may already have consumed the line terminator; the first argument
+	 * carries the line of the call site itself, which is what gawk-style
+	 * diagnostics report.
+	 */
+	private int extensionCallLineNumber(AST params) {
+		if (params != null && params.getAst1() != null) {
+			return params.getAst1().getLineNo();
+		}
+		return currentSourceLineNumber();
+	}
+
 	private final class ExtensionAst extends AST {
 
 		private final ExtensionFunction function;
 
-		private ExtensionAst(ExtensionFunction functionParam, AST paramAst) {
-			super(paramAst);
+		private ExtensionAst(ExtensionFunction functionParam, AST paramAst, int lineNoParam) {
+			super(lineNoParam, paramAst);
 			this.function = functionParam;
 		}
 
@@ -4950,12 +5189,18 @@ public class AwkParser {
 			}
 
 			int[] reqArrayIdxs = function.collectAssocArrayIndexes(argCount);
+			int[] rawValueIdxs = function.collectRawValueIndexes(argCount);
 
 			int paramCount;
 			if (getAst1() == null) {
 				paramCount = 0;
 			} else {
 				Set<Integer> arrayIndexes = new HashSet<Integer>();
+				Set<Integer> rawValueIndexes = new HashSet<Integer>();
+				Set<Integer> literalRegexpIndexes = new HashSet<Integer>();
+				for (int idx : rawValueIdxs) {
+					rawValueIndexes.add(Integer.valueOf(idx));
+				}
 				for (int idx : reqArrayIdxs) {
 					AST paramAst = getParamAst((FunctionCallParamListAst) getAst1(), idx).getAst1();
 					if (paramAst instanceof IDAst) {
@@ -4974,11 +5219,16 @@ public class AwkParser {
 						arrayIndexes.add(Integer.valueOf(idx));
 					}
 				}
+				for (int idx : function.collectRegexpIndexes(argCount)) {
+					literalRegexpIndexes.add(Integer.valueOf(idx));
+				}
 
 				paramCount = populateActualParameters(
 						tuples,
 						(FunctionCallParamListAst) getAst1(),
 						arrayIndexes,
+						rawValueIndexes,
+						literalRegexpIndexes,
 						0);
 			}
 			// isInitial == true ::
@@ -5375,6 +5625,15 @@ public class AwkParser {
 			return endAst;
 		}
 
+		/**
+		 * Returns whether the script references the named global variable,
+		 * without creating a symbol for it.
+		 */
+		private boolean isGlobalReferenced(String id) {
+			IDAst idAst = globalIds.get(id);
+			return idAst != null && idAst.isReferenced();
+		}
+
 		private IDAst getID(String id) {
 			if (functionProxies.get(id) != null) {
 				throw parserException("cannot use " + id + " as a variable; it is a function");
@@ -5405,6 +5664,11 @@ public class AwkParser {
 			if (idAst == null) {
 				idAst = new IDAst(id, map == globalIds);
 				idAst.offset = map.size();
+				if (map == globalIds && !posix && ("SYMTAB".equals(id) || "FUNCTAB".equals(id))) {
+					// the runtime-provided meta tables are array-only, as in
+					// gawk: using them as scalars must fail like any array
+					idAst.setArray(true);
+				}
 				map.put(id, idAst);
 			}
 			return idAst;
@@ -5506,7 +5770,11 @@ public class AwkParser {
 		}
 
 		AST addREGEXP(String localRegexp) {
-			return new RegexpAst(localRegexp);
+			return new RegexpAst(localRegexp, false);
+		}
+
+		AST addTYPED_REGEXP(String localRegexp) {
+			return new RegexpAst(localRegexp, true);
 		}
 	}
 

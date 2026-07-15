@@ -70,7 +70,7 @@ Compilation settings matter here. For example, gawk-style arrays of arrays (`a[i
 
 ```java
 AwkSettings settings = new AwkSettings();
-settings.setAllowArraysOfArrays(false);
+settings.setPosix(true);
 
 Awk awk = new Awk(settings);
 AwkProgram program = awk.compile("{ print a[1,2] }");

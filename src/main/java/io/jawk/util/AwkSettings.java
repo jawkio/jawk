@@ -92,7 +92,7 @@ public class AwkSettings {
 	 * and subarray operands in array-only positions such as {@code split(..., a[i])}.
 	 * <code>true</code> by default.
 	 */
-	private volatile boolean allowArraysOfArrays = true;
+	private volatile boolean posix;
 
 	/**
 	 * Locale for the output of numbers
@@ -129,7 +129,7 @@ public class AwkSettings {
 		desc.append("variables = ").append(getVariables()).append(newLine);
 		desc.append("fieldSeparator = ").append(getFieldSeparator()).append(newLine);
 		desc.append("useSortedArrayKeys = ").append(isUseSortedArrayKeys()).append(newLine);
-		desc.append("allowArraysOfArrays = ").append(isAllowArraysOfArrays()).append(newLine);
+		desc.append("posix = ").append(isPosix()).append(newLine);
 		return desc.toString();
 	}
 
@@ -147,7 +147,7 @@ public class AwkSettings {
 		if (isUseSortedArrayKeys()) {
 			extensions.append(", associative array keys are sorted");
 		}
-		if (isAllowArraysOfArrays()) {
+		if (!isPosix()) {
 			extensions.append(", arrays of arrays");
 		}
 		if (extensions.length() > 0) {
@@ -275,24 +275,26 @@ public class AwkSettings {
 	}
 
 	/**
-	 * Whether to accept gawk-style arrays of arrays syntax such as {@code a[i][j]}
-	 * and subarray operands in array-only positions such as {@code split(..., a[i])}.
+	 * Whether POSIX compile-time behavior is enforced, rejecting gawk syntax
+	 * such as arrays of arrays ({@code a[i][j]}, subarray operands like
+	 * {@code split(..., a[i])}) and typed regexp literals ({@code @/re/}).
 	 *
-	 * @return {@code true} when arrays of arrays are enabled at compile time
+	 * @return {@code true} when POSIX compile-time behavior is enforced
 	 */
-	public boolean isAllowArraysOfArrays() {
-		return allowArraysOfArrays;
+	public boolean isPosix() {
+		return posix;
 	}
 
 	/**
-	 * Enables or disables gawk-style arrays of arrays syntax such as
-	 * {@code a[i][j]} and subarray operands in array-only positions such as
-	 * {@code split(..., a[i])} or {@code for (k in a[i])}.
+	 * Enables or disables POSIX compile-time behavior. When enabled, gawk
+	 * syntax such as arrays of arrays ({@code a[i][j]}, subarray operands like
+	 * {@code split(..., a[i])} or {@code for (k in a[i])}) and typed regexp
+	 * literals ({@code @/re/}) is rejected.
 	 *
-	 * @param allowArraysOfArrays {@code true} to accept arrays-of-arrays features
+	 * @param posix {@code true} to enforce POSIX compile-time behavior
 	 */
-	public void setAllowArraysOfArrays(boolean allowArraysOfArrays) {
-		this.allowArraysOfArrays = allowArraysOfArrays;
+	public void setPosix(boolean posix) {
+		this.posix = posix;
 		markModified();
 	}
 
@@ -369,7 +371,7 @@ public class AwkSettings {
 		}
 
 		@Override
-		public void setAllowArraysOfArrays(boolean allowArraysOfArrays) {
+		public void setPosix(boolean posix) {
 			throw unsupported();
 		}
 

@@ -55,6 +55,28 @@ public class AwkTuples implements Serializable {
 	/** Address manager */
 	private final AddressManager addressManager = new AddressManager();
 
+	/** Description of the primary script source, used for runtime diagnostics. */
+	private String sourceDescription;
+
+	/**
+	 * Records the description of the primary script source (typically its file
+	 * name) so runtime diagnostics can point at it.
+	 *
+	 * @param sourceDescriptionParam script source description
+	 */
+	public void setSourceDescription(String sourceDescriptionParam) {
+		this.sourceDescription = sourceDescriptionParam;
+	}
+
+	/**
+	 * Returns the description of the primary script source.
+	 *
+	 * @return script source description, or {@code null} when unknown
+	 */
+	public String getSourceDescription() {
+		return sourceDescription;
+	}
+
 	// made public to access static members of AwkTuples via Java Reflection
 
 	// made public to be accessable via Java Reflection
@@ -373,6 +395,22 @@ public class AwkTuples implements Serializable {
 	 */
 	public void dereference(int offset, boolean isArray, boolean isGlobal) {
 		queue.add(new Tuple.DereferenceTuple(offset, isArray, isGlobal));
+	}
+
+	/**
+	 * Emits a variable read that does not assign a blank value when the variable
+	 * is still untyped.
+	 * <p>
+	 * This is used by extension functions such as gawk's {@code typeof()} that
+	 * need the current lvalue state, not AWK's normal scalar autovivification side
+	 * effect.
+	 * </p>
+	 *
+	 * @param offset variable offset
+	 * @param isGlobal whether the variable is global
+	 */
+	public void peekDereference(int offset, boolean isGlobal) {
+		queue.add(new Tuple.VariableTuple(Opcode.PEEK_DEREFERENCE, offset, isGlobal));
 	}
 
 	/**
@@ -1352,6 +1390,32 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
+	 * Emits the tuple that runs the extension beforeStart hooks, placed at the
+	 * end of the preamble.
+	 */
+	public void beforeStartHooks() {
+		queue.add(new Tuple.NoOperandTuple(Opcode.BEFORE_START_HOOKS));
+	}
+
+	/**
+	 * Emits the tuple populating the SYMTAB array.
+	 *
+	 * @param offset offset of the SYMTAB global
+	 */
+	public void updateSymtab(int offset) {
+		queue.add(new Tuple.LongTuple(Opcode.UPDATE_SYMTAB, offset));
+	}
+
+	/**
+	 * Emits the tuple populating the FUNCTAB array.
+	 *
+	 * @param offset offset of the FUNCTAB global
+	 */
+	public void updateFunctab(int offset) {
+		queue.add(new Tuple.LongTuple(Opcode.UPDATE_FUNCTAB, offset));
+	}
+
+	/**
 	 * <p>
 	 * argcOffset.
 	 * </p>
@@ -1412,6 +1476,20 @@ public class AwkTuples implements Serializable {
 	/** Assigns the top-of-stack value to {@code FS}. */
 	public void assignFS() {
 		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_FS));
+	}
+
+	/**
+	 * Emits a tuple pushing the value of IGNORECASE.
+	 */
+	public void pushIGNORECASE() {
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_IGNORECASE));
+	}
+
+	/**
+	 * Emits a tuple assigning the top of the stack to IGNORECASE.
+	 */
+	public void assignIGNORECASE() {
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_IGNORECASE));
 	}
 
 	/** Pushes the current value of {@code RS} onto the operand stack. */
@@ -1551,6 +1629,17 @@ public class AwkTuples implements Serializable {
 			int numFormalParams,
 			int numActualParams) {
 		queue.add(new Tuple.CallFunctionTuple(addressSupplier, funcName, numFormalParams, numActualParams));
+	}
+
+	/**
+	 * Emits a tuple that prints a diagnostic message to the warning stream when
+	 * executed. Planted by the parser just before the instruction it describes,
+	 * so the warning appears in runtime order, exactly where gawk emits it.
+	 *
+	 * @param message warning text to print
+	 */
+	public void warning(String message) {
+		queue.add(new Tuple.WarningTuple(message));
 	}
 
 	/**
@@ -2124,11 +2213,15 @@ public class AwkTuples implements Serializable {
 			return Double.valueOf(ans);
 		}
 		case CMP_EQ:
-			return JRT.compare2(left, right, 0) ? Long.valueOf(1L) : Long.valueOf(0L);
 		case CMP_LT:
-			return JRT.compare2(left, right, -1) ? Long.valueOf(1L) : Long.valueOf(0L);
 		case CMP_GT:
-			return JRT.compare2(left, right, 1) ? Long.valueOf(1L) : Long.valueOf(0L);
+			// only numeric comparisons are compile-time constants: string
+			// comparisons depend on the runtime IGNORECASE setting
+			if (!(left instanceof Number) || !(right instanceof Number)) {
+				return null;
+			}
+			return JRT.compare2(left, right, opcode == Opcode.CMP_EQ ? 0 : opcode == Opcode.CMP_LT ? -1 : 1) ?
+					Long.valueOf(1L) : Long.valueOf(0L);
 		case CONCAT:
 			if (left instanceof String && right instanceof String) {
 				return ((String) left) + ((String) right);
@@ -2666,6 +2759,7 @@ public class AwkTuples implements Serializable {
 		case ASSIGN_NOPUSH:
 		case ASSIGN_ARRAY:
 		case DEREFERENCE:
+		case PEEK_DEREFERENCE:
 		case PLUS_EQ:
 		case MINUS_EQ:
 		case MULT_EQ:
@@ -2679,6 +2773,9 @@ public class AwkTuples implements Serializable {
 		case MOD_EQ_ARRAY:
 		case POW_EQ_ARRAY:
 		case CALL_FUNCTION:
+			// extension calls read globals (e.g. IGNORECASE) and their
+			// beforeStart hooks assign gawk-owned arrays
+		case EXTENSION:
 		case SET_RETURN_RESULT:
 		case RETURN_FROM_FUNCTION:
 		case MATCH:

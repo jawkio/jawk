@@ -26,13 +26,21 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.Map;
 
 /**
- * Marks an extension function parameter that must be evaluated and passed as
- * an associative array backed by a {@link Map}. Combine with
- * {@link JawkOptional} when the AWK caller may omit the array.
+ * Marks an extension method that should run after globals are allocated and
+ * before tuple execution starts.
+ * <p>
+ * The method runs once per interpreter instance, not once per execution:
+ * extension initialization may be heavy, and the {@code AVM}/{@code JRT} pair
+ * it binds to is stable for the lifetime of the engine. Use it to register
+ * runtime hooks and build one-time state, not to seed per-run globals.
+ * </p>
+ * <p>
+ * Annotated methods must be instance methods that return {@code void} and
+ * accept {@code (AVM, JRT)}.
+ * </p>
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.PARAMETER)
-public @interface JawkAssocArray {}
+@Target(ElementType.METHOD)
+public @interface JawkBeforeStart {}

@@ -26,13 +26,18 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.Map;
 
 /**
- * Marks an extension function parameter that must be evaluated and passed as
- * an associative array backed by a {@link Map}. Combine with
- * {@link JawkOptional} when the AWK caller may omit the array.
+ * Marks an extension function parameter that must receive the AWK value
+ * exactly as the runtime stores it, without forcing an untyped variable or a
+ * missing array element into an assigned scalar.
+ * <p>
+ * Because the raw value can be an untyped placeholder, an uninitialized
+ * value, an associative array, or a precompiled regexp, the annotated Java
+ * parameter must be declared as {@link Object}. Type-introspection functions
+ * such as gawk's {@code typeof()} and {@code isarray()} rely on this marker.
+ * </p>
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.PARAMETER)
-public @interface JawkAssocArray {}
+public @interface JawkRawValue {}

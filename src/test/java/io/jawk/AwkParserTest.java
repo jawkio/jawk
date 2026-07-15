@@ -196,7 +196,7 @@ public class AwkParserTest {
 	@Test
 	public void testArraysOfArraysCanBeDisabled() {
 		AwkSettings settings = new AwkSettings();
-		settings.setAllowArraysOfArrays(false);
+		settings.setPosix(true);
 		Awk awk = new Awk(settings);
 
 		assertThrows(ParserException.class, () -> awk.compile("BEGIN { a[1][2] = 42 }"));

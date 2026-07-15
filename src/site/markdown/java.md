@@ -36,18 +36,18 @@ Awk awk = new Awk(settings);
 | `setLocale(Locale)` | `Locale.US` | Locale for numeric output formatting |
 | `setDefaultRS(String)` | Platform line separator | Default value for `RS`, the record separator  |
 | `setUseSortedArrayKeys(boolean)` | `false` | Whether to keep associative array keys in sorted order |
-| `setAllowArraysOfArrays(boolean)` | `true` | Whether the compiler accepts gawk-style nested array features such as `a[i][j]` and `split(..., a[i])` |
+| `setPosix(boolean)` | `false` | Enforce POSIX compile-time behavior, rejecting gawk syntax such as `a[i][j]`, `split(..., a[i])`, and typed regexp literals (`@/re/`) |
 | `putVariable(String, Object)` | Empty map | Pre-set variables available before `BEGIN` |
 
 Output destination is specified per-call on the builder (`execute()`, `execute(PrintStream)`, `execute(OutputStream)`, `execute(Appendable)`, or `execute(AwkSink)`). See the [Custom Output](java-output.html) guide for details.
 
 For more on passing variables to scripts, see [Variables and Arguments](java-variables.html).
 
-By default, Jawk accepts both classic multi-dimensional array syntax (`a[i, j]`) and gawk-style arrays of arrays (`a[i][j]`). Disable this compile-time mode when you need strict classic AWK parsing; doing so also rejects subarray operands in array-only positions such as `split(..., a[i])`, `for (k in a[i])`, and `"x" in a[i]`:
+By default, Jawk accepts both classic multi-dimensional array syntax (`a[i, j]`) and gawk-style arrays of arrays (`a[i][j]`). Enable POSIX mode when you need strict classic AWK parsing; it rejects arrays of arrays, subarray operands in array-only positions such as `split(..., a[i])`, `for (k in a[i])`, and `"x" in a[i]`, and typed regexp literals (`@/re/`):
 
 ```java
 AwkSettings settings = new AwkSettings();
-settings.setAllowArraysOfArrays(false);
+settings.setPosix(true);
 
 Awk awk = new Awk(settings);
 ```
@@ -57,6 +57,8 @@ Construct it with extension instances when you want those functions available to
 ```java
 Awk awk = new Awk(StdinExtension.INSTANCE, new MyExtension());
 ```
+
+A plain `new Awk()` enables the built-in [GNU Awk compatibility extension](extensions.html#gawk) (`asort()`, `typeof()`, and friends). Passing explicit extension instances replaces that default set, so include a `new GawkExtension()` in the list when the script still needs the gawk builtins.
 
 The dedicated [Writing Extensions](extensions-writing.html) guide covers how to write your own extensions to expose new functions, written in Java, to your AWK scripts.
 

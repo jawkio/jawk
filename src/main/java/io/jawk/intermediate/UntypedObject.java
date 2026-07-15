@@ -1,4 +1,4 @@
-package io.jawk.ext.annotations;
+package io.jawk.intermediate;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -22,17 +22,16 @@ package io.jawk.ext.annotations;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import java.util.Map;
-
 /**
- * Marks an extension function parameter that must be evaluated and passed as
- * an associative array backed by a {@link Map}. Combine with
- * {@link JawkOptional} when the AWK caller may omit the array.
+ * Marker for a variable or array element whose scalar-or-array nature has not
+ * yet been fixed.
  */
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.PARAMETER)
-public @interface JawkAssocArray {}
+public class UntypedObject extends UninitializedObject {
+
+	private static final long serialVersionUID = 1L;
+
+	/**
+	 * Creates an untyped marker.
+	 */
+	public UntypedObject() {}
+}

@@ -281,7 +281,7 @@ public final class Cli {
 					throw new IllegalArgumentException(POSIX_LOAD_CONFLICT_MESSAGE);
 				}
 				posixRequested = true;
-				settings.setAllowArraysOfArrays(false);
+				settings.setPosix(true);
 			} else if (arg.equals("--dump-syntax")) {
 // --dump-syntax : dump syntax tree to file
 				dumpSyntaxTree = true;
@@ -409,9 +409,9 @@ public final class Cli {
 			if (extension == null) {
 				throw new IllegalArgumentException("Unknown extension '" + spec + "'");
 			}
-			// Replace the StdinExtension singleton with a fresh instance
-			// wired to this CLI's input stream so that StdinGetline()
-			// reads from the correct source
+			// Replace the resolved StdinExtension with a fresh instance wired
+			// to this CLI's input stream so that StdinGetline() reads from
+			// the correct source
 			if (extension instanceof StdinExtension) {
 				extension = new StdinExtension(inputStream);
 			}
@@ -486,6 +486,7 @@ public final class Cli {
 		try (AVM avm = awk.createAvm(profiling)) {
 			avm.setAwkSink(sink);
 			avm.setErrorStream(err);
+			avm.setWarningStream(err);
 			if (memoryFile != null) {
 				restorePersistentMemoryIfPresent(avm, memoryFile);
 			}

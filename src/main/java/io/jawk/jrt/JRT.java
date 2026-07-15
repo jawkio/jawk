@@ -88,10 +88,11 @@ public class JRT {
 	private static final boolean IS_WINDOWS = System.getProperty("os.name").indexOf("Windows") >= 0;
 
 	/**
-	 * Ceiling for {@link #dynamicPatterns}: scripts can synthesize an unbounded
-	 * number of distinct dynamic regexps from input data, so the cache is dumped
-	 * wholesale when it fills instead of growing without bound. Real scripts use
-	 * a handful of dynamic regexps, so the limit is effectively never reached.
+	 * Ceiling for {@link #dynamicPatterns} and {@link #dynamicPatternsIgnoreCase}:
+	 * scripts can synthesize an unbounded number of distinct dynamic regexps from
+	 * input data, so a cache is dumped wholesale when it fills instead of growing
+	 * without bound. Real scripts use a handful of dynamic regexps, so the limit
+	 * is effectively never reached.
 	 */
 	private static final int DYNAMIC_PATTERN_CACHE_LIMIT = 256;
 
@@ -110,8 +111,10 @@ public class JRT {
 	private boolean ignoreCase;
 	/** Case-insensitive twins of precompiled patterns; created on first use. */
 	private Map<Pattern, Pattern> caseInsensitivePatterns;
-	/** Compiled dynamic (string) regexps, keyed by expression text; created on first use. */
+	/** Compiled case-sensitive dynamic (string) regexps, keyed by expression text; created on first use. */
 	private Map<String, Pattern> dynamicPatterns;
+	/** Compiled case-insensitive dynamic (string) regexps, keyed by expression text; created on first use. */
+	private Map<String, Pattern> dynamicPatternsIgnoreCase;
 	/** Reused buffer holding the result of the last sub()/gsub() replacement. */
 	private final StringBuffer replaceResult = new StringBuffer();
 	// Last input line consumed for getline-style transport.
@@ -1420,8 +1423,10 @@ public class JRT {
 	 * dynamic regexps are typically reused across records (for example a
 	 * {@code gsub(dynstr, ...)} loop), and the JDK's
 	 * {@link Pattern#compile(String, int)} reparses the expression on every
-	 * call. An entry compiled under a different {@code IGNORECASE} setting is
-	 * recompiled and replaced on access.
+	 * call. Each {@code IGNORECASE} setting has its own cache; the settings
+	 * cannot share one because {@link Pattern#flags()} reflects inline flag
+	 * constructs such as {@code (?i)}, so it cannot tell apart a pattern
+	 * compiled under the other setting.
 	 *
 	 * @param ere dynamic regular expression text
 	 * @return the compiled pattern honoring the current {@code IGNORECASE}
@@ -1430,15 +1435,16 @@ public class JRT {
 	public Pattern dynamicPattern(String ere) {
 		if (dynamicPatterns == null) {
 			dynamicPatterns = new HashMap<String, Pattern>();
+			dynamicPatternsIgnoreCase = new HashMap<String, Pattern>();
 		}
-		int flags = regexpFlags();
-		Pattern pattern = dynamicPatterns.get(ere);
-		if (pattern == null || pattern.flags() != flags) {
-			if (dynamicPatterns.size() >= DYNAMIC_PATTERN_CACHE_LIMIT) {
-				dynamicPatterns.clear();
+		Map<String, Pattern> cache = ignoreCase ? dynamicPatternsIgnoreCase : dynamicPatterns;
+		Pattern pattern = cache.get(ere);
+		if (pattern == null) {
+			if (cache.size() >= DYNAMIC_PATTERN_CACHE_LIMIT) {
+				cache.clear();
 			}
-			pattern = Pattern.compile(ere, flags);
-			dynamicPatterns.put(ere, pattern);
+			pattern = Pattern.compile(ere, regexpFlags());
+			cache.put(ere, pattern);
 		}
 		return pattern;
 	}

@@ -36,14 +36,14 @@ Awk awk = new Awk(settings);
 | `setLocale(Locale)` | `Locale.US` | Locale for numeric output formatting |
 | `setDefaultRS(String)` | Platform line separator | Default value for `RS`, the record separator  |
 | `setUseSortedArrayKeys(boolean)` | `false` | Whether to keep associative array keys in sorted order |
-| `setPosix(boolean)` | `false` | Enforce POSIX compile-time behavior, rejecting gawk syntax such as `a[i][j]`, `split(..., a[i])`, and typed regexp literals (`@/re/`) |
+| `setPosix(boolean)` | `false` | Enforce POSIX compile-time behavior, rejecting gawk syntax such as `a[i][j]`, `split(..., a[i])`, typed regexp literals (`@/re/`), and the `BEGINFILE` / `ENDFILE` special patterns |
 | `putVariable(String, Object)` | Empty map | Pre-set variables available before `BEGIN` |
 
 Output destination is specified per-call on the builder (`execute()`, `execute(PrintStream)`, `execute(OutputStream)`, `execute(Appendable)`, or `execute(AwkSink)`). See the [Custom Output](java-output.html) guide for details.
 
 For more on passing variables to scripts, see [Variables and Arguments](java-variables.html).
 
-By default, Jawk accepts both classic multi-dimensional array syntax (`a[i, j]`) and gawk-style arrays of arrays (`a[i][j]`). Enable POSIX mode when you need strict classic AWK parsing; it rejects arrays of arrays, subarray operands in array-only positions such as `split(..., a[i])`, `for (k in a[i])`, and `"x" in a[i]`, and typed regexp literals (`@/re/`):
+By default, Jawk accepts both classic multi-dimensional array syntax (`a[i, j]`) and gawk-style arrays of arrays (`a[i][j]`), and treats gawk's `BEGINFILE` / `ENDFILE` patterns as special. Enable POSIX mode when you need strict classic AWK parsing; it rejects arrays of arrays, subarray operands in array-only positions such as `split(..., a[i])`, `for (k in a[i])`, and `"x" in a[i]`, and typed regexp literals (`@/re/`), and it stops treating `BEGINFILE` / `ENDFILE` as special patterns:
 
 ```java
 AwkSettings settings = new AwkSettings();

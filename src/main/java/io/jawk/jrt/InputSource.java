@@ -98,6 +98,12 @@ public interface InputSource {
 	/**
 	 * Indicates whether the current record originates from a named file in the
 	 * argument list.
+	 * <p>
+	 * For custom implementations, this flag also controls whether consuming a
+	 * record advances the per-file record counter {@code FNR}. Records read by
+	 * the built-in stream input always advance {@code FNR} — including
+	 * standard input — per POSIX.
+	 * </p>
 	 *
 	 * @return {@code true} when sourced from a filename argument
 	 */

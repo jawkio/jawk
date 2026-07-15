@@ -84,6 +84,23 @@ public class InputSourceTest {
 	}
 
 	@Test
+	public void testFnrFollowsIsFromFilenameListContract() throws Exception {
+		// For custom InputSource implementations, isFromFilenameList() keeps
+		// controlling whether records advance FNR (unlike the built-in
+		// stream input, where stdin also counts).
+		awkTest("input source FNR gated by isFromFilenameList")
+				.script("{ print FNR, NR }")
+				.withInputSource(
+						new TableInputSource(
+								Arrays
+										.asList(
+												Collections.singletonList("r1"),
+												Collections.singletonList("r2"))))
+				.expectLines("0 1", "0 2")
+				.runAndAssert();
+	}
+
+	@Test
 	public void testDollarZeroUsesInputSourceRecord() throws Exception {
 		awkTest("input source controls dollar zero text")
 				.script("{ print $0, $2 }")

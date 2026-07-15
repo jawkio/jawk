@@ -131,6 +131,8 @@ public class AwkParser {
 		KW_FUNCTION,
 		KW_BEGIN,
 		KW_END,
+		KW_BEGINFILE,
+		KW_ENDFILE,
 		KW_IN,
 		KW_IF,
 		KW_ELSE,
@@ -140,6 +142,7 @@ public class AwkParser {
 		KW_RETURN,
 		KW_EXIT,
 		KW_NEXT,
+		KW_NEXTFILE,
 		KW_CONTINUE,
 		KW_DELETE,
 		KW_BREAK,
@@ -169,6 +172,8 @@ public class AwkParser {
 		KEYWORDS.put("function", Token.KW_FUNCTION);
 		KEYWORDS.put("BEGIN", Token.KW_BEGIN);
 		KEYWORDS.put("END", Token.KW_END);
+		KEYWORDS.put("BEGINFILE", Token.KW_BEGINFILE);
+		KEYWORDS.put("ENDFILE", Token.KW_ENDFILE);
 		KEYWORDS.put("in", Token.KW_IN);
 
 		// statements
@@ -180,6 +185,7 @@ public class AwkParser {
 		KEYWORDS.put("return", Token.KW_RETURN);
 		KEYWORDS.put("exit", Token.KW_EXIT);
 		KEYWORDS.put("next", Token.KW_NEXT);
+		KEYWORDS.put("nextfile", Token.KW_NEXTFILE);
 		KEYWORDS.put("continue", Token.KW_CONTINUE);
 		KEYWORDS.put("delete", Token.KW_DELETE);
 		KEYWORDS.put("break", Token.KW_BREAK);
@@ -283,6 +289,8 @@ public class AwkParser {
 		SPECIAL_VAR_NAMES.put("ARGC", SP_IDX);
 		SPECIAL_VAR_NAMES.put("ARGV", SP_IDX);
 		SPECIAL_VAR_NAMES.put("IGNORECASE", SP_IDX);
+		SPECIAL_VAR_NAMES.put("ERRNO", SP_IDX);
+		SPECIAL_VAR_NAMES.put("ARGIND", SP_IDX);
 	}
 
 	/**
@@ -308,6 +316,19 @@ public class AwkParser {
 	public AwkParser(Map<String, ExtensionFunction> extensions, boolean posix) {
 		this.extensions = extensions == null ? Collections.emptyMap() : new HashMap<>(extensions);
 		this.posix = posix;
+	}
+
+	/**
+	 * Returns whether the keyword is disabled in the current compile-time
+	 * mode. BEGINFILE and ENDFILE are gawk extensions: in POSIX mode they are
+	 * not special and lex as plain identifiers, exactly like
+	 * {@code gawk --posix}.
+	 *
+	 * @param keywordToken the keyword token to inspect
+	 * @return {@code true} when the keyword must be treated as an identifier
+	 */
+	private boolean isDisabledKeyword(Token keywordToken) {
+		return posix && (keywordToken == Token.KW_BEGINFILE || keywordToken == Token.KW_ENDFILE);
 	}
 
 	private List<ScriptSource> scriptSources;
@@ -515,18 +536,42 @@ public class AwkParser {
 
 	/**
 	 * Reads the regular expression (between slashes '/') and handle '\/'.
+	 * A slash within a bracket expression (e.g. {@code /[/]/}) does not
+	 * terminate the regular expression, per POSIX ERE bracket semantics.
 	 *
 	 * @throws IOException
 	 */
 	private void readRegexp() throws IOException {
 		regexp.setLength(0);
 
-		while (token != Token.EOF && c > 0 && c != '/' && c != '\n') {
+		boolean inBracket = false;
+		while (token != Token.EOF && c > 0 && (c != '/' || inBracket) && c != '\n') {
 			if (c == '\\') {
 				read();
 				if (c != '/') {
 					regexp.append('\\');
 				}
+				regexp.append((char) c);
+				read();
+				continue;
+			}
+			if (!inBracket && c == '[') {
+				inBracket = true;
+				regexp.append((char) c);
+				read();
+				// a ']' right after '[' (or after '[^') is a literal ']'
+				if (c == '^') {
+					regexp.append((char) c);
+					read();
+				}
+				if (c == ']') {
+					regexp.append((char) c);
+					read();
+				}
+				continue;
+			}
+			if (inBracket && c == ']') {
+				inBracket = false;
 			}
 			regexp.append((char) c);
 			read();
@@ -839,7 +884,7 @@ public class AwkParser {
 				return token;
 			}
 			Token kwToken = KEYWORDS.get(text.toString());
-			if (kwToken != null) {
+			if (kwToken != null && !isDisabledKeyword(kwToken)) {
 				token = kwToken;
 				return token;
 			}
@@ -1043,6 +1088,12 @@ public class AwkParser {
 		} else if (token == Token.KW_END) {
 			lexer();
 			optExpr = symbolTable.addEND();
+		} else if (token == Token.KW_BEGINFILE) {
+			lexer();
+			optExpr = symbolTable.addBEGINFILE();
+		} else if (token == Token.KW_ENDFILE) {
+			lexer();
+			optExpr = symbolTable.addENDFILE();
 		} else if (token != Token.OPEN_BRACE && token != Token.SEMICOLON && token != Token.NEWLINE && token != Token.EOF) {
 			// true = allow comparators, allow IN keyword, do Token.NOT allow multidim indices expressions
 			optExpr = ASSIGNMENT_EXPRESSION(null, true, true, false);
@@ -1676,6 +1727,8 @@ public class AwkParser {
 				stmt = PRINTF_STATEMENT();
 			} else if (token == Token.KW_NEXT) {
 				stmt = NEXT_STATEMENT();
+			} else if (token == Token.KW_NEXTFILE) {
+				stmt = NEXTFILE_STATEMENT();
 			} else if (token == Token.KW_CONTINUE) {
 				stmt = CONTINUE_STATEMENT();
 			} else if (token == Token.KW_BREAK) {
@@ -2094,6 +2147,12 @@ public class AwkParser {
 	AST NEXT_STATEMENT() throws IOException {
 		expectKeyword("next");
 		return new NextStatementAst();
+	}
+
+	AST NEXTFILE_STATEMENT() throws IOException {
+		expectKeyword("nextfile");
+		nextfileEncountered = true;
+		return new NextfileStatementAst();
 	}
 
 	AST CONTINUE_STATEMENT() throws IOException {
@@ -2614,6 +2673,52 @@ public class AwkParser {
 			return result;
 		}
 
+		private boolean isBeginFile = isBeginFile();
+
+		protected final void setBeginFileFlag(boolean flag) {
+			isBeginFile = flag;
+		}
+
+		private boolean isBeginFile() {
+			boolean result = isBeginFile;
+			if (!result && ast1 != null) {
+				result = ast1.isBeginFile();
+			}
+			if (!result && ast2 != null) {
+				result = ast2.isBeginFile();
+			}
+			if (!result && ast3 != null) {
+				result = ast3.isBeginFile();
+			}
+			if (!result && ast4 != null) {
+				result = ast4.isBeginFile();
+			}
+			return result;
+		}
+
+		private boolean isEndFile = isEndFile();
+
+		protected final void setEndFileFlag(boolean flag) {
+			isEndFile = flag;
+		}
+
+		private boolean isEndFile() {
+			boolean result = isEndFile;
+			if (!result && ast1 != null) {
+				result = ast1.isEndFile();
+			}
+			if (!result && ast2 != null) {
+				result = ast2.isEndFile();
+			}
+			if (!result && ast3 != null) {
+				result = ast3.isEndFile();
+			}
+			if (!result && ast4 != null) {
+				result = ast4.isEndFile();
+			}
+			return result;
+		}
+
 		private boolean isFunction = isFunction();
 
 		@SuppressWarnings("unused")
@@ -2719,7 +2824,12 @@ public class AwkParser {
 	}
 
 	private static boolean isRule(AST ast) {
-		return ast != null && !ast.isBegin() && !ast.isEnd() && !ast.isFunction();
+		return ast != null
+				&& !ast.isBegin()
+				&& !ast.isEnd()
+				&& !ast.isBeginFile()
+				&& !ast.isEndFile()
+				&& !ast.isFunction();
 	}
 
 	/**
@@ -2774,6 +2884,14 @@ public class AwkParser {
 	}
 
 	private Address nextAddress;
+
+	/**
+	 * Whether the program contains at least one {@code nextfile} statement,
+	 * anywhere (rules or user-defined functions). When set, the main input
+	 * loop is compiled with per-file stepping so the runtime can jump to the
+	 * ENDFILE section and advance to the next input file.
+	 */
+	private boolean nextfileEncountered;
 
 	private final class RuleListAst extends AST {
 
@@ -2857,20 +2975,26 @@ public class AwkParser {
 			Address exitAddr = tuples.createAddress("end blocks start address");
 			tuples.setExitAddress(exitAddr);
 
-			// grab all BEGINs
+			// Does the program use BEGINFILE/ENDFILE rules or nextfile? If so,
+			// the main input loop must step through the input one file at a
+			// time (per-file scaffolding) instead of streaming across files.
+			boolean hasBeginFileRules = false;
+			boolean hasEndFileRules = false;
 			ptr = this;
-			// ptr.getAst1() == blank rule condition (i.e.: { print })
 			while (ptr != null) {
-				if (ptr.getAst1() != null && ptr.getAst1().isBegin()) {
-					ptr.getAst1().populateTuples(tuples);
+				if (ptr.getAst1() != null && ptr.getAst1().isBeginFile()) {
+					hasBeginFileRules = true;
 				}
-
+				if (ptr.getAst1() != null && ptr.getAst1().isEndFile()) {
+					hasEndFileRules = true;
+				}
 				ptr = ptr.getAst2();
 			}
 
 			// Do we have rules? (apart from BEGIN)
-			// If we have rules or END, we need to parse the input
-			boolean reqInput = false;
+			// If we have rules, END, BEGINFILE, or ENDFILE, we need to parse
+			// the input
+			boolean reqInput = hasBeginFileRules || hasEndFileRules;
 
 			// Check for "normal" rules
 			ptr = this;
@@ -2890,19 +3014,64 @@ public class AwkParser {
 				ptr = ptr.getAst2();
 			}
 
+			boolean perFileScaffolding = reqInput
+					&& (hasBeginFileRules || hasEndFileRules || nextfileEncountered);
+
+			// The per-file addresses must be registered before the BEGIN rules
+			// run, so a nextfile executed from a user-defined function can
+			// resolve them at runtime.
+			Address beginFileAddress = null;
+			Address endFileAddress = null;
+			Address nextFileAddress = null;
+			if (perFileScaffolding) {
+				beginFileAddress = tuples.createAddress("begin_file");
+				endFileAddress = tuples.createAddress("end_file");
+				nextFileAddress = tuples.createAddress("next_file");
+				tuples.setEndFileAddress(endFileAddress);
+				tuples.setNextFileAddress(nextFileAddress);
+			}
+
+			// grab all BEGINs
+			ptr = this;
+			// ptr.getAst1() == blank rule condition (i.e.: { print })
+			while (ptr != null) {
+				if (ptr.getAst1() != null && ptr.getAst1().isBegin()) {
+					ptr.getAst1().populateTuples(tuples);
+				}
+
+				ptr = ptr.getAst2();
+			}
+
 			if (reqInput) {
-				Address inputLoopAddress = null;
-				Address noMoreInput = null;
+				Address inputLoopAddress = tuples.createAddress("input_loop_address");
+				Address noMoreInput = tuples.createAddress("no_more_input");
 
-				inputLoopAddress = tuples.createAddress("input_loop_address");
-				tuples.address(inputLoopAddress);
+				if (perFileScaffolding) {
+					// Advance to the first input file so the BEGINFILE rules
+					// observe its FILENAME, FNR, ARGIND, and ERRNO.
+					tuples.nextFile(noMoreInput);
 
-				ptr = this;
+					// BEGINFILE rules, in the order they were read
+					tuples.address(beginFileAddress);
+					ptr = this;
+					while (ptr != null) {
+						if (ptr.getAst1() != null && ptr.getAst1().isBeginFile()) {
+							ptr.getAst1().populateTuples(tuples);
+						}
+						ptr = ptr.getAst2();
+					}
 
-				noMoreInput = tuples.createAddress("no_more_input");
-				tuples.consumeInput(noMoreInput);
+					// per-file input loop: at end of the current file, run the
+					// ENDFILE rules instead of silently opening the next file
+					tuples.address(inputLoopAddress);
+					tuples.consumeFileInput(endFileAddress);
+				} else {
+					tuples.address(inputLoopAddress);
+					tuples.consumeInput(noMoreInput);
+				}
 
 				// grab all INPUT RULES
+				ptr = this;
 				while (ptr != null) {
 					// the first one of these is an input rule
 					if (isRule(ptr.getAst1())) {
@@ -2914,11 +3083,27 @@ public class AwkParser {
 
 				tuples.gotoAddress(inputLoopAddress);
 
-				if (reqInput) {
-					tuples.address(noMoreInput);
-					// compiler has issue with missing nop here
-					tuples.nop();
+				if (perFileScaffolding) {
+					// ENDFILE rules, in the order they were read
+					tuples.address(endFileAddress);
+					ptr = this;
+					while (ptr != null) {
+						if (ptr.getAst1() != null && ptr.getAst1().isEndFile()) {
+							ptr.getAst1().populateTuples(tuples);
+						}
+						ptr = ptr.getAst2();
+					}
+
+					// then move on to the next input file, or fall through to
+					// the END rules once the input is exhausted
+					tuples.address(nextFileAddress);
+					tuples.nextFile(noMoreInput);
+					tuples.gotoAddress(beginFileAddress);
 				}
+
+				tuples.address(noMoreInput);
+				// compiler has issue with missing nop here
+				tuples.nop();
 			}
 
 			// indicate where the first end block resides
@@ -3008,7 +3193,9 @@ public class AwkParser {
 			pushSourceLineNumber(tuples);
 			boolean unconditionalRule = getAst1() == null
 					|| getAst1().isBegin()
-					|| getAst1().isEnd();
+					|| getAst1().isEnd()
+					|| getAst1().isBeginFile()
+					|| getAst1().isEndFile();
 			if (!unconditionalRule) {
 				getAst1().populateTuples(tuples);
 				// result of whether to execute or not is on the stack
@@ -3026,12 +3213,12 @@ public class AwkParser {
 		private void populateRuleBody(AwkTuples tuples) {
 			// execute the optRule here!
 			if (getAst2() == null) {
-				if (getAst1() == null || (!getAst1().isBegin() && !getAst1().isEnd())) {
+				if (isRule(this)) {
 					// display $0
 					tuples.print(0);
 				}
 				// else, don't populate it with anything
-				// (i.e., blank BEGIN/END rule)
+				// (i.e., blank BEGIN/END/BEGINFILE/ENDFILE rule)
 			} else {
 				// execute it, and leave nothing on the stack
 				getAst2().populateTuples(tuples);
@@ -3041,12 +3228,34 @@ public class AwkParser {
 		@Override
 		public Address nextAddress() {
 			if (!isRule(this)) {
-				throw new SemanticException("Must call next within an input rule.");
+				throw new SemanticException(
+						"`next' cannot be called from a `" + specialRuleName() + "' rule.");
 			}
 			if (nextAddress == null) {
 				throw new SemanticException("Cannot call next here.");
 			}
 			return nextAddress;
+		}
+
+		/**
+		 * Names the special (non-input) rule this AST represents, for
+		 * gawk-compatible diagnostics.
+		 */
+		private String specialRuleName() {
+			AST pattern = getAst1();
+			if (pattern != null && pattern.isBegin()) {
+				return "BEGIN";
+			}
+			if (pattern != null && pattern.isEnd()) {
+				return "END";
+			}
+			if (pattern != null && pattern.isBeginFile()) {
+				return "BEGINFILE";
+			}
+			if (pattern != null && pattern.isEndFile()) {
+				return "ENDFILE";
+			}
+			return "special";
 		}
 	}
 
@@ -4770,6 +4979,38 @@ public class AwkParser {
 		}
 	}
 
+	private final class BeginFileAst extends AST {
+
+		private BeginFileAst() {
+			super();
+			setBeginFileFlag(true);
+		}
+
+		@Override
+		public int populateTuples(AwkTuples tuples) {
+			pushSourceLineNumber(tuples);
+			tuples.push(1);
+			popSourceLineNumber(tuples);
+			return 1;
+		}
+	}
+
+	private final class EndFileAst extends AST {
+
+		private EndFileAst() {
+			super();
+			setEndFileFlag(true);
+		}
+
+		@Override
+		public int populateTuples(AwkTuples tuples) {
+			pushSourceLineNumber(tuples);
+			tuples.push(1);
+			popSourceLineNumber(tuples);
+			return 1;
+		}
+	}
+
 	private final class PreIncAst extends ScalarExpressionAst {
 
 		private PreIncAst(AST symbolAst) {
@@ -5074,6 +5315,12 @@ public class AwkParser {
 		case "ARGC":
 			tuples.pushARGC();
 			break;
+		case "ERRNO":
+			tuples.pushERRNO();
+			break;
+		case "ARGIND":
+			tuples.pushARGIND();
+			break;
 		default:
 			throw new Error("Unhandled special var: " + id);
 		}
@@ -5126,6 +5373,12 @@ public class AwkParser {
 			break;
 		case "ARGC":
 			tuples.assignARGC();
+			break;
+		case "ERRNO":
+			tuples.assignERRNO();
+			break;
+		case "ARGIND":
+			tuples.assignARGIND();
 			break;
 		default:
 			throw new Error("Unhandled special var: " + id);
@@ -5494,6 +5747,29 @@ public class AwkParser {
 		}
 	}
 
+	private class NextfileStatementAst extends AST {
+
+		@Override
+		public int populateTuples(AwkTuples tuples) {
+			pushSourceLineNumber(tuples);
+			AST nextable = searchFor(AstFlag.NEXTABLE);
+			if (nextable != null) {
+				// Direct use inside a rule: BEGIN, END, and ENDFILE reject
+				// nextfile at compile time, mirroring gawk's fatal errors.
+				// (Uses within user-defined functions are checked at runtime.)
+				AST pattern = nextable.getAst1();
+				if (pattern != null && (pattern.isBegin() || pattern.isEnd() || pattern.isEndFile())) {
+					String ruleName = pattern.isBegin() ? "BEGIN" : pattern.isEnd() ? "END" : "ENDFILE";
+					throw new SemanticException(
+							"`nextfile' cannot be called from a `" + ruleName + "' rule.");
+				}
+			}
+			tuples.execNextfile();
+			popSourceLineNumber(tuples);
+			return 0;
+		}
+	}
+
 	private final class ContinueStatementAst extends AST {
 
 		private ContinueStatementAst() {
@@ -5589,6 +5865,8 @@ public class AwkParser {
 		// "constants"
 		private BeginAst beginAst = null;
 		private EndAst endAst = null;
+		private BeginFileAst beginFileAst = null;
+		private EndFileAst endFileAst = null;
 
 		// functions (proxies)
 		private Map<String, FunctionProxy> functionProxies = new HashMap<String, FunctionProxy>();
@@ -5623,6 +5901,20 @@ public class AwkParser {
 				endAst = new EndAst();
 			}
 			return endAst;
+		}
+
+		AST addBEGINFILE() {
+			if (beginFileAst == null) {
+				beginFileAst = new BeginFileAst();
+			}
+			return beginFileAst;
+		}
+
+		AST addENDFILE() {
+			if (endFileAst == null) {
+				endFileAst = new EndFileAst();
+			}
+			return endFileAst;
 		}
 
 		/**

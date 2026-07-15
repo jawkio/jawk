@@ -23,6 +23,7 @@ package io.jawk.jrt;
  */
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -72,6 +73,11 @@ public class StreamInputSource implements InputSource, Closeable {
 	private boolean currentFromFilenameList;
 	private String currentRecord;
 	private boolean currentReaderExhausted;
+
+	// Per-file stepping state (BEGINFILE/ENDFILE and nextfile support)
+	private String currentFileOpenError;
+	private boolean currentPresentedToLoop;
+	private int lastArgumentIndex;
 
 	/**
 	 * Creates a stream-backed input source.
@@ -274,6 +280,7 @@ public class StreamInputSource implements InputSource, Closeable {
 			}
 			String arg = jrt.toAwkString(argValue);
 			if (!arg.isEmpty()) {
+				lastArgumentIndex = idx;
 				return arg;
 			}
 		}
@@ -359,10 +366,184 @@ public class StreamInputSource implements InputSource, Closeable {
 						true);
 				jrt.setFILENAMEViaJrt(jrt.toInputScalar(arg));
 				jrt.setFNR(0L);
+				jrt.setARGIND(Long.valueOf(lastArgumentIndex));
 				ready = true;
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * Advance to the next input file for the per-file main input loop used
+	 * when BEGINFILE/ENDFILE rules or {@code nextfile} are present. Variable
+	 * assignment arguments are applied along the way, exactly like
+	 * {@link #nextRecord()} does when it crosses a file boundary.
+	 * <p>
+	 * On success, FILENAME, FNR, ARGIND, and ERRNO are updated and {@code $0}
+	 * is cleared, so the BEGINFILE rules observe the new file before any
+	 * record is read. A file that cannot be opened is still reported as
+	 * available: ERRNO carries the error description and
+	 * {@link #getCurrentFileOpenError()} returns it until the next advance,
+	 * enabling gawk's non-fatal BEGINFILE error handling.
+	 * </p>
+	 *
+	 * @return {@code true} when a new input file (or the initial stdin
+	 *         stream) is current; {@code false} when input is exhausted
+	 * @throws IOException if an I/O error occurs while traversing ARGV
+	 */
+	public boolean advanceToNextFile() throws IOException {
+		initializeArgList();
+
+		// Adopt a reader already opened by a non-redirected getline that ran
+		// before the per-file loop (e.g. in a BEGIN rule): it is the current
+		// input file, already positioned after the records getline consumed.
+		if (!currentPresentedToLoop
+				&& partitioningReader != null
+				&& !currentReaderExhausted
+				&& currentFileOpenError == null) {
+			currentPresentedToLoop = true;
+			return true;
+		}
+
+		currentFileOpenError = null;
+		arglistMaxKey = computeMaxArgvKey();
+		hasFilenames = detectFilenames();
+		while (true) {
+			String arg = nextArgument();
+			if (arg == null) {
+				// ARGC/ARGV may have changed while evaluating assignments.
+				hasFilenames = detectFilenames();
+				if (partitioningReader == null && !hasFilenames) {
+					return presentDefaultInput();
+				}
+				closeCurrentReaderIfFileStream();
+				return false;
+			}
+			if (arg.indexOf('=') > 0) {
+				setFilelistVariable(arg);
+				// Recompute bounds so ARGC changes are reflected immediately.
+				arglistMaxKey = computeMaxArgvKey();
+				hasFilenames = detectFilenames();
+				if (partitioningReader == null && !hasFilenames) {
+					return presentDefaultInput();
+				}
+				if (partitioningReader != null) {
+					jrt.setNR(jrt.getNR() + 1);
+				}
+			} else {
+				closeCurrentReaderIfFileStream();
+				partitioningReader = null;
+				currentReaderExhausted = false;
+				currentPresentedToLoop = true;
+				jrt.setFILENAMEViaJrt(jrt.toInputScalar(arg));
+				beginFileState(lastArgumentIndex);
+				currentFileOpenError = openCurrentFile(arg);
+				if (currentFileOpenError != null) {
+					jrt.setERRNO(currentFileOpenError);
+				}
+				return true;
+			}
+		}
+	}
+
+	/**
+	 * Reads the next record of the current input file only, never advancing
+	 * to the next input file. Used by the per-file main input loop so that
+	 * ENDFILE rules can run at each file boundary.
+	 *
+	 * @return {@code true} when a record is available; {@code false} at the
+	 *         end of the current input file
+	 * @throws IOException if an I/O error occurs
+	 */
+	public boolean nextRecordInCurrentFile() throws IOException {
+		if (partitioningReader == null || currentReaderExhausted || currentFileOpenError != null) {
+			return false;
+		}
+		String nextRecord = partitioningReader.readRecord();
+		if (nextRecord == null) {
+			currentReaderExhausted = true;
+			return false;
+		}
+		currentRecord = nextRecord;
+		currentFromFilenameList = partitioningReader.fromFilenameList();
+		return true;
+	}
+
+	/**
+	 * Returns the error description recorded when the current input file
+	 * could not be opened by {@link #advanceToNextFile()}, or {@code null}
+	 * when the current input is readable.
+	 *
+	 * @return the pending open error, or {@code null}
+	 */
+	public String getCurrentFileOpenError() {
+		return currentFileOpenError;
+	}
+
+	/**
+	 * Presents the default input stream (usually stdin) as the current and
+	 * only input "file" for the per-file main input loop.
+	 *
+	 * @return always {@code true}
+	 */
+	private boolean presentDefaultInput() {
+		partitioningReader = new PartitioningReader(
+				new InputStreamReader(defaultInput, StandardCharsets.UTF_8),
+				jrt.getRSString());
+		currentPresentedToLoop = true;
+		jrt.setFILENAMEViaJrt(jrt.toInputScalar(""));
+		beginFileState(0);
+		return true;
+	}
+
+	/**
+	 * Resets the per-file special variables observed by BEGINFILE rules: FNR
+	 * and {@code $0} are cleared, ERRNO is emptied, and ARGIND designates the
+	 * ARGV entry being processed.
+	 *
+	 * @param argvIndex the ARGV index of the new current file, or {@code 0}
+	 *        for the default input stream
+	 */
+	private void beginFileState(int argvIndex) {
+		jrt.setFNR(0L);
+		jrt.setERRNO("");
+		jrt.setARGIND(Long.valueOf(argvIndex));
+		jrt.setInputLine("");
+	}
+
+	/**
+	 * Attempts to open the given filename as the current input file.
+	 *
+	 * @param arg the filename to open
+	 * @return {@code null} on success, or a gawk-style error description when
+	 *         the file cannot be opened for reading
+	 */
+	private String openCurrentFile(String arg) {
+		File file = new File(arg);
+		if (file.isDirectory()) {
+			return "Is a directory";
+		}
+		if (!file.exists()) {
+			return "No such file or directory";
+		}
+		try {
+			partitioningReader = new PartitioningReader(
+					new InputStreamReader(new FileInputStream(arg), StandardCharsets.UTF_8),
+					jrt.getRSString(),
+					true);
+			return null;
+		} catch (IOException e) {
+			String message = e.getMessage();
+			if (message == null || message.isEmpty()) {
+				return "Permission denied";
+			}
+			// Java prefixes the failing path: "path (reason)". Keep the reason.
+			int open = message.lastIndexOf('(');
+			if (open >= 0 && message.endsWith(")")) {
+				return message.substring(open + 1, message.length() - 1);
+			}
+			return message;
+		}
 	}
 
 	/**

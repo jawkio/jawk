@@ -591,6 +591,37 @@ public class AVM implements VariableManager, Closeable {
 	private Address exitAddress = null;
 
 	/**
+	 * Address of the ENDFILE section, registered by SET_ENDFILE_ADDRESS when
+	 * the program requires per-file input stepping (BEGINFILE/ENDFILE rules
+	 * or a {@code nextfile} statement); {@code null} otherwise.
+	 */
+	private Address endFileAddress = null;
+
+	/**
+	 * Address of the NEXT_FILE tuple, registered by SET_NEXTFILE_ADDRESS when
+	 * the program requires per-file input stepping; {@code null} otherwise.
+	 */
+	private Address nextFileAddress = null;
+
+	/**
+	 * <code>true</code> if execution position is within a BEGINFILE rule;
+	 * <code>false</code> otherwise.
+	 */
+	private boolean withinBeginFileBlocks = false;
+
+	/**
+	 * <code>true</code> if execution position is within an ENDFILE rule;
+	 * <code>false</code> otherwise.
+	 */
+	private boolean withinEndFileBlocks = false;
+
+	/**
+	 * <code>true</code> once the per-file main input loop has advanced to its
+	 * first input file; <code>false</code> while still in the BEGIN blocks.
+	 */
+	private boolean inputFileLoopStarted = false;
+
+	/**
 	 * <code>true</code> if execution position is within an END block;
 	 * <code>false</code> otherwise.
 	 */
@@ -678,6 +709,11 @@ public class AVM implements VariableManager, Closeable {
 		argvOffset = NULL_OFFSET;
 		symtabOffset = NULL_OFFSET;
 		exitAddress = null;
+		endFileAddress = null;
+		nextFileAddress = null;
+		withinBeginFileBlocks = false;
+		withinEndFileBlocks = false;
+		inputFileLoopStarted = false;
 		withinEndBlocks = false;
 		exitCode = 0;
 		throwExitException = false;
@@ -2035,14 +2071,46 @@ public class AVM implements VariableManager, Closeable {
 					}
 					break;
 				}
+				case CONSUME_FILE_INPUT: {
+					// arg[0] = address of the ENDFILE section
+					// store the next record of the current file into $0, $1, ...
+					applyInputSourceFilelistAssignmentsIfNeeded();
+					withinBeginFileBlocks = false;
+					if (jrt.consumeCurrentFileInput(resolvedInputSource)) {
+						position.next();
+					} else {
+						withinEndFileBlocks = true;
+						position.jump(tuple.getAddress());
+					}
+					break;
+				}
+				case NEXT_FILE: {
+					// arg[0] = address to jump to when no input file remains
+					applyInputSourceFilelistAssignmentsIfNeeded();
+					inputFileLoopStarted = true;
+					withinEndFileBlocks = false;
+					if (jrt.advanceToNextFile(resolvedInputSource)) {
+						withinBeginFileBlocks = true;
+						position.next();
+					} else {
+						position.jump(tuple.getAddress());
+					}
+					break;
+				}
+				case EXEC_NEXTFILE: {
+					executeNextfile(position);
+					break;
+				}
 
 				case GETLINE_INPUT: {
+					checkGetlineAllowed(position);
 					applyInputSourceFilelistAssignmentsIfNeeded();
 					push(jrt.consumeInput(resolvedInputSource) ? 1 : 0);
 					position.next();
 					break;
 				}
 				case GETLINE_INPUT_TO_TARGET: {
+					checkGetlineAllowed(position);
 					applyInputSourceFilelistAssignmentsIfNeeded();
 					Object input = jrt.consumeInputToTarget(resolvedInputSource);
 					if (input != null) {
@@ -2245,6 +2313,18 @@ public class AVM implements VariableManager, Closeable {
 					position.next();
 					break;
 				}
+				case SET_ENDFILE_ADDRESS: {
+					// arg[0] = address of the ENDFILE section
+					endFileAddress = tuple.getAddress();
+					position.next();
+					break;
+				}
+				case SET_NEXTFILE_ADDRESS: {
+					// arg[0] = address of the NEXT_FILE tuple
+					nextFileAddress = tuple.getAddress();
+					position.next();
+					break;
+				}
 				case SET_WITHIN_END_BLOCKS: {
 					// arg[0] = whether within the END blocks section
 					BooleanTuple endBlocksTuple = (BooleanTuple) tuple;
@@ -2259,6 +2339,8 @@ public class AVM implements VariableManager, Closeable {
 						exitCode = (int) JRT.toDouble(pop());
 					}
 					throwExitException = true;
+					withinBeginFileBlocks = false;
+					withinEndFileBlocks = false;
 
 					// If in BEGIN or in a rule, jump to the END section
 					if (!withinEndBlocks && exitAddress != null) {
@@ -2524,6 +2606,30 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case PUSH_FILENAME: {
 					push(jrt.getFILENAME());
+					position.next();
+					break;
+				}
+				case ASSIGN_ERRNO: {
+					Object v = pop();
+					jrt.setERRNO(v);
+					push(v == null ? "" : v);
+					position.next();
+					break;
+				}
+				case PUSH_ERRNO: {
+					push(jrt.getERRNO());
+					position.next();
+					break;
+				}
+				case ASSIGN_ARGIND: {
+					Object v = pop();
+					jrt.setARGIND(v);
+					push(v == null ? ZERO : v);
+					position.next();
+					break;
+				}
+				case PUSH_ARGIND: {
+					push(jrt.getARGIND());
 					position.next();
 					break;
 				}
@@ -3246,6 +3352,8 @@ public class AVM implements VariableManager, Closeable {
 											"RSTART",
 											"RLENGTH",
 											"IGNORECASE",
+											"ERRNO",
+											"ARGIND",
 											"ARGC",
 											"ARGV")));
 
@@ -3294,6 +3402,10 @@ public class AVM implements VariableManager, Closeable {
 			return jrt.getRLENGTH();
 		case "IGNORECASE":
 			return jrt.getIGNORECASEVar();
+		case "ERRNO":
+			return jrt.getERRNO();
+		case "ARGIND":
+			return jrt.getARGIND();
 		// lazily-materialized globals answered through their synthetic accessors
 		case "ARGC":
 			return getARGC();
@@ -3393,6 +3505,61 @@ public class AVM implements VariableManager, Closeable {
 		}
 		// names without a compiled slot are still symbols: keep SYMTAB current
 		updateSymtabEntry(name, normalized);
+	}
+
+	/**
+	 * Executes the {@code nextfile} statement: abandons the current input file
+	 * and resumes the per-file input loop at the appropriate point. The
+	 * runtime and operand stacks are cleared, so {@code nextfile} unwinds
+	 * user-defined function calls, mirroring {@code exit}.
+	 *
+	 * @param position the tuple position tracker to redirect
+	 */
+	private void executeNextfile(PositionTracker position) {
+		if (endFileAddress == null || !inputFileLoopStarted) {
+			throw new AwkRuntimeException(
+					position.lineNumber(),
+					"`nextfile' cannot be called from a BEGIN rule");
+		}
+		if (withinEndBlocks) {
+			throw new AwkRuntimeException(
+					position.lineNumber(),
+					"`nextfile' cannot be called from an END rule");
+		}
+		if (withinEndFileBlocks) {
+			throw new AwkRuntimeException(
+					position.lineNumber(),
+					"`nextfile' cannot be called from an ENDFILE rule");
+		}
+		// nextfile can be invoked from user-defined functions: unwind them.
+		runtimeStack.popAllFrames();
+		operandStack.clear();
+		if (withinBeginFileBlocks && jrt.hasPendingInputFileError(resolvedInputSource)) {
+			// The file could not be opened: skip its ENDFILE rules (gawk
+			// BEGINFILE error handling) and go straight to the next file.
+			withinBeginFileBlocks = false;
+			position.jump(nextFileAddress);
+		} else {
+			withinBeginFileBlocks = false;
+			withinEndFileBlocks = true;
+			position.jump(endFileAddress);
+		}
+	}
+
+	/**
+	 * Raises the gawk-compatible fatal error when a non-redirected
+	 * {@code getline} executes inside a BEGINFILE or ENDFILE rule.
+	 *
+	 * @param position the tuple position tracker, for error reporting
+	 */
+	private void checkGetlineAllowed(PositionTracker position) {
+		if (withinBeginFileBlocks || withinEndFileBlocks) {
+			throw new AwkRuntimeException(
+					position.lineNumber(),
+					"non-redirected `getline' invalid inside `"
+							+ (withinBeginFileBlocks ? "BEGINFILE" : "ENDFILE")
+							+ "' rule");
+		}
 	}
 
 	private void applyInputSourceFilelistAssignmentsIfNeeded() {

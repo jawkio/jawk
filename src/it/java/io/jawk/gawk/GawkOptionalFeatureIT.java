@@ -729,7 +729,10 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_getfile() throws Exception {
-		skip(MANUAL_SKIP_REASON);
+		skip(
+				"Requires gawk's dynamic extension API (the get_file() input hand-off used by gawkextlib),"
+						+ " which Jawk does not provide. The BEGINFILE/ENDFILE rules the fixture also exercises"
+						+ " are covered by GawkExtensionIT.test_beginfile1 and test_beginfile2_test*.");
 	}
 
 	@Test

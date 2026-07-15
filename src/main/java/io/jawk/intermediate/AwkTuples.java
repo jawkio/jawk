@@ -1492,6 +1492,36 @@ public class AwkTuples implements Serializable {
 		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_IGNORECASE));
 	}
 
+	/**
+	 * Emits the tuple pushing the value of ERRNO, managed by the JRT.
+	 */
+	public void pushERRNO() {
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_ERRNO));
+	}
+
+	/**
+	 * Emits the tuple assigning the top of the stack to ERRNO, managed by the
+	 * JRT.
+	 */
+	public void assignERRNO() {
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_ERRNO));
+	}
+
+	/**
+	 * Emits the tuple pushing the value of ARGIND, managed by the JRT.
+	 */
+	public void pushARGIND() {
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_ARGIND));
+	}
+
+	/**
+	 * Emits the tuple assigning the top of the stack to ARGIND, managed by
+	 * the JRT.
+	 */
+	public void assignARGIND() {
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_ARGIND));
+	}
+
 	/** Pushes the current value of {@code RS} onto the operand stack. */
 	public void pushRS() {
 		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_RS));
@@ -1742,6 +1772,54 @@ public class AwkTuples implements Serializable {
 	 */
 	public void setWithinEndBlocks(boolean b) {
 		queue.add(new Tuple.BooleanTuple(Opcode.SET_WITHIN_END_BLOCKS, b));
+	}
+
+	/**
+	 * Emits the tuple registering the address of the ENDFILE section, so that
+	 * a runtime {@code nextfile} statement can jump to it.
+	 *
+	 * @param addr address of the ENDFILE section
+	 */
+	public void setEndFileAddress(Address addr) {
+		queue.add(new Tuple.AddressTuple(Opcode.SET_ENDFILE_ADDRESS, addr));
+	}
+
+	/**
+	 * Emits the tuple registering the address of the {@code NEXT_FILE} tuple,
+	 * so that a runtime {@code nextfile} statement can bypass the ENDFILE
+	 * rules for input files that could not be opened.
+	 *
+	 * @param addr address of the NEXT_FILE tuple
+	 */
+	public void setNextFileAddress(Address addr) {
+		queue.add(new Tuple.AddressTuple(Opcode.SET_NEXTFILE_ADDRESS, addr));
+	}
+
+	/**
+	 * Emits the tuple advancing the main input to the next input file, or
+	 * jumping to the given address when no input file remains.
+	 *
+	 * @param address address to jump to when no more input files remain
+	 */
+	public void nextFile(Address address) {
+		queue.add(new Tuple.AddressTuple(Opcode.NEXT_FILE, address));
+	}
+
+	/**
+	 * Emits the tuple consuming one record of the current input file only,
+	 * jumping to the given address at end of the current file.
+	 *
+	 * @param address address to jump to at end of the current input file
+	 */
+	public void consumeFileInput(Address address) {
+		queue.add(new Tuple.AddressTuple(Opcode.CONSUME_FILE_INPUT, address));
+	}
+
+	/**
+	 * Emits the tuple executing the {@code nextfile} statement at runtime.
+	 */
+	public void execNextfile() {
+		queue.add(new Tuple.NoOperandTuple(Opcode.EXEC_NEXTFILE));
 	}
 
 	/**

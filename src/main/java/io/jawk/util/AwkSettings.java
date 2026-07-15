@@ -277,7 +277,9 @@ public class AwkSettings {
 	/**
 	 * Whether POSIX compile-time behavior is enforced, rejecting gawk syntax
 	 * such as arrays of arrays ({@code a[i][j]}, subarray operands like
-	 * {@code split(..., a[i])}) and typed regexp literals ({@code @/re/}).
+	 * {@code split(..., a[i])}) and typed regexp literals ({@code @/re/}),
+	 * and treating the gawk-specific {@code BEGINFILE} / {@code ENDFILE}
+	 * patterns as ordinary identifiers.
 	 *
 	 * @return {@code true} when POSIX compile-time behavior is enforced
 	 */
@@ -289,7 +291,8 @@ public class AwkSettings {
 	 * Enables or disables POSIX compile-time behavior. When enabled, gawk
 	 * syntax such as arrays of arrays ({@code a[i][j]}, subarray operands like
 	 * {@code split(..., a[i])} or {@code for (k in a[i])}) and typed regexp
-	 * literals ({@code @/re/}) is rejected.
+	 * literals ({@code @/re/}) is rejected, and the gawk-specific
+	 * {@code BEGINFILE} / {@code ENDFILE} patterns are not special.
 	 *
 	 * @param posix {@code true} to enforce POSIX compile-time behavior
 	 */

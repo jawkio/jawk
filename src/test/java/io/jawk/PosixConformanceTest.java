@@ -388,6 +388,26 @@ public class PosixConformanceTest {
 	}
 
 	@Test
+	public void posix51FnrCountsRecordsOnStandardInput() throws Exception {
+		AwkTestSupport
+				.awkTest("POSIX 5.1 FNR counts records read from standard input")
+				.script("{ print FNR, NR }")
+				.stdin("a\nb\nc\n")
+				.expectLines("1 1", "2 2", "3 3")
+				.runAndAssert();
+	}
+
+	@Test
+	public void posix51FnrCountsGetlineRecordsOnStandardInput() throws Exception {
+		AwkTestSupport
+				.awkTest("POSIX 5.1 plain getline from standard input advances FNR and NR")
+				.script("BEGIN { getline; getline line; print FNR, NR }")
+				.stdin("a\nb\nc\n")
+				.expectLines("2 2")
+				.runAndAssert();
+	}
+
+	@Test
 	public void posix52FilenameUnsetInBegin() throws Exception {
 		AwkTestSupport
 				.awkTest("POSIX 5.2 FILENAME unset in BEGIN and holds last file in END")
@@ -584,7 +604,6 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix88NextfileSkipsRestOfCurrentFile() throws Exception {
-		Assume.assumeTrue("nextfile is not supported by Jawk", false);
 		AwkTestSupport
 				.awkTest("POSIX 8.8 nextfile skips rest of current file")
 				.script("{print FILENAME \":\" $0; if (FNR==1) nextfile}")

@@ -10,6 +10,8 @@ Jawk is a pure Java implementation of [AWK](https://en.wikipedia.org/wiki/AWK). 
 
 Gawk-specific builtins — `asort()`, `asorti()`, `typeof()`, `isarray()`, `mkbool()`, `gensub()`, and `PROCINFO["sorted_in"]`-controlled array traversal — are available by default through the built-in GNU Awk compatibility extension.
 
+Jawk also supports gawk's `BEGINFILE` / `ENDFILE` special patterns (with the `ERRNO` and `ARGIND` special variables) and the `nextfile` statement, so a script can hook into the command-line file processing loop and skip unreadable files without a fatal error. As in gawk, `BEGINFILE` and `ENDFILE` are not special in `--posix` mode.
+
 ## CLI Example
 
 ```shell

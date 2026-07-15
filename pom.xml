@@ -1,12 +1,6 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<parent>
-		<groupId>org.metricshub</groupId>
-		<artifactId>oss-parent</artifactId>
-		<version>5</version>
-	</parent>
-
 	<groupId>io.jawk</groupId>
 	<artifactId>jawk</artifactId>
 	<version>6.5.00-SNAPSHOT</version>
@@ -68,7 +62,22 @@
 		</developer>
 	</developers>
 
+	<distributionManagement>
+		<repository>
+			<id>central</id>
+			<url>https://central.sonatype.com</url>
+		</repository>
+		<snapshotRepository>
+			<id>central</id>
+			<url>https://central.sonatype.com/repository/maven-snapshots</url>
+		</snapshotRepository>
+	</distributionManagement>
+
 	<properties>
+		<!-- UTF-8 -->
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.build.resourceEncoding>UTF-8</project.build.resourceEncoding>
+
 		<!-- Java 8 -->
 		<maven.compiler.release>8</maven.compiler.release>
 
@@ -77,8 +86,11 @@
 		<project.build.outputTimestamp>2026-06-03T10:27:54Z</project.build.outputTimestamp>
 		<jmh.version>1.37</jmh.version>
 
-		<!-- Same SpotBugs version for the verify-phase check and the site-phase report,
-		     overriding the older version inherited from oss-parent's reporting section -->
+		<!-- Same version for the verify-phase checks and the site-phase reports,
+		     so the reports do not overwrite the check results with output from a
+		     different engine version (see issue #509) -->
+		<maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
+		<maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
 		<spotbugs-maven-plugin.version>4.10.3.0</spotbugs-maven-plugin.version>
 	</properties>
 
@@ -113,7 +125,58 @@
 	</dependencies>
 
 	<build>
+
+		<!-- Versions of the plugins bound to the default lifecycle -->
+		<pluginManagement>
+			<plugins>
+
+				<plugin>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<version>3.14.0</version>
+				</plugin>
+
+				<plugin>
+					<artifactId>maven-deploy-plugin</artifactId>
+					<version>3.1.4</version>
+				</plugin>
+
+				<plugin>
+					<artifactId>maven-install-plugin</artifactId>
+					<version>3.1.4</version>
+				</plugin>
+
+				<plugin>
+					<artifactId>maven-release-plugin</artifactId>
+					<version>3.1.1</version>
+				</plugin>
+
+				<plugin>
+					<artifactId>maven-resources-plugin</artifactId>
+					<version>3.3.1</version>
+				</plugin>
+
+			</plugins>
+		</pluginManagement>
+
 		<plugins>
+
+			<!-- artifact (Reproducible Build) -->
+			<plugin>
+				<artifactId>maven-artifact-plugin</artifactId>
+				<version>3.6.0</version>
+				<executions>
+					<execution>
+						<id>buildinfo</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>buildinfo</goal>
+						</goals>
+						<configuration>
+							<reproducible>true</reproducible>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
@@ -168,6 +231,7 @@
 				<version>2.7.1</version>
 				<configuration>
 					<licenseName>lgpl_v3</licenseName>
+					<copyrightOwners>MetricsHub</copyrightOwners>
 					<copyrightStringFormat>Copyright (C) %1$s %2$s</copyrightStringFormat>
 					<includes>
 						<include>main/java/**/*.java</include>
@@ -175,12 +239,54 @@
 						<include>it/java/**/*.java</include>
 						<include>jmh/java/**/*.java</include>
 					</includes>
+					<trimHeaderLine>true</trimHeaderLine>
+					<canUpdateCopyright>true</canUpdateCopyright>
+					<canUpdateDescription>true</canUpdateDescription>
+					<processStartTag>╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲</processStartTag>
+					<sectionDelimiter>჻჻჻჻჻჻</sectionDelimiter>
+					<processEndTag>╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱</processEndTag>
 				</configuration>
+				<executions>
+					<execution>
+						<id>check-license</id>
+						<phase>process-sources</phase>
+						<goals>
+							<goal>check-file-header</goal>
+						</goals>
+						<configuration>
+							<failOnMissingHeader>true</failOnMissingHeader>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- source -->
+			<plugin>
+				<artifactId>maven-source-plugin</artifactId>
+				<version>3.3.1</version>
+				<executions>
+					<execution>
+						<id>attach-sources</id>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 
 			<!-- javadoc -->
 			<plugin>
 				<artifactId>maven-javadoc-plugin</artifactId>
+				<version>3.11.2</version>
+				<configuration>
+					<detectJavaApiLink>false</detectJavaApiLink>
+					<release>${maven.compiler.release}</release>
+					<show>public</show>
+					<notimestamp>true</notimestamp>
+					<failOnError>false</failOnError>
+					<sourcepath>${project.basedir}/src/main/java</sourcepath>
+					<doclint>all,-missing</doclint>
+				</configuration>
 				<executions>
 					<execution>
 						<id>attach-javadocs</id>
@@ -197,6 +303,7 @@
 			<!-- surefire -->
 			<plugin>
 				<artifactId>maven-surefire-plugin</artifactId>
+				<version>3.5.3</version>
 				<configuration>
 					<workingDirectory>${project.build.directory}/surefire-workingdir</workingDirectory>
 				</configuration>
@@ -205,6 +312,7 @@
 			<!-- failsafe for compatibility tests -->
 			<plugin>
 				<artifactId>maven-failsafe-plugin</artifactId>
+				<version>3.5.3</version>
 				<configuration>
 					<includes>
 						<include>**/*IT.java</include>
@@ -225,11 +333,12 @@
 			<!-- jar -->
 			<plugin>
 				<artifactId>maven-jar-plugin</artifactId>
+				<version>3.4.2</version>
 				<configuration>
 					<archive>
 						<manifest>
 							<packageName>${project.groupId}</packageName>
-                                                        <mainClass>io.jawk.Cli</mainClass>
+							<mainClass>io.jawk.Cli</mainClass>
 						</manifest>
 					</archive>
 				</configuration>
@@ -314,7 +423,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-checkstyle-plugin</artifactId>
-				<version>3.6.0</version>
+				<version>${maven-checkstyle-plugin.version}</version>
 				<configuration>
 					<failOnViolation>true</failOnViolation>
 					<configLocation>checkstyle.xml</configLocation>
@@ -332,7 +441,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-pmd-plugin</artifactId>
-				<version>3.28.0</version>
+				<version>${maven-pmd-plugin.version}</version>
 				<executions>
 					<execution>
 						<goals>
@@ -366,6 +475,43 @@
 			<!-- Default project-info-reports -->
 			<plugin>
 				<artifactId>maven-project-info-reports-plugin</artifactId>
+				<version>3.9.0</version>
+				<reportSets>
+					<reportSet>
+						<reports>
+							<report>ci-management</report>
+							<report>dependencies</report>
+							<report>dependency-info</report>
+							<report>distribution-management</report>
+							<report>issue-management</report>
+							<report>licenses</report>
+							<report>plugins</report>
+							<report>scm</report>
+							<report>summary</report>
+							<report>team</report>
+						</reports>
+					</reportSet>
+				</reportSets>
+			</plugin>
+
+			<!-- jxr: creates XRef links -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jxr-plugin</artifactId>
+				<version>3.6.0</version>
+			</plugin>
+
+			<!-- javadoc -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<reportSets>
+					<reportSet>
+						<reports>
+							<report>javadoc</report>
+						</reports>
+					</reportSet>
+				</reportSets>
 			</plugin>
 
 			<!-- surefire report -->
@@ -376,12 +522,28 @@
 				<!-- Also renders the Failsafe HTML report from target/failsafe-reports during site generation. -->
 			</plugin>
 
+			<!-- checkstyle -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-changelog-plugin</artifactId>
-				<version>3.0.0-M2</version>
+				<artifactId>maven-checkstyle-plugin</artifactId>
+				<version>${maven-checkstyle-plugin.version}</version>
 				<configuration>
-					<skip>true</skip>
+					<sourceEncoding>${project.build.sourceEncoding}</sourceEncoding>
+					<linkXref>true</linkXref>
+					<configLocation>checkstyle.xml</configLocation>
+				</configuration>
+			</plugin>
+
+			<!-- pmd -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-pmd-plugin</artifactId>
+				<version>${maven-pmd-plugin.version}</version>
+				<configuration>
+					<linkXref>true</linkXref>
+					<sourceEncoding>${project.build.sourceEncoding}</sourceEncoding>
+					<minimumTokens>50</minimumTokens>
+					<targetJdk>${maven.compiler.release}</targetJdk>
 				</configuration>
 			</plugin>
 
@@ -473,6 +635,85 @@
 										</transformer>
 									</transformers>
 								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+
+		<!-- Profile to deploy on Maven Central -->
+		<profile>
+			<id>maven-central</id>
+			<activation>
+				<property>
+					<name>env.MAVEN_CENTRAL_TOKEN</name>
+				</property>
+			</activation>
+			<properties>
+				<maven.deploy.skip>true</maven.deploy.skip>
+			</properties>
+			<build>
+				<plugins>
+
+					<!-- Replaces the default Maven Deploy plugin -->
+					<!-- publishes on https://central.sonatype.com -->
+					<plugin>
+						<groupId>org.sonatype.central</groupId>
+						<artifactId>central-publishing-maven-plugin</artifactId>
+						<version>0.11.0</version>
+						<extensions>true</extensions>
+						<configuration>
+							<publishingServerId>central</publishingServerId>
+							<autoPublish>${env.AUTO_RELEASE_AFTER_CLOSE}</autoPublish>
+							<centralSnapshotsUrl>https://central.sonatype.com/repository/maven-snapshots/</centralSnapshotsUrl>
+						</configuration>
+					</plugin>
+
+				</plugins>
+			</build>
+		</profile>
+
+		<!-- Profile for releasing the project -->
+		<profile>
+			<id>release</id>
+			<build>
+				<plugins>
+
+					<!-- gpg to sign the released artifacts -->
+					<plugin>
+						<artifactId>maven-gpg-plugin</artifactId>
+						<version>3.2.7</version>
+						<executions>
+							<execution>
+								<id>sign-artifacts</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>sign</goal>
+								</goals>
+								<configuration>
+									<updateReleaseInfo>true</updateReleaseInfo>
+									<gpgArguments>
+										<arg>--pinentry-mode</arg>
+										<arg>loopback</arg>
+									</gpgArguments>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+
+					<!-- release -->
+					<plugin>
+						<artifactId>maven-release-plugin</artifactId>
+						<configuration>
+							<tagNameFormat>v@{project.version}</tagNameFormat>
+						</configuration>
+						<executions>
+							<execution>
+								<id>default</id>
+								<goals>
+									<goal>perform</goal>
+								</goals>
 							</execution>
 						</executions>
 					</plugin>

@@ -30,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jawk.jrt.BlockObject;
 import io.jawk.jrt.IllegalAwkArgumentException;
 import io.jawk.jrt.JRT;
@@ -127,6 +128,7 @@ public class StdinExtension extends AbstractExtension implements JawkExtension {
 	/**
 	 * Creates a {@code StdinExtension} that reads from {@link System#in}.
 	 */
+	@SuppressFBWarnings(value = "CT_CONSTRUCTOR_THROW", justification = "Fail-fast argument validation; no security-sensitive state to protect from finalizer attacks")
 	public StdinExtension() {
 		this(System.in);
 	}
@@ -136,6 +138,7 @@ public class StdinExtension extends AbstractExtension implements JawkExtension {
 	 *
 	 * @param inputStream the stream to read stdin data from
 	 */
+	@SuppressFBWarnings(value = "CT_CONSTRUCTOR_THROW", justification = "Fail-fast argument validation; no security-sensitive state to protect from finalizer attacks")
 	public StdinExtension(InputStream inputStream) {
 		this.inputStream = Objects.requireNonNull(inputStream, "inputStream");
 	}

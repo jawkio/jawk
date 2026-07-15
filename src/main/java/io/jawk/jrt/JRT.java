@@ -193,7 +193,10 @@ public class JRT {
 	 * @param awkSink default output sink used by plain AWK print operations
 	 * @param error default error stream used for process stderr
 	 */
-	@SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "JRT must hold the provided runtime collaborators for later use")
+	@SuppressFBWarnings(value = {
+			"EI_EXPOSE_REP2",
+			"CT_CONSTRUCTOR_THROW" }, justification = "JRT must hold the provided runtime collaborators for later use;"
+					+ " fail-fast argument validation with no security-sensitive state to protect from finalizer attacks")
 	public JRT(VariableManager vm, Locale locale, AwkSink awkSink, PrintStream error) {
 		this.vm = vm;
 		this.locale = locale == null ? Locale.US : locale;

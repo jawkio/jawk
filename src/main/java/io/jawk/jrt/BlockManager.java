@@ -35,6 +35,8 @@ import java.util.List;
  */
 public class BlockManager {
 
+	private final Object lock = new Object();
+
 	private String notifier = null;
 
 	/**
@@ -83,7 +85,7 @@ public class BlockManager {
 
 		List<Thread> threadList = new LinkedList<Thread>();
 		String blockNotifier = null;
-		synchronized (this) {
+		synchronized (lock) {
 			notifier = null;
 			for (BlockObject blockobj : bos) {
 				// spawn a thread
@@ -95,7 +97,7 @@ public class BlockManager {
 			// now, wait for notification from one of the BlockThreads
 			while (notifier == null) {
 				try {
-					this.wait();
+					lock.wait();
 				} catch (InterruptedException ie) {
 					Thread.currentThread().interrupt();
 				}
@@ -118,6 +120,15 @@ public class BlockManager {
 		return blockNotifier;
 	}
 
+	private void notifyUnblock(String notifierTag) {
+		synchronized (lock) {
+			if (notifier == null) {
+				notifier = notifierTag;
+			}
+			lock.notifyAll();
+		}
+	}
+
 	private final class BlockThread extends Thread {
 
 		private BlockObject bo;
@@ -131,12 +142,7 @@ public class BlockManager {
 		public void run() {
 			try {
 				bo.block();
-				synchronized (BlockManager.this) {
-					if (notifier == null) {
-						notifier = bo.getNotifierTag();
-					}
-					BlockManager.this.notifyAll();
-				}
+				notifyUnblock(bo.getNotifierTag());
 			} catch (InterruptedException ie) {
 				currentThread().interrupt();
 			} catch (RuntimeException re) {

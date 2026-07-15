@@ -32,6 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 /**
  * An {@link InputSource} that reads records from an {@link InputStream},
  * traversing the {@code ARGV} array to open filenames and apply
@@ -81,6 +83,7 @@ public class StreamInputSource implements InputSource, Closeable {
 	 * @param jrt the JRT instance used for string conversion and special
 	 *        variable updates
 	 */
+	@SuppressFBWarnings(value = "CT_CONSTRUCTOR_THROW", justification = "Fail-fast argument validation; no security-sensitive state to protect from finalizer attacks")
 	public StreamInputSource(InputStream defaultInput, VariableManager vm, JRT jrt) {
 		this.defaultInput = Objects.requireNonNull(defaultInput, "defaultInput");
 		this.vm = Objects.requireNonNull(vm, "vm");

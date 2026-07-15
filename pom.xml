@@ -76,6 +76,10 @@
 		<!-- See https://maven.apache.org/guides/mini/guide-reproducible-builds.html -->
 		<project.build.outputTimestamp>2026-06-03T10:27:54Z</project.build.outputTimestamp>
 		<jmh.version>1.37</jmh.version>
+
+		<!-- Same SpotBugs version for the verify-phase check and the site-phase report,
+		     overriding the older version inherited from oss-parent's reporting section -->
+		<spotbugs-maven-plugin.version>4.10.3.0</spotbugs-maven-plugin.version>
 	</properties>
 
 	<dependencies>
@@ -343,7 +347,7 @@
 			<plugin>
 				<groupId>com.github.spotbugs</groupId>
 				<artifactId>spotbugs-maven-plugin</artifactId>
-				<version>4.9.8.3</version>
+				<version>${spotbugs-maven-plugin.version}</version>
 				<executions>
 					<execution>
 						<goals>
@@ -379,6 +383,15 @@
 				<configuration>
 					<skip>true</skip>
 				</configuration>
+			</plugin>
+
+			<!-- spotbugs: keep the site report on the same version as the verify-phase
+			     check, so the report does not overwrite spotbugsXml.xml with results
+			     from an older SpotBugs engine -->
+			<plugin>
+				<groupId>com.github.spotbugs</groupId>
+				<artifactId>spotbugs-maven-plugin</artifactId>
+				<version>${spotbugs-maven-plugin.version}</version>
 			</plugin>
 		</plugins>
 	</reporting>

@@ -338,6 +338,9 @@ public class StreamInputSource implements InputSource, Closeable {
 							new InputStreamReader(defaultInput, StandardCharsets.UTF_8),
 							jrt.getRSString());
 					jrt.setFILENAMEViaJrt(jrt.toInputScalar(""));
+					// gawk clears ERRNO whenever the main input advances
+					// successfully
+					jrt.setERRNO("");
 					return true;
 				}
 				closeCurrentReaderIfFileStream();
@@ -353,6 +356,9 @@ public class StreamInputSource implements InputSource, Closeable {
 							new InputStreamReader(defaultInput, StandardCharsets.UTF_8),
 							jrt.getRSString());
 					jrt.setFILENAMEViaJrt(jrt.toInputScalar(""));
+					// gawk clears ERRNO whenever the main input advances
+					// successfully
+					jrt.setERRNO("");
 					return true;
 				}
 				if (partitioningReader != null) {
@@ -367,6 +373,9 @@ public class StreamInputSource implements InputSource, Closeable {
 				jrt.setFILENAMEViaJrt(jrt.toInputScalar(arg));
 				jrt.setFNR(0L);
 				jrt.setARGIND(Long.valueOf(lastArgumentIndex));
+				// gawk clears ERRNO whenever the main input advances
+				// successfully
+				jrt.setERRNO("");
 				ready = true;
 			}
 		}

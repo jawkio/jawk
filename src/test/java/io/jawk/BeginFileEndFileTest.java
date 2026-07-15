@@ -298,6 +298,29 @@ public class BeginFileEndFileTest {
 	}
 
 	@Test
+	public void errnoIsClearedWhenMainInputOpensAFile() throws Exception {
+		// gawk clears ERRNO whenever the main input advances successfully,
+		// even without BEGINFILE/ENDFILE rules.
+		AwkTestSupport
+				.awkTest("ERRNO is cleared when an input file opens successfully")
+				.script("BEGIN { ERRNO = \"boom\" } { print \"[\" ERRNO \"]\" }")
+				.file("f1", "a1\n")
+				.operand("{{f1}}")
+				.expectLines("[]")
+				.runAndAssert();
+	}
+
+	@Test
+	public void errnoIsClearedWhenMainInputReadsStandardInput() throws Exception {
+		AwkTestSupport
+				.awkTest("ERRNO is cleared when standard input is selected as main input")
+				.script("BEGIN { ERRNO = \"boom\" } { print \"[\" ERRNO \"]\" }")
+				.stdin("s1\n")
+				.expectLines("[]")
+				.runAndAssert();
+	}
+
+	@Test
 	public void exitInsideBeginFileRunsEndRules() throws Exception {
 		AwkTestSupport
 				.cliTest("exit in BEGINFILE skips ENDFILE and runs END")

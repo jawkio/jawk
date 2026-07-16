@@ -2105,14 +2105,17 @@ public class AVM implements VariableManager, Closeable {
 				case GETLINE_INPUT: {
 					checkGetlineAllowed(position);
 					applyInputSourceFilelistAssignmentsIfNeeded();
-					push(jrt.consumeInput(resolvedInputSource) ? 1 : 0);
+					boolean consumed = isMainInputFileBounded() ?
+							jrt.consumeCurrentFileInput(resolvedInputSource) : jrt.consumeInput(resolvedInputSource);
+					push(consumed ? 1 : 0);
 					position.next();
 					break;
 				}
 				case GETLINE_INPUT_TO_TARGET: {
 					checkGetlineAllowed(position);
 					applyInputSourceFilelistAssignmentsIfNeeded();
-					Object input = jrt.consumeInputToTarget(resolvedInputSource);
+					Object input = isMainInputFileBounded() ?
+							jrt.consumeCurrentFileInputToTarget(resolvedInputSource) : jrt.consumeInputToTarget(resolvedInputSource);
 					if (input != null) {
 						push(1);
 						push(input);
@@ -3516,7 +3519,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @param position the tuple position tracker to redirect
 	 */
 	private void executeNextfile(PositionTracker position) {
-		if (endFileAddress == null || !inputFileLoopStarted) {
+		if (nextFileAddress == null || !inputFileLoopStarted) {
 			throw new AwkRuntimeException(
 					position.lineNumber(),
 					"`nextfile' cannot be called from a BEGIN rule");
@@ -3534,9 +3537,11 @@ public class AVM implements VariableManager, Closeable {
 		// nextfile can be invoked from user-defined functions: unwind them.
 		runtimeStack.popAllFrames();
 		operandStack.clear();
-		if (withinBeginFileBlocks && jrt.hasPendingInputFileError(resolvedInputSource)) {
-			// The file could not be opened: skip its ENDFILE rules (gawk
-			// BEGINFILE error handling) and go straight to the next file.
+		if (endFileAddress == null
+				|| withinBeginFileBlocks && jrt.hasPendingInputFileError(resolvedInputSource)) {
+			// No ENDFILE rules to run, or the file could not be opened: skip
+			// the ENDFILE section (gawk BEGINFILE error handling) and go
+			// straight to the next file.
 			withinBeginFileBlocks = false;
 			position.jump(nextFileAddress);
 		} else {
@@ -3544,6 +3549,22 @@ public class AVM implements VariableManager, Closeable {
 			withinEndFileBlocks = true;
 			position.jump(endFileAddress);
 		}
+	}
+
+	/**
+	 * Returns whether a non-redirected {@code getline} must be confined to
+	 * the current input file. While the per-file main input loop of a program
+	 * with BEGINFILE/ENDFILE rules is running, only the loop itself may cross
+	 * file boundaries, so that no file's hooks are ever skipped; a
+	 * {@code getline} in an action therefore reports end-of-input at the end
+	 * of the current file. In BEGIN and END rules — before the loop starts or
+	 * after it ends — {@code getline} keeps streaming across the remaining
+	 * input.
+	 *
+	 * @return {@code true} when getline must not advance to the next file
+	 */
+	private boolean isMainInputFileBounded() {
+		return endFileAddress != null && inputFileLoopStarted && !withinEndBlocks;
 	}
 
 	/**

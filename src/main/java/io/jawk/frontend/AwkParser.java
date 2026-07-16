@@ -3027,7 +3027,13 @@ public class AwkParser {
 				beginFileAddress = tuples.createAddress("begin_file");
 				endFileAddress = tuples.createAddress("end_file");
 				nextFileAddress = tuples.createAddress("next_file");
-				tuples.setEndFileAddress(endFileAddress);
+				// The ENDFILE address is registered only when BEGINFILE or
+				// ENDFILE rules exist: its presence also confines a
+				// non-redirected getline to the current input file, which
+				// only matters when there are per-file hooks to protect.
+				if (hasBeginFileRules || hasEndFileRules) {
+					tuples.setEndFileAddress(endFileAddress);
+				}
 				tuples.setNextFileAddress(nextFileAddress);
 			}
 

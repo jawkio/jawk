@@ -91,6 +91,8 @@ skipping missing.txt (No such file or directory)
 
 The `nextfile` statement is also available in ordinary rules — including from user-defined functions — and abandons the rest of the current input file after running the `ENDFILE` rules. `next` is rejected inside `BEGINFILE`/`ENDFILE` rules, `nextfile` is rejected inside `ENDFILE`, `BEGIN`, and `END` rules, and only redirected forms of `getline` (such as `getline line < "file"`) may be used inside `BEGINFILE`/`ENDFILE`, all matching gawk's restrictions.
 
+When `BEGINFILE`/`ENDFILE` rules are present, a non-redirected `getline` in an ordinary rule never crosses a file boundary: it reports end-of-input at the end of the current file, and the main loop then runs the `ENDFILE` and `BEGINFILE` rules before the next file's records are processed. (gawk instead lets such a `getline` pull in the next file's first record, firing the hooks mid-statement.) Without `BEGINFILE`/`ENDFILE` rules, `getline` keeps the classic AWK behavior of streaming across input files.
+
 As in gawk, `BEGINFILE` and `ENDFILE` are gawk extensions: with `--posix` they are not special and parse as ordinary identifiers.
 
 ## Pass Variables

@@ -1809,17 +1809,64 @@ public class JRT {
 			return consumeInput(source);
 		}
 		StreamInputSource streamSource = (StreamInputSource) source;
-		String openError = streamSource.getCurrentFileOpenError();
-		if (openError != null) {
-			throw new AwkRuntimeException(
-					"cannot open file `" + toAwkString(getFILENAME()) + "' for reading: " + openError);
-		}
+		throwIfCurrentFileUnopened(streamSource);
 		activeSource = source;
 		if (!streamSource.nextRecordInCurrentFile()) {
 			return false;
 		}
 		bindConsumedRecord(source);
 		return true;
+	}
+
+	/**
+	 * Attempt to consume one record of the current input file only for
+	 * {@code getline target}, returning the input value and leaving the
+	 * current input record state untouched. Used instead of
+	 * {@link #consumeInputToTarget(InputSource)} while the per-file main
+	 * input loop is active, so a {@code getline} in an action never crosses a
+	 * file boundary behind the BEGINFILE/ENDFILE rules' back.
+	 *
+	 * @param source source strategy that provides records and optional
+	 *        pre-split fields
+	 * @return the consumed input value, or {@code null} at the end of the
+	 *         current input file
+	 * @throws IOException if the source raises an I/O error
+	 */
+	public Object consumeCurrentFileInputToTarget(final InputSource source) throws IOException {
+		Objects.requireNonNull(source, "source");
+		if (!(source instanceof StreamInputSource)) {
+			// Custom input sources behave as a single unnamed input file.
+			return consumeInputToTarget(source);
+		}
+		StreamInputSource streamSource = (StreamInputSource) source;
+		throwIfCurrentFileUnopened(streamSource);
+		activeSource = source;
+		materializeCurrentRecord();
+		if (!streamSource.nextRecordInCurrentFile()) {
+			return null;
+		}
+
+		RecordState inputState = new RecordState(source);
+		this.nr++;
+		if (countsTowardFNR(source)) {
+			this.fnr++;
+		}
+		return new StrNum(inputState.getRecordText(), decimalSeparator);
+	}
+
+	/**
+	 * Raises the gawk-compatible fatal error when the current input file
+	 * could not be opened and no BEGINFILE rule bypassed it with
+	 * {@code nextfile}.
+	 *
+	 * @param streamSource the main input source to check
+	 */
+	private void throwIfCurrentFileUnopened(StreamInputSource streamSource) {
+		String openError = streamSource.getCurrentFileOpenError();
+		if (openError != null) {
+			throw new AwkRuntimeException(
+					"cannot open file `" + toAwkString(getFILENAME()) + "' for reading: " + openError);
+		}
 	}
 
 	/**

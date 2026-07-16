@@ -262,6 +262,50 @@ public class BeginFileEndFileTest {
 	}
 
 	@Test
+	public void getlineInActionStopsAtFileBoundaryWhenHooksArePresent() throws Exception {
+		// The per-file loop is the only place allowed to cross file
+		// boundaries when BEGINFILE/ENDFILE rules exist, so no file's hooks
+		// are ever skipped: getline reports end-of-input at the end of the
+		// current file instead of silently opening the next one.
+		AwkTestSupport
+				.awkTest("getline in an action does not cross file boundaries behind the hooks")
+				.script(
+						"BEGINFILE { print \"bf:\" FILENAME }"
+								+ " { print \"r:\" $0; if ((getline x) > 0) print \"g:\" x; else print \"g:eof\" }"
+								+ " ENDFILE { print \"ef:\" FILENAME }")
+				.file("f1", "a1\na2\n")
+				.file("f2", "b1\n")
+				.operand("{{f1}}", "{{f2}}")
+				.expectLines(
+						"bf:{{f1}}",
+						"r:a1",
+						"g:a2",
+						"ef:{{f1}}",
+						"bf:{{f2}}",
+						"r:b1",
+						"g:eof",
+						"ef:{{f2}}")
+				.runAndAssert();
+	}
+
+	@Test
+	public void getlineInActionStillCrossesFilesWithoutHooks() throws Exception {
+		// Without BEGINFILE/ENDFILE rules there are no per-file hooks to
+		// protect, so getline keeps the classic AWK behavior of streaming
+		// across input files — even when nextfile forces the per-file loop.
+		AwkTestSupport
+				.awkTest("getline in an action crosses file boundaries without hooks")
+				.script(
+						"function unused() { nextfile }"
+								+ " { print \"r:\" $0; if ((getline x) > 0) print \"g:\" x }")
+				.file("f1", "a1\n")
+				.file("f2", "b1\n")
+				.operand("{{f1}}", "{{f2}}")
+				.expectLines("r:a1", "g:b1")
+				.runAndAssert();
+	}
+
+	@Test
 	public void redirectedGetlineIsAllowedInsideBeginFile() throws Exception {
 		AwkTestSupport
 				.awkTest("redirected getline is allowed inside BEGINFILE")

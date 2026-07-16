@@ -1017,8 +1017,31 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	private boolean isPersistentEligibleGlobal(String name) {
 		return name != null
-				&& !JRT.isJrtManagedSpecialVariable(name)
+				&& !isManagedSpecialVariable(name)
 				&& !NON_PERSISTENT_GLOBALS.contains(name);
+	}
+
+	/**
+	 * Returns whether the name is a JRT-managed special variable for this
+	 * execution. ERRNO and ARGIND are gawk extensions: in POSIX mode they are
+	 * ordinary global variables, as in {@code gawk --posix}.
+	 *
+	 * @param name variable name to inspect
+	 * @return {@code true} when the variable is managed by the JRT
+	 */
+	private boolean isManagedSpecialVariable(String name) {
+		return JRT.isJrtManagedSpecialVariable(name) && !isPosixOrdinaryVariable(name);
+	}
+
+	/**
+	 * Returns whether the name is a gawk-only special variable that POSIX
+	 * mode treats as an ordinary global.
+	 *
+	 * @param name variable name to inspect
+	 * @return {@code true} when the name is ordinary in the current mode
+	 */
+	private boolean isPosixOrdinaryVariable(String name) {
+		return settings.isPosix() && ("ERRNO".equals(name) || "ARGIND".equals(name));
 	}
 
 	/**
@@ -3406,9 +3429,17 @@ public class AVM implements VariableManager, Closeable {
 		case "IGNORECASE":
 			return jrt.getIGNORECASEVar();
 		case "ERRNO":
-			return jrt.getERRNO();
+			if (!settings.isPosix()) {
+				return jrt.getERRNO();
+			}
+			// POSIX mode: ordinary global, answered by the slot lookup below
+			break;
 		case "ARGIND":
-			return jrt.getARGIND();
+			if (!settings.isPosix()) {
+				return jrt.getARGIND();
+			}
+			// POSIX mode: ordinary global, answered by the slot lookup below
+			break;
 		// lazily-materialized globals answered through their synthetic accessors
 		case "ARGC":
 			return getARGC();
@@ -3473,7 +3504,7 @@ public class AVM implements VariableManager, Closeable {
 		if (globalVariableOffsets == null || globalVariableArrays == null) {
 			Object normalized = normalizeExternalVariableValue(obj);
 			baseInitialVariables.put(name, normalized);
-			if (JRT.isJrtManagedSpecialVariable(name)) {
+			if (isManagedSpecialVariable(name)) {
 				baseSpecialVariables.put(name, normalized);
 			}
 			return;
@@ -3489,7 +3520,9 @@ public class AVM implements VariableManager, Closeable {
 		// FS=: between input files) must reach the JRT, not a global slot.
 		// ARGC is excluded: JRT.setARGC delegates back to this method, and its
 		// authoritative storage is the compiled slot below.
-		if (!"ARGC".equals(name) && jrt.applySpecialVariable(name, normalized)) {
+		if (!"ARGC".equals(name)
+				&& !isPosixOrdinaryVariable(name)
+				&& jrt.applySpecialVariable(name, normalized)) {
 			updateSymtabEntry(name, normalized);
 			return;
 		}

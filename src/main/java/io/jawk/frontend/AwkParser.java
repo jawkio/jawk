@@ -4698,7 +4698,7 @@ public class AwkParser {
 
 			FunctionDefParamListAst ptr = this;
 			while (ptr != null) {
-				if (SPECIAL_VAR_NAMES.get(ptr.id) != null) {
+				if (SPECIAL_VAR_NAMES.get(ptr.id) != null && !isPosixOrdinarySpecialName(ptr.id)) {
 					throw new SemanticException("Special variable " + ptr.id + " cannot be used as a formal parameter");
 				}
 				ptr = (FunctionDefParamListAst) ptr.getAst1();
@@ -5292,7 +5292,23 @@ public class AwkParser {
 	 * them.
 	 */
 	private boolean isJrtManagedSpecialName(String id) {
-		return SPECIAL_VAR_NAMES.containsKey(id) && !"ENVIRON".equals(id) && !"ARGV".equals(id);
+		return SPECIAL_VAR_NAMES.containsKey(id)
+				&& !"ENVIRON".equals(id)
+				&& !"ARGV".equals(id)
+				&& !isPosixOrdinarySpecialName(id);
+	}
+
+	/**
+	 * Returns whether the name is a gawk-only special variable that POSIX
+	 * mode treats as an ordinary identifier. Like {@code gawk --posix}, POSIX
+	 * mode compiles ERRNO and ARGIND as plain global variables, usable as
+	 * function parameters and untouched by the input machinery.
+	 *
+	 * @param id the identifier to inspect
+	 * @return {@code true} when the name is ordinary in the current mode
+	 */
+	private boolean isPosixOrdinarySpecialName(String id) {
+		return posix && ("ERRNO".equals(id) || "ARGIND".equals(id));
 	}
 
 	/** Emits the tuple pushing the value of a JRT-managed special variable. */

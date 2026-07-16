@@ -393,6 +393,50 @@ public class BeginFileEndFileTest {
 	}
 
 	@Test
+	public void errnoAndArgindAreOrdinaryVariablesInPosixMode() throws Exception {
+		// Like gawk --posix: ERRNO and ARGIND are plain identifiers, usable
+		// as function parameters and as ordinary globals.
+		AwkTestSupport
+				.cliTest("--posix treats ERRNO and ARGIND as ordinary identifiers")
+				.argument("--posix")
+				.script(
+						"function f(ARGIND) { return ARGIND * 2 }"
+								+ " function g(ERRNO) { return ERRNO \"x\" }"
+								+ " BEGIN { ERRNO = \"a\"; print f(3), g(ERRNO) }")
+				.expectLines("6 ax")
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
+	public void argindIsNotUpdatedAtFileBoundariesInPosixMode() throws Exception {
+		// Like gawk --posix: reading input files does not touch a
+		// user-assigned ARGIND.
+		AwkTestSupport
+				.cliTest("--posix keeps a user-assigned ARGIND across input files")
+				.argument("--posix")
+				.script("BEGIN { ARGIND = 99 } { print ARGIND \":\" $0 }")
+				.file("f1", "a1\n")
+				.file("f2", "b1\n")
+				.operand("{{f1}}", "{{f2}}")
+				.expectLines("99:a1", "99:b1")
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
+	public void errnoIsAssignableThroughDashVInPosixMode() throws Exception {
+		// -v ERRNO=... must reach the ordinary global slot in POSIX mode.
+		AwkTestSupport
+				.cliTest("--posix -v ERRNO seeds the ordinary global")
+				.argument("--posix", "-v", "ERRNO=foo")
+				.script("BEGIN { print ERRNO }")
+				.expectLines("foo")
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
 	public void beginFileIsUsableAsVariableInPosixMode() throws Exception {
 		AwkTestSupport
 				.cliTest("--posix allows BEGINFILE as an ordinary variable name")

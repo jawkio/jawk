@@ -108,6 +108,19 @@ public class StreamInputSourceTest {
 	}
 
 	@Test
+	public void testVariableAssignmentBetweenFilesDoesNotConsumeARecord() throws Exception {
+		// A name=value operand between two input files applies its assignment
+		// without reading a record: NR stays contiguous across the boundary.
+		awkTest("StreamInputSource name=value operands leave NR untouched")
+				.script("{ print NR \":\" x \":\" $0 } END { print \"end:\" NR }")
+				.file("a.txt", "A1\nA2\n")
+				.file("b.txt", "B1\n")
+				.operand("{{a.txt}}", "x=1", "{{b.txt}}")
+				.expectLines("1::A1", "2::A2", "3:1:B1", "end:3")
+				.runAndAssert();
+	}
+
+	@Test
 	public void testGetlineFromStdin() throws Exception {
 		awkTest("StreamInputSource getline from stdin")
 				.script("NR==1 { getline; print $0; exit }")

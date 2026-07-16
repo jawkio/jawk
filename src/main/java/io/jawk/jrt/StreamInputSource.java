@@ -361,9 +361,6 @@ public class StreamInputSource implements InputSource, Closeable {
 					jrt.setERRNO("");
 					return true;
 				}
-				if (partitioningReader != null) {
-					jrt.setNR(jrt.getNR() + 1);
-				}
 			} else {
 				closeCurrentReaderIfFileStream();
 				partitioningReader = new PartitioningReader(
@@ -435,9 +432,6 @@ public class StreamInputSource implements InputSource, Closeable {
 				hasFilenames = detectFilenames();
 				if (partitioningReader == null && !hasFilenames) {
 					return presentDefaultInput();
-				}
-				if (partitioningReader != null) {
-					jrt.setNR(jrt.getNR() + 1);
 				}
 			} else {
 				closeCurrentReaderIfFileStream();

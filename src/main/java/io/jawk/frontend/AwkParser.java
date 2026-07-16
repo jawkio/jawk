@@ -570,6 +570,28 @@ public class AwkParser {
 				}
 				continue;
 			}
+			if (inBracket && c == '[') {
+				regexp.append((char) c);
+				read();
+				// POSIX character class, collating element, or equivalence
+				// class ([:alpha:], [.x.], [=e=]): its closing ']' does not
+				// end the outer bracket expression.
+				if (c == ':' || c == '.' || c == '=') {
+					int delimiter = c;
+					boolean closed = false;
+					while (token != Token.EOF && c > 0 && c != '\n' && !closed) {
+						int previous = c;
+						regexp.append((char) c);
+						read();
+						if (previous == delimiter && c == ']') {
+							regexp.append((char) c);
+							read();
+							closed = true;
+						}
+					}
+				}
+				continue;
+			}
 			if (inBracket && c == ']') {
 				inBracket = false;
 			}

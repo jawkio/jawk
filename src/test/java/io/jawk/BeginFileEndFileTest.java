@@ -411,4 +411,33 @@ public class BeginFileEndFileTest {
 				.expectLines("a-b")
 				.runAndAssert();
 	}
+
+	@Test
+	public void regexpBracketExpressionMayContainSlashAfterCharacterClass() throws Exception {
+		// The ']' closing a POSIX character class such as [:digit:] must not
+		// be taken as the end of the enclosing bracket expression, so the
+		// slash that follows still belongs to the regexp literal.
+		AwkTestSupport
+				.awkTest("a slash after a POSIX character class does not end the regexp")
+				.script("BEGIN { s = \"a/b\"; gsub(/[[:digit:]/]/, \"-\", s); print s }")
+				.expectLines("a-b")
+				.runAndAssert();
+	}
+
+	@Test
+	public void assignmentOperandsDoNotConsumeRecordsInPerFileLoop() throws Exception {
+		// A name=value operand between input files applies its assignment
+		// without reading a record, so NR stays contiguous across files.
+		AwkTestSupport
+				.awkTest("assignment operands leave NR untouched in the per-file loop")
+				.script(
+						"BEGINFILE { print \"bf\", NR }"
+								+ " { print NR \":\" $0 }"
+								+ " END { print \"end\", NR }")
+				.file("f1", "a1\na2\n")
+				.file("f2", "b1\n")
+				.operand("{{f1}}", "x=1", "{{f2}}")
+				.expectLines("bf 0", "1:a1", "2:a2", "bf 2", "3:b1", "end 3")
+				.runAndAssert();
+	}
 }

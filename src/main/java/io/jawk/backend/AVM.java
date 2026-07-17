@@ -78,7 +78,6 @@ import io.jawk.jrt.BlockManager;
 import io.jawk.jrt.BlockObject;
 import io.jawk.jrt.ConditionPair;
 import io.jawk.jrt.InputSource;
-import io.jawk.jrt.StreamInputSource;
 import io.jawk.jrt.JRT;
 import io.jawk.jrt.VariableManager;
 import io.jawk.util.AwkSettings;
@@ -150,7 +149,6 @@ public class AVM implements VariableManager, Closeable {
 	private final Map<Opcode, ProfilingReport.Accumulator> tupleProfilingStats;
 	private final Map<String, ProfilingReport.Accumulator> functionProfilingStats;
 	private final Deque<ActiveFunction> activeProfilingFunctions;
-	private boolean inputSourceFilelistAssignmentsApplied;
 	private InputSource resolvedInputSource;
 	private AwkExpression installedEvalExpression;
 	private boolean mergedGlobalLayoutActive;
@@ -717,7 +715,6 @@ public class AVM implements VariableManager, Closeable {
 		withinEndBlocks = false;
 		exitCode = 0;
 		throwExitException = false;
-		inputSourceFilelistAssignmentsApplied = false;
 		globalVariableOffsets = null;
 		globalVariableArrays = null;
 		functionNames = Collections.emptySet();
@@ -1069,23 +1066,6 @@ public class AVM implements VariableManager, Closeable {
 		if (Boolean.TRUE.equals(arrayObj) && !(value instanceof Map)) {
 			throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + name + ").");
 		}
-	}
-
-	/**
-	 * Parses a runtime {@code name=value} assignment.
-	 *
-	 * @param nameValue raw assignment text
-	 * @return parsed assignment
-	 */
-	private NameValueAssignment parseNameValueAssignment(String nameValue) {
-		int eqIdx = nameValue.indexOf('=');
-		if (eqIdx == 0) {
-			throw new IllegalArgumentException(
-					"Must have a non-blank variable name in a name=value variable assignment argument.");
-		}
-		String name = nameValue.substring(0, eqIdx);
-		String value = nameValue.substring(eqIdx + 1);
-		return new NameValueAssignment(name, jrt.toInputScalar(value));
 	}
 
 	/**
@@ -2086,7 +2066,6 @@ public class AVM implements VariableManager, Closeable {
 				case CONSUME_INPUT: {
 					// arg[0] = address
 					// store the next record into $0, $1, ...
-					applyInputSourceFilelistAssignmentsIfNeeded();
 					if (jrt.consumeInput(resolvedInputSource)) {
 						position.next();
 					} else {
@@ -2097,8 +2076,6 @@ public class AVM implements VariableManager, Closeable {
 				case CONSUME_FILE_INPUT: {
 					// arg[0] = address of the ENDFILE section
 					// store the next record of the current file into $0, $1, ...
-					// (name=value assignments were already applied by the
-					// NEXT_FILE tuple that necessarily executed before this one)
 					withinBeginFileBlocks = false;
 					if (jrt.consumeCurrentFileInput(resolvedInputSource)) {
 						position.next();
@@ -2110,7 +2087,6 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case NEXT_FILE: {
 					// arg[0] = address to jump to when no input file remains
-					applyInputSourceFilelistAssignmentsIfNeeded();
 					inputFileLoopStarted = true;
 					withinEndFileBlocks = false;
 					if (jrt.advanceToNextFile(resolvedInputSource)) {
@@ -2128,7 +2104,6 @@ public class AVM implements VariableManager, Closeable {
 
 				case GETLINE_INPUT: {
 					checkGetlineAllowed(position);
-					applyInputSourceFilelistAssignmentsIfNeeded();
 					boolean consumed = isMainInputFileBounded() ?
 							jrt.consumeCurrentFileInput(resolvedInputSource) : jrt.consumeInput(resolvedInputSource);
 					push(consumed ? 1 : 0);
@@ -2137,7 +2112,6 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case GETLINE_INPUT_TO_TARGET: {
 					checkGetlineAllowed(position);
-					applyInputSourceFilelistAssignmentsIfNeeded();
 					Object input = isMainInputFileBounded() ?
 							jrt.consumeCurrentFileInputToTarget(resolvedInputSource) : jrt.consumeInputToTarget(resolvedInputSource);
 					if (input != null) {
@@ -3202,7 +3176,6 @@ public class AVM implements VariableManager, Closeable {
 		jrt.jrtCloseAll();
 		closeResolvedInputSource();
 		resolvedInputSource = null;
-		inputSourceFilelistAssignmentsApplied = false;
 	}
 
 	/**
@@ -3503,21 +3476,6 @@ public class AVM implements VariableManager, Closeable {
 		return currentLineNumber;
 	}
 
-	/**
-	 * Performs the global variable assignment within the runtime environment.
-	 * These assignments come from the ARGV list (bounded by ARGC), which, in
-	 * turn, come from the command-line arguments passed into Awk.
-	 *
-	 * @param nameValue The variable assignment in <i>name=value</i> form.
-	 */
-	@SuppressWarnings("unused")
-	private void setFilelistVariable(String nameValue) {
-		// route through assignVariable so JRT-managed specials, global slots,
-		// and SYMTAB updates are handled in exactly one place
-		NameValueAssignment assignment = parseNameValueAssignment(nameValue);
-		assignVariable(assignment.name, assignment.value);
-	}
-
 	/** {@inheritDoc} */
 	@Override
 	public final void assignVariable(String name, Object obj) {
@@ -3652,27 +3610,6 @@ public class AVM implements VariableManager, Closeable {
 							+ (withinBeginFileBlocks ? "BEGINFILE" : "ENDFILE")
 							+ "' rule");
 		}
-	}
-
-	/**
-	 * Applies the command-line {@code name=value} operands once, before the
-	 * first record of a custom {@link InputSource} is consumed. The built-in
-	 * {@link StreamInputSource} needs none of this: it applies each
-	 * assignment itself while traversing ARGV, at the file boundary where it
-	 * appears. Custom sources have no ARGV traversal, so every input opcode
-	 * that can be the first one executed (CONSUME_INPUT, NEXT_FILE, and the
-	 * getline forms) calls this cheap, idempotent hook.
-	 */
-	private void applyInputSourceFilelistAssignmentsIfNeeded() {
-		if (inputSourceFilelistAssignmentsApplied || resolvedInputSource instanceof StreamInputSource) {
-			return;
-		}
-		for (String argument : arguments) {
-			if (argument.indexOf('=') > 0) {
-				setFilelistVariable(argument);
-			}
-		}
-		inputSourceFilelistAssignmentsApplied = true;
 	}
 
 	/** {@inheritDoc} */
@@ -3839,16 +3776,6 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	private static final Set<String> NON_PERSISTENT_GLOBALS = new HashSet<>(
 			Arrays.asList("ARGV", "ARGC", "ENVIRON", "RSTART", "RLENGTH", "IGNORECASE"));
-
-	private static final class NameValueAssignment {
-		private final String name;
-		private final Object value;
-
-		private NameValueAssignment(String name, Object value) {
-			this.name = name;
-			this.value = value;
-		}
-	}
 
 	private static final class SingleRecordInputSource implements InputSource {
 

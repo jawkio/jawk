@@ -112,6 +112,19 @@ public class AwkTuples implements Serializable {
 	private boolean evalTupleStream;
 
 	/**
+	 * Address of the ENDFILE section, or {@code null} when the program has
+	 * no BEGINFILE/ENDFILE rules. Created addresses are remapped by the
+	 * optimizer through the address manager, so this stays valid.
+	 */
+	private Address endFileAddress;
+
+	/**
+	 * Address of the {@code NEXT_FILE} tuple that opens each input file, or
+	 * {@code null} when the program does not use per-file input stepping.
+	 */
+	private Address nextFileAddress;
+
+	/**
 	 * <p>
 	 * toOpcodeString.
 	 * </p>
@@ -1775,24 +1788,49 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
-	 * Emits the tuple registering the address of the ENDFILE section, so that
-	 * a runtime {@code nextfile} statement can jump to it.
+	 * Registers the address of the ENDFILE section, so that a runtime
+	 * {@code nextfile} statement can jump to it. A property of the tuple
+	 * stream rather than a tuple: the interpreter reads it once when it
+	 * installs the program.
 	 *
 	 * @param addr address of the ENDFILE section
 	 */
 	public void setEndFileAddress(Address addr) {
-		queue.add(new Tuple.AddressTuple(Opcode.SET_ENDFILE_ADDRESS, addr));
+		endFileAddress = addr;
 	}
 
 	/**
-	 * Emits the tuple registering the address of the {@code NEXT_FILE} tuple,
-	 * so that a runtime {@code nextfile} statement can bypass the ENDFILE
-	 * rules for input files that could not be opened.
+	 * Returns the address of the ENDFILE section, or {@code null} when the
+	 * program has no BEGINFILE/ENDFILE rules.
+	 *
+	 * @return address of the ENDFILE section, or {@code null}
+	 */
+	public Address getEndFileAddress() {
+		return endFileAddress;
+	}
+
+	/**
+	 * Registers the address of the {@code NEXT_FILE} tuple that opens each
+	 * input file, so that a runtime {@code nextfile} statement can bypass
+	 * the ENDFILE rules for input files that could not be opened. A property
+	 * of the tuple stream rather than a tuple: the interpreter reads it once
+	 * when it installs the program.
 	 *
 	 * @param addr address of the NEXT_FILE tuple
 	 */
 	public void setNextFileAddress(Address addr) {
-		queue.add(new Tuple.AddressTuple(Opcode.SET_NEXTFILE_ADDRESS, addr));
+		nextFileAddress = addr;
+	}
+
+	/**
+	 * Returns the address of the {@code NEXT_FILE} tuple that opens each
+	 * input file, or {@code null} when the program does not use per-file
+	 * input stepping.
+	 *
+	 * @return address of the NEXT_FILE tuple, or {@code null}
+	 */
+	public Address getNextFileAddress() {
+		return nextFileAddress;
 	}
 
 	/**
@@ -2398,19 +2436,43 @@ public class AwkTuples implements Serializable {
 		}
 		Set<Address> processedAddresses = Collections.newSetFromMap(new IdentityHashMap<Address, Boolean>());
 		for (Tuple tuple : queue) {
-			Address address = tuple.getAddress();
-			if (address != null && processedAddresses.add(address)) {
-				int oldIndex = address.index();
-				if (oldIndex >= 0 && oldIndex < indexMapping.length) {
-					int mappedIndex = indexMapping[oldIndex];
-					if (mappedIndex < 0) {
-						throw new Error("Address " + address + " references removed tuple " + oldIndex);
-					}
-					address.assignIndex(mappedIndex);
-				}
-			}
+			remapAddress(tuple.getAddress(), indexMapping, processedAddresses);
 		}
+		// The per-file property addresses may not be referenced by any tuple
+		// (e.g. after jump threading rewired the loop-back GOTO), so they
+		// must be remapped explicitly to stay valid.
+		remapAddress(endFileAddress, indexMapping, processedAddresses);
+		remapAddress(nextFileAddress, indexMapping, processedAddresses);
 		addressManager.remapIndexes(indexMapping);
+	}
+
+	private static void seedPropertyAddress(
+			Address address,
+			int size,
+			boolean[] reachable,
+			Deque<Integer> worklist) {
+		if (address == null) {
+			return;
+		}
+		int targetIndex = address.index();
+		if (targetIndex >= 0 && targetIndex < size && !reachable[targetIndex]) {
+			reachable[targetIndex] = true;
+			worklist.addLast(targetIndex);
+		}
+	}
+
+	private static void remapAddress(Address address, int[] indexMapping, Set<Address> processedAddresses) {
+		if (address == null || !processedAddresses.add(address)) {
+			return;
+		}
+		int oldIndex = address.index();
+		if (oldIndex >= 0 && oldIndex < indexMapping.length) {
+			int mappedIndex = indexMapping[oldIndex];
+			if (mappedIndex < 0) {
+				throw new Error("Address " + address + " references removed tuple " + oldIndex);
+			}
+			address.assignIndex(mappedIndex);
+		}
 	}
 
 	private void reprocessQueue() {
@@ -2592,6 +2654,12 @@ public class AwkTuples implements Serializable {
 			reachable[0] = true;
 			worklist.add(0);
 		}
+		// The per-file property addresses are runtime jump targets (nextfile,
+		// and the ENDFILE section it resumes at) that no tuple may reference:
+		// treat them as reachability roots so their sections are never
+		// eliminated as dead code.
+		seedPropertyAddress(endFileAddress, size, reachable, worklist);
+		seedPropertyAddress(nextFileAddress, size, reachable, worklist);
 
 		while (!worklist.isEmpty()) {
 			int index = worklist.removeFirst();

@@ -3040,16 +3040,15 @@ public class AwkParser {
 			boolean perFileScaffolding = reqInput
 					&& (hasBeginFileRules || hasEndFileRules || nextfileEncountered);
 
-			// The per-file addresses must be registered before the BEGIN rules
-			// run, so a nextfile executed from a user-defined function can
-			// resolve them at runtime.
+			// The per-file addresses are carried as properties of the tuple
+			// stream, so a nextfile executed from a user-defined function can
+			// resolve them at runtime. The begin_file address labels the
+			// NEXT_FILE tuple that opens each input file.
 			Address beginFileAddress = null;
 			Address endFileAddress = null;
-			Address nextFileAddress = null;
 			if (perFileScaffolding) {
 				beginFileAddress = tuples.createAddress("begin_file");
 				endFileAddress = tuples.createAddress("end_file");
-				nextFileAddress = tuples.createAddress("next_file");
 				// The ENDFILE address is registered only when BEGINFILE or
 				// ENDFILE rules exist: its presence also confines a
 				// non-redirected getline to the current input file, which
@@ -3057,7 +3056,7 @@ public class AwkParser {
 				if (hasBeginFileRules || hasEndFileRules) {
 					tuples.setEndFileAddress(endFileAddress);
 				}
-				tuples.setNextFileAddress(nextFileAddress);
+				tuples.setNextFileAddress(beginFileAddress);
 			}
 
 			// grab all BEGINs
@@ -3076,12 +3075,13 @@ public class AwkParser {
 				Address noMoreInput = tuples.createAddress("no_more_input");
 
 				if (perFileScaffolding) {
-					// Advance to the first input file so the BEGINFILE rules
-					// observe its FILENAME, FNR, ARGIND, and ERRNO.
+					// Advance to the next input file so the BEGINFILE rules
+					// observe its FILENAME, FNR, ARGIND, and ERRNO. The
+					// ENDFILE section loops back here for the following files.
+					tuples.address(beginFileAddress);
 					tuples.nextFile(noMoreInput);
 
 					// BEGINFILE rules, in the order they were read
-					tuples.address(beginFileAddress);
 					ptr = this;
 					while (ptr != null) {
 						if (ptr.getAst1() != null && ptr.getAst1().isBeginFile()) {
@@ -3123,10 +3123,9 @@ public class AwkParser {
 						ptr = ptr.getAst2();
 					}
 
-					// then move on to the next input file, or fall through to
-					// the END rules once the input is exhausted
-					tuples.address(nextFileAddress);
-					tuples.nextFile(noMoreInput);
+					// then loop back to the NEXT_FILE tuple at begin_file,
+					// which falls through to the END rules once the input is
+					// exhausted
 					tuples.gotoAddress(beginFileAddress);
 				}
 
@@ -4699,7 +4698,7 @@ public class AwkParser {
 
 			FunctionDefParamListAst ptr = this;
 			while (ptr != null) {
-				if (SPECIAL_VAR_NAMES.get(ptr.id) != null && !isPosixOrdinarySpecialName(ptr.id)) {
+				if (isSpecialVariableName(ptr.id)) {
 					throw new SemanticException("Special variable " + ptr.id + " cannot be used as a formal parameter");
 				}
 				ptr = (FunctionDefParamListAst) ptr.getAst1();
@@ -5293,23 +5292,28 @@ public class AwkParser {
 	 * them.
 	 */
 	private boolean isJrtManagedSpecialName(String id) {
-		return SPECIAL_VAR_NAMES.containsKey(id)
-				&& !"ENVIRON".equals(id)
-				&& !"ARGV".equals(id)
-				&& !isPosixOrdinarySpecialName(id);
+		return isSpecialVariableName(id) && !"ENVIRON".equals(id) && !"ARGV".equals(id);
 	}
 
 	/**
-	 * Returns whether the name is a gawk-only special variable that POSIX
-	 * mode treats as an ordinary identifier. Like {@code gawk --posix}, POSIX
-	 * mode compiles ERRNO and ARGIND as plain global variables, usable as
-	 * function parameters and untouched by the input machinery.
+	 * Returns whether the identifier names a special variable in the current
+	 * compile-time mode. Most special names (NR, FS, FILENAME, ...) always
+	 * are. The gawk-only ERRNO and ARGIND are special outside POSIX mode
+	 * only: with {@code --posix} they are plain identifiers — usable as
+	 * function parameters and compiled as ordinary globals — exactly like
+	 * {@code gawk --posix} treats them.
 	 *
 	 * @param id the identifier to inspect
-	 * @return {@code true} when the name is ordinary in the current mode
+	 * @return {@code true} when the name is special in the current mode
 	 */
-	private boolean isPosixOrdinarySpecialName(String id) {
-		return posix && JRT.isGawkOnlySpecialVariable(id);
+	private boolean isSpecialVariableName(String id) {
+		if (!SPECIAL_VAR_NAMES.containsKey(id)) {
+			return false;
+		}
+		if (JRT.isGawkOnlySpecialVariable(id)) {
+			return !posix;
+		}
+		return true;
 	}
 
 	/** Emits the tuple pushing the value of a JRT-managed special variable. */

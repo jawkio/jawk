@@ -589,15 +589,16 @@ public class AVM implements VariableManager, Closeable {
 	private Address exitAddress = null;
 
 	/**
-	 * Address of the ENDFILE section, registered by SET_ENDFILE_ADDRESS when
-	 * the program requires per-file input stepping (BEGINFILE/ENDFILE rules
-	 * or a {@code nextfile} statement); {@code null} otherwise.
+	 * Address of the ENDFILE section, read from the compiled program when it
+	 * has BEGINFILE/ENDFILE rules; {@code null} otherwise.
 	 */
 	private Address endFileAddress = null;
 
 	/**
-	 * Address of the NEXT_FILE tuple, registered by SET_NEXTFILE_ADDRESS when
-	 * the program requires per-file input stepping; {@code null} otherwise.
+	 * Address of the NEXT_FILE tuple that opens each input file, read from
+	 * the compiled program when it requires per-file input stepping
+	 * (BEGINFILE/ENDFILE rules or a {@code nextfile} statement);
+	 * {@code null} otherwise.
 	 */
 	private Address nextFileAddress = null;
 
@@ -744,6 +745,8 @@ public class AVM implements VariableManager, Closeable {
 		globalVariableArrays = compiledProgram.getGlobalVariableAarrayMap();
 		functionNames = compiledProgram.getFunctionNameSet();
 		sourceDescription = compiledProgram.getSourceDescription();
+		endFileAddress = compiledProgram.getEndFileAddress();
+		nextFileAddress = compiledProgram.getNextFileAddress();
 	}
 
 	private void rebindResolvedInputSource(InputSource resolvedSource) {
@@ -1019,26 +1022,24 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	/**
-	 * Returns whether the name is a JRT-managed special variable for this
-	 * execution. ERRNO and ARGIND are gawk extensions: in POSIX mode they are
-	 * ordinary global variables, as in {@code gawk --posix}.
+	 * Returns whether the named variable is a JRT-managed special variable in
+	 * the current execution mode. Most special variables (NR, FS, FILENAME,
+	 * ...) always are. The gawk-only ERRNO and ARGIND are special outside
+	 * POSIX mode only: with {@code --posix} they are ordinary global
+	 * variables, exactly like {@code gawk --posix} treats them.
 	 *
 	 * @param name variable name to inspect
-	 * @return {@code true} when the variable is managed by the JRT
+	 * @return {@code true} when reads and writes of the variable go through
+	 *         the JRT instead of a global slot
 	 */
 	private boolean isManagedSpecialVariable(String name) {
-		return JRT.isJrtManagedSpecialVariable(name) && !isPosixOrdinaryVariable(name);
-	}
-
-	/**
-	 * Returns whether the name is a gawk-only special variable that POSIX
-	 * mode treats as an ordinary global.
-	 *
-	 * @param name variable name to inspect
-	 * @return {@code true} when the name is ordinary in the current mode
-	 */
-	private boolean isPosixOrdinaryVariable(String name) {
-		return settings.isPosix() && JRT.isGawkOnlySpecialVariable(name);
+		if (!JRT.isJrtManagedSpecialVariable(name)) {
+			return false;
+		}
+		if (JRT.isGawkOnlySpecialVariable(name)) {
+			return !settings.isPosix();
+		}
+		return true;
 	}
 
 	/**
@@ -2314,18 +2315,6 @@ public class AVM implements VariableManager, Closeable {
 					position.next();
 					break;
 				}
-				case SET_ENDFILE_ADDRESS: {
-					// arg[0] = address of the ENDFILE section
-					endFileAddress = tuple.getAddress();
-					position.next();
-					break;
-				}
-				case SET_NEXTFILE_ADDRESS: {
-					// arg[0] = address of the NEXT_FILE tuple
-					nextFileAddress = tuple.getAddress();
-					position.next();
-					break;
-				}
 				case SET_WITHIN_END_BLOCKS: {
 					// arg[0] = whether within the END blocks section
 					BooleanTuple endBlocksTuple = (BooleanTuple) tuple;
@@ -3424,13 +3413,13 @@ public class AVM implements VariableManager, Closeable {
 		case "IGNORECASE":
 			return jrt.getIGNORECASEVar();
 		case "ERRNO":
-			if (!settings.isPosix()) {
+			if (isManagedSpecialVariable(name)) {
 				return jrt.getERRNO();
 			}
 			// POSIX mode: ordinary global, answered by the slot lookup below
 			break;
 		case "ARGIND":
-			if (!settings.isPosix()) {
+			if (isManagedSpecialVariable(name)) {
 				return jrt.getARGIND();
 			}
 			// POSIX mode: ordinary global, answered by the slot lookup below
@@ -3500,9 +3489,8 @@ public class AVM implements VariableManager, Closeable {
 		// FS=: between input files) must reach the JRT, not a global slot.
 		// ARGC is excluded: JRT.setARGC delegates back to this method, and its
 		// authoritative storage is the compiled slot below.
-		if (!"ARGC".equals(name)
-				&& !isPosixOrdinaryVariable(name)
-				&& jrt.applySpecialVariable(name, normalized)) {
+		if (!"ARGC".equals(name) && isManagedSpecialVariable(name)) {
+			jrt.applySpecialVariable(name, normalized);
 			updateSymtabEntry(name, normalized);
 			return;
 		}

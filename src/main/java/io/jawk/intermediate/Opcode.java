@@ -1573,33 +1573,14 @@ public enum Opcode {
 	 * file and resumes the per-file input loop. The runtime jumps to the
 	 * ENDFILE rules when the current file was opened successfully, or
 	 * directly past them when the file could not be opened (BEGINFILE error
-	 * handling). The runtime stack and operand stack are cleared, allowing
-	 * {@code nextfile} to be invoked from user-defined functions.
+	 * handling). The jump targets are carried as properties of the tuple
+	 * stream, not as tuples. The runtime stack and operand stack are
+	 * cleared, allowing {@code nextfile} to be invoked from user-defined
+	 * functions.
 	 * <p>
 	 * Stack after: (empty)
 	 */
 	EXEC_NEXTFILE,
-
-	/**
-	 * Internal. Registers the address of the ENDFILE section so that a
-	 * runtime {@code nextfile} can jump to it.
-	 * <p>
-	 * Argument: address of the ENDFILE section
-	 * <p>
-	 * Stack remains unchanged.
-	 */
-	SET_ENDFILE_ADDRESS,
-
-	/**
-	 * Internal. Registers the address of the {@link #NEXT_FILE} tuple so that
-	 * a runtime {@code nextfile} can bypass the ENDFILE rules for input files
-	 * that could not be opened.
-	 * <p>
-	 * Argument: address of the NEXT_FILE tuple
-	 * <p>
-	 * Stack remains unchanged.
-	 */
-	SET_NEXTFILE_ADDRESS,
 
 	/**
 	 * Assigns the top of the stack to ERRNO, managed by the JRT.

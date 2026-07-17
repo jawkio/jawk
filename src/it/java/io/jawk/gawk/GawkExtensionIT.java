@@ -1579,13 +1579,11 @@ public class GawkExtensionIT extends AbstractGawkSuite {
 				.runAndAssert();
 	}
 
-	@Test
-	public void test_beginfile2() throws Exception {
-		skip(
-				"Covered by the test_beginfile2_test* cases below; the remaining beginfile2.sh sub-tests rely on"
-						+ " non-redirected getline in BEGIN/END driving the BEGINFILE/ENDFILE hooks, or compare"
-						+ " non-zero gawk CLI transcripts, which Jawk does not reproduce.");
-	}
+	// The gawk beginfile2 target is a shell script running 16 sub-tests; the
+	// reproducible ones are transcribed below as test_beginfile2_test*. The
+	// remaining sub-tests rely on non-redirected getline in BEGIN/END driving
+	// the BEGINFILE/ENDFILE hooks mid-statement, or compare non-zero gawk CLI
+	// transcripts, which Jawk does not reproduce.
 
 	@Test
 	public void test_beginfile2_test2() throws Exception {

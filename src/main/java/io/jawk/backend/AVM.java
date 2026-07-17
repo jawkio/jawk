@@ -586,6 +586,10 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	private int oldseed = 1;
 
+	/**
+	 * Address of the END blocks section, read from the compiled program;
+	 * {@code null} for expression streams.
+	 */
 	private Address exitAddress = null;
 
 	/**
@@ -745,6 +749,7 @@ public class AVM implements VariableManager, Closeable {
 		globalVariableArrays = compiledProgram.getGlobalVariableAarrayMap();
 		functionNames = compiledProgram.getFunctionNameSet();
 		sourceDescription = compiledProgram.getSourceDescription();
+		exitAddress = compiledProgram.getExitAddress();
 		endFileAddress = compiledProgram.getEndFileAddress();
 		nextFileAddress = compiledProgram.getNextFileAddress();
 	}
@@ -2306,12 +2311,6 @@ public class AVM implements VariableManager, Closeable {
 					if (array != null) {
 						array.clear();
 					}
-					position.next();
-					break;
-				}
-				case SET_EXIT_ADDRESS: {
-					// arg[0] = exit address
-					exitAddress = tuple.getAddress();
 					position.next();
 					break;
 				}

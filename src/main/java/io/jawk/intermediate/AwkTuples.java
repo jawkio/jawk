@@ -50,7 +50,7 @@ import io.jawk.jrt.JRT;
  */
 public class AwkTuples implements Serializable {
 
-	private static final long serialVersionUID = 2L;
+	private static final long serialVersionUID = 3L;
 
 	/** Address manager */
 	private final AddressManager addressManager = new AddressManager();
@@ -112,9 +112,16 @@ public class AwkTuples implements Serializable {
 	private boolean evalTupleStream;
 
 	/**
+	 * Address of the END blocks section, where a runtime {@code exit} jumps;
+	 * {@code null} for expression streams. Property addresses are remapped
+	 * explicitly by the optimizer and seeded as reachability roots, so they
+	 * stay valid even when no tuple references them.
+	 */
+	private Address exitAddress;
+
+	/**
 	 * Address of the ENDFILE section, or {@code null} when the program has
-	 * no BEGINFILE/ENDFILE rules. Created addresses are remapped by the
-	 * optimizer through the address manager, so this stays valid.
+	 * no BEGINFILE/ENDFILE rules.
 	 */
 	private Address endFileAddress;
 
@@ -1766,14 +1773,25 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
-	 * <p>
-	 * setExitAddress.
-	 * </p>
+	 * Registers the address of the END blocks section, so that a runtime
+	 * {@code exit} statement can jump to it. A property of the tuple stream
+	 * rather than a tuple: the interpreter reads it once when it installs
+	 * the program.
 	 *
-	 * @param addr a {@link io.jawk.intermediate.Address} object
+	 * @param addr address of the END blocks section
 	 */
 	public void setExitAddress(Address addr) {
-		queue.add(new Tuple.AddressTuple(Opcode.SET_EXIT_ADDRESS, addr));
+		exitAddress = addr;
+	}
+
+	/**
+	 * Returns the address of the END blocks section, or {@code null} when
+	 * the tuple stream is an expression stream with no END blocks.
+	 *
+	 * @return address of the END blocks section, or {@code null}
+	 */
+	public Address getExitAddress() {
+		return exitAddress;
 	}
 
 	/**
@@ -2438,9 +2456,10 @@ public class AwkTuples implements Serializable {
 		for (Tuple tuple : queue) {
 			remapAddress(tuple.getAddress(), indexMapping, processedAddresses);
 		}
-		// The per-file property addresses may not be referenced by any tuple
-		// (e.g. after jump threading rewired the loop-back GOTO), so they
-		// must be remapped explicitly to stay valid.
+		// Property addresses may not be referenced by any tuple (e.g. after
+		// jump threading rewired the loop-back GOTO), so they must be
+		// remapped explicitly to stay valid.
+		remapAddress(exitAddress, indexMapping, processedAddresses);
 		remapAddress(endFileAddress, indexMapping, processedAddresses);
 		remapAddress(nextFileAddress, indexMapping, processedAddresses);
 		addressManager.remapIndexes(indexMapping);
@@ -2654,10 +2673,11 @@ public class AwkTuples implements Serializable {
 			reachable[0] = true;
 			worklist.add(0);
 		}
-		// The per-file property addresses are runtime jump targets (nextfile,
+		// The property addresses are runtime jump targets (exit, nextfile,
 		// and the ENDFILE section it resumes at) that no tuple may reference:
 		// treat them as reachability roots so their sections are never
 		// eliminated as dead code.
+		seedPropertyAddress(exitAddress, size, reachable, worklist);
 		seedPropertyAddress(endFileAddress, size, reachable, worklist);
 		seedPropertyAddress(nextFileAddress, size, reachable, worklist);
 

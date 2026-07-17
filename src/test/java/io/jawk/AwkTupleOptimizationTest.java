@@ -731,7 +731,6 @@ public class AwkTupleOptimizationTest {
 		case IS_EMPTY_KEYLIST:
 		case CONSUME_INPUT:
 		case CALL_FUNCTION:
-		case SET_EXIT_ADDRESS:
 			return true;
 		default:
 			return false;

@@ -1284,13 +1284,6 @@ public enum Opcode {
 	 * <p>
 	 * Stack remains unchanged.
 	 */
-	SET_EXIT_ADDRESS,
-
-	/**
-	 * Internal.
-	 * <p>
-	 * Stack remains unchanged.
-	 */
 	SET_WITHIN_END_BLOCKS,
 
 	/**

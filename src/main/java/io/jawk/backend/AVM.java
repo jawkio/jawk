@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jawk.AwkExpression;
@@ -2947,35 +2948,31 @@ public class AVM implements VariableManager, Closeable {
 
 	private void populateArgv(long offset) {
 		argvOffset = offset;
-		// Integer keys, deliberately: a host-injected plain ARGV map uses
-		// Long keys, and the ARGV traversal gives those precedence, so the
-		// injected entries must not be overwritten here.
+		// A host-supplied ARGV takes precedence over the operand list: leave
+		// it untouched instead of overwriting its entries.
+		Object existing = runtimeStack.getVariable(argvOffset, true);
+		if (existing instanceof Map && !((Map<?, ?>) existing).isEmpty()) {
+			return;
+		}
 		forEachArgvEntry((index, value) -> {
-			assignArray(argvOffset, Integer.valueOf(index), value, true);
+			assignArray(argvOffset, index, value, true);
 			pop(); // clean up the stack after the assignment
 		});
 	}
 
 	/**
-	 * Receives one ARGV entry from {@link #forEachArgvEntry(ArgvEntryConsumer)}.
-	 */
-	@FunctionalInterface
-	private interface ArgvEntryConsumer {
-		void accept(int index, Object value);
-	}
-
-	/**
 	 * Supplies the ARGV entries to the given consumer, in index order:
 	 * ARGV[0] is the program name, ARGV[1..n] the command-line arguments.
-	 * The count comes straight from the argument list because ARGC may not
-	 * be materialized when the script does not reference it.
+	 * Indexes are supplied as {@code Long}, the canonical AWK array key
+	 * form. The count comes straight from the argument list because ARGC
+	 * may not be materialized when the script does not reference it.
 	 *
 	 * @param consumer receives each (index, value) ARGV entry
 	 */
-	private void forEachArgvEntry(ArgvEntryConsumer consumer) {
-		consumer.accept(0, "jawk");
+	private void forEachArgvEntry(BiConsumer<Long, Object> consumer) {
+		consumer.accept(Long.valueOf(0L), "jawk");
 		for (int i = 1; i <= arguments.size(); i++) {
-			consumer.accept(i, jrt.toInputScalar(arguments.get(i - 1)));
+			consumer.accept(Long.valueOf(i), jrt.toInputScalar(arguments.get(i - 1)));
 		}
 	}
 
@@ -3648,7 +3645,7 @@ public class AVM implements VariableManager, Closeable {
 	public Object getARGV() {
 		if (argvOffset == NULL_OFFSET) {
 			Map<Object, Object> argv = newAwkArray();
-			forEachArgvEntry((index, value) -> argv.put(Long.valueOf(index), value));
+			forEachArgvEntry(argv::put);
 			return argv;
 		}
 		return runtimeStack.getVariable(argvOffset, true);

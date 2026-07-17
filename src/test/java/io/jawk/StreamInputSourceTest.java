@@ -85,6 +85,25 @@ public class StreamInputSourceTest {
 	}
 
 	@Test
+	public void testFileInputThroughInjectedIntegerKeyArgvMap() throws Exception {
+		// A host-supplied ARGV wins over the operand list regardless of the
+		// numeric key type it uses.
+		Path file = Files.createTempFile(AwkTestSupport.sharedTempDirectory(), "argv-int-", ".txt");
+		Files.write(file, "mapped".getBytes(StandardCharsets.UTF_8));
+		Map<Object, Object> argv = new LinkedHashMap<>();
+		argv.put(0, "jawk");
+		argv.put(1, file.toString());
+
+		awkTest("StreamInputSource reads injected ARGV map with Integer keys")
+				.script("BEGIN { _ = ARGV[0] } { print $0 }")
+				.preassign("ARGV", argv)
+				.file("operand.txt", "operand\n")
+				.operand("{{operand.txt}}")
+				.expectLines("mapped")
+				.runAndAssert();
+	}
+
+	@Test
 	public void testMultipleFilesWithFnrReset() throws Exception {
 		awkTest("StreamInputSource resets FNR per file")
 				.script("{ print NR, FNR, $0 }")

@@ -232,22 +232,25 @@ public class BeginFileEndFileTest {
 	}
 
 	@Test
-	public void nonRedirectedGetlineIsFatalInsideBeginFile() throws Exception {
+	public void nonRedirectedGetlineIsRejectedInsideBeginFile() throws Exception {
+		// Direct use is a compile-time error; see the ViaFunction cases for
+		// the runtime detection.
 		AwkTestSupport
 				.awkTest("non-redirected getline is invalid inside BEGINFILE")
 				.script("BEGINFILE { getline } { print }")
 				.stdin("x\n")
-				.expectThrow(AwkRuntimeException.class)
+				.expectThrow(RuntimeException.class)
 				.runAndAssert();
 	}
 
 	@Test
-	public void nonRedirectedGetlineIsFatalInsideEndFile() throws Exception {
+	public void nonRedirectedGetlineIsRejectedInsideEndFile() throws Exception {
+		// Direct use of the "getline var" form is a compile-time error too.
 		AwkTestSupport
 				.awkTest("non-redirected getline is invalid inside ENDFILE")
-				.script("ENDFILE { getline } { print }")
+				.script("ENDFILE { getline line } { print }")
 				.stdin("x\n")
-				.expectThrow(AwkRuntimeException.class)
+				.expectThrow(RuntimeException.class)
 				.runAndAssert();
 	}
 
@@ -256,6 +259,16 @@ public class BeginFileEndFileTest {
 		AwkTestSupport
 				.awkTest("non-redirected getline through a function is invalid inside BEGINFILE")
 				.script("function g() { getline } BEGINFILE { g() } { print }")
+				.stdin("x\n")
+				.expectThrow(AwkRuntimeException.class)
+				.runAndAssert();
+	}
+
+	@Test
+	public void nonRedirectedGetlineIsFatalInsideEndFileViaFunction() throws Exception {
+		AwkTestSupport
+				.awkTest("non-redirected getline through a function is invalid inside ENDFILE")
+				.script("function g() { getline } ENDFILE { g() } { print }")
 				.stdin("x\n")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();

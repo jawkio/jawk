@@ -332,6 +332,18 @@ public class JRT {
 	}
 
 	/**
+	 * Returns whether the name is a gawk-only special variable that POSIX
+	 * mode treats as an ordinary identifier, like {@code gawk --posix} does.
+	 * Shared by the parser and the interpreter so both stay in sync.
+	 *
+	 * @param name variable name to inspect
+	 * @return {@code true} when POSIX mode must treat the name as ordinary
+	 */
+	public static boolean isGawkOnlySpecialVariable(String name) {
+		return "ERRNO".equals(name) || "ARGIND".equals(name);
+	}
+
+	/**
 	 * Copies only the JRT-managed special variables from the supplied map.
 	 *
 	 * @param variableMap source variable map

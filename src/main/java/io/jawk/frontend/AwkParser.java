@@ -40,6 +40,7 @@ import io.jawk.backend.AVM;
 import io.jawk.ext.ExtensionFunction;
 import io.jawk.intermediate.Address;
 import io.jawk.intermediate.AwkTuples;
+import io.jawk.jrt.JRT;
 import io.jawk.util.ScriptSource;
 import io.jawk.frontend.ast.LexerException;
 import io.jawk.frontend.ast.ParserException;
@@ -5308,7 +5309,7 @@ public class AwkParser {
 	 * @return {@code true} when the name is ordinary in the current mode
 	 */
 	private boolean isPosixOrdinarySpecialName(String id) {
-		return posix && ("ERRNO".equals(id) || "ARGIND".equals(id));
+		return posix && JRT.isGawkOnlySpecialVariable(id);
 	}
 
 	/** Emits the tuple pushing the value of a JRT-managed special variable. */
@@ -5624,6 +5625,21 @@ public class AwkParser {
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
+			// gawk restriction: only redirected forms of getline may be used
+			// inside BEGINFILE/ENDFILE rules. Direct uses are rejected here at
+			// compile time; uses reached through user-defined functions are
+			// caught at runtime by the interpreter, which knows the current
+			// rule.
+			if (getAst1() == null && getAst3() == null) {
+				AST enclosingRule = searchFor(AstFlag.NEXTABLE);
+				AST pattern = enclosingRule == null ? null : enclosingRule.getAst1();
+				if (pattern != null && (pattern.isBeginFile() || pattern.isEndFile())) {
+					throw new SemanticException(
+							"non-redirected `getline' invalid inside `"
+									+ (pattern.isBeginFile() ? "BEGINFILE" : "ENDFILE")
+									+ "' rule");
+				}
+			}
 			if (getAst1() == null && getAst3() == null && getAst2() == null) {
 				tuples.getlineInput();
 				popSourceLineNumber(tuples);

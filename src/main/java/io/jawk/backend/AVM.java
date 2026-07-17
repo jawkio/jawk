@@ -1041,7 +1041,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @return {@code true} when the name is ordinary in the current mode
 	 */
 	private boolean isPosixOrdinaryVariable(String name) {
-		return settings.isPosix() && ("ERRNO".equals(name) || "ARGIND".equals(name));
+		return settings.isPosix() && JRT.isGawkOnlySpecialVariable(name);
 	}
 
 	/**
@@ -2097,7 +2097,8 @@ public class AVM implements VariableManager, Closeable {
 				case CONSUME_FILE_INPUT: {
 					// arg[0] = address of the ENDFILE section
 					// store the next record of the current file into $0, $1, ...
-					applyInputSourceFilelistAssignmentsIfNeeded();
+					// (name=value assignments were already applied by the
+					// NEXT_FILE tuple that necessarily executed before this one)
 					withinBeginFileBlocks = false;
 					if (jrt.consumeCurrentFileInput(resolvedInputSource)) {
 						position.next();
@@ -2984,14 +2985,35 @@ public class AVM implements VariableManager, Closeable {
 
 	private void populateArgv(long offset) {
 		argvOffset = offset;
-		// ARGV[0] is the program name, ARGV[1..n] the command-line arguments.
-		// The count comes straight from the argument list because ARGC may not
-		// be materialized when the script does not reference it.
-		assignArray(argvOffset, 0, "jawk", true);
-		pop();
-		for (int i = 1; i <= arguments.size(); i++) {
-			assignArray(argvOffset, i, jrt.toInputScalar(arguments.get(i - 1)), true);
+		// Integer keys, deliberately: a host-injected plain ARGV map uses
+		// Long keys, and the ARGV traversal gives those precedence, so the
+		// injected entries must not be overwritten here.
+		forEachArgvEntry((index, value) -> {
+			assignArray(argvOffset, Integer.valueOf(index), value, true);
 			pop(); // clean up the stack after the assignment
+		});
+	}
+
+	/**
+	 * Receives one ARGV entry from {@link #forEachArgvEntry(ArgvEntryConsumer)}.
+	 */
+	@FunctionalInterface
+	private interface ArgvEntryConsumer {
+		void accept(int index, Object value);
+	}
+
+	/**
+	 * Supplies the ARGV entries to the given consumer, in index order:
+	 * ARGV[0] is the program name, ARGV[1..n] the command-line arguments.
+	 * The count comes straight from the argument list because ARGC may not
+	 * be materialized when the script does not reference it.
+	 *
+	 * @param consumer receives each (index, value) ARGV entry
+	 */
+	private void forEachArgvEntry(ArgvEntryConsumer consumer) {
+		consumer.accept(0, "jawk");
+		for (int i = 1; i <= arguments.size(); i++) {
+			consumer.accept(i, jrt.toInputScalar(arguments.get(i - 1)));
 		}
 	}
 
@@ -3548,6 +3570,14 @@ public class AVM implements VariableManager, Closeable {
 	 * and resumes the per-file input loop at the appropriate point. The
 	 * runtime and operand stacks are cleared, so {@code nextfile} unwinds
 	 * user-defined function calls, mirroring {@code exit}.
+	 * <p>
+	 * A {@code nextfile} written directly inside a BEGIN, END, or ENDFILE
+	 * rule is already rejected at compile time by the parser. The checks
+	 * below cover the uses reached through user-defined functions, where the
+	 * calling rule cannot be known statically (the same function may be
+	 * called from both an ordinary rule and an END rule); gawk performs the
+	 * same checks at runtime.
+	 * </p>
 	 *
 	 * @param position the tuple position tracker to redirect
 	 */
@@ -3603,6 +3633,14 @@ public class AVM implements VariableManager, Closeable {
 	/**
 	 * Raises the gawk-compatible fatal error when a non-redirected
 	 * {@code getline} executes inside a BEGINFILE or ENDFILE rule.
+	 * <p>
+	 * A non-redirected {@code getline} written directly inside a
+	 * BEGINFILE/ENDFILE rule is already rejected at compile time by the
+	 * parser. This runtime check covers the uses reached through
+	 * user-defined functions, where the calling rule cannot be known
+	 * statically; it lives here rather than in {@link JRT} because the
+	 * current-rule flags are interpreter execution state.
+	 * </p>
 	 *
 	 * @param position the tuple position tracker, for error reporting
 	 */
@@ -3616,6 +3654,15 @@ public class AVM implements VariableManager, Closeable {
 		}
 	}
 
+	/**
+	 * Applies the command-line {@code name=value} operands once, before the
+	 * first record of a custom {@link InputSource} is consumed. The built-in
+	 * {@link StreamInputSource} needs none of this: it applies each
+	 * assignment itself while traversing ARGV, at the file boundary where it
+	 * appears. Custom sources have no ARGV traversal, so every input opcode
+	 * that can be the first one executed (CONSUME_INPUT, NEXT_FILE, and the
+	 * getline forms) calls this cheap, idempotent hook.
+	 */
 	private void applyInputSourceFilelistAssignmentsIfNeeded() {
 		if (inputSourceFilelistAssignmentsApplied || resolvedInputSource instanceof StreamInputSource) {
 			return;
@@ -3677,10 +3724,7 @@ public class AVM implements VariableManager, Closeable {
 	public Object getARGV() {
 		if (argvOffset == NULL_OFFSET) {
 			Map<Object, Object> argv = newAwkArray();
-			argv.put(0L, "jawk");
-			for (int i = 0; i < arguments.size(); i++) {
-				argv.put(Long.valueOf(i + 1L), jrt.toInputScalar(arguments.get(i)));
-			}
+			forEachArgvEntry((index, value) -> argv.put(Long.valueOf(index), value));
 			return argv;
 		}
 		return runtimeStack.getVariable(argvOffset, true);

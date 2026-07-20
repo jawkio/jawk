@@ -915,6 +915,46 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void timeFunctionsHonorEnvironTz() throws Exception {
+		// gawk lets scripts switch time zones through ENVIRON["TZ"]. For
+		// zones renamed over time (America/Indiana/Knox was Eastern in 2000,
+		// Central today) the %z offset is the historical one while %Z uses
+		// the zone's current designation: the JDK's time zone data does not
+		// record historical designations.
+		AwkTestSupport
+				.awkTest("ENVIRON[\"TZ\"] selects the local time zone")
+				.script(
+						"BEGIN { "
+								+ "ENVIRON[\"TZ\"] = \"America/New_York\"; "
+								+ "print strftime(\"%z %Z\", 946684800); "
+								+ "print mktime(\"2000 1 1 0 0 0\"); "
+								+ "ENVIRON[\"TZ\"] = \"America/Indiana/Knox\"; "
+								+ "print \"[\" strftime(\"%z\", 946684800) \"]\" "
+								+ "}")
+				.expectLines("-0500 EST", "946702800", "[-0500]")
+				.runAndAssert();
+	}
+
+	@Test
+	public void patsplitAdvancesByCodePoints() throws Exception {
+		// zero-length matches must never step into the middle of a surrogate
+		// pair: one supplementary character yields two empty fields around it
+		AwkTestSupport
+				.awkTest("patsplit advances over supplementary characters atomically")
+				.script(
+						"BEGIN { "
+								+ "n = patsplit(\"😀\", f, \"^\", s); "
+								+ "line = n \":\"; "
+								+ "for (i = 1; i <= n; i++) line = line \"<\" f[i] \">\"; "
+								+ "line = line \";\"; "
+								+ "for (i = 0; i in s; i++) line = line \"<\" s[i] \">\"; "
+								+ "print line "
+								+ "}")
+				.expectLines("2:<><>;<><😀><>")
+				.runAndAssert();
+	}
+
+	@Test
 	public void strftimeDefaultFormatComesFromProcinfo() throws Exception {
 		AwkTestSupport
 				.awkTest("strftime() without arguments uses PROCINFO[\"strftime\"]")

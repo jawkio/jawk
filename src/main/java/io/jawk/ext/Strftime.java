@@ -353,14 +353,7 @@ final class Strftime {
 			appendZoneOffset(out, calendar);
 			break;
 		case 'Z':
-			out
-					.append(
-							calendar
-									.getTimeZone()
-									.getDisplayName(
-											calendar.get(Calendar.DST_OFFSET) != 0,
-											TimeZone.SHORT,
-											Locale.US));
+			out.append(zoneName(calendar));
 			break;
 		case '%':
 			out.append('%');
@@ -370,6 +363,21 @@ final class Strftime {
 			out.append('%').append(specifier);
 			break;
 		}
+	}
+
+	/**
+	 * Returns the zone abbreviation for {@code %Z}, choosing the standard or
+	 * daylight designation from the formatted instant. The JDK's time zone
+	 * data carries per-instant offsets and DST rules but not historical
+	 * designations, so a zone that changed names over time (such as
+	 * America/Indiana/Knox, Eastern until 2006) reports its current
+	 * designation even for older timestamps; the {@code %z} offset is always
+	 * the historical one.
+	 */
+	private static String zoneName(GregorianCalendar calendar) {
+		return calendar
+				.getTimeZone()
+				.getDisplayName(calendar.get(Calendar.DST_OFFSET) != 0, TimeZone.SHORT, Locale.US);
 	}
 
 	/** Day of week, 0 = Sunday, matching C's {@code tm_wday}. */

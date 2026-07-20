@@ -271,7 +271,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 			}
 		}
 		boolean utc = utcFlag != null && getJrt().toBoolean(utcFlag);
-		TimeZone timeZone = utc ? TimeZone.getTimeZone("UTC") : TimeZone.getDefault();
+		TimeZone timeZone = utc ? TimeZone.getTimeZone("UTC") : localTimeZone();
 		GregorianCalendar calendar = new GregorianCalendar(timeZone);
 		// proleptic Gregorian: gawk's civil dates never switch to Julian
 		calendar.setGregorianChange(new Date(Long.MIN_VALUE));
@@ -328,8 +328,33 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		long seconds = timestamp == null ?
 				System.currentTimeMillis() / 1000L : (long) JRT.toDouble(timestamp);
 		boolean utc = utcFlag != null && getJrt().toBoolean(utcFlag);
-		TimeZone timeZone = utc ? TimeZone.getTimeZone("UTC") : TimeZone.getDefault();
+		TimeZone timeZone = utc ? TimeZone.getTimeZone("UTC") : localTimeZone();
 		return Strftime.format(formatString, seconds, timeZone);
+	}
+
+	/**
+	 * Returns the local time zone for {@code mktime()} and {@code strftime()},
+	 * honoring {@code ENVIRON["TZ"]}: gawk supports changing the time zone
+	 * from within the script through the AWK environment.
+	 */
+	private TimeZone localTimeZone() {
+		Object environ = getVm().getVariable("ENVIRON");
+		if (environ instanceof Map) {
+			@SuppressWarnings("unchecked")
+			Map<Object, Object> environMap = (Map<Object, Object>) environ;
+			if (JRT.containsAwkKey(environMap, "TZ")) {
+				String tz = getJrt().toAwkString(JRT.getAssocArrayValue(environMap, "TZ"));
+				if (tz.startsWith(":")) {
+					// POSIX: a leading colon introduces an implementation-defined
+					// (here: Olson) time zone name
+					tz = tz.substring(1);
+				}
+				if (!tz.isEmpty()) {
+					return TimeZone.getTimeZone(tz);
+				}
+			}
+		}
+		return TimeZone.getDefault();
 	}
 
 	/** Returns {@code PROCINFO["strftime"]} when set, gawk's default format otherwise. */
@@ -459,7 +484,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		/*
 		 * gawk's FPAT splitting rules: every accepted match becomes a field,
 		 * except that a zero-length match immediately following a non-empty
-		 * field is skipped, retrying one character further. The separators are
+		 * field is skipped, retrying one character (code point) further. The separators are
 		 * the gaps around the accepted fields: seps[i] is the text between
 		 * fields i and i+1, seps[0] the text before the first field, seps[n]
 		 * the text after the last one. The matcher region makes anchors behave
@@ -489,7 +514,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 				}
 			} else if (lastMatchNonEmpty) {
 				lastMatchNonEmpty = false;
-				pos++;
+				pos = str.offsetByCodePoints(pos, 1);
 			} else {
 				putSeparator(seps, fieldCount, str.substring(previousEnd, start));
 				array.put(Long.valueOf(++fieldCount), getJrt().toInputScalar(""));
@@ -498,7 +523,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 					// trailing empty field at end of input: done
 					break;
 				}
-				pos = start + 1;
+				pos = str.offsetByCodePoints(start, 1);
 			}
 		}
 		// seps[n] holds the text after the last field: the rest of the input,

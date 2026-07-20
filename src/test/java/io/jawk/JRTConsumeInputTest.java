@@ -32,19 +32,20 @@ public class JRTConsumeInputTest {
 
 	/**
 	 * Ensures that variable assignments interleaved with filenames in
-	 * {@code ARGV} correctly advance {@code NR}.
+	 * {@code ARGV} apply without consuming a record: per POSIX (and gawk),
+	 * {@code NR} only counts records actually read.
 	 *
 	 * @throws Exception if the AWK invocation fails
 	 */
 	@Test
-	public void testVariableAssignmentBetweenFilesIncrementsNR() throws Exception {
+	public void testVariableAssignmentBetweenFilesDoesNotAdvanceNR() throws Exception {
 		AwkTestSupport
-				.awkTest("variable assignments interleaved with filenames advance NR")
+				.awkTest("variable assignments interleaved with filenames leave NR untouched")
 				.file("file1", "a\n")
 				.file("file2", "b\n")
 				.script("{ next } \nEND { print NR }")
 				.operand("{{file1}}", "X=1", "{{file2}}")
-				.expectLines("3")
+				.expectLines("2")
 				.runAndAssert();
 	}
 

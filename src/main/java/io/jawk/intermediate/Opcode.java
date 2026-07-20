@@ -1284,13 +1284,6 @@ public enum Opcode {
 	 * <p>
 	 * Stack remains unchanged.
 	 */
-	SET_EXIT_ADDRESS,
-
-	/**
-	 * Internal.
-	 * <p>
-	 * Stack remains unchanged.
-	 */
 	SET_WITHIN_END_BLOCKS,
 
 	/**
@@ -1540,7 +1533,79 @@ public enum Opcode {
 	 * Argument: offset of the FUNCTAB global<br/>
 	 * Stack unchanged.
 	 */
-	UPDATE_FUNCTAB;
+	UPDATE_FUNCTAB,
+
+	/**
+	 * Advances the main input to the next input file, applying pending
+	 * {@code name=value} command-line assignments along the way. On success,
+	 * FILENAME, FNR, ARGIND, and ERRNO are updated and execution falls through
+	 * to the BEGINFILE rules. When no input file remains, it jumps to the
+	 * specified address. Emitted only when BEGINFILE/ENDFILE rules or a
+	 * {@code nextfile} statement require per-file input stepping.
+	 * <p>
+	 * Argument: address to jump to when no more input files remain
+	 * <p>
+	 * Stack unchanged.
+	 */
+	NEXT_FILE,
+
+	/**
+	 * Consume the next record of the current input file only; assigning $0 and
+	 * recalculating $1, $2, etc. Unlike {@link #CONSUME_INPUT}, it never
+	 * advances to the next input file: at end of the current file it jumps to
+	 * the specified address so the ENDFILE rules can run.
+	 * <p>
+	 * Argument: address to jump to at end of the current input file
+	 * <p>
+	 * Stack unchanged.
+	 */
+	CONSUME_FILE_INPUT,
+
+	/**
+	 * Executes the {@code nextfile} statement: abandons the current input
+	 * file and resumes the per-file input loop. The runtime jumps to the
+	 * ENDFILE rules when the current file was opened successfully, or
+	 * directly past them when the file could not be opened (BEGINFILE error
+	 * handling). The jump targets are carried as properties of the tuple
+	 * stream, not as tuples. The runtime stack and operand stack are
+	 * cleared, allowing {@code nextfile} to be invoked from user-defined
+	 * functions.
+	 * <p>
+	 * Stack after: (empty)
+	 */
+	EXEC_NEXTFILE,
+
+	/**
+	 * Assigns the top of the stack to ERRNO, managed by the JRT.
+	 * <p>
+	 * Stack before: value ...<br/>
+	 * Stack after: value ...
+	 */
+	ASSIGN_ERRNO,
+
+	/**
+	 * Pushes the value of ERRNO, managed by the JRT.
+	 * <p>
+	 * Stack before: ...<br/>
+	 * Stack after: errno-value ...
+	 */
+	PUSH_ERRNO,
+
+	/**
+	 * Assigns the top of the stack to ARGIND, managed by the JRT.
+	 * <p>
+	 * Stack before: value ...<br/>
+	 * Stack after: value ...
+	 */
+	ASSIGN_ARGIND,
+
+	/**
+	 * Pushes the value of ARGIND, managed by the JRT.
+	 * <p>
+	 * Stack before: ...<br/>
+	 * Stack after: argind-value ...
+	 */
+	PUSH_ARGIND;
 
 	private static final Opcode[] VALUES = values();
 

@@ -75,6 +75,26 @@ $ java -jar jawk-${project.version}-standalone.jar -F : '{ print FILENAME ":" FN
 
 Jawk follows the usual AWK distinction between the script itself and the remaining operands. Files and `name=value` operands after the script are visible through `ARGV` and `ARGC`.
 
+### BEGINFILE and ENDFILE Rules
+
+Jawk supports gawk's `BEGINFILE` and `ENDFILE` special patterns, which hook into the command-line file processing loop. `BEGINFILE` rules run just before the first record of each input file is read, with `FILENAME` set, `FNR` at 0, `$0` cleared, and `ARGIND` designating the `ARGV` entry being processed. `ENDFILE` rules run when the last record of a file has been consumed — even for empty files — and before the `END` rules for the last file.
+
+When a `BEGINFILE` rule is present, a file that cannot be opened is no longer an immediate fatal error: `ERRNO` carries the error description (for example `No such file or directory` or `Is a directory`), and the script can skip the file with `nextfile`. If the `BEGINFILE` rule does not skip it, the usual fatal error is raised:
+
+```shell-session
+$ java -jar jawk-${project.version}-standalone.jar '
+    BEGINFILE { if (ERRNO != "") { printf "skipping %s (%s)\n", FILENAME, ERRNO; nextfile } }
+    { print FILENAME ":" FNR ":" $0 }' good.txt missing.txt
+good.txt:1:hello
+skipping missing.txt (No such file or directory)
+```
+
+The `nextfile` statement is also available in ordinary rules — including from user-defined functions — and abandons the rest of the current input file after running the `ENDFILE` rules. `next` is rejected inside `BEGINFILE`/`ENDFILE` rules, `nextfile` is rejected inside `ENDFILE`, `BEGIN`, and `END` rules, and only redirected forms of `getline` (such as `getline line < "file"`) may be used inside `BEGINFILE`/`ENDFILE`, all matching gawk's restrictions.
+
+When `BEGINFILE`/`ENDFILE` rules are present, a non-redirected `getline` in an ordinary rule never crosses a file boundary: it reports end-of-input at the end of the current file, and the main loop then runs the `ENDFILE` and `BEGINFILE` rules before the next file's records are processed. (gawk instead lets such a `getline` pull in the next file's first record, firing the hooks mid-statement.) Without `BEGINFILE`/`ENDFILE` rules, `getline` keeps the classic AWK behavior of streaming across input files.
+
+As in gawk, `BEGINFILE` and `ENDFILE` are gawk extensions: with `--posix` they are not special and parse as ordinary identifiers.
+
 ## Pass Variables
 
 Use `-v` for variables that must exist before `BEGIN` runs:

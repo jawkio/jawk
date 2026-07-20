@@ -136,6 +136,9 @@ public class JRT {
 	private int rstart; // last match start (1-based)
 	private int rlength; // last match length
 	private Object filename; // current input filename scalar (or empty for stdin/pipe)
+	private Object errno; // last input I/O error description (gawk ERRNO)
+	private Object argind; // ARGV index of the current input file (gawk ARGIND)
+	private boolean syntheticFilePresented; // custom InputSource already presented as a single "file"
 	private String fs; // field separator
 	private String rs; // record separator (regexp)
 	private String ofs; // output field separator
@@ -320,10 +323,24 @@ public class JRT {
 		case "FNR":
 		case "ARGC":
 		case "IGNORECASE":
+		case "ERRNO":
+		case "ARGIND":
 			return true;
 		default:
 			return false;
 		}
+	}
+
+	/**
+	 * Returns whether the name is a gawk-only special variable that POSIX
+	 * mode treats as an ordinary identifier, like {@code gawk --posix} does.
+	 * Shared by the parser and the interpreter so both stay in sync.
+	 *
+	 * @param name variable name to inspect
+	 * @return {@code true} when POSIX mode must treat the name as ordinary
+	 */
+	public static boolean isGawkOnlySpecialVariable(String name) {
+		return "ERRNO".equals(name) || "ARGIND".equals(name);
 	}
 
 	/**
@@ -375,6 +392,9 @@ public class JRT {
 		rstart = 0;
 		rlength = 0;
 		filename = "";
+		errno = "";
+		argind = ZERO;
+		syntheticFilePresented = false;
 
 		// Apply default runtime special variables.
 		setFS(defaultFs == null ? Awk.DEFAULT_FS : defaultFs);
@@ -456,6 +476,12 @@ public class JRT {
 			return true;
 		case "IGNORECASE":
 			setIGNORECASE(value);
+			return true;
+		case "ERRNO":
+			setERRNO(value);
+			return true;
+		case "ARGIND":
+			setARGIND(value);
 			return true;
 		default:
 			return false;
@@ -1586,6 +1612,42 @@ public class JRT {
 	}
 
 	/**
+	 * Get ERRNO as tracked by JRT.
+	 *
+	 * @return current ERRNO (empty string when no input error is pending)
+	 */
+	public Object getERRNO() {
+		return errno == null ? "" : errno;
+	}
+
+	/**
+	 * Set ERRNO tracked by JRT.
+	 *
+	 * @param value new ERRNO value
+	 */
+	public void setERRNO(Object value) {
+		this.errno = normalizeRecordValue(value);
+	}
+
+	/**
+	 * Get ARGIND as tracked by JRT.
+	 *
+	 * @return ARGV index of the current input file (0 before any file is open)
+	 */
+	public Object getARGIND() {
+		return argind == null ? ZERO : argind;
+	}
+
+	/**
+	 * Set ARGIND tracked by JRT.
+	 *
+	 * @param value new ARGIND value
+	 */
+	public void setARGIND(Object value) {
+		this.argind = normalizeRecordValue(value);
+	}
+
+	/**
 	 * Get SUBSEP from the VariableManager.
 	 *
 	 * @return SUBSEP value
@@ -1731,14 +1793,163 @@ public class JRT {
 			return false;
 		}
 
+		bindConsumedRecord(source);
+		return true;
+	}
+
+	/**
+	 * Attempt to consume one record from the current input file only, without
+	 * ever advancing to the next input file. Used by the per-file main input
+	 * loop when BEGINFILE/ENDFILE rules or {@code nextfile} are present, so
+	 * that the ENDFILE rules can run at each file boundary.
+	 * <p>
+	 * When the current input file could not be opened (a pending ERRNO set by
+	 * {@link #advanceToNextFile(InputSource)} that no {@code nextfile}
+	 * consumed), the usual fatal error is raised, mirroring gawk.
+	 * </p>
+	 *
+	 * @param source source strategy that provides records and optional
+	 *        pre-split fields
+	 * @return {@code true} if a record was consumed; {@code false} at the end
+	 *         of the current input file
+	 * @throws IOException if the source raises an I/O error
+	 */
+	public boolean consumeCurrentFileInput(final InputSource source) throws IOException {
+		Objects.requireNonNull(source, "source");
+		if (!(source instanceof StreamInputSource)) {
+			// Custom input sources behave as a single unnamed input file.
+			return consumeInput(source);
+		}
+		StreamInputSource streamSource = (StreamInputSource) source;
+		throwIfCurrentFileUnopened(streamSource);
+		activeSource = source;
+		if (!streamSource.nextRecordInCurrentFile()) {
+			return false;
+		}
+		bindConsumedRecord(source);
+		return true;
+	}
+
+	/**
+	 * Attempt to consume one record of the current input file only for
+	 * {@code getline target}, returning the input value and leaving the
+	 * current input record state untouched. Used instead of
+	 * {@link #consumeInputToTarget(InputSource)} while the per-file main
+	 * input loop is active, so a {@code getline} in an action never crosses a
+	 * file boundary behind the BEGINFILE/ENDFILE rules' back.
+	 *
+	 * @param source source strategy that provides records and optional
+	 *        pre-split fields
+	 * @return the consumed input value, or {@code null} at the end of the
+	 *         current input file
+	 * @throws IOException if the source raises an I/O error
+	 */
+	public Object consumeCurrentFileInputToTarget(final InputSource source) throws IOException {
+		Objects.requireNonNull(source, "source");
+		if (!(source instanceof StreamInputSource)) {
+			// Custom input sources behave as a single unnamed input file.
+			return consumeInputToTarget(source);
+		}
+		StreamInputSource streamSource = (StreamInputSource) source;
+		throwIfCurrentFileUnopened(streamSource);
+		activeSource = source;
+		materializeCurrentRecord();
+		if (!streamSource.nextRecordInCurrentFile()) {
+			return null;
+		}
+
+		RecordState inputState = new RecordState(source);
+		this.nr++;
+		if (countsTowardFNR(source)) {
+			this.fnr++;
+		}
+		return new StrNum(inputState.getRecordText(), decimalSeparator);
+	}
+
+	/**
+	 * Raises the gawk-compatible fatal error when the current input file
+	 * could not be opened and no BEGINFILE rule bypassed it with
+	 * {@code nextfile}.
+	 *
+	 * @param streamSource the main input source to check
+	 */
+	private void throwIfCurrentFileUnopened(StreamInputSource streamSource) {
+		String openError = streamSource.getCurrentFileOpenError();
+		if (openError != null) {
+			throw new AwkRuntimeException(
+					"cannot open file `" + toAwkString(getFILENAME()) + "' for reading: " + openError);
+		}
+	}
+
+	/**
+	 * Advance the main input to the next input file, applying pending
+	 * {@code name=value} command-line assignments along the way. On success,
+	 * FILENAME, FNR, ARGIND, and ERRNO are updated and {@code $0} is cleared,
+	 * so the BEGINFILE rules observe the new file. A file that cannot be
+	 * opened is still reported as available, with ERRNO carrying the error
+	 * description (gawk BEGINFILE error handling).
+	 *
+	 * @param source source strategy that provides records and optional
+	 *        pre-split fields
+	 * @return {@code true} when a new input file (or the initial stdin
+	 *         stream) is available; {@code false} when input is exhausted
+	 * @throws IOException if an I/O error occurs while traversing ARGV
+	 */
+	public boolean advanceToNextFile(final InputSource source) throws IOException {
+		Objects.requireNonNull(source, "source");
+		if (source instanceof StreamInputSource) {
+			return ((StreamInputSource) source).advanceToNextFile();
+		}
+		// Custom input sources behave as a single unnamed input file.
+		if (syntheticFilePresented) {
+			return false;
+		}
+		syntheticFilePresented = true;
+		return true;
+	}
+
+	/**
+	 * Returns whether the current input file of the given source failed to
+	 * open, leaving a pending error that only a {@code nextfile} statement in
+	 * a BEGINFILE rule may bypass.
+	 *
+	 * @param source source strategy that provides records
+	 * @return {@code true} when the current input file could not be opened
+	 */
+	public boolean hasPendingInputFileError(InputSource source) {
+		return source instanceof StreamInputSource
+				&& ((StreamInputSource) source).getCurrentFileOpenError() != null;
+	}
+
+	/**
+	 * Binds the record just consumed from the given source as the current
+	 * input record and updates the NR/FNR counters.
+	 *
+	 * @param source the source a record was just consumed from
+	 */
+	private void bindConsumedRecord(InputSource source) {
 		inputLine = null;
 		recordState = new RecordState(source);
 
 		this.nr++;
-		if (source.isFromFilenameList()) {
+		if (countsTowardFNR(source)) {
 			this.fnr++;
 		}
-		return true;
+	}
+
+	/**
+	 * Returns whether consuming a record from the given source advances FNR,
+	 * the per-file record counter. All records of the main command-line input
+	 * flow count, including standard input (POSIX defines FNR as the record
+	 * number in the <em>current</em> input file, which stdin is). For custom
+	 * {@link InputSource} implementations, {@link InputSource#isFromFilenameList()}
+	 * keeps controlling FNR, as documented.
+	 *
+	 * @param source the source a record was just consumed from
+	 * @return {@code true} when the record advances FNR
+	 */
+	private static boolean countsTowardFNR(InputSource source) {
+		return source instanceof StreamInputSource || source.isFromFilenameList();
 	}
 
 	/**
@@ -1762,7 +1973,7 @@ public class JRT {
 
 		RecordState inputState = new RecordState(source);
 		this.nr++;
-		if (source.isFromFilenameList()) {
+		if (countsTowardFNR(source)) {
 			this.fnr++;
 		}
 		return new StrNum(inputState.getRecordText(), decimalSeparator);

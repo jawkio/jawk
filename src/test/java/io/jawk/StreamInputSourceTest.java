@@ -85,6 +85,25 @@ public class StreamInputSourceTest {
 	}
 
 	@Test
+	public void testFileInputThroughInjectedIntegerKeyArgvMap() throws Exception {
+		// A host-supplied ARGV wins over the operand list regardless of the
+		// numeric key type it uses.
+		Path file = Files.createTempFile(AwkTestSupport.sharedTempDirectory(), "argv-int-", ".txt");
+		Files.write(file, "mapped".getBytes(StandardCharsets.UTF_8));
+		Map<Object, Object> argv = new LinkedHashMap<>();
+		argv.put(0, "jawk");
+		argv.put(1, file.toString());
+
+		awkTest("StreamInputSource reads injected ARGV map with Integer keys")
+				.script("BEGIN { _ = ARGV[0] } { print $0 }")
+				.preassign("ARGV", argv)
+				.file("operand.txt", "operand\n")
+				.operand("{{operand.txt}}")
+				.expectLines("mapped")
+				.runAndAssert();
+	}
+
+	@Test
 	public void testMultipleFilesWithFnrReset() throws Exception {
 		awkTest("StreamInputSource resets FNR per file")
 				.script("{ print NR, FNR, $0 }")
@@ -104,6 +123,19 @@ public class StreamInputSourceTest {
 				.operand("x=42")
 				.operand("{{data.txt}}")
 				.expectLines("42 row1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testVariableAssignmentBetweenFilesDoesNotConsumeARecord() throws Exception {
+		// A name=value operand between two input files applies its assignment
+		// without reading a record: NR stays contiguous across the boundary.
+		awkTest("StreamInputSource name=value operands leave NR untouched")
+				.script("{ print NR \":\" x \":\" $0 } END { print \"end:\" NR }")
+				.file("a.txt", "A1\nA2\n")
+				.file("b.txt", "B1\n")
+				.operand("{{a.txt}}", "x=1", "{{b.txt}}")
+				.expectLines("1::A1", "2::A2", "3:1:B1", "end:3")
 				.runAndAssert();
 	}
 

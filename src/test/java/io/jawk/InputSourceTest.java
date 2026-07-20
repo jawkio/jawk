@@ -84,6 +84,23 @@ public class InputSourceTest {
 	}
 
 	@Test
+	public void testFnrFollowsIsFromFilenameListContract() throws Exception {
+		// For custom InputSource implementations, isFromFilenameList() keeps
+		// controlling whether records advance FNR (unlike the built-in
+		// stream input, where stdin also counts).
+		awkTest("input source FNR gated by isFromFilenameList")
+				.script("{ print FNR, NR }")
+				.withInputSource(
+						new TableInputSource(
+								Arrays
+										.asList(
+												Collections.singletonList("r1"),
+												Collections.singletonList("r2"))))
+				.expectLines("0 1", "0 2")
+				.runAndAssert();
+	}
+
+	@Test
 	public void testDollarZeroUsesInputSourceRecord() throws Exception {
 		awkTest("input source controls dollar zero text")
 				.script("{ print $0, $2 }")
@@ -216,12 +233,15 @@ public class InputSourceTest {
 	}
 
 	@Test
-	public void testFileListVariableAssignmentsAreAppliedWithInputSource() throws Exception {
-		awkTest("input source still applies name=value operands")
-				.script("{ print x }")
+	public void testFileListVariableAssignmentsAreIgnoredWithInputSource() throws Exception {
+		// name=value operands belong to the ARGV file-list traversal, which a
+		// custom InputSource replaces entirely: they are never applied and
+		// remain visible only as plain ARGV entries.
+		awkTest("input source ignores name=value operands")
+				.script("{ print \"[\" x \"]\" ARGV[1] }")
 				.operand("x=42")
 				.withInputSource(new TableInputSource(Collections.singletonList(Collections.singletonList("row"))))
-				.expectLines("42")
+				.expectLines("[]x=42")
 				.runAndAssert();
 	}
 

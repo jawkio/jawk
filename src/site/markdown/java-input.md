@@ -21,7 +21,9 @@ An `InputSource` implementation controls four things:
 - `nextRecord()` advances to the next record and returns `true` while input remains
 - `getRecordText()` provides the current `$0`, or `null` if you only expose fields
 - `getFields()` provides `$1..$NF`, or `null` if Jawk should split `$0` using `FS`
-- `isFromFilenameList()` tells Jawk whether the current record should behave like file-list input for counters such as `FNR`
+- `isFromFilenameList()` tells Jawk whether the current record should behave like file-list input for counters such as `FNR` (records from Jawk's built-in stream input always advance `FNR`, including standard input, per POSIX)
+
+A custom `InputSource` replaces the ARGV file-list traversal entirely: `name=value` runtime arguments are not applied and remain visible only as plain `ARGV` entries. Use `-v`-style variables or `putVariable(...)` to pass values to the script.
 
 When both record text and fields are available, Jawk uses:
 

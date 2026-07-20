@@ -645,7 +645,10 @@ public final class Cli {
 				.println(
 						" -S, --sandbox = (extension) Enable sandbox mode (no system(), redirection, pipelines, or"
 								+ " dynamic extensions).");
-		dest.println(" --posix = Enforce POSIX-compatible behavior such as disabling nested arrays.");
+		dest
+				.println(
+						" --posix = Enforce POSIX-compatible behavior such as disabling nested arrays and"
+								+ " BEGINFILE/ENDFILE rules.");
 		dest.println(" --dump-syntax = Print the syntax tree.");
 		dest.println(" --dump-intermediate = Print the intermediate code.");
 		dest.println(" -s, --no-optimize = (extension) Disable optimizations during compilation.");

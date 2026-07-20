@@ -50,7 +50,7 @@ import io.jawk.jrt.JRT;
  */
 public class AwkTuples implements Serializable {
 
-	private static final long serialVersionUID = 2L;
+	private static final long serialVersionUID = 3L;
 
 	/** Address manager */
 	private final AddressManager addressManager = new AddressManager();
@@ -110,6 +110,26 @@ public class AwkTuples implements Serializable {
 
 	/** Whether this tuple stream was produced by {@code compileExpression()}. */
 	private boolean evalTupleStream;
+
+	/**
+	 * Address of the END blocks section, where a runtime {@code exit} jumps;
+	 * {@code null} for expression streams. Property addresses are remapped
+	 * explicitly by the optimizer and seeded as reachability roots, so they
+	 * stay valid even when no tuple references them.
+	 */
+	private Address exitAddress;
+
+	/**
+	 * Address of the ENDFILE section, or {@code null} when the program has
+	 * no BEGINFILE/ENDFILE rules.
+	 */
+	private Address endFileAddress;
+
+	/**
+	 * Address of the {@code NEXT_FILE} tuple that opens each input file, or
+	 * {@code null} when the program does not use per-file input stepping.
+	 */
+	private Address nextFileAddress;
 
 	/**
 	 * <p>
@@ -1492,6 +1512,36 @@ public class AwkTuples implements Serializable {
 		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_IGNORECASE));
 	}
 
+	/**
+	 * Emits the tuple pushing the value of ERRNO, managed by the JRT.
+	 */
+	public void pushERRNO() {
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_ERRNO));
+	}
+
+	/**
+	 * Emits the tuple assigning the top of the stack to ERRNO, managed by the
+	 * JRT.
+	 */
+	public void assignERRNO() {
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_ERRNO));
+	}
+
+	/**
+	 * Emits the tuple pushing the value of ARGIND, managed by the JRT.
+	 */
+	public void pushARGIND() {
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_ARGIND));
+	}
+
+	/**
+	 * Emits the tuple assigning the top of the stack to ARGIND, managed by
+	 * the JRT.
+	 */
+	public void assignARGIND() {
+		queue.add(new Tuple.BuiltinVarTuple(Opcode.ASSIGN_ARGIND));
+	}
+
 	/** Pushes the current value of {@code RS} onto the operand stack. */
 	public void pushRS() {
 		queue.add(new Tuple.BuiltinVarTuple(Opcode.PUSH_RS));
@@ -1723,14 +1773,25 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
-	 * <p>
-	 * setExitAddress.
-	 * </p>
+	 * Registers the address of the END blocks section, so that a runtime
+	 * {@code exit} statement can jump to it. A property of the tuple stream
+	 * rather than a tuple: the interpreter reads it once when it installs
+	 * the program.
 	 *
-	 * @param addr a {@link io.jawk.intermediate.Address} object
+	 * @param addr address of the END blocks section
 	 */
 	public void setExitAddress(Address addr) {
-		queue.add(new Tuple.AddressTuple(Opcode.SET_EXIT_ADDRESS, addr));
+		exitAddress = addr;
+	}
+
+	/**
+	 * Returns the address of the END blocks section, or {@code null} when
+	 * the tuple stream is an expression stream with no END blocks.
+	 *
+	 * @return address of the END blocks section, or {@code null}
+	 */
+	public Address getExitAddress() {
+		return exitAddress;
 	}
 
 	/**
@@ -1742,6 +1803,79 @@ public class AwkTuples implements Serializable {
 	 */
 	public void setWithinEndBlocks(boolean b) {
 		queue.add(new Tuple.BooleanTuple(Opcode.SET_WITHIN_END_BLOCKS, b));
+	}
+
+	/**
+	 * Registers the address of the ENDFILE section, so that a runtime
+	 * {@code nextfile} statement can jump to it. A property of the tuple
+	 * stream rather than a tuple: the interpreter reads it once when it
+	 * installs the program.
+	 *
+	 * @param addr address of the ENDFILE section
+	 */
+	public void setEndFileAddress(Address addr) {
+		endFileAddress = addr;
+	}
+
+	/**
+	 * Returns the address of the ENDFILE section, or {@code null} when the
+	 * program has no BEGINFILE/ENDFILE rules.
+	 *
+	 * @return address of the ENDFILE section, or {@code null}
+	 */
+	public Address getEndFileAddress() {
+		return endFileAddress;
+	}
+
+	/**
+	 * Registers the address of the {@code NEXT_FILE} tuple that opens each
+	 * input file, so that a runtime {@code nextfile} statement can bypass
+	 * the ENDFILE rules for input files that could not be opened. A property
+	 * of the tuple stream rather than a tuple: the interpreter reads it once
+	 * when it installs the program.
+	 *
+	 * @param addr address of the NEXT_FILE tuple
+	 */
+	public void setNextFileAddress(Address addr) {
+		nextFileAddress = addr;
+	}
+
+	/**
+	 * Returns the address of the {@code NEXT_FILE} tuple that opens each
+	 * input file, or {@code null} when the program does not use per-file
+	 * input stepping.
+	 *
+	 * @return address of the NEXT_FILE tuple, or {@code null}
+	 */
+	public Address getNextFileAddress() {
+		return nextFileAddress;
+	}
+
+	/**
+	 * Emits the tuple advancing the main input to the next input file, or
+	 * jumping to the given address when no input file remains.
+	 *
+	 * @param address address to jump to when no more input files remain
+	 */
+	public void nextFile(Address address) {
+		queue.add(new Tuple.AddressTuple(Opcode.NEXT_FILE, address));
+	}
+
+	/**
+	 * Emits the tuple consuming one record of the current input file only,
+	 * jumping to the given address at end of the current file.
+	 *
+	 * @param address address to jump to at end of the current input file
+	 */
+	public void consumeFileInput(Address address) {
+		queue.add(new Tuple.AddressTuple(Opcode.CONSUME_FILE_INPUT, address));
+	}
+
+	/**
+	 * Emits the tuple executing the {@code nextfile} statement at runtime.
+	 */
+	public void execNextfile() {
+		queue.add(new Tuple.NoOperandTuple(Opcode.EXEC_NEXTFILE));
 	}
 
 	/**
@@ -2320,19 +2454,44 @@ public class AwkTuples implements Serializable {
 		}
 		Set<Address> processedAddresses = Collections.newSetFromMap(new IdentityHashMap<Address, Boolean>());
 		for (Tuple tuple : queue) {
-			Address address = tuple.getAddress();
-			if (address != null && processedAddresses.add(address)) {
-				int oldIndex = address.index();
-				if (oldIndex >= 0 && oldIndex < indexMapping.length) {
-					int mappedIndex = indexMapping[oldIndex];
-					if (mappedIndex < 0) {
-						throw new Error("Address " + address + " references removed tuple " + oldIndex);
-					}
-					address.assignIndex(mappedIndex);
-				}
-			}
+			remapAddress(tuple.getAddress(), indexMapping, processedAddresses);
 		}
+		// Property addresses may not be referenced by any tuple (e.g. after
+		// jump threading rewired the loop-back GOTO), so they must be
+		// remapped explicitly to stay valid.
+		remapAddress(exitAddress, indexMapping, processedAddresses);
+		remapAddress(endFileAddress, indexMapping, processedAddresses);
+		remapAddress(nextFileAddress, indexMapping, processedAddresses);
 		addressManager.remapIndexes(indexMapping);
+	}
+
+	private static void seedPropertyAddress(
+			Address address,
+			int size,
+			boolean[] reachable,
+			Deque<Integer> worklist) {
+		if (address == null) {
+			return;
+		}
+		int targetIndex = address.index();
+		if (targetIndex >= 0 && targetIndex < size && !reachable[targetIndex]) {
+			reachable[targetIndex] = true;
+			worklist.addLast(targetIndex);
+		}
+	}
+
+	private static void remapAddress(Address address, int[] indexMapping, Set<Address> processedAddresses) {
+		if (address == null || !processedAddresses.add(address)) {
+			return;
+		}
+		int oldIndex = address.index();
+		if (oldIndex >= 0 && oldIndex < indexMapping.length) {
+			int mappedIndex = indexMapping[oldIndex];
+			if (mappedIndex < 0) {
+				throw new Error("Address " + address + " references removed tuple " + oldIndex);
+			}
+			address.assignIndex(mappedIndex);
+		}
 	}
 
 	private void reprocessQueue() {
@@ -2514,6 +2673,13 @@ public class AwkTuples implements Serializable {
 			reachable[0] = true;
 			worklist.add(0);
 		}
+		// The property addresses are runtime jump targets (exit, nextfile,
+		// and the ENDFILE section it resumes at) that no tuple may reference:
+		// treat them as reachability roots so their sections are never
+		// eliminated as dead code.
+		seedPropertyAddress(exitAddress, size, reachable, worklist);
+		seedPropertyAddress(endFileAddress, size, reachable, worklist);
+		seedPropertyAddress(nextFileAddress, size, reachable, worklist);
 
 		while (!worklist.isEmpty()) {
 			int index = worklist.removeFirst();

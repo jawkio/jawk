@@ -49,7 +49,7 @@ java -jar jawk-${project.version}-standalone.jar --list-ext
 >   - `-r` disables Jawk's default trapping of `IllegalFormatException` for `printf` and `sprintf`.
 >   - `--locale <locale>` sets the locale through `Locale.forLanguageTag(...)`.
 >   - `-t` keeps associative array keys sorted.
->   - `--posix` enforces POSIX-oriented compile-time behavior such as disabling gawk-style nested arrays and typed regexp literals (`@/re/`).
+>   - `--posix` enforces POSIX-oriented compile-time behavior such as disabling gawk-style nested arrays, typed regexp literals (`@/re/`), and the `BEGINFILE` / `ENDFILE` special patterns.
 >   - `JAWK_PERSISTENT_MEMORY` can also point at the persistent-memory file when you do not want to pass `--persist` explicitly. `--persist` wins when both are present.
 >
 > - Extensions and sandbox
@@ -78,7 +78,7 @@ java -jar jawk-${project.version}-standalone.jar --list-ext
 - `--profile` is an executing mode. It keeps normal AWK output on stdout and writes the profiling report to stderr after execution finishes.
 - `--profile=<filename>` keeps normal AWK output on stdout and writes only the profiling report to the file.
 - `-S` affects compilation and execution, not just runtime behavior.
-- `--posix` currently disables arrays-of-arrays syntax and related subarray-only operands in order to keep CLI compilation aligned with classic POSIX-style AWK expectations.
+- `--posix` currently disables arrays-of-arrays syntax and related subarray-only operands, and stops treating gawk's `BEGINFILE` / `ENDFILE` patterns as special, in order to keep CLI compilation aligned with classic POSIX-style AWK expectations.
 - `--posix` is rejected together with `-L`, because loading precompiled tuples bypasses source compilation entirely.
 - `-L` lets you skip source compilation, but the loaded tuples must still be compatible with the current runtime.
 - `-f` and `-L` are distinct paths: source files compile now, tuple files load now.

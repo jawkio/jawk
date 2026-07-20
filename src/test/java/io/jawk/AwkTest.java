@@ -1508,20 +1508,23 @@ public class AwkTest {
 	}
 
 	@Test
-	public void executePersistingGlobalsDefersRuntimeArgumentAssignmentsUntilInputTraversal() throws Exception {
+	public void executePersistingGlobalsIgnoresRuntimeArgumentAssignmentsWithCustomInput() throws Exception {
+		// name=value runtime arguments belong to the ARGV file-list traversal,
+		// which a custom InputSource replaces entirely: they are never applied,
+		// so nothing is persisted for them either.
 		AwkProgram seedFromRuntimeArguments = AWK.compile("BEGIN { print x } { x = x } END { print x }");
 		AwkProgram readValue = AWK.compile("BEGIN { print x }");
 
 		try (AVM avm = AWK.createAvm()) {
 			assertEquals(
-					"\n1\n",
+					"\n\n",
 					executePersistent(
 							avm,
 							seedFromRuntimeArguments,
 							Collections.singletonList("x=1"),
 							Collections.<String, Object>emptyMap(),
 							new SingleRecordInputSource("record")));
-			assertEquals("1\n", executePersistent(avm, readValue));
+			assertEquals("\n", executePersistent(avm, readValue));
 		}
 	}
 

@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jawk.AwkExpression;
@@ -78,7 +79,6 @@ import io.jawk.jrt.BlockManager;
 import io.jawk.jrt.BlockObject;
 import io.jawk.jrt.ConditionPair;
 import io.jawk.jrt.InputSource;
-import io.jawk.jrt.StreamInputSource;
 import io.jawk.jrt.JRT;
 import io.jawk.jrt.VariableManager;
 import io.jawk.util.AwkSettings;
@@ -150,7 +150,6 @@ public class AVM implements VariableManager, Closeable {
 	private final Map<Opcode, ProfilingReport.Accumulator> tupleProfilingStats;
 	private final Map<String, ProfilingReport.Accumulator> functionProfilingStats;
 	private final Deque<ActiveFunction> activeProfilingFunctions;
-	private boolean inputSourceFilelistAssignmentsApplied;
 	private InputSource resolvedInputSource;
 	private AwkExpression installedEvalExpression;
 	private boolean mergedGlobalLayoutActive;
@@ -588,7 +587,43 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	private int oldseed = 1;
 
+	/**
+	 * Address of the END blocks section, read from the compiled program;
+	 * {@code null} for expression streams.
+	 */
 	private Address exitAddress = null;
+
+	/**
+	 * Address of the ENDFILE section, read from the compiled program when it
+	 * has BEGINFILE/ENDFILE rules; {@code null} otherwise.
+	 */
+	private Address endFileAddress = null;
+
+	/**
+	 * Address of the NEXT_FILE tuple that opens each input file, read from
+	 * the compiled program when it requires per-file input stepping
+	 * (BEGINFILE/ENDFILE rules or a {@code nextfile} statement);
+	 * {@code null} otherwise.
+	 */
+	private Address nextFileAddress = null;
+
+	/**
+	 * <code>true</code> if execution position is within a BEGINFILE rule;
+	 * <code>false</code> otherwise.
+	 */
+	private boolean withinBeginFileBlocks = false;
+
+	/**
+	 * <code>true</code> if execution position is within an ENDFILE rule;
+	 * <code>false</code> otherwise.
+	 */
+	private boolean withinEndFileBlocks = false;
+
+	/**
+	 * <code>true</code> once the per-file main input loop has advanced to its
+	 * first input file; <code>false</code> while still in the BEGIN blocks.
+	 */
+	private boolean inputFileLoopStarted = false;
 
 	/**
 	 * <code>true</code> if execution position is within an END block;
@@ -678,10 +713,14 @@ public class AVM implements VariableManager, Closeable {
 		argvOffset = NULL_OFFSET;
 		symtabOffset = NULL_OFFSET;
 		exitAddress = null;
+		endFileAddress = null;
+		nextFileAddress = null;
+		withinBeginFileBlocks = false;
+		withinEndFileBlocks = false;
+		inputFileLoopStarted = false;
 		withinEndBlocks = false;
 		exitCode = 0;
 		throwExitException = false;
-		inputSourceFilelistAssignmentsApplied = false;
 		globalVariableOffsets = null;
 		globalVariableArrays = null;
 		functionNames = Collections.emptySet();
@@ -711,6 +750,9 @@ public class AVM implements VariableManager, Closeable {
 		globalVariableArrays = compiledProgram.getGlobalVariableAarrayMap();
 		functionNames = compiledProgram.getFunctionNameSet();
 		sourceDescription = compiledProgram.getSourceDescription();
+		exitAddress = compiledProgram.getExitAddress();
+		endFileAddress = compiledProgram.getEndFileAddress();
+		nextFileAddress = compiledProgram.getNextFileAddress();
 	}
 
 	private void rebindResolvedInputSource(InputSource resolvedSource) {
@@ -981,8 +1023,29 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	private boolean isPersistentEligibleGlobal(String name) {
 		return name != null
-				&& !JRT.isJrtManagedSpecialVariable(name)
+				&& !isManagedSpecialVariable(name)
 				&& !NON_PERSISTENT_GLOBALS.contains(name);
+	}
+
+	/**
+	 * Returns whether the named variable is a JRT-managed special variable in
+	 * the current execution mode. Most special variables (NR, FS, FILENAME,
+	 * ...) always are. The gawk-only ERRNO and ARGIND are special outside
+	 * POSIX mode only: with {@code --posix} they are ordinary global
+	 * variables, exactly like {@code gawk --posix} treats them.
+	 *
+	 * @param name variable name to inspect
+	 * @return {@code true} when reads and writes of the variable go through
+	 *         the JRT instead of a global slot
+	 */
+	private boolean isManagedSpecialVariable(String name) {
+		if (!JRT.isJrtManagedSpecialVariable(name)) {
+			return false;
+		}
+		if (JRT.isGawkOnlySpecialVariable(name)) {
+			return !settings.isPosix();
+		}
+		return true;
 	}
 
 	/**
@@ -1010,23 +1073,6 @@ public class AVM implements VariableManager, Closeable {
 		if (Boolean.TRUE.equals(arrayObj) && !(value instanceof Map)) {
 			throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + name + ").");
 		}
-	}
-
-	/**
-	 * Parses a runtime {@code name=value} assignment.
-	 *
-	 * @param nameValue raw assignment text
-	 * @return parsed assignment
-	 */
-	private NameValueAssignment parseNameValueAssignment(String nameValue) {
-		int eqIdx = nameValue.indexOf('=');
-		if (eqIdx == 0) {
-			throw new IllegalArgumentException(
-					"Must have a non-blank variable name in a name=value variable assignment argument.");
-		}
-		String name = nameValue.substring(0, eqIdx);
-		String value = nameValue.substring(eqIdx + 1);
-		return new NameValueAssignment(name, jrt.toInputScalar(value));
 	}
 
 	/**
@@ -2027,7 +2073,6 @@ public class AVM implements VariableManager, Closeable {
 				case CONSUME_INPUT: {
 					// arg[0] = address
 					// store the next record into $0, $1, ...
-					applyInputSourceFilelistAssignmentsIfNeeded();
 					if (jrt.consumeInput(resolvedInputSource)) {
 						position.next();
 					} else {
@@ -2035,16 +2080,47 @@ public class AVM implements VariableManager, Closeable {
 					}
 					break;
 				}
+				case CONSUME_FILE_INPUT: {
+					// arg[0] = address of the ENDFILE section
+					// store the next record of the current file into $0, $1, ...
+					withinBeginFileBlocks = false;
+					if (jrt.consumeCurrentFileInput(resolvedInputSource)) {
+						position.next();
+					} else {
+						withinEndFileBlocks = true;
+						position.jump(tuple.getAddress());
+					}
+					break;
+				}
+				case NEXT_FILE: {
+					// arg[0] = address to jump to when no input file remains
+					inputFileLoopStarted = true;
+					withinEndFileBlocks = false;
+					if (jrt.advanceToNextFile(resolvedInputSource)) {
+						withinBeginFileBlocks = true;
+						position.next();
+					} else {
+						position.jump(tuple.getAddress());
+					}
+					break;
+				}
+				case EXEC_NEXTFILE: {
+					executeNextfile(position);
+					break;
+				}
 
 				case GETLINE_INPUT: {
-					applyInputSourceFilelistAssignmentsIfNeeded();
-					push(jrt.consumeInput(resolvedInputSource) ? 1 : 0);
+					checkGetlineAllowed(position);
+					boolean consumed = isMainInputFileBounded() ?
+							jrt.consumeCurrentFileInput(resolvedInputSource) : jrt.consumeInput(resolvedInputSource);
+					push(consumed ? 1 : 0);
 					position.next();
 					break;
 				}
 				case GETLINE_INPUT_TO_TARGET: {
-					applyInputSourceFilelistAssignmentsIfNeeded();
-					Object input = jrt.consumeInputToTarget(resolvedInputSource);
+					checkGetlineAllowed(position);
+					Object input = isMainInputFileBounded() ?
+							jrt.consumeCurrentFileInputToTarget(resolvedInputSource) : jrt.consumeInputToTarget(resolvedInputSource);
 					if (input != null) {
 						push(1);
 						push(input);
@@ -2239,12 +2315,6 @@ public class AVM implements VariableManager, Closeable {
 					position.next();
 					break;
 				}
-				case SET_EXIT_ADDRESS: {
-					// arg[0] = exit address
-					exitAddress = tuple.getAddress();
-					position.next();
-					break;
-				}
 				case SET_WITHIN_END_BLOCKS: {
 					// arg[0] = whether within the END blocks section
 					BooleanTuple endBlocksTuple = (BooleanTuple) tuple;
@@ -2259,6 +2329,8 @@ public class AVM implements VariableManager, Closeable {
 						exitCode = (int) JRT.toDouble(pop());
 					}
 					throwExitException = true;
+					withinBeginFileBlocks = false;
+					withinEndFileBlocks = false;
 
 					// If in BEGIN or in a rule, jump to the END section
 					if (!withinEndBlocks && exitAddress != null) {
@@ -2524,6 +2596,30 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case PUSH_FILENAME: {
 					push(jrt.getFILENAME());
+					position.next();
+					break;
+				}
+				case ASSIGN_ERRNO: {
+					Object v = pop();
+					jrt.setERRNO(v);
+					push(v == null ? "" : v);
+					position.next();
+					break;
+				}
+				case PUSH_ERRNO: {
+					push(jrt.getERRNO());
+					position.next();
+					break;
+				}
+				case ASSIGN_ARGIND: {
+					Object v = pop();
+					jrt.setARGIND(v);
+					push(v == null ? ZERO : v);
+					position.next();
+					break;
+				}
+				case PUSH_ARGIND: {
+					push(jrt.getARGIND());
 					position.next();
 					break;
 				}
@@ -2852,14 +2948,31 @@ public class AVM implements VariableManager, Closeable {
 
 	private void populateArgv(long offset) {
 		argvOffset = offset;
-		// ARGV[0] is the program name, ARGV[1..n] the command-line arguments.
-		// The count comes straight from the argument list because ARGC may not
-		// be materialized when the script does not reference it.
-		assignArray(argvOffset, 0, "jawk", true);
-		pop();
-		for (int i = 1; i <= arguments.size(); i++) {
-			assignArray(argvOffset, i, jrt.toInputScalar(arguments.get(i - 1)), true);
+		// A host-supplied ARGV takes precedence over the operand list: leave
+		// it untouched instead of overwriting its entries.
+		Object existing = runtimeStack.getVariable(argvOffset, true);
+		if (existing instanceof Map && !((Map<?, ?>) existing).isEmpty()) {
+			return;
+		}
+		forEachArgvEntry((index, value) -> {
+			assignArray(argvOffset, index, value, true);
 			pop(); // clean up the stack after the assignment
+		});
+	}
+
+	/**
+	 * Supplies the ARGV entries to the given consumer, in index order:
+	 * ARGV[0] is the program name, ARGV[1..n] the command-line arguments.
+	 * Indexes are supplied as {@code Long}, the canonical AWK array key
+	 * form. The count comes straight from the argument list because ARGC
+	 * may not be materialized when the script does not reference it.
+	 *
+	 * @param consumer receives each (index, value) ARGV entry
+	 */
+	private void forEachArgvEntry(BiConsumer<Long, Object> consumer) {
+		consumer.accept(Long.valueOf(0L), "jawk");
+		for (int i = 1; i <= arguments.size(); i++) {
+			consumer.accept(Long.valueOf(i), jrt.toInputScalar(arguments.get(i - 1)));
 		}
 	}
 
@@ -3048,7 +3161,6 @@ public class AVM implements VariableManager, Closeable {
 		jrt.jrtCloseAll();
 		closeResolvedInputSource();
 		resolvedInputSource = null;
-		inputSourceFilelistAssignmentsApplied = false;
 	}
 
 	/**
@@ -3246,6 +3358,8 @@ public class AVM implements VariableManager, Closeable {
 											"RSTART",
 											"RLENGTH",
 											"IGNORECASE",
+											"ERRNO",
+											"ARGIND",
 											"ARGC",
 											"ARGV")));
 
@@ -3294,6 +3408,18 @@ public class AVM implements VariableManager, Closeable {
 			return jrt.getRLENGTH();
 		case "IGNORECASE":
 			return jrt.getIGNORECASEVar();
+		case "ERRNO":
+			if (isManagedSpecialVariable(name)) {
+				return jrt.getERRNO();
+			}
+			// POSIX mode: ordinary global, answered by the slot lookup below
+			break;
+		case "ARGIND":
+			if (isManagedSpecialVariable(name)) {
+				return jrt.getARGIND();
+			}
+			// POSIX mode: ordinary global, answered by the slot lookup below
+			break;
 		// lazily-materialized globals answered through their synthetic accessors
 		case "ARGC":
 			return getARGC();
@@ -3335,21 +3461,6 @@ public class AVM implements VariableManager, Closeable {
 		return currentLineNumber;
 	}
 
-	/**
-	 * Performs the global variable assignment within the runtime environment.
-	 * These assignments come from the ARGV list (bounded by ARGC), which, in
-	 * turn, come from the command-line arguments passed into Awk.
-	 *
-	 * @param nameValue The variable assignment in <i>name=value</i> form.
-	 */
-	@SuppressWarnings("unused")
-	private void setFilelistVariable(String nameValue) {
-		// route through assignVariable so JRT-managed specials, global slots,
-		// and SYMTAB updates are handled in exactly one place
-		NameValueAssignment assignment = parseNameValueAssignment(nameValue);
-		assignVariable(assignment.name, assignment.value);
-	}
-
 	/** {@inheritDoc} */
 	@Override
 	public final void assignVariable(String name, Object obj) {
@@ -3358,7 +3469,7 @@ public class AVM implements VariableManager, Closeable {
 		if (globalVariableOffsets == null || globalVariableArrays == null) {
 			Object normalized = normalizeExternalVariableValue(obj);
 			baseInitialVariables.put(name, normalized);
-			if (JRT.isJrtManagedSpecialVariable(name)) {
+			if (isManagedSpecialVariable(name)) {
 				baseSpecialVariables.put(name, normalized);
 			}
 			return;
@@ -3374,7 +3485,8 @@ public class AVM implements VariableManager, Closeable {
 		// FS=: between input files) must reach the JRT, not a global slot.
 		// ARGC is excluded: JRT.setARGC delegates back to this method, and its
 		// authoritative storage is the compiled slot below.
-		if (!"ARGC".equals(name) && jrt.applySpecialVariable(name, normalized)) {
+		if (!"ARGC".equals(name) && isManagedSpecialVariable(name)) {
+			jrt.applySpecialVariable(name, normalized);
 			updateSymtabEntry(name, normalized);
 			return;
 		}
@@ -3395,16 +3507,93 @@ public class AVM implements VariableManager, Closeable {
 		updateSymtabEntry(name, normalized);
 	}
 
-	private void applyInputSourceFilelistAssignmentsIfNeeded() {
-		if (inputSourceFilelistAssignmentsApplied || resolvedInputSource instanceof StreamInputSource) {
-			return;
+	/**
+	 * Executes the {@code nextfile} statement: abandons the current input file
+	 * and resumes the per-file input loop at the appropriate point. The
+	 * runtime and operand stacks are cleared, so {@code nextfile} unwinds
+	 * user-defined function calls, mirroring {@code exit}.
+	 * <p>
+	 * A {@code nextfile} written directly inside a BEGIN, END, or ENDFILE
+	 * rule is already rejected at compile time by the parser. The checks
+	 * below cover the uses reached through user-defined functions, where the
+	 * calling rule cannot be known statically (the same function may be
+	 * called from both an ordinary rule and an END rule); gawk performs the
+	 * same checks at runtime.
+	 * </p>
+	 *
+	 * @param position the tuple position tracker to redirect
+	 */
+	private void executeNextfile(PositionTracker position) {
+		if (nextFileAddress == null || !inputFileLoopStarted) {
+			throw new AwkRuntimeException(
+					position.lineNumber(),
+					"`nextfile' cannot be called from a BEGIN rule");
 		}
-		for (String argument : arguments) {
-			if (argument.indexOf('=') > 0) {
-				setFilelistVariable(argument);
-			}
+		if (withinEndBlocks) {
+			throw new AwkRuntimeException(
+					position.lineNumber(),
+					"`nextfile' cannot be called from an END rule");
 		}
-		inputSourceFilelistAssignmentsApplied = true;
+		if (withinEndFileBlocks) {
+			throw new AwkRuntimeException(
+					position.lineNumber(),
+					"`nextfile' cannot be called from an ENDFILE rule");
+		}
+		// nextfile can be invoked from user-defined functions: unwind them.
+		runtimeStack.popAllFrames();
+		operandStack.clear();
+		if (endFileAddress == null
+				|| withinBeginFileBlocks && jrt.hasPendingInputFileError(resolvedInputSource)) {
+			// No ENDFILE rules to run, or the file could not be opened: skip
+			// the ENDFILE section (gawk BEGINFILE error handling) and go
+			// straight to the next file.
+			withinBeginFileBlocks = false;
+			position.jump(nextFileAddress);
+		} else {
+			withinBeginFileBlocks = false;
+			withinEndFileBlocks = true;
+			position.jump(endFileAddress);
+		}
+	}
+
+	/**
+	 * Returns whether a non-redirected {@code getline} must be confined to
+	 * the current input file. While the per-file main input loop of a program
+	 * with BEGINFILE/ENDFILE rules is running, only the loop itself may cross
+	 * file boundaries, so that no file's hooks are ever skipped; a
+	 * {@code getline} in an action therefore reports end-of-input at the end
+	 * of the current file. In BEGIN and END rules — before the loop starts or
+	 * after it ends — {@code getline} keeps streaming across the remaining
+	 * input.
+	 *
+	 * @return {@code true} when getline must not advance to the next file
+	 */
+	private boolean isMainInputFileBounded() {
+		return endFileAddress != null && inputFileLoopStarted && !withinEndBlocks;
+	}
+
+	/**
+	 * Raises the gawk-compatible fatal error when a non-redirected
+	 * {@code getline} executes inside a BEGINFILE or ENDFILE rule.
+	 * <p>
+	 * A non-redirected {@code getline} written directly inside a
+	 * BEGINFILE/ENDFILE rule is already rejected at compile time by the
+	 * parser. This runtime check covers the uses reached through
+	 * user-defined functions, where the calling rule cannot be known
+	 * statically; it lives here rather than in {@link JRT} because the
+	 * current-rule flags are interpreter execution state.
+	 * </p>
+	 *
+	 * @param position the tuple position tracker, for error reporting
+	 */
+	private void checkGetlineAllowed(PositionTracker position) {
+		if (withinBeginFileBlocks || withinEndFileBlocks) {
+			throw new AwkRuntimeException(
+					position.lineNumber(),
+					"non-redirected `getline' invalid inside `"
+							+ (withinBeginFileBlocks ? "BEGINFILE" : "ENDFILE")
+							+ "' rule");
+		}
 	}
 
 	/** {@inheritDoc} */
@@ -3456,10 +3645,7 @@ public class AVM implements VariableManager, Closeable {
 	public Object getARGV() {
 		if (argvOffset == NULL_OFFSET) {
 			Map<Object, Object> argv = newAwkArray();
-			argv.put(0L, "jawk");
-			for (int i = 0; i < arguments.size(); i++) {
-				argv.put(Long.valueOf(i + 1L), jrt.toInputScalar(arguments.get(i)));
-			}
+			forEachArgvEntry(argv::put);
 			return argv;
 		}
 		return runtimeStack.getVariable(argvOffset, true);
@@ -3574,16 +3760,6 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	private static final Set<String> NON_PERSISTENT_GLOBALS = new HashSet<>(
 			Arrays.asList("ARGV", "ARGC", "ENVIRON", "RSTART", "RLENGTH", "IGNORECASE"));
-
-	private static final class NameValueAssignment {
-		private final String name;
-		private final Object value;
-
-		private NameValueAssignment(String name, Object value) {
-			this.name = name;
-			this.value = value;
-		}
-	}
 
 	private static final class SingleRecordInputSource implements InputSource {
 

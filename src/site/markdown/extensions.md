@@ -76,6 +76,8 @@ That keeps extension availability explicit and local to the embedding code.
 
 `asort()`, `asorti()`, and the `for (index in array)` statement honor `PROCINFO["sorted_in"]` with gawk's predefined comparison modes: `@unsorted`, `@ind_str_asc`, `@ind_num_asc`, `@val_str_asc`, `@val_num_asc`, `@val_type_asc`, and their `_desc` counterparts. String comparisons ignore case when `IGNORECASE` is non-zero.
 
+Beyond the extension functions, the interpreter itself implements gawk's `BEGINFILE` / `ENDFILE` special patterns, the `nextfile` statement, and the `ERRNO` and `ARGIND` special variables (see the [CLI guide](cli.html#BEGINFILE_and_ENDFILE_Rules)). Like the other gawk-specific syntax, `BEGINFILE` and `ENDFILE` are not special in POSIX mode.
+
 Scripts that reference `SYMTAB` or `FUNCTAB` get honest, Jawk-shaped content, populated by the runtime itself (outside POSIX mode): `SYMTAB` holds the names of the program's globals, Jawk's special variables, and `-v`/host-supplied variables; `FUNCTAB` holds the names of the program's user-defined functions plus the loaded extensions' function keywords. Command-line `name=value` operand assignments update `SYMTAB` live, as in gawk; ordinary in-script assignments are not reflected (the array is a startup snapshot, not gawk's live view). As in gawk, assigning a scalar to `SYMTAB` or `FUNCTAB` is a runtime error.
 
 > [!NOTE]

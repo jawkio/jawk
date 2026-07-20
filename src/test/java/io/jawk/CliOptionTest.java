@@ -219,6 +219,27 @@ public class CliOptionTest {
 	}
 
 	@Test
+	public void unreadableFileAfterStdinOperandDoesNotCloseCallerInput() throws Exception {
+		File missing = new File(tempFolder.getRoot(), "missing.txt");
+		// Direct Cli construction (like persistOptionFlushesOutputBeforeSaveFailure):
+		// the AwkTestSupport builders cannot observe whether the caller-provided
+		// input stream gets closed.
+		CloseTrackingInputStream input = new CloseTrackingInputStream("s\n".getBytes(StandardCharsets.UTF_8));
+		ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
+		Cli cli = new Cli(
+				input,
+				new PrintStream(outBytes, true, StandardCharsets.UTF_8.name()),
+				new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8.name()),
+				Collections.<String, String>emptyMap());
+		cli.parse(new String[] { "{ print }", "-", missing.getAbsolutePath() });
+
+		assertThrows(Exception.class, () -> cli.run());
+
+		assertEquals("s\n", outBytes.toString(StandardCharsets.UTF_8.name()));
+		assertFalse(input.isClosed());
+	}
+
+	@Test
 	public void unknownOptionAfterScriptFileIsPassedToArgv() throws Exception {
 		AwkTestSupport
 				.cliTest("CLI unknown option after -f is passed to ARGV")
@@ -479,6 +500,24 @@ public class CliOptionTest {
 	private static void writeProgram(File target, String script) throws Exception {
 		try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(target))) {
 			oos.writeObject(new Awk().compile(script));
+		}
+	}
+
+	private static final class CloseTrackingInputStream extends ByteArrayInputStream {
+		private boolean closed;
+
+		CloseTrackingInputStream(byte[] data) {
+			super(data);
+		}
+
+		@Override
+		public void close() throws IOException {
+			closed = true;
+			super.close();
+		}
+
+		private boolean isClosed() {
+			return closed;
 		}
 	}
 

@@ -566,12 +566,17 @@ public class StreamInputSource implements InputSource, Closeable {
 	 * @throws IOException if the file cannot be opened for reading
 	 */
 	private PartitioningReader openFileListReader(String arg) throws IOException {
-		currentReaderIsDefaultInput = "-".equals(arg);
-		InputStream stream = currentReaderIsDefaultInput ? defaultInput : new FileInputStream(arg);
-		return new PartitioningReader(
+		boolean isDefaultInput = "-".equals(arg);
+		// Open the stream before publishing the flag: if the open fails, the
+		// still-current reader must keep its own classification, so that
+		// cleanup does not close the caller-provided default input stream.
+		InputStream stream = isDefaultInput ? defaultInput : new FileInputStream(arg);
+		PartitioningReader reader = new PartitioningReader(
 				new InputStreamReader(stream, StandardCharsets.UTF_8),
 				jrt.getRSString(),
 				true);
+		currentReaderIsDefaultInput = isDefaultInput;
+		return reader;
 	}
 
 	/**

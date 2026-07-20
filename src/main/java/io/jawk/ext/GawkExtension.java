@@ -29,6 +29,7 @@ import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -272,15 +273,41 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		boolean utc = utcFlag != null && getJrt().toBoolean(utcFlag);
 		TimeZone timeZone = utc ? TimeZone.getTimeZone("UTC") : TimeZone.getDefault();
 		GregorianCalendar calendar = new GregorianCalendar(timeZone);
+		// proleptic Gregorian: gawk's civil dates never switch to Julian
+		calendar.setGregorianChange(new Date(Long.MIN_VALUE));
 		calendar.setLenient(true);
 		calendar.clear();
 		calendar.set(values[0], values[1] - 1, values[2], values[3], values[4], values[5]);
+		long millis;
 		if (fields.length == 7 && !utc && values[6] >= 0) {
 			// like C's tm_isdst: a non-negative hint forces the DST offset;
 			// a negative one lets the zone's rules decide
 			calendar.set(Calendar.DST_OFFSET, values[6] > 0 ? timeZone.getDSTSavings() : 0);
+			millis = calendar.getTimeInMillis();
+		} else {
+			millis = preferDaylightAtOverlap(calendar.getTimeInMillis(), timeZone);
 		}
-		return Long.valueOf(Math.floorDiv(calendar.getTimeInMillis(), 1000L));
+		return Long.valueOf(Math.floorDiv(millis, 1000L));
+	}
+
+	/**
+	 * Resolves ambiguous fall-back wall times to their first (daylight
+	 * saving) occurrence, as glibc's {@code mktime()} does when
+	 * {@code tm_isdst} is unspecified; {@link GregorianCalendar} picks the
+	 * later standard-time occurrence instead.
+	 */
+	private static long preferDaylightAtOverlap(long millis, TimeZone timeZone) {
+		int savings = timeZone.getDSTSavings();
+		if (savings <= 0) {
+			return millis;
+		}
+		long earlier = millis - savings;
+		// the shifted instant represents the same wall time exactly when it
+		// falls in daylight saving while the original resolution is standard
+		if (timeZone.getOffset(earlier) - timeZone.getOffset(millis) == savings) {
+			return earlier;
+		}
+		return millis;
 	}
 
 	/**

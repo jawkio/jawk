@@ -859,6 +859,62 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void timeFunctionsUseProlepticGregorianDates() throws Exception {
+		// gawk's civil dates never switch to the Julian calendar: 1500-01-01
+		// is 9 days away from what a default GregorianCalendar would compute
+		AwkTestSupport
+				.awkTest("mktime and strftime use the proleptic Gregorian calendar")
+				.script(
+						"BEGIN { "
+								+ "t = mktime(\"1500 1 1 0 0 0\", 1); "
+								+ "print t; "
+								+ "print strftime(\"%F\", t, 1) "
+								+ "}")
+				.expectLines("-14831769600", "1500-01-01")
+				.runAndAssert();
+	}
+
+	@Test
+	public void strftimeSupportsGnuFlagsAndWidths() throws Exception {
+		// the GNU extensions gawk exposes through glibc: '-' no padding,
+		// '_' space padding, '0' zero padding, '^' upper case, '#' swapped
+		// case, and a minimum field width
+		AwkTestSupport
+				.awkTest("strftime honors GNU padding and case flags")
+				.script(
+						"BEGIN { "
+								+ "t = 1483228800; "
+								+ "print \"[\" strftime(\"%-d\", t, 1) \"][\" strftime(\"%_d\", t, 1) \"][\" strftime(\"%5d\", t, 1) \"]\"; "
+								+ "print \"[\" strftime(\"%^a\", t, 1) \"][\" strftime(\"%#p\", t, 1) \"][\" strftime(\"%_j\", t, 1) \"]\"; "
+								+ "print \"[\" strftime(\"%08Y\", t, 1) \"][\" strftime(\"%-e\", t, 1) \"][\" strftime(\"%3a\", t, 1) \"]\" "
+								+ "}")
+				.expectLines("[1][ 1][00001]", "[SUN][am][  1]", "[00002017][1][Sun]")
+				.runAndAssert();
+	}
+
+	@Test
+	public void mktimeResolvesDstOverlapLikeGlibc() throws Exception {
+		// 2021-11-07 01:30 happens twice in America/New_York; with no DST
+		// hint glibc's mktime picks the first (daylight) occurrence
+		java.util.TimeZone original = java.util.TimeZone.getDefault();
+		try {
+			java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("America/New_York"));
+			AwkTestSupport
+					.awkTest("ambiguous fall-back times pick the daylight occurrence")
+					.script(
+							"BEGIN { "
+									+ "print mktime(\"2021 11 7 1 30 0\"); "
+									+ "print mktime(\"2021 11 7 1 30 0 1\"); "
+									+ "print mktime(\"2021 11 7 1 30 0 0\") "
+									+ "}")
+					.expectLines("1636263000", "1636263000", "1636266600")
+					.runAndAssert();
+		} finally {
+			java.util.TimeZone.setDefault(original);
+		}
+	}
+
+	@Test
 	public void strftimeDefaultFormatComesFromProcinfo() throws Exception {
 		AwkTestSupport
 				.awkTest("strftime() without arguments uses PROCINFO[\"strftime\"]")

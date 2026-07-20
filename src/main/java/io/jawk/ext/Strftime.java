@@ -23,6 +23,7 @@ package io.jawk.ext;
  */
 
 import java.util.Calendar;
+import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.Locale;
 import java.util.TimeZone;
@@ -97,6 +98,9 @@ final class Strftime {
 	 */
 	static String format(String format, long epochSeconds, TimeZone timeZone) {
 		GregorianCalendar calendar = new GregorianCalendar(timeZone, Locale.US);
+		// proleptic Gregorian: gawk's civil dates never switch to the Julian
+		// calendar, so 1500-01-01 round-trips with mktime()
+		calendar.setGregorianChange(new Date(Long.MIN_VALUE));
 		// ISO 8601 week rules, needed by %V, %G, and %g; %U and %W are
 		// computed from the day of year instead, so this setting is safe
 		calendar.setFirstDayOfWeek(Calendar.MONDAY);
@@ -115,13 +119,126 @@ final class Strftime {
 				out.append(c);
 				continue;
 			}
-			char specifier = format.charAt(++i);
-			// glibc treats the E and O locale modifiers as no-ops in the C locale
-			if ((specifier == 'E' || specifier == 'O') && i + 1 < length) {
-				specifier = format.charAt(++i);
-			}
-			appendSpecifier(out, specifier, calendar);
+			i = appendConversion(out, format, i + 1, calendar);
 		}
+	}
+
+	/**
+	 * Renders one conversion whose {@code %} sits at {@code index - 1},
+	 * honoring the GNU flag and field-width syntax ({@code %-d}, {@code %_d},
+	 * {@code %^a}, {@code %5d}, ...) that gawk supports through glibc.
+	 *
+	 * @return index of the conversion's last consumed character
+	 */
+	private static int appendConversion(StringBuilder out, String format, int index, GregorianCalendar calendar) {
+		int length = format.length();
+		int i = index;
+		// GNU flags: '-' no padding, '_' space padding, '0' zero padding,
+		// '^' uppercase, '#' swap case
+		boolean noPadding = false;
+		boolean upperCase = false;
+		boolean swapCase = false;
+		char padOverride = 0;
+		for (; i < length; i++) {
+			char c = format.charAt(i);
+			if (c == '-') {
+				noPadding = true;
+			} else if (c == '_') {
+				padOverride = ' ';
+			} else if (c == '0') {
+				padOverride = '0';
+			} else if (c == '^') {
+				upperCase = true;
+			} else if (c == '#') {
+				swapCase = true;
+			} else {
+				break;
+			}
+		}
+		int width = -1;
+		while (i < length && format.charAt(i) >= '0' && format.charAt(i) <= '9') {
+			width = Math.max(width, 0) * 10 + format.charAt(i) - '0';
+			i++;
+		}
+		// glibc treats the E and O locale modifiers as no-ops in the C locale
+		if (i + 1 < length && (format.charAt(i) == 'E' || format.charAt(i) == 'O')) {
+			i++;
+		}
+		if (i >= length) {
+			// dangling specifier: emit verbatim, as glibc does
+			out.append(format, index - 1, length);
+			return length - 1;
+		}
+		char specifier = format.charAt(i);
+		if (!noPadding && !upperCase && !swapCase && padOverride == 0 && width < 0) {
+			appendSpecifier(out, specifier, calendar);
+			return i;
+		}
+		StringBuilder piece = new StringBuilder();
+		appendSpecifier(piece, specifier, calendar);
+		out.append(transform(piece.toString(), noPadding, padOverride, width, upperCase, swapCase));
+		return i;
+	}
+
+	/** Applies the GNU padding and case flags to a rendered conversion. */
+	private static String transform(
+			String text,
+			boolean noPadding,
+			char padOverride,
+			int width,
+			boolean upperCase,
+			boolean swapCase) {
+		String result = text;
+		if (noPadding || padOverride != 0 || width >= 0) {
+			int naturalWidth = result.length();
+			result = stripPadding(result);
+			if (!noPadding) {
+				char pad = padOverride != 0 ? padOverride : defaultPad(text);
+				int targetWidth = Math.max(width, width < 0 ? naturalWidth : 0);
+				StringBuilder padded = new StringBuilder(Math.max(targetWidth, result.length()));
+				for (int i = result.length(); i < targetWidth; i++) {
+					padded.append(pad);
+				}
+				result = padded.append(result).toString();
+			}
+		}
+		if (upperCase) {
+			result = result.toUpperCase(Locale.US);
+		}
+		if (swapCase) {
+			result = swapLetterCase(result);
+		}
+		return result;
+	}
+
+	/** Removes the leading zero or space padding of a rendered conversion. */
+	private static String stripPadding(String text) {
+		int start = 0;
+		while (start < text.length() - 1 && (text.charAt(start) == '0' || text.charAt(start) == ' ')) {
+			start++;
+		}
+		return text.substring(start);
+	}
+
+	/** Zero-padded numeric conversions keep zero padding; text pads with spaces. */
+	private static char defaultPad(String text) {
+		return !text.isEmpty() && Character.isDigit(text.charAt(0)) ? '0' : ' ';
+	}
+
+	/** Swaps the case of every letter, the GNU {@code #} flag. */
+	private static String swapLetterCase(String text) {
+		StringBuilder swapped = new StringBuilder(text.length());
+		for (int i = 0; i < text.length(); i++) {
+			char c = text.charAt(i);
+			if (Character.isUpperCase(c)) {
+				swapped.append(Character.toLowerCase(c));
+			} else if (Character.isLowerCase(c)) {
+				swapped.append(Character.toUpperCase(c));
+			} else {
+				swapped.append(c);
+			}
+		}
+		return swapped.toString();
 	}
 
 	private static void appendSpecifier(StringBuilder out, char specifier, GregorianCalendar calendar) {

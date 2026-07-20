@@ -151,6 +151,92 @@ public class CliOptionTest {
 	}
 
 	@Test
+	public void doubleDashEndsOptionProcessing() {
+		Cli cli = new Cli();
+		// After "--", "-v" is no longer an option: it becomes the inline script
+		cli.parse(new String[] { "--", "-v" });
+
+		assertEquals(1, cli.getScriptSources().size());
+	}
+
+	@Test
+	public void doubleDashPassesRemainingArgumentsToArgv() throws Exception {
+		AwkTestSupport
+				.cliTest("CLI -- passes remaining arguments to ARGV")
+				.file("argv.awk", "BEGIN { for (i = 1; i < ARGC; i++) print i \"=\" ARGV[i] }")
+				.argument("-f", "{{argv.awk}}", "--")
+				.operand("-v", "x=1")
+				.expectLines("1=-v", "2=x=1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void singleDashOperandReadsStandardInput() throws Exception {
+		AwkTestSupport
+				.cliTest("CLI - operand reads standard input")
+				.script("{ print FILENAME \":\" $0 }")
+				.operand("-")
+				.stdin("hello\n")
+				.expectLines("-:hello")
+				.runAndAssert();
+	}
+
+	@Test
+	public void singleDashOperandMixesWithRegularFiles() throws Exception {
+		AwkTestSupport
+				.cliTest("CLI - operand mixes with regular input files")
+				.script("{ print FILENAME \":\" FNR \":\" $0 }")
+				.file("data.txt", "a\n")
+				.operand("-", "{{data.txt}}")
+				.stdin("s\n")
+				.expectLines("-:1:s", "{{data.txt}}:1:a")
+				.runAndAssert();
+	}
+
+	@Test
+	public void singleDashOperandWorksWithBeginFileRules() throws Exception {
+		AwkTestSupport
+				.cliTest("CLI - operand works with BEGINFILE rules")
+				.script("BEGINFILE { print \"BF:\" FILENAME } { print $0 }")
+				.operand("-")
+				.stdin("s\n")
+				.expectLines("BF:-", "s")
+				.runAndAssert();
+	}
+
+	@Test
+	public void singleDashBeforeScriptIsTreatedAsScript() throws Exception {
+		// "-" no longer terminates option processing while being skipped: it is
+		// an operand, so here it is (mis)used as the inline script, like gawk
+		AwkTestSupport
+				.cliTest("CLI - before script is treated as the script")
+				.argument("-", "BEGIN { print \"never\" }")
+				.expectThrow(ParserException.class)
+				.runAndAssert();
+	}
+
+	@Test
+	public void unknownOptionAfterScriptFileIsPassedToArgv() throws Exception {
+		AwkTestSupport
+				.cliTest("CLI unknown option after -f is passed to ARGV")
+				.file("argv.awk", "BEGIN { for (i = 1; i < ARGC; i++) print i \"=\" ARGV[i] }")
+				.argument("-f", "{{argv.awk}}", "-q")
+				.operand("one")
+				.expectLines("1=-q", "2=one")
+				.runAndAssert();
+	}
+
+	@Test
+	public void unknownOptionWithoutScriptIsRejected() {
+		Cli cli = new Cli();
+		IllegalArgumentException ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> cli.parse(new String[]
+				{ "-q", "{ print }" }));
+		assertTrue(ex.getMessage().contains("Unknown parameter: -q"));
+	}
+
+	@Test
 	public void posixOptionDisablesArraysOfArrays() {
 		Cli cli = new Cli();
 		cli.parse(new String[] { "--posix", "{ print 1 }" });

@@ -15,7 +15,7 @@ This page documents the CLI surface implemented by [`Cli`](apidocs/io/jawk/Cli.h
 The common command shape is:
 
 ```shell
-java -jar jawk-${project.version}-standalone.jar [options] [script] [name=value | input_filename]...
+java -jar jawk-${project.version}-standalone.jar [options] [--] [script] [name=value | input_filename | -]...
 ```
 
 The extension listing mode is separate:
@@ -37,10 +37,13 @@ java -jar jawk-${project.version}-standalone.jar --list-ext
 >
 > - Input and `ARGV`
 >
+>   - `--` marks the end of options (POSIX): every following argument is the script (when `-f` or `-L` was not used) and its operands.
 >   - Remaining operands after the script are exposed through `ARGV` and `ARGC`.
 >   - An operand without `=` is treated as an input filename.
+>   - The `-` operand designates standard input as an input file (POSIX). `FILENAME` is `-` while it is being read.
 >   - An operand containing `=` is treated as an AWK-style file-list assignment that applies before the next input file is consumed.
 >   - Use `-v name=value` instead when the variable must exist before `BEGIN`.
+>   - As in gawk, once the program text has been supplied (with `-f` or `-L`), an unknown option ends option processing and is passed on to the AWK program through `ARGV`, which is useful for `#!` interpreter scripts.
 >
 > - Variables and formatting
 >
@@ -69,7 +72,7 @@ java -jar jawk-${project.version}-standalone.jar --list-ext
 > - Help and errors
 >
 >   - `-h` and `-?` print usage and exit. They must be used by themselves.
->   - Missing option arguments, unknown parameters, invalid `-v` syntax, or missing scripts cause argument parsing to fail.
+>   - Missing option arguments, invalid `-v` syntax, or missing scripts cause argument parsing to fail. An unknown option is rejected only when no program text has been supplied yet; otherwise it flows to `ARGV` as described above.
 >   - Jawk reports runtime problems through exceptions and exits with a non-zero status when execution fails.
 
 ## Execution Notes

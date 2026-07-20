@@ -192,21 +192,28 @@ final class Strftime {
 		if (noPadding || padOverride != 0 || width >= 0) {
 			int naturalWidth = result.length();
 			result = stripPadding(result);
-			if (!noPadding) {
-				char pad = padOverride != 0 ? padOverride : defaultPad(text);
-				int targetWidth = Math.max(width, width < 0 ? naturalWidth : 0);
-				StringBuilder padded = new StringBuilder(Math.max(targetWidth, result.length()));
-				for (int i = result.length(); i < targetWidth; i++) {
-					padded.append(pad);
-				}
-				result = padded.append(result).toString();
+			char pad;
+			int targetWidth;
+			if (noPadding) {
+				// '-' drops the conversion's own padding; an explicitly
+				// requested width is still honored, padded with spaces
+				pad = ' ';
+				targetWidth = Math.max(width, 0);
+			} else {
+				pad = padOverride != 0 ? padOverride : defaultPad(text);
+				targetWidth = width < 0 ? naturalWidth : width;
 			}
+			StringBuilder padded = new StringBuilder(Math.max(targetWidth, result.length()));
+			for (int i = result.length(); i < targetWidth; i++) {
+				padded.append(pad);
+			}
+			result = padded.append(result).toString();
 		}
 		if (upperCase) {
 			result = result.toUpperCase(Locale.US);
 		}
 		if (swapCase) {
-			result = swapLetterCase(result);
+			result = alternateCase(result);
 		}
 		return result;
 	}
@@ -225,20 +232,18 @@ final class Strftime {
 		return !text.isEmpty() && Character.isDigit(text.charAt(0)) ? '0' : ' ';
 	}
 
-	/** Swaps the case of every letter, the GNU {@code #} flag. */
-	private static String swapLetterCase(String text) {
-		StringBuilder swapped = new StringBuilder(text.length());
+	/**
+	 * The GNU {@code #} flag: glibc uppercases conversions that normally
+	 * produce lowercase or mixed-case text ({@code %#a} is {@code SUN}) and
+	 * lowercases the normally-uppercase ones ({@code %#p} is {@code am}).
+	 */
+	private static String alternateCase(String text) {
 		for (int i = 0; i < text.length(); i++) {
-			char c = text.charAt(i);
-			if (Character.isUpperCase(c)) {
-				swapped.append(Character.toLowerCase(c));
-			} else if (Character.isLowerCase(c)) {
-				swapped.append(Character.toUpperCase(c));
-			} else {
-				swapped.append(c);
+			if (Character.isLowerCase(text.charAt(i))) {
+				return text.toUpperCase(Locale.US);
 			}
 		}
-		return swapped.toString();
+		return text.toLowerCase(Locale.US);
 	}
 
 	private static void appendSpecifier(StringBuilder out, char specifier, GregorianCalendar calendar) {
@@ -260,7 +265,7 @@ final class Strftime {
 			appendFormat(out, "%a %b %e %H:%M:%S %Y", calendar);
 			break;
 		case 'C':
-			appendPadded(out, calendar.get(Calendar.YEAR) / 100, 2);
+			appendPadded(out, year(calendar) / 100, 2);
 			break;
 		case 'd':
 			appendPadded(out, calendar.get(Calendar.DAY_OF_MONTH), 2);
@@ -281,10 +286,10 @@ final class Strftime {
 			appendFormat(out, "%Y-%m-%d", calendar);
 			break;
 		case 'g':
-			appendPadded(out, Math.floorMod(calendar.getWeekYear(), 100), 2);
+			appendPadded(out, Math.floorMod(weekYear(calendar), 100), 2);
 			break;
 		case 'G':
-			out.append(calendar.getWeekYear());
+			out.append(weekYear(calendar));
 			break;
 		case 'H':
 			appendPadded(out, calendar.get(Calendar.HOUR_OF_DAY), 2);
@@ -344,10 +349,10 @@ final class Strftime {
 			appendPadded(out, weekNumber(calendar, (dayOfWeek(calendar) + 6) % 7), 2);
 			break;
 		case 'y':
-			appendPadded(out, Math.floorMod(calendar.get(Calendar.YEAR), 100), 2);
+			appendPadded(out, Math.floorMod(year(calendar), 100), 2);
 			break;
 		case 'Y':
-			out.append(calendar.get(Calendar.YEAR));
+			out.append(year(calendar));
 			break;
 		case 'z':
 			appendZoneOffset(out, calendar);
@@ -378,6 +383,18 @@ final class Strftime {
 		return calendar
 				.getTimeZone()
 				.getDisplayName(calendar.get(Calendar.DST_OFFSET) != 0, TimeZone.SHORT, Locale.US);
+	}
+
+	/** Astronomical year: year zero and negative years for the BC era. */
+	private static int year(GregorianCalendar calendar) {
+		int year = calendar.get(Calendar.YEAR);
+		return calendar.get(Calendar.ERA) == GregorianCalendar.BC ? 1 - year : year;
+	}
+
+	/** ISO 8601 week-based year, era-adjusted like {@link #year}. */
+	private static int weekYear(GregorianCalendar calendar) {
+		int weekYear = calendar.getWeekYear();
+		return calendar.get(Calendar.ERA) == GregorianCalendar.BC ? 1 - weekYear : weekYear;
 	}
 
 	/** Day of week, 0 = Sunday, matching C's {@code tm_wday}. */

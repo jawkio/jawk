@@ -886,9 +886,17 @@ public class GawkExtensionTest {
 								+ "t = 1483228800; "
 								+ "print \"[\" strftime(\"%-d\", t, 1) \"][\" strftime(\"%_d\", t, 1) \"][\" strftime(\"%5d\", t, 1) \"]\"; "
 								+ "print \"[\" strftime(\"%^a\", t, 1) \"][\" strftime(\"%#p\", t, 1) \"][\" strftime(\"%_j\", t, 1) \"]\"; "
-								+ "print \"[\" strftime(\"%08Y\", t, 1) \"][\" strftime(\"%-e\", t, 1) \"][\" strftime(\"%3a\", t, 1) \"]\" "
+								+ "print \"[\" strftime(\"%08Y\", t, 1) \"][\" strftime(\"%-e\", t, 1) \"][\" strftime(\"%3a\", t, 1) \"]\"; "
+								+ "print \"[\" strftime(\"%-5d\", t, 1) \"][\" strftime(\"%-5a\", t, 1) \"][\" strftime(\"%#a\", t, 1) \"]\" "
 								+ "}")
-				.expectLines("[1][ 1][00001]", "[SUN][am][  1]", "[00002017][1][Sun]")
+				.expectLines(
+						"[1][ 1][00001]",
+						"[SUN][am][  1]",
+						"[00002017][1][Sun]",
+						// '-' drops the default padding but keeps an explicit
+						// width, space-padded; '#' applies the opposite of the
+						// conversion's usual case
+						"[    1][  Sun][SUN]")
 				.runAndAssert();
 	}
 
@@ -951,6 +959,61 @@ public class GawkExtensionTest {
 								+ "print line "
 								+ "}")
 				.expectLines("2:<><>;<><😀><>")
+				.runAndAssert();
+	}
+
+	@Test
+	public void strftimeHandlesYearZero() throws Exception {
+		// -62167219200 is 0000-01-01T00:00:00Z: the astronomical year keeps
+		// its sign instead of collapsing to the year-of-era
+		AwkTestSupport
+				.awkTest("year conversions account for the calendar era")
+				.script("BEGIN { print strftime(\"%Y|%C|%y\", -62167219200, 1) }")
+				.expectLines("0|00|00")
+				.runAndAssert();
+	}
+
+	@Test
+	public void emptyEnvironTzMeansUtc() throws Exception {
+		// POSIX: an explicitly empty TZ selects UTC, distinct from an unset
+		// TZ, which keeps the JVM default zone; forcing the DST hint applies
+		// C's one-hour adjustment even in zones without savings
+		AwkTestSupport
+				.awkTest("ENVIRON[\"TZ\"] = \"\" switches to UTC")
+				.script(
+						"BEGIN { "
+								+ "ENVIRON[\"TZ\"] = \"\"; "
+								+ "print strftime(\"%z %Z\", 0); "
+								+ "print mktime(\"2021 1 1 12 0 0 1\") - mktime(\"2021 1 1 12 0 0 0\") "
+								+ "}")
+				.expectLines("+0000 UTC", "-3600")
+				.runAndAssert();
+	}
+
+	@Test
+	public void gettextFunctionsRejectInvalidLocaleCategories() throws Exception {
+		AwkTestSupport
+				.awkTest("dcgettext rejects an invalid locale category")
+				.script("BEGIN { dcgettext(\"x\", \"d\", \"BAD\") }")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
+		AwkTestSupport
+				.awkTest("dcngettext rejects an invalid locale category")
+				.script("BEGIN { dcngettext(\"a\", \"b\", 2, \"d\", \"BAD\") }")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
+		AwkTestSupport
+				.awkTest("all gawk locale categories are accepted")
+				.script(
+						"BEGIN { "
+								+ "print dcgettext(\"x\", \"d\", \"LC_ALL\"), "
+								+ "dcgettext(\"x\", \"d\", \"LC_COLLATE\"), "
+								+ "dcgettext(\"x\", \"d\", \"LC_CTYPE\"), "
+								+ "dcgettext(\"x\", \"d\", \"LC_MONETARY\"), "
+								+ "dcgettext(\"x\", \"d\", \"LC_NUMERIC\"), "
+								+ "dcgettext(\"x\", \"d\", \"LC_TIME\") "
+								+ "}")
+				.expectLines("x x x x x x")
 				.runAndAssert();
 	}
 

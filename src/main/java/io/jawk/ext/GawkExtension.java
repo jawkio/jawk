@@ -25,6 +25,7 @@ package io.jawk.ext;
 import java.io.File;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
@@ -75,6 +76,23 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 
 	/** Largest double (2^53) whose conversion to long is exact. */
 	private static final double MAX_EXACT_LONG_DOUBLE = 9007199254740992.0D;
+
+	/** DST offset forced by a positive {@code mktime()} DST hint in zones without savings. */
+	private static final int DEFAULT_DST_SAVINGS = 3600000;
+
+	/** Locale categories accepted by the gettext functions, as in gawk. */
+	private static final Set<String> LOCALE_CATEGORIES = Collections
+			.unmodifiableSet(
+					new HashSet<String>(
+							Arrays
+									.asList(
+											"LC_ALL",
+											"LC_COLLATE",
+											"LC_CTYPE",
+											"LC_MESSAGES",
+											"LC_MONETARY",
+											"LC_NUMERIC",
+											"LC_TIME")));
 
 	/** Interpreter this per-engine extension instance is bound to. */
 	private AVM avm;
@@ -280,9 +298,11 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		calendar.set(values[0], values[1] - 1, values[2], values[3], values[4], values[5]);
 		long millis;
 		if (fields.length == 7 && !utc && values[6] >= 0) {
-			// like C's tm_isdst: a non-negative hint forces the DST offset;
-			// a negative one lets the zone's rules decide
-			calendar.set(Calendar.DST_OFFSET, values[6] > 0 ? timeZone.getDSTSavings() : 0);
+			// like C's tm_isdst: a non-negative hint forces the DST offset; a
+			// negative one lets the zone's rules decide. Zones without savings
+			// (fixed offsets) still get C's usual one-hour adjustment.
+			int savings = timeZone.getDSTSavings() > 0 ? timeZone.getDSTSavings() : DEFAULT_DST_SAVINGS;
+			calendar.set(Calendar.DST_OFFSET, values[6] > 0 ? savings : 0);
 			millis = calendar.getTimeInMillis();
 		} else {
 			millis = preferDaylightAtOverlap(calendar.getTimeInMillis(), timeZone);
@@ -349,9 +369,8 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 					// (here: Olson) time zone name
 					tz = tz.substring(1);
 				}
-				if (!tz.isEmpty()) {
-					return TimeZone.getTimeZone(tz);
-				}
+				// POSIX: an explicitly empty TZ means UTC
+				return TimeZone.getTimeZone(tz.isEmpty() ? "UTC" : tz);
 			}
 		}
 		return TimeZone.getDefault();
@@ -579,11 +598,12 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 *
 	 * @param string text to translate
 	 * @param domain text domain; defaults to {@code TEXTDOMAIN}
-	 * @param category locale category; accepted and ignored
+	 * @param category locale category; validated, then ignored (no catalogs)
 	 * @return the untranslated text
 	 */
 	@JawkFunction("dcgettext")
 	public String dcgettext(Object string, @JawkOptional Object domain, @JawkOptional Object category) {
+		checkLocaleCategory(category);
 		return toAwkString(string);
 	}
 
@@ -596,7 +616,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * @param plural plural form
 	 * @param number quantity deciding the form
 	 * @param domain text domain; defaults to {@code TEXTDOMAIN}
-	 * @param category locale category; accepted and ignored
+	 * @param category locale category; validated, then ignored (no catalogs)
 	 * @return {@code singular} when the number is 1, {@code plural} otherwise
 	 */
 	@JawkFunction("dcngettext")
@@ -606,7 +626,22 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 			Object number,
 			@JawkOptional Object domain,
 			@JawkOptional Object category) {
+		checkLocaleCategory(category);
 		return (long) JRT.toDouble(number) == 1L ? toAwkString(singular) : toAwkString(plural);
+	}
+
+	/**
+	 * Rejects invalid locale category arguments with gawk's fatal diagnostic,
+	 * which names dcgettext even for {@code dcngettext()}.
+	 */
+	private void checkLocaleCategory(Object category) {
+		if (category == null) {
+			return;
+		}
+		String name = toAwkString(category);
+		if (!LOCALE_CATEGORIES.contains(name)) {
+			throw new IllegalAwkArgumentException("dcgettext: `" + name + "' is not a valid locale category");
+		}
 	}
 
 	/**

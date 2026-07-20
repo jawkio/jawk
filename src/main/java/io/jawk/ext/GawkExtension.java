@@ -350,10 +350,11 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	/**
 	 * Determines the numeric base of a string constant, as gawk does: a
 	 * {@code 0x}/{@code 0X} prefix means hexadecimal, and a leading zero means
-	 * octal unless the token is really a decimal number. A digit above 7, a
-	 * decimal point, or an exponent makes the constant decimal (so {@code 019}
-	 * is 19), while any other character merely terminates the octal digits (so
-	 * {@code 011x} is 9).
+	 * octal unless the token is really a decimal number. Scanning the
+	 * contiguous digit prefix, a digit above 7 or an adjacent decimal point or
+	 * exponent makes the constant decimal (so {@code 019} is 19 and
+	 * {@code 011e2} is 1100), while any other character merely terminates the
+	 * numeric token (so {@code 011x} is 9 and {@code 077foo.5} is 63).
 	 */
 	private static int numberBase(String text) {
 		if (text.length() < 2 || text.charAt(0) != '0') {
@@ -363,17 +364,11 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		if (second == 'x' || second == 'X') {
 			return 16;
 		}
-		for (int i = 0; i < text.length(); i++) {
+		for (int i = 1; i < text.length(); i++) {
 			char c = text.charAt(i);
 			if (c == '.' || c == 'e' || c == 'E') {
 				return 10;
 			}
-			if (Character.isWhitespace(c)) {
-				break;
-			}
-		}
-		for (int i = 1; i < text.length(); i++) {
-			char c = text.charAt(i);
 			if (c < '0' || c > '9') {
 				break;
 			}
@@ -422,25 +417,31 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 			@JawkAssocArray Map<Object, Object> array,
 			@JawkOptional @JawkRegexp Object fieldpat,
 			@JawkOptional @JawkAssocArray Map<Object, Object> seps) {
+		if (array == seps) {
+			throw new IllegalAwkArgumentException("patsplit: cannot use the same array for second and fourth args");
+		}
 		String str = toAwkString(source);
 		Pattern pattern = fieldPattern(fieldpat);
 		array.clear();
-		Map<Object, Object> separators = seps == null ? new HashMap<Object, Object>() : seps;
-		separators.clear();
+		if (seps != null) {
+			seps.clear();
+		}
 		if (str.isEmpty()) {
 			return Long.valueOf(0L);
 		}
 		/*
-		 * Port of the FPAT splitting algorithm from the gawk manual ("Splitting
-		 * by Content"): a zero-length match immediately after a non-empty field
-		 * is skipped (consuming one separator character), while consecutive
-		 * zero-length matches produce empty fields. The matcher region stands
-		 * in for the manual's repeated substr() truncation, so anchors behave
-		 * as if the consumed prefix were gone.
+		 * gawk's FPAT splitting rules: every accepted match becomes a field,
+		 * except that a zero-length match immediately following a non-empty
+		 * field is skipped, retrying one character further. The separators are
+		 * the gaps around the accepted fields: seps[i] is the text between
+		 * fields i and i+1, seps[0] the text before the first field, seps[n]
+		 * the text after the last one. The matcher region makes anchors behave
+		 * as if the already-consumed prefix were gone, as in gawk.
 		 */
 		Matcher matcher = pattern.matcher(str);
 		int length = str.length();
 		int pos = 0;
+		int previousEnd = 0;
 		long fieldCount = 0L;
 		boolean lastMatchNonEmpty = false;
 		while (pos <= length) {
@@ -452,38 +453,37 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 			int end = matcher.end();
 			if (end > start) {
 				lastMatchNonEmpty = true;
-				putSeparatorIfAbsent(separators, fieldCount, str.substring(pos, start));
+				putSeparator(seps, fieldCount, str.substring(previousEnd, start));
 				array.put(Long.valueOf(++fieldCount), getJrt().toInputScalar(str.substring(start, end)));
+				previousEnd = end;
 				pos = end;
 				if (pos >= length) {
 					break;
 				}
 			} else if (lastMatchNonEmpty) {
 				lastMatchNonEmpty = false;
-				separators.put(Long.valueOf(fieldCount), getJrt().toInputScalar(str.substring(pos, pos + 1)));
 				pos++;
 			} else {
-				putSeparatorIfAbsent(separators, fieldCount, str.substring(pos, start));
+				putSeparator(seps, fieldCount, str.substring(previousEnd, start));
 				array.put(Long.valueOf(++fieldCount), getJrt().toInputScalar(""));
-				if (pos >= length) {
+				previousEnd = start;
+				if (start >= length) {
 					// trailing empty field at end of input: done
 					break;
 				}
-				separators.put(Long.valueOf(fieldCount), getJrt().toInputScalar(str.substring(pos, pos + 1)));
-				pos++;
+				pos = start + 1;
 			}
 		}
-		// gawk always terminates seps: seps[n] holds the text after the last
-		// field, the empty string when the input ends at a field boundary
-		separators.put(Long.valueOf(fieldCount), getJrt().toInputScalar(str.substring(pos)));
+		// seps[n] holds the text after the last field: the rest of the input,
+		// the empty string when the input ends at a field boundary
+		putSeparator(seps, fieldCount, str.substring(previousEnd));
 		return Long.valueOf(fieldCount);
 	}
 
-	/** Stores a separator only when the slot has not been written yet. */
-	private void putSeparatorIfAbsent(Map<Object, Object> separators, long index, String value) {
-		Long key = Long.valueOf(index);
-		if (!separators.containsKey(key)) {
-			separators.put(key, getJrt().toInputScalar(value));
+	/** Stores a separator, unless the caller omitted the separator array. */
+	private void putSeparator(Map<Object, Object> separators, long index, String value) {
+		if (separators != null) {
+			separators.put(Long.valueOf(index), getJrt().toInputScalar(value));
 		}
 	}
 

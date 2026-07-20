@@ -876,9 +876,10 @@ public class GawkExtensionTest {
 								+ "print strtonum(\"0x13\"), strtonum(\"013\"), strtonum(\"13\"), strtonum(13); "
 								+ "print strtonum(\"0x\"), strtonum(\"019\"), strtonum(\"0.5\"), strtonum(\"abc\"); "
 								+ "print strtonum(\"0xff\"), strtonum(\"0X1A\"), strtonum(\"017 \"); "
-								+ "print strtonum(\"011x\"), strtonum(\"077foo\"), strtonum(\"08x\") "
+								+ "print strtonum(\"011x\"), strtonum(\"077foo\"), strtonum(\"08x\"); "
+								+ "print strtonum(\"077foo.5\"), strtonum(\"011E2\") "
 								+ "}")
-				.expectLines("19 11 13 13", "0 19 0.5 0", "255 26 15", "9 63 8")
+				.expectLines("19 11 13 13", "0 19 0.5 0", "255 26 15", "9 63 8", "63 1100")
 				.runAndAssert();
 	}
 
@@ -917,14 +918,20 @@ public class GawkExtensionTest {
 								+ "dump(patsplit(\"Smith,,\\\"1234 A Pretty Place, NE\\\",Sometown,NY,12345-6789,USA\", f2, csv, s2), f2, s2); "
 								+ "dump(patsplit(\"bbbaaacccdddaaaaaqqqqa\", f3, \"aa+\", s3), f3, s3); "
 								+ "dump(patsplit(\"qqq\", f4, \"aa+\", s4), f4, s4); "
-								+ "dump(patsplit(\"\", f5, \"aa+\", s5), f5, s5) "
+								+ "dump(patsplit(\"\", f5, \"aa+\", s5), f5, s5); "
+								+ "dump(patsplit(\"abc\", f6, \"$\", s6), f6, s6); "
+								+ "dump(patsplit(\"abc\", f7, \"a+|$\", s7), f7, s7) "
 								+ "}")
 				.expectLines(
 						"4:<Robbins><><Arnold><>;<><,><,><,><>",
 						"7:<Smith><><\"1234 A Pretty Place, NE\"><Sometown><NY><12345-6789><USA>;<><,><,><,><,><,><,><>",
 						"2:<aaa><aaaaa>;<bbb><cccddd><qqqqa>",
 						"0:;<qqq>",
-						"0:;")
+						"0:;",
+						// anchored patterns match away from the scan position:
+						// the single end-of-string match yields one empty field
+						"1:<>;<abc><>",
+						"2:<a><>;<><bc><>")
 				.runAndAssert();
 	}
 
@@ -956,6 +963,16 @@ public class GawkExtensionTest {
 		AwkTestSupport
 				.awkTest("an explicitly empty field pattern argument is a runtime error")
 				.script("BEGIN { patsplit(\"a b\", f, \"\") }")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
+	}
+
+	@Test
+	public void patsplitRejectsAliasedDestinationArrays() throws Exception {
+		// gawk: fatal "cannot use the same array for second and fourth args"
+		AwkTestSupport
+				.awkTest("patsplit rejects the same array for fields and separators")
+				.script("BEGIN { patsplit(\"abc\", a, \"b\", a) }")
 				.expectThrow(RuntimeException.class)
 				.runAndAssert();
 	}

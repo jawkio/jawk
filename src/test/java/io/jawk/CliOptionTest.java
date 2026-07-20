@@ -221,21 +221,17 @@ public class CliOptionTest {
 	@Test
 	public void unreadableFileAfterStdinOperandDoesNotCloseCallerInput() throws Exception {
 		File missing = new File(tempFolder.getRoot(), "missing.txt");
-		// Direct Cli construction (like persistOptionFlushesOutputBeforeSaveFailure):
-		// the AwkTestSupport builders cannot observe whether the caller-provided
-		// input stream gets closed.
 		CloseTrackingInputStream input = new CloseTrackingInputStream("s\n".getBytes(StandardCharsets.UTF_8));
-		ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
-		Cli cli = new Cli(
-				input,
-				new PrintStream(outBytes, true, StandardCharsets.UTF_8.name()),
-				new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8.name()),
-				Collections.<String, String>emptyMap());
-		cli.parse(new String[] { "{ print }", "-", missing.getAbsolutePath() });
 
-		assertThrows(Exception.class, () -> cli.run());
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.cliTest("CLI unreadable file after - operand keeps caller input open")
+				.stdin(input)
+				.script("{ print }")
+				.operand("-", missing.getAbsolutePath())
+				.expectThrow(Exception.class)
+				.run();
 
-		assertEquals("s\n", outBytes.toString(StandardCharsets.UTF_8.name()));
+		result.assertExpected();
 		assertFalse(input.isClosed());
 	}
 

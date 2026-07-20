@@ -415,6 +415,38 @@
 						<groupId>org.sentrysoftware.maven</groupId>
 						<artifactId>maven-skin-tools</artifactId>
 						<version>1.7.00</version>
+						<!-- maven-skin-tools 1.7.00 brings GraalJS / Truffle 23.0.11,
+						     which calls sun.misc.Unsafe.ensureClassInitialized,
+						     a method removed in JDK 22 (JDK-8316160). Exclude the
+						     legacy GraalVM stack and replace it below with a
+						     JDK 25-compatible release. -->
+						<exclusions>
+							<exclusion>
+								<groupId>org.graalvm.js</groupId>
+								<artifactId>js</artifactId>
+							</exclusion>
+							<exclusion>
+								<groupId>org.graalvm.js</groupId>
+								<artifactId>js-scriptengine</artifactId>
+							</exclusion>
+							<exclusion>
+								<groupId>org.graalvm.truffle</groupId>
+								<artifactId>truffle-api</artifactId>
+							</exclusion>
+						</exclusions>
+					</dependency>
+					<!-- Modern (JDK 25-compatible) GraalVM polyglot stack to feed
+					     IndexTool. Replaces the legacy org.graalvm.js:js artifacts. -->
+					<dependency>
+						<groupId>org.graalvm.polyglot</groupId>
+						<artifactId>polyglot</artifactId>
+						<version>24.2.2</version>
+					</dependency>
+					<dependency>
+						<groupId>org.graalvm.polyglot</groupId>
+						<artifactId>js</artifactId>
+						<version>24.2.2</version>
+						<type>pom</type>
 					</dependency>
 				</dependencies>
 			</plugin>

@@ -782,10 +782,12 @@ public class GawkExtensionTest {
 	@Test
 	public void systimeReturnsCurrentEpochSeconds() throws Exception {
 		long before = System.currentTimeMillis() / 1000L;
-		StringBuilder out = new StringBuilder();
-		new Awk().script("BEGIN { print systime() }").execute(out);
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.awkTest("systime reports the current epoch time")
+				.script("BEGIN { print systime() }")
+				.run();
 		long after = System.currentTimeMillis() / 1000L;
-		long reported = Long.parseLong(out.toString().trim());
+		long reported = Long.parseLong(result.output().trim());
 		assertTrue(
 				"systime() must report the current time",
 				reported >= before && reported <= after);
@@ -873,9 +875,10 @@ public class GawkExtensionTest {
 						"BEGIN { "
 								+ "print strtonum(\"0x13\"), strtonum(\"013\"), strtonum(\"13\"), strtonum(13); "
 								+ "print strtonum(\"0x\"), strtonum(\"019\"), strtonum(\"0.5\"), strtonum(\"abc\"); "
-								+ "print strtonum(\"0xff\"), strtonum(\"0X1A\"), strtonum(\"017 \") "
+								+ "print strtonum(\"0xff\"), strtonum(\"0X1A\"), strtonum(\"017 \"); "
+								+ "print strtonum(\"011x\"), strtonum(\"077foo\"), strtonum(\"08x\") "
 								+ "}")
-				.expectLines("19 11 13 13", "0 19 0.5 0", "255 26 15")
+				.expectLines("19 11 13 13", "0 19 0.5 0", "255 26 15", "9 63 8")
 				.runAndAssert();
 	}
 
@@ -942,6 +945,22 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void patsplitRejectsEmptyFieldPatterns() throws Exception {
+		// gawk: an explicitly empty field pattern is fatal; only an unset
+		// FPAT stands in for gawk's built-in default
+		AwkTestSupport
+				.awkTest("an explicitly empty FPAT is a runtime error")
+				.script("BEGIN { FPAT = \"\"; patsplit(\"a b\", f) }")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
+		AwkTestSupport
+				.awkTest("an explicitly empty field pattern argument is a runtime error")
+				.script("BEGIN { patsplit(\"a b\", f, \"\") }")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
+	}
+
+	@Test
 	public void patsplitHonorsIgnoreCase() throws Exception {
 		AwkTestSupport
 				.awkTest("IGNORECASE applies to patsplit field patterns")
@@ -979,9 +998,19 @@ public class GawkExtensionTest {
 								+ "print bindtextdomain(\"\", \"mydom\"); "
 								+ "print bindtextdomain(\"\"); "
 								+ "TEXTDOMAIN = \"mydom\"; "
-								+ "print bindtextdomain(\"\") "
+								+ "print bindtextdomain(\"\"); "
+								+ "print \"<\" bindtextdomain(\"/elsewhere\", \"\") \">\"; "
+								+ "print bindtextdomain(\"\", \"mydom\") "
 								+ "}")
-				.expectLines("/opt/locale", "/opt/locale", "/usr/share/locale", "/opt/locale")
+				.expectLines(
+						"/opt/locale",
+						"/opt/locale",
+						"/usr/share/locale",
+						"/opt/locale",
+						// an explicitly empty domain is rejected: the result is
+						// empty and no binding changes, as with C bindtextdomain()
+						"<>",
+						"/opt/locale")
 				.runAndAssert();
 	}
 

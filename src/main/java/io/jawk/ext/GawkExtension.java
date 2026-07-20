@@ -349,9 +349,11 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 
 	/**
 	 * Determines the numeric base of a string constant, as gawk does: a
-	 * {@code 0x}/{@code 0X} prefix means hexadecimal, a leading zero followed
-	 * exclusively by octal digits (up to optional trailing whitespace) means
-	 * octal, and anything else is decimal.
+	 * {@code 0x}/{@code 0X} prefix means hexadecimal, and a leading zero means
+	 * octal unless the token is really a decimal number. A digit above 7, a
+	 * decimal point, or an exponent makes the constant decimal (so {@code 019}
+	 * is 19), while any other character merely terminates the octal digits (so
+	 * {@code 011x} is 9).
 	 */
 	private static int numberBase(String text) {
 		if (text.length() < 2 || text.charAt(0) != '0') {
@@ -361,13 +363,21 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		if (second == 'x' || second == 'X') {
 			return 16;
 		}
-		for (int i = 1; i < text.length(); i++) {
+		for (int i = 0; i < text.length(); i++) {
 			char c = text.charAt(i);
+			if (c == '.' || c == 'e' || c == 'E') {
+				return 10;
+			}
 			if (Character.isWhitespace(c)) {
 				break;
 			}
-			if (c < '0' || c > '7') {
-				// 8, 9, '.', 'e', ... make the constant decimal, so 019 is 19
+		}
+		for (int i = 1; i < text.length(); i++) {
+			char c = text.charAt(i);
+			if (c < '0' || c > '9') {
+				break;
+			}
+			if (c > '7') {
 				return 10;
 			}
 		}
@@ -477,17 +487,37 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		}
 	}
 
-	/** Resolves the {@code patsplit()} field pattern: argument, FPAT, or gawk's default. */
+	/**
+	 * Resolves the {@code patsplit()} field pattern: argument, FPAT, or gawk's
+	 * default. Jawk has no FPAT special variable, so an unset FPAT stands in
+	 * for gawk's built-in default; an explicitly empty pattern is fatal, as in
+	 * gawk.
+	 */
 	private Pattern fieldPattern(Object fieldpat) {
 		if (fieldpat instanceof Pattern) {
-			return getJrt().caseAwarePattern((Pattern) fieldpat);
+			Pattern pattern = (Pattern) fieldpat;
+			requireNonEmptyFieldPattern(pattern.pattern());
+			return getJrt().caseAwarePattern(pattern);
 		}
+		String expression;
 		if (fieldpat != null) {
-			return getJrt().dynamicPattern(toAwkString(fieldpat));
+			expression = toAwkString(fieldpat);
+		} else {
+			Object fpat = getVm().getVariable("FPAT");
+			if (fpat == null || fpat instanceof UninitializedObject) {
+				return getJrt().dynamicPattern(DEFAULT_FPAT);
+			}
+			expression = toAwkString(fpat);
 		}
-		Object fpat = getVm().getVariable("FPAT");
-		String fpatString = fpat == null ? "" : toAwkString(fpat);
-		return getJrt().dynamicPattern(fpatString.isEmpty() ? DEFAULT_FPAT : fpatString);
+		requireNonEmptyFieldPattern(expression);
+		return getJrt().dynamicPattern(expression);
+	}
+
+	/** Rejects an empty field pattern with gawk's fatal diagnostic. */
+	private static void requireNonEmptyFieldPattern(String expression) {
+		if (expression.isEmpty()) {
+			throw new IllegalAwkArgumentException("patsplit: field pattern must be non-null");
+		}
 	}
 
 	/**
@@ -538,9 +568,11 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 */
 	@JawkFunction("bindtextdomain")
 	public String bindtextdomain(Object directory, @JawkOptional Object domain) {
-		String domainName = domain == null ? "" : toAwkString(domain);
+		String domainName = domain == null ? currentTextdomain() : toAwkString(domain);
 		if (domainName.isEmpty()) {
-			domainName = currentTextdomain();
+			// C's bindtextdomain() rejects an explicitly empty domain: gawk
+			// returns the empty string and no binding changes
+			return "";
 		}
 		String directoryName = toAwkString(directory);
 		if (textdomainBindings == null) {

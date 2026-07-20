@@ -414,7 +414,7 @@
 					<dependency>
 						<groupId>org.sentrysoftware.maven</groupId>
 						<artifactId>maven-skin-tools</artifactId>
-						<version>1.7.00</version>
+						<version>1.8.00</version>
 					</dependency>
 				</dependencies>
 			</plugin>

@@ -530,9 +530,24 @@ public final class AwkTestSupport {
 		private final Map<String, Object> assignments = new LinkedHashMap<>();
 		private final Map<String, String> environment = new LinkedHashMap<>();
 		private boolean redirectErrorStream;
+		private InputStream stdinStream;
 
 		private CliTestBuilder(String description) {
 			super(description);
+		}
+
+		/**
+		 * Supplies the raw standard-input stream handed to the CLI under test.
+		 * Use this instead of {@link #stdin(String)} when the test must observe
+		 * interactions with the stream itself, such as tracking whether the CLI
+		 * closes the caller-provided stream.
+		 *
+		 * @param stream the input stream the CLI reads program input from
+		 * @return this builder for method chaining
+		 */
+		public CliTestBuilder stdin(InputStream stream) {
+			this.stdinStream = stream;
+			return this;
 		}
 
 		/**
@@ -619,7 +634,8 @@ public final class AwkTestSupport {
 					argumentSpecs,
 					assignments,
 					environment,
-					redirectErrorStream);
+					redirectErrorStream,
+					stdinStream);
 		}
 	}
 
@@ -1116,6 +1132,7 @@ public final class AwkTestSupport {
 		private final Map<String, Object> assignments;
 		private final Map<String, String> environment;
 		private final boolean redirectErrorStream;
+		private final InputStream stdinStream;
 
 		CliTestCase(
 				TestLayout layout,
@@ -1126,20 +1143,27 @@ public final class AwkTestSupport {
 				List<String> argumentSpecs,
 				Map<String, Object> assignments,
 				Map<String, String> environment,
-				boolean redirectErrorStream) {
+				boolean redirectErrorStream,
+				InputStream stdinStream) {
 			super(layout, fileContents, operandSpecs, pathPlaceholders, requiresPosix);
 			this.argumentSpecs = new ArrayList<>(argumentSpecs);
 			this.assignments = new LinkedHashMap<>(assignments);
 			this.environment = new LinkedHashMap<>(environment);
 			this.redirectErrorStream = redirectErrorStream;
+			this.stdinStream = stdinStream;
 		}
 
 		@Override
 		protected ActualResult execute(ExecutionEnvironment env) throws Exception {
 			String stdin = resolvedStdin(env);
-			InputStream in = stdin != null ?
-					new ByteArrayInputStream(stdin.getBytes(StandardCharsets.UTF_8)) :
-					new ByteArrayInputStream(new byte[0]);
+			InputStream in;
+			if (stdinStream != null) {
+				in = stdinStream;
+			} else {
+				in = stdin != null ?
+						new ByteArrayInputStream(stdin.getBytes(StandardCharsets.UTF_8)) :
+						new ByteArrayInputStream(new byte[0]);
+			}
 			ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
 			ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
 			Map<String, String> resolvedEnvironment = new LinkedHashMap<String, String>();

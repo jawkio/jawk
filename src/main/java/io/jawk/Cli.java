@@ -220,7 +220,12 @@ public final class Cli {
 				// end of options: remaining args are part of the script execution
 				break;
 			} else if (arg.equals("-")) {
-				// single dash indicates end of options as well
+				// single dash is the standard-input operand (POSIX): end of
+				// options, and keep it so it is processed as an input file
+				break;
+			} else if (arg.equals("--")) {
+				// POSIX end-of-options marker: the remaining args are part of
+				// the script execution
 				++argIdx;
 				break;
 			} else if (arg.equals("-v")) {
@@ -321,6 +326,12 @@ public final class Cli {
 				printUsage = true;
 				return;
 			} else {
+				// Like gawk: once the program text has been supplied, an
+				// unknown option ends option processing and is passed on to
+				// the AWK program through ARGV (useful for '#!' scripts)
+				if (!scriptSources.isEmpty() || precompiledProgram != null) {
+					break;
+				}
 				throw new IllegalArgumentException("Unknown parameter: " + arg);
 			}
 			++argIdx;
@@ -619,8 +630,9 @@ public final class Cli {
 								" [-t]" +
 								" [-l extension]..." +
 								" [-v name=val]..." +
+								" [--]" +
 								" [script]" +
-								" [name=val | input_filename]...");
+								" [name=val | input_filename | -]...");
 		dest.println();
 		dest.println("java -jar " + JAR_NAME + " --list-ext");
 		dest.println();
@@ -638,6 +650,8 @@ public final class Cli {
 		dest.println(" --load extension = Same as -l.");
 		dest.println("                      Extensions must already be on the class path before loading them.");
 		dest.println(" -v name=val = Initial awk variable assignments.");
+		dest.println(" -- = End of options: the remaining arguments are the script and its operands.");
+		dest.println(" - = As an operand, read input from standard input.");
 		dest.println();
 		dest.println(" -t = (extension) Maintain array keys in sorted order.");
 		dest.println(" -K filename = Compile to program file and halt.");

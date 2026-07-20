@@ -151,6 +151,115 @@ public class CliOptionTest {
 	}
 
 	@Test
+	public void doubleDashEndsOptionProcessing() throws Exception {
+		// After "--", the dash-leading argument is no longer an option: it is
+		// the inline script (without "--" it would be rejected as unknown)
+		AwkTestSupport
+				.cliTest("CLI -- ends option processing")
+				.argument("--", "-1 { print \"ok\" }")
+				.stdin("x\n")
+				.expectLines("ok")
+				.runAndAssert();
+	}
+
+	@Test
+	public void doubleDashPassesRemainingArgumentsToArgv() throws Exception {
+		AwkTestSupport
+				.cliTest("CLI -- passes remaining arguments to ARGV")
+				.file("argv.awk", "BEGIN { for (i = 1; i < ARGC; i++) print i \"=\" ARGV[i] }")
+				.argument("-f", "{{argv.awk}}", "--")
+				.operand("-v", "x=1")
+				.expectLines("1=-v", "2=x=1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void singleDashOperandReadsStandardInput() throws Exception {
+		AwkTestSupport
+				.cliTest("CLI - operand reads standard input")
+				.script("{ print FILENAME \":\" $0 }")
+				.operand("-")
+				.stdin("hello\n")
+				.expectLines("-:hello")
+				.runAndAssert();
+	}
+
+	@Test
+	public void singleDashOperandMixesWithRegularFiles() throws Exception {
+		AwkTestSupport
+				.cliTest("CLI - operand mixes with regular input files")
+				.script("{ print FILENAME \":\" FNR \":\" $0 }")
+				.file("data.txt", "a\n")
+				.operand("-", "{{data.txt}}")
+				.stdin("s\n")
+				.expectLines("-:1:s", "{{data.txt}}:1:a")
+				.runAndAssert();
+	}
+
+	@Test
+	public void singleDashOperandWorksWithBeginFileRules() throws Exception {
+		AwkTestSupport
+				.cliTest("CLI - operand works with BEGINFILE rules")
+				.script("BEGINFILE { print \"BF:\" FILENAME } { print $0 }")
+				.operand("-")
+				.stdin("s\n")
+				.expectLines("BF:-", "s")
+				.runAndAssert();
+	}
+
+	@Test
+	public void singleDashBeforeScriptIsTreatedAsScript() throws Exception {
+		// "-" no longer terminates option processing while being skipped: it is
+		// an operand, so here it is (mis)used as the inline script, like gawk
+		AwkTestSupport
+				.cliTest("CLI - before script is treated as the script")
+				.argument("-", "BEGIN { print \"never\" }")
+				.expectThrow(ParserException.class)
+				.runAndAssert();
+	}
+
+	@Test
+	public void unreadableFileAfterStdinOperandDoesNotCloseCallerInput() throws Exception {
+		File missing = new File(tempFolder.getRoot(), "missing.txt");
+		CloseTrackingInputStream input = new CloseTrackingInputStream("s\n".getBytes(StandardCharsets.UTF_8));
+
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.cliTest("CLI unreadable file after - operand keeps caller input open")
+				.stdin(input)
+				.script("{ print }")
+				.operand("-", missing.getAbsolutePath())
+				.expectThrow(Exception.class)
+				.run();
+
+		result.assertExpected();
+		assertFalse(input.isClosed());
+	}
+
+	@Test
+	public void unknownOptionAfterScriptFileIsPassedToArgv() throws Exception {
+		AwkTestSupport
+				.cliTest("CLI unknown option after -f is passed to ARGV")
+				.file("argv.awk", "BEGIN { for (i = 1; i < ARGC; i++) print i \"=\" ARGV[i] }")
+				.argument("-f", "{{argv.awk}}", "-q")
+				.operand("one")
+				.expectLines("1=-q", "2=one")
+				.runAndAssert();
+	}
+
+	@Test
+	public void unknownOptionWithoutScriptIsRejected() throws Exception {
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.cliTest("CLI unknown option without script is rejected")
+				.argument("-q")
+				.script("{ print }")
+				.expectThrow(IllegalArgumentException.class)
+				.run();
+
+		result.assertExpected();
+		assertTrue(result.thrownException().getMessage().contains("Unknown parameter: -q"));
+	}
+
+	@Test
 	public void posixOptionDisablesArraysOfArrays() {
 		Cli cli = new Cli();
 		cli.parse(new String[] { "--posix", "{ print 1 }" });
@@ -387,6 +496,24 @@ public class CliOptionTest {
 	private static void writeProgram(File target, String script) throws Exception {
 		try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(target))) {
 			oos.writeObject(new Awk().compile(script));
+		}
+	}
+
+	private static final class CloseTrackingInputStream extends ByteArrayInputStream {
+		private boolean closed;
+
+		CloseTrackingInputStream(byte[] data) {
+			super(data);
+		}
+
+		@Override
+		public void close() throws IOException {
+			closed = true;
+			super.close();
+		}
+
+		private boolean isClosed() {
+			return closed;
 		}
 	}
 

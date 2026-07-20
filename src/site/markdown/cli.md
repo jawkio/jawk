@@ -65,6 +65,12 @@ $ printf "alpha\nbeta\n" | java -jar jawk-${project.version}-standalone.jar '{ p
 2:beta
 ```
 
+You can also request standard input explicitly with the `-` operand, which makes it possible to interleave it with regular input files. `FILENAME` is `-` while standard input is being read:
+
+```shell-session
+$ echo "from stdin" | java -jar jawk-${project.version}-standalone.jar '{ print FILENAME ":" $0 }' before.txt - after.txt
+```
+
 ## Read Input Files
 
 Input filenames passed after the script become runtime operands and are processed as AWK input files:
@@ -74,6 +80,14 @@ $ java -jar jawk-${project.version}-standalone.jar -F : '{ print FILENAME ":" FN
 ```
 
 Jawk follows the usual AWK distinction between the script itself and the remaining operands. Files and `name=value` operands after the script are visible through `ARGV` and `ARGC`.
+
+Use `--` to mark the end of options when the script or the first operand could otherwise be mistaken for an option:
+
+```shell-session
+$ java -jar jawk-${project.version}-standalone.jar -f totals.awk -- values.txt
+```
+
+As in gawk, once the program text has been supplied with `-f` or `-L`, an unknown option also ends option processing and is passed on to the AWK program through `ARGV`, which is useful for `#!` interpreter scripts.
 
 ### BEGINFILE and ENDFILE Rules
 

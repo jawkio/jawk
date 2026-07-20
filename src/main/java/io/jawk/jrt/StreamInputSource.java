@@ -70,6 +70,7 @@ public class StreamInputSource implements InputSource, Closeable {
 
 	// Current reader and record
 	private PartitioningReader partitioningReader;
+	private boolean currentReaderIsDefaultInput;
 	private boolean currentFromFilenameList;
 	private String currentRecord;
 	private boolean currentReaderExhausted;
@@ -337,6 +338,7 @@ public class StreamInputSource implements InputSource, Closeable {
 					partitioningReader = new PartitioningReader(
 							new InputStreamReader(defaultInput, StandardCharsets.UTF_8),
 							jrt.getRSString());
+					currentReaderIsDefaultInput = true;
 					jrt.setFILENAMEViaJrt(jrt.toInputScalar(""));
 					// gawk clears ERRNO whenever the main input advances
 					// successfully
@@ -355,6 +357,7 @@ public class StreamInputSource implements InputSource, Closeable {
 					partitioningReader = new PartitioningReader(
 							new InputStreamReader(defaultInput, StandardCharsets.UTF_8),
 							jrt.getRSString());
+					currentReaderIsDefaultInput = true;
 					jrt.setFILENAMEViaJrt(jrt.toInputScalar(""));
 					// gawk clears ERRNO whenever the main input advances
 					// successfully
@@ -363,10 +366,7 @@ public class StreamInputSource implements InputSource, Closeable {
 				}
 			} else {
 				closeCurrentReaderIfFileStream();
-				partitioningReader = new PartitioningReader(
-						new InputStreamReader(new FileInputStream(arg), StandardCharsets.UTF_8),
-						jrt.getRSString(),
-						true);
+				partitioningReader = openFileListReader(arg);
 				jrt.setFILENAMEViaJrt(jrt.toInputScalar(arg));
 				jrt.setFNR(0L);
 				jrt.setARGIND(Long.valueOf(lastArgumentIndex));
@@ -493,6 +493,7 @@ public class StreamInputSource implements InputSource, Closeable {
 		partitioningReader = new PartitioningReader(
 				new InputStreamReader(defaultInput, StandardCharsets.UTF_8),
 				jrt.getRSString());
+		currentReaderIsDefaultInput = true;
 		currentPresentedToLoop = true;
 		jrt.setFILENAMEViaJrt(jrt.toInputScalar(""));
 		beginFileState(0);
@@ -522,6 +523,14 @@ public class StreamInputSource implements InputSource, Closeable {
 	 *         the file cannot be opened for reading
 	 */
 	private String openCurrentFile(String arg) {
+		if ("-".equals(arg)) {
+			try {
+				partitioningReader = openFileListReader(arg);
+				return null;
+			} catch (IOException e) {
+				return e.getMessage();
+			}
+		}
 		File file = new File(arg);
 		if (file.isDirectory()) {
 			return "Is a directory";
@@ -530,10 +539,7 @@ public class StreamInputSource implements InputSource, Closeable {
 			return "No such file or directory";
 		}
 		try {
-			partitioningReader = new PartitioningReader(
-					new InputStreamReader(new FileInputStream(arg), StandardCharsets.UTF_8),
-					jrt.getRSString(),
-					true);
+			partitioningReader = openFileListReader(arg);
 			return null;
 		} catch (IOException e) {
 			String message = e.getMessage();
@@ -550,12 +556,36 @@ public class StreamInputSource implements InputSource, Closeable {
 	}
 
 	/**
+	 * Opens a reader for the given {@code ARGV} filename entry. The
+	 * conventional {@code -} filename designates the default input stream
+	 * (usually stdin), as required by POSIX; any other name is opened as a
+	 * regular file.
+	 *
+	 * @param arg the filename from the {@code ARGV} file list
+	 * @return a reader presenting the argument as a file-list input
+	 * @throws IOException if the file cannot be opened for reading
+	 */
+	private PartitioningReader openFileListReader(String arg) throws IOException {
+		boolean isDefaultInput = "-".equals(arg);
+		// Open the stream before publishing the flag: if the open fails, the
+		// still-current reader must keep its own classification, so that
+		// cleanup does not close the caller-provided default input stream.
+		InputStream stream = isDefaultInput ? defaultInput : new FileInputStream(arg);
+		PartitioningReader reader = new PartitioningReader(
+				new InputStreamReader(stream, StandardCharsets.UTF_8),
+				jrt.getRSString(),
+				true);
+		currentReaderIsDefaultInput = isDefaultInput;
+		return reader;
+	}
+
+	/**
 	 * Closes the current {@link PartitioningReader} if it wraps a file stream
 	 * (not {@code defaultInput}). This prevents file-descriptor leaks when
 	 * traversing multiple ARGV files.
 	 */
 	private void closeCurrentReaderIfFileStream() {
-		if (partitioningReader != null && partitioningReader.fromFilenameList()) {
+		if (partitioningReader != null && partitioningReader.fromFilenameList() && !currentReaderIsDefaultInput) {
 			try {
 				partitioningReader.close();
 			} catch (IOException ignored) {

@@ -151,12 +151,15 @@ public class CliOptionTest {
 	}
 
 	@Test
-	public void doubleDashEndsOptionProcessing() {
-		Cli cli = new Cli();
-		// After "--", "-v" is no longer an option: it becomes the inline script
-		cli.parse(new String[] { "--", "-v" });
-
-		assertEquals(1, cli.getScriptSources().size());
+	public void doubleDashEndsOptionProcessing() throws Exception {
+		// After "--", the dash-leading argument is no longer an option: it is
+		// the inline script (without "--" it would be rejected as unknown)
+		AwkTestSupport
+				.cliTest("CLI -- ends option processing")
+				.argument("--", "-1 { print \"ok\" }")
+				.stdin("x\n")
+				.expectLines("ok")
+				.runAndAssert();
 	}
 
 	@Test
@@ -227,13 +230,16 @@ public class CliOptionTest {
 	}
 
 	@Test
-	public void unknownOptionWithoutScriptIsRejected() {
-		Cli cli = new Cli();
-		IllegalArgumentException ex = assertThrows(
-				IllegalArgumentException.class,
-				() -> cli.parse(new String[]
-				{ "-q", "{ print }" }));
-		assertTrue(ex.getMessage().contains("Unknown parameter: -q"));
+	public void unknownOptionWithoutScriptIsRejected() throws Exception {
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.cliTest("CLI unknown option without script is rejected")
+				.argument("-q")
+				.script("{ print }")
+				.expectThrow(IllegalArgumentException.class)
+				.run();
+
+		result.assertExpected();
+		assertTrue(result.thrownException().getMessage().contains("Unknown parameter: -q"));
 	}
 
 	@Test

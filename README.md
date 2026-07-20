@@ -26,6 +26,8 @@ As in gawk, the gawk-specific syntax is not special in `--posix` mode.
 echo "hello world" | java -jar jawk-${project.version}-standalone.jar '{ print $2 ", " $1 "!" }'
 ```
 
+The CLI follows the POSIX argument conventions: `--` marks the end of options, and the `-` operand designates standard input as an input file (with `FILENAME` set to `-`). As in gawk, once the program text has been supplied (with `-f` or `-L`), an unknown option ends option processing and is passed on to the AWK script through `ARGV`, which makes `#!` interpreter scripts work. See the [CLI documentation](https://jawk.io/cli.html) for details.
+
 ## Java Example
 
 ```java

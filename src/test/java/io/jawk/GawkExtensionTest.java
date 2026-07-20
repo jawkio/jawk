@@ -780,6 +780,231 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void systimeReturnsCurrentEpochSeconds() throws Exception {
+		long before = System.currentTimeMillis() / 1000L;
+		StringBuilder out = new StringBuilder();
+		new Awk().script("BEGIN { print systime() }").execute(out);
+		long after = System.currentTimeMillis() / 1000L;
+		long reported = Long.parseLong(out.toString().trim());
+		assertTrue(
+				"systime() must report the current time",
+				reported >= before && reported <= after);
+	}
+
+	@Test
+	public void mktimeConvertsUtcDatespecs() throws Exception {
+		AwkTestSupport
+				.awkTest("mktime converts and normalizes UTC date specifications")
+				.script(
+						"BEGIN { "
+								+ "print mktime(\"2017 1 1 0 0 0\", 1); "
+								+ "print mktime(\"2016 13 1 0 0 0\", 1); "
+								+ "print mktime(\"2017 1 1 0 0 -30\", 1); "
+								+ "print mktime(strftime(\"%Y %m %d %H %M %S\", 1483228800, 1), 1) "
+								+ "}")
+				.expectLines("1483228800", "1483228800", "1483228770", "1483228800")
+				.runAndAssert();
+	}
+
+	@Test
+	public void mktimeRejectsMalformedDatespecs() throws Exception {
+		AwkTestSupport
+				.awkTest("mktime returns -1 on malformed date specifications")
+				.script(
+						"BEGIN { "
+								+ "print mktime(\"garbage\"); "
+								+ "print mktime(\"2017 1 1 0 0\"); "
+								+ "print mktime(\"2017 1 1 0 0 0 0 0\"); "
+								+ "print mktime(\"2017 1 1 0 0 x\") "
+								+ "}")
+				.expectLines("-1", "-1", "-1", "-1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void strftimeFormatsUtcTimestamps() throws Exception {
+		// 1483228800 is Sun Jan 1 2017 00:00:00 UTC
+		AwkTestSupport
+				.awkTest("strftime supports the C conversion specifiers")
+				.script(
+						"BEGIN { "
+								+ "t = 1483228800; "
+								+ "print strftime(\"%Y-%m-%d %H:%M:%S\", t, 1); "
+								+ "print strftime(\"%a %A %b %B %h\", t, 1); "
+								+ "print strftime(\"%d|%e|%j|%u|%w|%C|%y\", t, 1); "
+								+ "print strftime(\"%V %G %g %U %W\", t, 1); "
+								+ "print strftime(\"%z %Z %s %%\", t, 1); "
+								+ "print strftime(\"%c\", t, 1); "
+								+ "print strftime(\"%D %F %x %X %r %R %T\", t, 1); "
+								+ "t2 = mktime(\"2017 6 15 15 30 45\", 1); "
+								+ "print strftime(\"%a %u %j %e %I:%M:%S %p\", t2, 1); "
+								+ "print strftime(\"a%nb\", t, 1); "
+								+ "print strftime(\"%q %E\", t, 1) "
+								+ "}")
+				.expectLines(
+						"2017-01-01 00:00:00",
+						"Sun Sunday Jan January Jan",
+						"01| 1|001|7|0|20|17",
+						"52 2016 16 01 00",
+						"+0000 UTC 1483228800 %",
+						"Sun Jan  1 00:00:00 2017",
+						"01/01/17 2017-01-01 01/01/17 00:00:00 12:00:00 AM 00:00 00:00:00",
+						"Thu 4 166 15 03:30:45 PM",
+						"a",
+						"b",
+						"%q %E")
+				.runAndAssert();
+	}
+
+	@Test
+	public void strftimeDefaultFormatComesFromProcinfo() throws Exception {
+		AwkTestSupport
+				.awkTest("strftime() without arguments uses PROCINFO[\"strftime\"]")
+				.script("BEGIN { PROCINFO[\"strftime\"] = \"fixed-format\"; print strftime() }")
+				.expectLines("fixed-format")
+				.runAndAssert();
+	}
+
+	@Test
+	public void strtonumConvertsNonDecimalStrings() throws Exception {
+		AwkTestSupport
+				.awkTest("strtonum understands hexadecimal and octal notation")
+				.script(
+						"BEGIN { "
+								+ "print strtonum(\"0x13\"), strtonum(\"013\"), strtonum(\"13\"), strtonum(13); "
+								+ "print strtonum(\"0x\"), strtonum(\"019\"), strtonum(\"0.5\"), strtonum(\"abc\"); "
+								+ "print strtonum(\"0xff\"), strtonum(\"0X1A\"), strtonum(\"017 \") "
+								+ "}")
+				.expectLines("19 11 13 13", "0 19 0.5 0", "255 26 15")
+				.runAndAssert();
+	}
+
+	@Test
+	public void strtonumResolvesNumericInputFieldsAsDecimal() throws Exception {
+		// gawk resolves numeric-looking strnums to plain numbers before
+		// looking at the base, so an input field "011" is decimal, while a
+		// script string constant "011" is octal (see the mixed case above)
+		AwkTestSupport
+				.awkTest("strtonum treats numeric strnum fields as decimal")
+				.script("{ print strtonum($1), strtonum($2) }")
+				.stdin("011 0x11\n")
+				.expectLines("11 17")
+				.runAndAssert();
+	}
+
+	@Test
+	public void patsplitSplitsByContent() throws Exception {
+		// fixture from gawk's own patsplit test: empty matches become empty
+		// fields, and seps[0]..seps[n] frame every field. The quoted-field
+		// alternative comes first because Java regexps pick the first matching
+		// alternative, not the POSIX longest one.
+		AwkTestSupport
+				.awkTest("patsplit implements gawk's FPAT splitting rules")
+				.script(
+						"function dump(n, f, s,    i, line) { "
+								+ "line = n \":\"; "
+								+ "for (i = 1; i <= n; i++) line = line \"<\" f[i] \">\"; "
+								+ "line = line \";\"; "
+								+ "for (i = 0; i in s; i++) line = line \"<\" s[i] \">\"; "
+								+ "print line "
+								+ "} "
+								+ "BEGIN { "
+								+ "csv = \"(\\\"[^\\\"]+\\\")|([^,]*)\"; "
+								+ "dump(patsplit(\"Robbins,,Arnold,\", f1, csv, s1), f1, s1); "
+								+ "dump(patsplit(\"Smith,,\\\"1234 A Pretty Place, NE\\\",Sometown,NY,12345-6789,USA\", f2, csv, s2), f2, s2); "
+								+ "dump(patsplit(\"bbbaaacccdddaaaaaqqqqa\", f3, \"aa+\", s3), f3, s3); "
+								+ "dump(patsplit(\"qqq\", f4, \"aa+\", s4), f4, s4); "
+								+ "dump(patsplit(\"\", f5, \"aa+\", s5), f5, s5) "
+								+ "}")
+				.expectLines(
+						"4:<Robbins><><Arnold><>;<><,><,><,><>",
+						"7:<Smith><><\"1234 A Pretty Place, NE\"><Sometown><NY><12345-6789><USA>;<><,><,><,><,><,><,><>",
+						"2:<aaa><aaaaa>;<bbb><cccddd><qqqqa>",
+						"0:;<qqq>",
+						"0:;")
+				.runAndAssert();
+	}
+
+	@Test
+	public void patsplitDefaultsToFpat() throws Exception {
+		AwkTestSupport
+				.awkTest("patsplit falls back to FPAT, then to non-whitespace runs")
+				.script(
+						"BEGIN { "
+								+ "n = patsplit(\"  a  b \", f); "
+								+ "print n, f[1], f[2]; "
+								+ "FPAT = \"[0-9]+\"; "
+								+ "n = patsplit(\"a1b22c\", g); "
+								+ "print n, g[1], g[2] "
+								+ "}")
+				.expectLines("2 a b", "2 1 22")
+				.runAndAssert();
+	}
+
+	@Test
+	public void patsplitHonorsIgnoreCase() throws Exception {
+		AwkTestSupport
+				.awkTest("IGNORECASE applies to patsplit field patterns")
+				.script(
+						"BEGIN { "
+								+ "print patsplit(\"xAx\", f, /a/); "
+								+ "IGNORECASE = 1; "
+								+ "print patsplit(\"xAx\", f, /a/), f[1] "
+								+ "}")
+				.expectLines("0", "1 A")
+				.runAndAssert();
+	}
+
+	@Test
+	public void gettextFunctionsReturnUntranslatedText() throws Exception {
+		AwkTestSupport
+				.awkTest("dcgettext and dcngettext behave like gawk without catalogs")
+				.script(
+						"BEGIN { "
+								+ "print dcgettext(\"hello\"); "
+								+ "print dcgettext(\"hello\", \"dom\", \"LC_MESSAGES\"); "
+								+ "print dcngettext(\"one\", \"many\", 1), dcngettext(\"one\", \"many\", 2), dcngettext(\"one\", \"many\", 0) "
+								+ "}")
+				.expectLines("hello", "hello", "one many many")
+				.runAndAssert();
+	}
+
+	@Test
+	public void bindtextdomainTracksDirectoryBindings() throws Exception {
+		AwkTestSupport
+				.awkTest("bindtextdomain records and reports per-domain directories")
+				.script(
+						"BEGIN { "
+								+ "print bindtextdomain(\"/opt/locale\", \"mydom\"); "
+								+ "print bindtextdomain(\"\", \"mydom\"); "
+								+ "print bindtextdomain(\"\"); "
+								+ "TEXTDOMAIN = \"mydom\"; "
+								+ "print bindtextdomain(\"\") "
+								+ "}")
+				.expectLines("/opt/locale", "/opt/locale", "/usr/share/locale", "/opt/locale")
+				.runAndAssert();
+	}
+
+	@Test
+	public void functabListsBuiltinAndExtensionFunctions() throws Exception {
+		AwkTestSupport
+				.awkTest("FUNCTAB lists standard built-ins and gawk extension functions")
+				.script(
+						"BEGIN { "
+								+ "n = asorti(FUNCTAB, sorted); "
+								+ "line = \"\"; "
+								+ "for (i = 1; i <= n; i++) line = line (i > 1 ? \" \" : \"\") sorted[i]; "
+								+ "print line "
+								+ "}")
+				.expectLines(
+						"asort asorti atan2 bindtextdomain close cos dcgettext dcngettext exp gensub"
+								+ " gsub index int isarray length log match mkbool mktime patsplit rand sin"
+								+ " split sprintf sqrt srand strftime strtonum sub substr system systime"
+								+ " tolower toupper typeof")
+				.runAndAssert();
+	}
+
+	@Test
 	public void asortiWritesIndicesAsStrings() throws Exception {
 		// gawk: the destination values of asorti() are strings even when the
 		// source index looks numeric

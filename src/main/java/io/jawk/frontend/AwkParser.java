@@ -237,6 +237,12 @@ public class AwkParser {
 			for (BuiltinFunction function : values()) {
 				BY_NAME.put(function.awkName, function);
 			}
+			// FUNCTAB is populated from the shared name list; a mismatch here
+			// means a built-in was added on one side only
+			if (!BY_NAME.keySet().equals(AwkTuples.BUILTIN_FUNCTION_NAMES)) {
+				throw new IllegalStateException(
+						"AwkTuples.BUILTIN_FUNCTION_NAMES is out of sync with the parser's built-in function table");
+			}
 		}
 
 		/**

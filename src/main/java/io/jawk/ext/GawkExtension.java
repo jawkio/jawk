@@ -25,13 +25,17 @@ package io.jawk.ext;
 import java.io.File;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.GregorianCalendar;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -56,11 +60,29 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 
 	private static final String VAL_TYPE_ASC = "@val_type_asc";
 
+	/** Default {@code strftime()} format, as in gawk's C locale. */
+	private static final String DEFAULT_STRFTIME_FORMAT = "%a %b %e %H:%M:%S %Z %Y";
+
+	/** gawk's default field pattern when {@code FPAT} is unset. */
+	private static final String DEFAULT_FPAT = "[^\\s]+";
+
+	/** Default gettext text domain, as in gawk. */
+	private static final String DEFAULT_TEXTDOMAIN = "messages";
+
+	/** Directory reported for text domains never bound with {@code bindtextdomain()}. */
+	private static final String DEFAULT_LOCALE_DIRECTORY = "/usr/share/locale";
+
+	/** Largest double (2^53) whose conversion to long is exact. */
+	private static final double MAX_EXACT_LONG_DOUBLE = 9007199254740992.0D;
+
 	/** Interpreter this per-engine extension instance is bound to. */
 	private AVM avm;
 
 	/** Comparison-function names already warned about; created on first use. */
 	private Set<String> warnedComparators;
+
+	/** Per-domain directory bindings established by {@code bindtextdomain()}; created on first use. */
+	private Map<String, String> textdomainBindings;
 
 	private static final class SortEntry {
 		private final Object index;
@@ -213,6 +235,329 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		}
 		matcher.appendTail(result);
 		return result.toString();
+	}
+
+	/**
+	 * Returns the current time in seconds since the epoch.
+	 *
+	 * @return seconds since 1970-01-01 00:00:00 UTC
+	 */
+	@JawkFunction("systime")
+	public Long systime() {
+		return Long.valueOf(System.currentTimeMillis() / 1000L);
+	}
+
+	/**
+	 * Converts a gawk {@code "YYYY MM DD HH MM SS [DST]"} date specification
+	 * into seconds since the epoch, normalizing out-of-range values.
+	 *
+	 * @param datespec date specification with six or seven numeric fields
+	 * @param utcFlag when truthy, interpret the specification as UTC
+	 * @return seconds since the epoch, or -1 when the specification is invalid
+	 */
+	@JawkFunction("mktime")
+	public Long mktime(Object datespec, @JawkOptional Object utcFlag) {
+		String[] fields = toAwkString(datespec).trim().split("\\s+");
+		if (fields.length < 6 || fields.length > 7) {
+			return Long.valueOf(-1L);
+		}
+		int[] values = new int[fields.length];
+		for (int i = 0; i < fields.length; i++) {
+			try {
+				values[i] = Integer.parseInt(fields[i]);
+			} catch (NumberFormatException e) {
+				return Long.valueOf(-1L);
+			}
+		}
+		boolean utc = utcFlag != null && getJrt().toBoolean(utcFlag);
+		TimeZone timeZone = utc ? TimeZone.getTimeZone("UTC") : TimeZone.getDefault();
+		GregorianCalendar calendar = new GregorianCalendar(timeZone);
+		calendar.setLenient(true);
+		calendar.clear();
+		calendar.set(values[0], values[1] - 1, values[2], values[3], values[4], values[5]);
+		if (fields.length == 7 && !utc && values[6] >= 0) {
+			// like C's tm_isdst: a non-negative hint forces the DST offset;
+			// a negative one lets the zone's rules decide
+			calendar.set(Calendar.DST_OFFSET, values[6] > 0 ? timeZone.getDSTSavings() : 0);
+		}
+		return Long.valueOf(Math.floorDiv(calendar.getTimeInMillis(), 1000L));
+	}
+
+	/**
+	 * Formats a timestamp with C {@code strftime(3)} conversion specifiers.
+	 *
+	 * @param format format string; defaults to {@code PROCINFO["strftime"]} or
+	 *        gawk's {@code "%a %b %e %H:%M:%S %Z %Y"}
+	 * @param timestamp seconds since the epoch; defaults to the current time
+	 * @param utcFlag when truthy, format in UTC instead of the local time zone
+	 * @return formatted timestamp
+	 */
+	@JawkFunction("strftime")
+	public String strftime(
+			@JawkOptional Object format,
+			@JawkOptional Object timestamp,
+			@JawkOptional Object utcFlag) {
+		String formatString = format == null ? defaultStrftimeFormat() : toAwkString(format);
+		long seconds = timestamp == null ?
+				System.currentTimeMillis() / 1000L : (long) JRT.toDouble(timestamp);
+		boolean utc = utcFlag != null && getJrt().toBoolean(utcFlag);
+		TimeZone timeZone = utc ? TimeZone.getTimeZone("UTC") : TimeZone.getDefault();
+		return Strftime.format(formatString, seconds, timeZone);
+	}
+
+	/** Returns {@code PROCINFO["strftime"]} when set, gawk's default format otherwise. */
+	private String defaultStrftimeFormat() {
+		Object procinfo = getVm().getVariable("PROCINFO");
+		if (procinfo instanceof Map) {
+			@SuppressWarnings("unchecked")
+			Map<Object, Object> procinfoMap = (Map<Object, Object>) procinfo;
+			if (JRT.containsAwkKey(procinfoMap, "strftime")) {
+				return getJrt().toAwkString(JRT.getAssocArrayValue(procinfoMap, "strftime"));
+			}
+		}
+		return DEFAULT_STRFTIME_FORMAT;
+	}
+
+	/**
+	 * Converts a string to a number, recognizing gawk's non-decimal notation:
+	 * a {@code 0x} prefix selects hexadecimal and a leading {@code 0} over
+	 * octal digits selects octal.
+	 *
+	 * @param value value to convert
+	 * @return numeric value
+	 */
+	@JawkFunction("strtonum")
+	public Number strtonum(@JawkRawValue Object value) {
+		if (value instanceof Number) {
+			return (Number) value;
+		}
+		if (value instanceof StrNum && ((StrNum) value).isNumber()) {
+			// gawk resolves numeric-looking input fields to plain numbers
+			// before looking at the base, so "011" from input is decimal 11
+			return Double.valueOf(((StrNum) value).doubleValue());
+		}
+		String text = toAwkString(value);
+		switch (numberBase(text)) {
+		case 16:
+			return parseNonDecimal(text, 2, 16);
+		case 8:
+			return parseNonDecimal(text, 1, 8);
+		default:
+			return Double.valueOf(JRT.toDouble(text));
+		}
+	}
+
+	/**
+	 * Determines the numeric base of a string constant, as gawk does: a
+	 * {@code 0x}/{@code 0X} prefix means hexadecimal, a leading zero followed
+	 * exclusively by octal digits (up to optional trailing whitespace) means
+	 * octal, and anything else is decimal.
+	 */
+	private static int numberBase(String text) {
+		if (text.length() < 2 || text.charAt(0) != '0') {
+			return 10;
+		}
+		char second = text.charAt(1);
+		if (second == 'x' || second == 'X') {
+			return 16;
+		}
+		for (int i = 1; i < text.length(); i++) {
+			char c = text.charAt(i);
+			if (Character.isWhitespace(c)) {
+				break;
+			}
+			if (c < '0' || c > '7') {
+				// 8, 9, '.', 'e', ... make the constant decimal, so 019 is 19
+				return 10;
+			}
+		}
+		return 8;
+	}
+
+	/**
+	 * Parses digits of the given base, stopping at the first invalid
+	 * character, as gawk's non-decimal scanner does ({@code "0x"} is 0).
+	 */
+	private static Number parseNonDecimal(String text, int offset, int base) {
+		double value = 0.0D;
+		for (int i = offset; i < text.length(); i++) {
+			int digit = Character.digit(text.charAt(i), base);
+			if (digit < 0) {
+				break;
+			}
+			value = value * base + digit;
+		}
+		if (value <= MAX_EXACT_LONG_DOUBLE) {
+			return Long.valueOf((long) value);
+		}
+		return Double.valueOf(value);
+	}
+
+	/**
+	 * Splits a string by content: pieces matching {@code fieldpat} become
+	 * fields, the text between them becomes separators. This is gawk's
+	 * {@code patsplit()}, the function form of {@code FPAT} field splitting.
+	 *
+	 * @param source text to split
+	 * @param array destination array for the fields
+	 * @param fieldpat field pattern, or {@code null} to use the {@code FPAT}
+	 *        global variable (default {@code "[^[:space:]]+"})
+	 * @param seps optional destination array for the separators; entry 0 holds
+	 *        the text before the first field
+	 * @return number of fields
+	 */
+	@JawkFunction("patsplit")
+	public Long patsplit(
+			Object source,
+			@JawkAssocArray Map<Object, Object> array,
+			@JawkOptional @JawkRegexp Object fieldpat,
+			@JawkOptional @JawkAssocArray Map<Object, Object> seps) {
+		String str = toAwkString(source);
+		Pattern pattern = fieldPattern(fieldpat);
+		array.clear();
+		Map<Object, Object> separators = seps == null ? new HashMap<Object, Object>() : seps;
+		separators.clear();
+		if (str.isEmpty()) {
+			return Long.valueOf(0L);
+		}
+		/*
+		 * Port of the FPAT splitting algorithm from the gawk manual ("Splitting
+		 * by Content"): a zero-length match immediately after a non-empty field
+		 * is skipped (consuming one separator character), while consecutive
+		 * zero-length matches produce empty fields. The matcher region stands
+		 * in for the manual's repeated substr() truncation, so anchors behave
+		 * as if the consumed prefix were gone.
+		 */
+		Matcher matcher = pattern.matcher(str);
+		int length = str.length();
+		int pos = 0;
+		long fieldCount = 0L;
+		boolean lastMatchNonEmpty = false;
+		while (pos <= length) {
+			matcher.region(pos, length);
+			if (!matcher.find()) {
+				break;
+			}
+			int start = matcher.start();
+			int end = matcher.end();
+			if (end > start) {
+				lastMatchNonEmpty = true;
+				putSeparatorIfAbsent(separators, fieldCount, str.substring(pos, start));
+				array.put(Long.valueOf(++fieldCount), getJrt().toInputScalar(str.substring(start, end)));
+				pos = end;
+				if (pos >= length) {
+					break;
+				}
+			} else if (lastMatchNonEmpty) {
+				lastMatchNonEmpty = false;
+				separators.put(Long.valueOf(fieldCount), getJrt().toInputScalar(str.substring(pos, pos + 1)));
+				pos++;
+			} else {
+				putSeparatorIfAbsent(separators, fieldCount, str.substring(pos, start));
+				array.put(Long.valueOf(++fieldCount), getJrt().toInputScalar(""));
+				if (pos >= length) {
+					// trailing empty field at end of input: done
+					break;
+				}
+				separators.put(Long.valueOf(fieldCount), getJrt().toInputScalar(str.substring(pos, pos + 1)));
+				pos++;
+			}
+		}
+		// gawk always terminates seps: seps[n] holds the text after the last
+		// field, the empty string when the input ends at a field boundary
+		separators.put(Long.valueOf(fieldCount), getJrt().toInputScalar(str.substring(pos)));
+		return Long.valueOf(fieldCount);
+	}
+
+	/** Stores a separator only when the slot has not been written yet. */
+	private void putSeparatorIfAbsent(Map<Object, Object> separators, long index, String value) {
+		Long key = Long.valueOf(index);
+		if (!separators.containsKey(key)) {
+			separators.put(key, getJrt().toInputScalar(value));
+		}
+	}
+
+	/** Resolves the {@code patsplit()} field pattern: argument, FPAT, or gawk's default. */
+	private Pattern fieldPattern(Object fieldpat) {
+		if (fieldpat instanceof Pattern) {
+			return getJrt().caseAwarePattern((Pattern) fieldpat);
+		}
+		if (fieldpat != null) {
+			return getJrt().dynamicPattern(toAwkString(fieldpat));
+		}
+		Object fpat = getVm().getVariable("FPAT");
+		String fpatString = fpat == null ? "" : toAwkString(fpat);
+		return getJrt().dynamicPattern(fpatString.isEmpty() ? DEFAULT_FPAT : fpatString);
+	}
+
+	/**
+	 * Returns the translation of a string in the given text domain and locale
+	 * category. Jawk ships no message catalogs, so the text is returned
+	 * untranslated, exactly like gawk without a matching {@code .mo} file.
+	 *
+	 * @param string text to translate
+	 * @param domain text domain; defaults to {@code TEXTDOMAIN}
+	 * @param category locale category; accepted and ignored
+	 * @return the untranslated text
+	 */
+	@JawkFunction("dcgettext")
+	public String dcgettext(Object string, @JawkOptional Object domain, @JawkOptional Object category) {
+		return toAwkString(string);
+	}
+
+	/**
+	 * Returns the singular or plural form of a message according to a number.
+	 * Without message catalogs this applies the English plural rule, exactly
+	 * like gawk without a matching {@code .mo} file.
+	 *
+	 * @param singular singular form
+	 * @param plural plural form
+	 * @param number quantity deciding the form
+	 * @param domain text domain; defaults to {@code TEXTDOMAIN}
+	 * @param category locale category; accepted and ignored
+	 * @return {@code singular} when the number is 1, {@code plural} otherwise
+	 */
+	@JawkFunction("dcngettext")
+	public String dcngettext(
+			Object singular,
+			Object plural,
+			Object number,
+			@JawkOptional Object domain,
+			@JawkOptional Object category) {
+		return (long) JRT.toDouble(number) == 1L ? toAwkString(singular) : toAwkString(plural);
+	}
+
+	/**
+	 * Binds a text domain to a message catalog directory and returns the
+	 * binding, mirroring gawk's {@code bindtextdomain()}.
+	 *
+	 * @param directory directory to bind; the AWK empty string queries the
+	 *        current binding without changing it
+	 * @param domain text domain; defaults to {@code TEXTDOMAIN}
+	 * @return the directory now bound to the domain
+	 */
+	@JawkFunction("bindtextdomain")
+	public String bindtextdomain(Object directory, @JawkOptional Object domain) {
+		String domainName = domain == null ? "" : toAwkString(domain);
+		if (domainName.isEmpty()) {
+			domainName = currentTextdomain();
+		}
+		String directoryName = toAwkString(directory);
+		if (textdomainBindings == null) {
+			textdomainBindings = new HashMap<String, String>();
+		}
+		if (!directoryName.isEmpty()) {
+			textdomainBindings.put(domainName, directoryName);
+		}
+		String bound = textdomainBindings.get(domainName);
+		return bound == null ? DEFAULT_LOCALE_DIRECTORY : bound;
+	}
+
+	/** Returns the {@code TEXTDOMAIN} variable, or gawk's default domain when unset. */
+	private String currentTextdomain() {
+		Object textdomain = getVm().getVariable("TEXTDOMAIN");
+		String name = textdomain == null ? "" : toAwkString(textdomain);
+		return name.isEmpty() ? DEFAULT_TEXTDOMAIN : name;
 	}
 
 	/**

@@ -52,6 +52,7 @@ import io.jawk.ext.ExtensionFunction;
 import io.jawk.ext.ForInKeyOrder;
 import io.jawk.ext.JawkExtension;
 import io.jawk.intermediate.Address;
+import io.jawk.intermediate.AwkTuples;
 import io.jawk.intermediate.Opcode;
 import io.jawk.intermediate.PositionTracker;
 import io.jawk.intermediate.Tuple;
@@ -3028,16 +3029,19 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	/*
-	 * FUNCTAB is a gawk extension listing the names of the program's
-	 * user-defined functions and the loaded extensions' function keywords. The
-	 * parser emits UPDATE_FUNCTAB only when the script references FUNCTAB
-	 * outside POSIX mode.
+	 * FUNCTAB is a gawk extension listing the names of the standard built-in
+	 * functions, the program's user-defined functions, and the loaded
+	 * extensions' function keywords. The parser emits UPDATE_FUNCTAB only when
+	 * the script references FUNCTAB outside POSIX mode.
 	 */
 	private void execUpdateFunctab(long offset) {
 		if (runtimeStack.getVariable(offset, true) != null) {
 			return;
 		}
 		Map<Object, Object> functab = newAwkArray();
+		for (String name : AwkTuples.BUILTIN_FUNCTION_NAMES) {
+			functab.put(name, name);
+		}
 		for (String name : functionNames) {
 			functab.put(name, name);
 		}

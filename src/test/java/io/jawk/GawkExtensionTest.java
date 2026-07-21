@@ -887,7 +887,8 @@ public class GawkExtensionTest {
 								+ "print \"[\" strftime(\"%-d\", t, 1) \"][\" strftime(\"%_d\", t, 1) \"][\" strftime(\"%5d\", t, 1) \"]\"; "
 								+ "print \"[\" strftime(\"%^a\", t, 1) \"][\" strftime(\"%#p\", t, 1) \"][\" strftime(\"%_j\", t, 1) \"]\"; "
 								+ "print \"[\" strftime(\"%08Y\", t, 1) \"][\" strftime(\"%-e\", t, 1) \"][\" strftime(\"%3a\", t, 1) \"]\"; "
-								+ "print \"[\" strftime(\"%-5d\", t, 1) \"][\" strftime(\"%-5a\", t, 1) \"][\" strftime(\"%#a\", t, 1) \"]\" "
+								+ "print \"[\" strftime(\"%-5d\", t, 1) \"][\" strftime(\"%-5a\", t, 1) \"][\" strftime(\"%#a\", t, 1) \"]\"; "
+								+ "print \"[\" strftime(\"%20D\", t, 1) \"]\" "
 								+ "}")
 				.expectLines(
 						"[1][ 1][00001]",
@@ -896,7 +897,9 @@ public class GawkExtensionTest {
 						// '-' drops the default padding but keeps an explicit
 						// width, space-padded; '#' applies the opposite of the
 						// conversion's usual case
-						"[    1][  Sun][SUN]")
+						"[    1][  Sun][SUN]",
+						// composite conversions pad with spaces, not zeros
+						"[            01/01/17]")
 				.runAndAssert();
 	}
 
@@ -964,12 +967,54 @@ public class GawkExtensionTest {
 
 	@Test
 	public void strftimeHandlesYearZero() throws Exception {
-		// -62167219200 is 0000-01-01T00:00:00Z: the astronomical year keeps
-		// its sign instead of collapsing to the year-of-era
+		// -62167219200 is 0000-01-01T00:00:00Z and -62198755200 is
+		// -0001-01-01T00:00:00Z: the astronomical year keeps its sign instead
+		// of collapsing to the year-of-era, the century divides toward
+		// negative infinity, and the ISO week year is signed as well
 		AwkTestSupport
 				.awkTest("year conversions account for the calendar era")
-				.script("BEGIN { print strftime(\"%Y|%C|%y\", -62167219200, 1) }")
-				.expectLines("0|00|00")
+				.script(
+						"BEGIN { "
+								+ "print strftime(\"%Y|%C|%y\", -62167219200, 1); "
+								+ "print strftime(\"%G %g\", -62167219200, 1); "
+								+ "print strftime(\"%Y|%C|%y\", -62198755200, 1) "
+								+ "}")
+				.expectLines("0|00|00", "-1 99", "-1|-1|99")
+				.runAndAssert();
+	}
+
+	@Test
+	public void environTzAcceptsPosixSpecifications() throws Exception {
+		// TimeZone.getTimeZone() would silently turn these into GMT; POSIX
+		// says XXX3 is 3 hours west of Greenwich
+		AwkTestSupport
+				.awkTest("POSIX TZ specifications are parsed")
+				.script(
+						"BEGIN { "
+								+ "ENVIRON[\"TZ\"] = \"XXX3\"; "
+								+ "print \"[\" strftime(\"%z\", 0) \"]\"; "
+								+ "print mktime(\"1970 1 1 0 0 0\"); "
+								+ "ENVIRON[\"TZ\"] = \"CET-1CEST,M3.5.0,M10.5.0/3\"; "
+								+ "print \"[\" strftime(\"%z\", 1483228800) \"]\"; "
+								+ "print \"[\" strftime(\"%z\", 1500000000) \"]\" "
+								+ "}")
+				.expectLines("[-0300]", "10800", "[+0100]", "[+0200]")
+				.runAndAssert();
+	}
+
+	@Test
+	public void mktimeUsesHistoricalDstSavings() throws Exception {
+		// Australia/Lord_Howe saved a full hour in 1982 but only 30 minutes
+		// today: a forced DST hint must apply the adjustment of that era
+		AwkTestSupport
+				.awkTest("forced DST hints use the date's historical savings")
+				.script(
+						"BEGIN { "
+								+ "ENVIRON[\"TZ\"] = \"Australia/Lord_Howe\"; "
+								+ "print mktime(\"1982 1 1 12 0 0 1\"); "
+								+ "print mktime(\"1982 1 1 12 0 0 1\") - mktime(\"1982 1 1 12 0 0 0\") "
+								+ "}")
+				.expectLines("378693000", "-3600")
 				.runAndAssert();
 	}
 

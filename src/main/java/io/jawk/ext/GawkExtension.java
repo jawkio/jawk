@@ -80,6 +80,9 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	/** DST offset forced by a positive {@code mktime()} DST hint in zones without savings. */
 	private static final int DEFAULT_DST_SAVINGS = 3600000;
 
+	/** Half a year, the probe distance used to find a date's applicable DST savings. */
+	private static final long HALF_YEAR_MILLIS = 182L * 24L * 3600L * 1000L;
+
 	/** Locale categories accepted by the gettext functions, as in gawk. */
 	private static final Set<String> LOCALE_CATEGORIES = Collections
 			.unmodifiableSet(
@@ -296,18 +299,40 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		calendar.setLenient(true);
 		calendar.clear();
 		calendar.set(values[0], values[1] - 1, values[2], values[3], values[4], values[5]);
-		long millis;
+		long millis = calendar.getTimeInMillis();
 		if (fields.length == 7 && !utc && values[6] >= 0) {
-			// like C's tm_isdst: a non-negative hint forces the DST offset; a
-			// negative one lets the zone's rules decide. Zones without savings
-			// (fixed offsets) still get C's usual one-hour adjustment.
-			int savings = timeZone.getDSTSavings() > 0 ? timeZone.getDSTSavings() : DEFAULT_DST_SAVINGS;
-			calendar.set(Calendar.DST_OFFSET, values[6] > 0 ? savings : 0);
+			// like C's tm_isdst: a non-negative hint forces the DST offset (the
+			// one applicable at that date, which may differ from the zone's
+			// current savings); a negative hint lets the zone's rules decide
+			calendar.clear();
+			calendar.set(values[0], values[1] - 1, values[2], values[3], values[4], values[5]);
+			calendar.set(Calendar.DST_OFFSET, values[6] > 0 ? applicableDstSavings(timeZone, millis) : 0);
 			millis = calendar.getTimeInMillis();
-		} else {
-			millis = preferDaylightAtOverlap(calendar.getTimeInMillis(), timeZone);
+		} else if (!utc) {
+			millis = preferDaylightAtOverlap(millis, timeZone);
 		}
 		return Long.valueOf(Math.floorDiv(millis, 1000L));
+	}
+
+	/**
+	 * DST adjustment applicable around an instant. Zones like
+	 * Australia/Lord_Howe changed their savings over time, so the current
+	 * {@code getDSTSavings()} value may be wrong for older dates: probing half
+	 * a year around the date finds that era's actual adjustment. Zones without
+	 * any savings (fixed offsets) get C's usual one-hour adjustment.
+	 */
+	private static int applicableDstSavings(TimeZone timeZone, long millis) {
+		long best = 0L;
+		try {
+			java.time.zone.ZoneRules rules = timeZone.toZoneId().getRules();
+			for (long probe : new long[] { millis, millis - HALF_YEAR_MILLIS, millis + HALF_YEAR_MILLIS }) {
+				best = Math.max(best, rules.getDaylightSavings(java.time.Instant.ofEpochMilli(probe)).toMillis());
+			}
+		} catch (RuntimeException e) {
+			// custom zones or timestamps beyond java.time's range
+			best = timeZone.getDSTSavings();
+		}
+		return best > 0L ? (int) best : DEFAULT_DST_SAVINGS;
 	}
 
 	/**
@@ -370,10 +395,27 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 					tz = tz.substring(1);
 				}
 				// POSIX: an explicitly empty TZ means UTC
-				return TimeZone.getTimeZone(tz.isEmpty() ? "UTC" : tz);
+				return tz.isEmpty() ? TimeZone.getTimeZone("UTC") : resolveTimeZone(tz);
 			}
 		}
 		return TimeZone.getDefault();
+	}
+
+	/**
+	 * Resolves a TZ value: an Olson or Java zone ID when known, otherwise a
+	 * POSIX TZ specification such as {@code XXX3} or
+	 * {@code CET-1CEST,M3.5.0,M10.5.0/3}, which
+	 * {@link TimeZone#getTimeZone(String)} alone would silently turn into GMT.
+	 */
+	private static TimeZone resolveTimeZone(String id) {
+		TimeZone zone = TimeZone.getTimeZone(id);
+		if ("GMT".equals(zone.getID()) && !"GMT".equals(id)) {
+			TimeZone posix = PosixTimeZone.parse(id);
+			if (posix != null) {
+				return posix;
+			}
+		}
+		return zone;
 	}
 
 	/** Returns {@code PROCINFO["strftime"]} when set, gawk's default format otherwise. */

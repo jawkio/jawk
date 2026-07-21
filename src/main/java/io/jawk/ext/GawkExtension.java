@@ -23,6 +23,7 @@ package io.jawk.ext;
  */
 
 import java.io.File;
+import java.math.BigInteger;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -71,11 +72,14 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	/** Default gettext text domain, as in gawk. */
 	private static final String DEFAULT_TEXTDOMAIN = "messages";
 
-	/** Directory reported for text domains never bound with {@code bindtextdomain()}. */
+	/**
+	 * Directory reported for text domains never bound with
+	 * {@code bindtextdomain()}: gawk's conventional compiled-in default. The
+	 * value is purely informational — Jawk ships no message catalogs and never
+	 * accesses this path (so it is harmless on Windows too); it only echoes
+	 * what a typical gawk reports.
+	 */
 	private static final String DEFAULT_LOCALE_DIRECTORY = "/usr/share/locale";
-
-	/** Largest double (2^53) whose conversion to long is exact. */
-	private static final double MAX_EXACT_LONG_DOUBLE = 9007199254740992.0D;
 
 	/** Locale categories accepted by the gettext functions, as in gawk. */
 	private static final Set<String> LOCALE_CATEGORIES = Collections
@@ -344,8 +348,8 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		if (environ instanceof Map) {
 			@SuppressWarnings("unchecked")
 			Map<Object, Object> environMap = (Map<Object, Object>) environ;
-			if (JRT.containsAwkKey(environMap, "TZ")) {
-				String tz = getJrt().toAwkString(JRT.getAssocArrayValue(environMap, "TZ"));
+			String tz = getJrt().getAwkStringEntry(environMap, "TZ");
+			if (tz != null) {
 				if (tz.startsWith(":")) {
 					// POSIX: a leading colon introduces an implementation-defined
 					// (here: Olson) time zone name
@@ -364,8 +368,9 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		if (procinfo instanceof Map) {
 			@SuppressWarnings("unchecked")
 			Map<Object, Object> procinfoMap = (Map<Object, Object>) procinfo;
-			if (JRT.containsAwkKey(procinfoMap, "strftime")) {
-				return getJrt().toAwkString(JRT.getAssocArrayValue(procinfoMap, "strftime"));
+			String format = getJrt().getAwkStringEntry(procinfoMap, "strftime");
+			if (format != null) {
+				return format;
 			}
 		}
 		return DEFAULT_STRFTIME_FORMAT;
@@ -408,6 +413,12 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * exponent makes the constant decimal (so {@code 019} is 19 and
 	 * {@code 011e2} is 1100), while any other character merely terminates the
 	 * numeric token (so {@code 011x} is 9 and {@code 077foo.5} is 63).
+	 * <p>
+	 * This deliberately lives here and not in {@link JRT}'s input conversion:
+	 * POSIX numeric strings are strictly decimal, so input fields never get
+	 * hexadecimal or octal interpretation (gawk applies it only under
+	 * {@code --non-decimal-data}, which Jawk does not implement);
+	 * {@code strtonum()} is the explicit gateway to non-decimal notation.
 	 */
 	private static int numberBase(String text) {
 		if (text.length() < 2 || text.charAt(0) != '0') {
@@ -433,22 +444,25 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	}
 
 	/**
-	 * Parses digits of the given base, stopping at the first invalid
-	 * character, as gawk's non-decimal scanner does ({@code "0x"} is 0).
+	 * Parses the digits of the given base, stopping at the first invalid
+	 * character, as gawk's non-decimal scanner does ({@code "0x"} is 0,
+	 * {@code "011x"} is 9). Values beyond the long range degrade to the
+	 * nearest double, as in gawk.
 	 */
 	private static Number parseNonDecimal(String text, int offset, int base) {
-		double value = 0.0D;
-		for (int i = offset; i < text.length(); i++) {
-			int digit = Character.digit(text.charAt(i), base);
-			if (digit < 0) {
-				break;
-			}
-			value = value * base + digit;
+		int end = offset;
+		while (end < text.length() && Character.digit(text.charAt(end), base) >= 0) {
+			end++;
 		}
-		if (value <= MAX_EXACT_LONG_DOUBLE) {
-			return Long.valueOf((long) value);
+		if (end == offset) {
+			return Long.valueOf(0L);
 		}
-		return Double.valueOf(value);
+		String digits = text.substring(offset, end);
+		try {
+			return Long.valueOf(Long.parseLong(digits, base));
+		} catch (NumberFormatException overflow) {
+			return Double.valueOf(new BigInteger(digits, base).doubleValue());
+		}
 	}
 
 	/**
@@ -586,6 +600,8 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	@JawkFunction("dcgettext")
 	public String dcgettext(Object string, @JawkOptional Object domain, @JawkOptional Object category) {
 		checkLocaleCategory(category);
+		// no .mo catalog support yet (issue #530): behave like gawk built
+		// without gettext, whose own test suite accepts this as passing
 		return toAwkString(string);
 	}
 
@@ -698,10 +714,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		}
 		@SuppressWarnings("unchecked")
 		Map<Object, Object> procinfoMap = (Map<Object, Object>) procinfo;
-		if (!JRT.containsAwkKey(procinfoMap, "sorted_in")) {
-			return null;
-		}
-		return getJrt().toAwkString(JRT.getAssocArrayValue(procinfoMap, "sorted_in"));
+		return getJrt().getAwkStringEntry(procinfoMap, "sorted_in");
 	}
 
 	/*

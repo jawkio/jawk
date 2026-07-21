@@ -571,6 +571,24 @@ public class JRT {
 	}
 
 	/**
+	 * Returns the AWK string value of an associative array entry, or
+	 * {@code null} when the array has no such key. This is the common way to
+	 * read optional settings out of AWK arrays, such as
+	 * {@code PROCINFO["sorted_in"]} or {@code ENVIRON["TZ"]}.
+	 *
+	 * @param map associative array to read
+	 * @param key entry key
+	 * @return the entry value converted with {@code CONVFMT}, or {@code null}
+	 *         when the key is absent
+	 */
+	public String getAwkStringEntry(Map<Object, Object> map, Object key) {
+		if (!containsAwkKey(map, key)) {
+			return null;
+		}
+		return toAwkString(getAssocArrayValue(map, key));
+	}
+
+	/**
 	 * Convert Strings, Integers, and Doubles to Strings
 	 * based on the CONVFMT variable contents and the stored Locale.
 	 *

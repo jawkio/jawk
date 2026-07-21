@@ -52,7 +52,7 @@ import io.jawk.ext.ExtensionFunction;
 import io.jawk.ext.ForInKeyOrder;
 import io.jawk.ext.JawkExtension;
 import io.jawk.intermediate.Address;
-import io.jawk.intermediate.AwkTuples;
+import io.jawk.intermediate.BuiltinFunction;
 import io.jawk.intermediate.Opcode;
 import io.jawk.intermediate.PositionTracker;
 import io.jawk.intermediate.Tuple;
@@ -3039,7 +3039,7 @@ public class AVM implements VariableManager, Closeable {
 			return;
 		}
 		Map<Object, Object> functab = newAwkArray();
-		for (String name : AwkTuples.BUILTIN_FUNCTION_NAMES) {
+		for (String name : BuiltinFunction.names()) {
 			functab.put(name, name);
 		}
 		for (String name : functionNames) {

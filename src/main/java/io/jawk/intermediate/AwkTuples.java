@@ -32,7 +32,6 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,39 +51,6 @@ import io.jawk.jrt.JRT;
 public class AwkTuples implements Serializable {
 
 	private static final long serialVersionUID = 3L;
-
-	/**
-	 * Names of the standard AWK built-in functions, as they appear in gawk's
-	 * {@code FUNCTAB}. Must stay in sync with the parser's built-in function
-	 * table; {@code print}, {@code printf}, and {@code getline} are statements,
-	 * not functions, so they are not listed, as in gawk.
-	 */
-	public static final Set<String> BUILTIN_FUNCTION_NAMES = Collections
-			.unmodifiableSet(
-					new LinkedHashSet<String>(
-							Arrays
-									.asList(
-											"atan2",
-											"close",
-											"cos",
-											"exp",
-											"gsub",
-											"index",
-											"int",
-											"length",
-											"log",
-											"match",
-											"rand",
-											"sin",
-											"split",
-											"sprintf",
-											"sqrt",
-											"srand",
-											"sub",
-											"substr",
-											"system",
-											"tolower",
-											"toupper")));
 
 	/** Address manager */
 	private final AddressManager addressManager = new AddressManager();

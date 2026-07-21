@@ -40,6 +40,7 @@ import io.jawk.backend.AVM;
 import io.jawk.ext.ExtensionFunction;
 import io.jawk.intermediate.Address;
 import io.jawk.intermediate.AwkTuples;
+import io.jawk.intermediate.BuiltinFunction;
 import io.jawk.jrt.JRT;
 import io.jawk.util.ScriptSource;
 import io.jawk.frontend.ast.LexerException;
@@ -195,75 +196,6 @@ public class AwkParser {
 		KEYWORDS.put("print", Token.KW_PRINT);
 		KEYWORDS.put("printf", Token.KW_PRINTF);
 		KEYWORDS.put("getline", Token.KW_GETLINE);
-	}
-
-	/**
-	 * The AWK built-in functions.
-	 * Each constant carries the function name as it appears in AWK
-	 * source code, which may differ from the constant name itself
-	 * (e.g. {@link #INT} for the <code>int</code> function).
-	 */
-	private enum BuiltinFunction {
-
-		ATAN2("atan2"),
-		CLOSE("close"),
-		COS("cos"),
-		EXP("exp"),
-		GSUB("gsub"),
-		INDEX("index"),
-		INT("int"),
-		LENGTH("length"),
-		LOG("log"),
-		MATCH("match"),
-		RAND("rand"),
-		SIN("sin"),
-		SPLIT("split"),
-		SPRINTF("sprintf"),
-		SQRT("sqrt"),
-		SRAND("srand"),
-		SUB("sub"),
-		SUBSTR("substr"),
-		SYSTEM("system"),
-		TOLOWER("tolower"),
-		TOUPPER("toupper");
-
-		/**
-		 * A mapping of built-in function names to their
-		 * enum constants, for name-based lookup.
-		 */
-		private static final Map<String, BuiltinFunction> BY_NAME = new HashMap<String, BuiltinFunction>();
-
-		static {
-			for (BuiltinFunction function : values()) {
-				BY_NAME.put(function.awkName, function);
-			}
-			// FUNCTAB is populated from the shared name list; a mismatch here
-			// means a built-in was added on one side only
-			if (!BY_NAME.keySet().equals(AwkTuples.BUILTIN_FUNCTION_NAMES)) {
-				throw new IllegalStateException(
-						"AwkTuples.BUILTIN_FUNCTION_NAMES is out of sync with the parser's built-in function table");
-			}
-		}
-
-		/**
-		 * The name of the function as it appears in AWK source code.
-		 */
-		private final String awkName;
-
-		BuiltinFunction(String awkName) {
-			this.awkName = awkName;
-		}
-
-		/**
-		 * Resolves an AWK function name to its enum constant.
-		 *
-		 * @param name the function name as it appears in AWK source code
-		 * @return the matching constant, or <code>null</code> if the name
-		 *         does not denote a built-in function
-		 */
-		private static BuiltinFunction of(String name) {
-			return BY_NAME.get(name);
-		}
 	}
 
 	private static final int SP_IDX = 257;

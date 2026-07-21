@@ -233,7 +233,17 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_nlstringtest() throws Exception {
-		skip(MANUAL_SKIP_REASON);
+		// Jawk ships no message catalogs, so it behaves exactly like gawk
+		// built without gettext: compare against the untranslated
+		// nlstringtest-nogettext baseline (upstream runs the same script
+		// against it on gettext-less builds)
+		AwkTestSupport
+				.cliTest("GAWK nlstringtest")
+				.argument("-f", gawkFile("nlstringtest.awk"))
+				.operand(".")
+				.expectLines(gawkPath("nlstringtest-nogettext.ok"))
+				.expectExit(0)
+				.runAndAssert();
 	}
 
 	@Test

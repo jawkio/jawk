@@ -77,12 +77,6 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	/** Largest double (2^53) whose conversion to long is exact. */
 	private static final double MAX_EXACT_LONG_DOUBLE = 9007199254740992.0D;
 
-	/** DST offset forced by a positive {@code mktime()} DST hint in zones without savings. */
-	private static final int DEFAULT_DST_SAVINGS = 3600000;
-
-	/** Half a year, the probe distance used to find a date's applicable DST savings. */
-	private static final long HALF_YEAR_MILLIS = 182L * 24L * 3600L * 1000L;
-
 	/** Locale categories accepted by the gettext functions, as in gawk. */
 	private static final Set<String> LOCALE_CATEGORIES = Collections
 			.unmodifiableSet(
@@ -272,6 +266,12 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	/**
 	 * Converts a gawk {@code "YYYY MM DD HH MM SS [DST]"} date specification
 	 * into seconds since the epoch, normalizing out-of-range values.
+	 * <p>
+	 * The conversion follows Java's calendar rules: an ambiguous wall time
+	 * during a DST fall-back resolves to its standard-time occurrence, and a
+	 * positive DST hint applies the zone's current savings (zones without DST
+	 * ignore the hint). See the documented differences with gawk, whose
+	 * behavior in these edge cases follows the C library.
 	 *
 	 * @param datespec date specification with six or seven numeric fields
 	 * @param utcFlag when truthy, interpret the specification as UTC
@@ -299,61 +299,12 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		calendar.setLenient(true);
 		calendar.clear();
 		calendar.set(values[0], values[1] - 1, values[2], values[3], values[4], values[5]);
-		long millis = calendar.getTimeInMillis();
 		if (fields.length == 7 && !utc && values[6] >= 0) {
-			// like C's tm_isdst: a non-negative hint forces the DST offset (the
-			// one applicable at that date, which may differ from the zone's
-			// current savings); a negative hint lets the zone's rules decide
-			calendar.clear();
-			calendar.set(values[0], values[1] - 1, values[2], values[3], values[4], values[5]);
-			calendar.set(Calendar.DST_OFFSET, values[6] > 0 ? applicableDstSavings(timeZone, millis) : 0);
-			millis = calendar.getTimeInMillis();
-		} else if (!utc) {
-			millis = resolveOverlapLikeGlibc(millis, timeZone);
+			// like C's tm_isdst: a non-negative hint forces the DST offset, a
+			// negative one lets the zone's rules decide
+			calendar.set(Calendar.DST_OFFSET, values[6] > 0 ? timeZone.getDSTSavings() : 0);
 		}
-		return Long.valueOf(Math.floorDiv(millis, 1000L));
-	}
-
-	/**
-	 * DST adjustment applicable around an instant. Zones like
-	 * Australia/Lord_Howe changed their savings over time, so the current
-	 * {@code getDSTSavings()} value may be wrong for older dates: probing half
-	 * a year around the date finds that era's actual adjustment. Zones without
-	 * any savings (fixed offsets) get C's usual one-hour adjustment.
-	 */
-	private static int applicableDstSavings(TimeZone timeZone, long millis) {
-		long best = 0L;
-		try {
-			java.time.zone.ZoneRules rules = timeZone.toZoneId().getRules();
-			for (long probe : new long[] { millis, millis - HALF_YEAR_MILLIS, millis + HALF_YEAR_MILLIS }) {
-				best = Math.max(best, rules.getDaylightSavings(java.time.Instant.ofEpochMilli(probe)).toMillis());
-			}
-		} catch (RuntimeException e) {
-			// custom zones or timestamps beyond java.time's range
-			best = timeZone.getDSTSavings();
-		}
-		return best > 0L ? (int) best : DEFAULT_DST_SAVINGS;
-	}
-
-	/**
-	 * Resolves ambiguous fall-back wall times the way glibc's {@code mktime()}
-	 * does when {@code tm_isdst} is unspecified: the chosen occurrence is the
-	 * one whose UTC offset is in effect at the instant obtained by reading the
-	 * wall time as UTC. That favors the daylight occurrence in zones west of
-	 * Greenwich (America/New_York) and the standard one east of it
-	 * (Europe/Berlin); {@link GregorianCalendar} would always pick the later
-	 * standard-time occurrence.
-	 */
-	private static long resolveOverlapLikeGlibc(long millis, TimeZone timeZone) {
-		int savings = applicableDstSavings(timeZone, millis);
-		long earlier = millis - savings;
-		// the shifted instant represents the same wall time exactly when it
-		// falls in daylight saving while the original resolution is standard
-		if (timeZone.getOffset(earlier) - timeZone.getOffset(millis) != savings) {
-			return millis;
-		}
-		long wallReadAsUtc = millis + timeZone.getOffset(millis);
-		return timeZone.getOffset(wallReadAsUtc) == timeZone.getOffset(earlier) ? earlier : millis;
+		return Long.valueOf(Math.floorDiv(calendar.getTimeInMillis(), 1000L));
 	}
 
 	/**
@@ -381,7 +332,12 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	/**
 	 * Returns the local time zone for {@code mktime()} and {@code strftime()},
 	 * honoring {@code ENVIRON["TZ"]}: gawk supports changing the time zone
-	 * from within the script through the AWK environment.
+	 * from within the script through the AWK environment. The value is
+	 * resolved with Java's time zone semantics: any zone ID that
+	 * {@link TimeZone#getTimeZone(String)} understands (Olson names such as
+	 * {@code America/New_York}, custom IDs such as {@code GMT+3} with Java's
+	 * sign convention); POSIX TZ rule specifications are not parsed, and
+	 * unknown zones fall back to GMT.
 	 */
 	private TimeZone localTimeZone() {
 		Object environ = getVm().getVariable("ENVIRON");
@@ -396,36 +352,10 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 					tz = tz.substring(1);
 				}
 				// POSIX: an explicitly empty TZ means UTC
-				return tz.isEmpty() ? TimeZone.getTimeZone("UTC") : resolveTimeZone(tz);
+				return TimeZone.getTimeZone(tz.isEmpty() ? "UTC" : tz);
 			}
 		}
 		return TimeZone.getDefault();
-	}
-
-	/**
-	 * Resolves a TZ value: an Olson or Java zone ID when known, otherwise a
-	 * POSIX TZ specification such as {@code XXX3} or
-	 * {@code CET-1CEST,M3.5.0,M10.5.0/3}, which
-	 * {@link TimeZone#getTimeZone(String)} alone would silently turn into GMT.
-	 * Java's custom {@code GMT+3} IDs conflict with POSIX, where a positive
-	 * offset lies west of Greenwich: for TZ values the POSIX reading wins, as
-	 * in gawk, so {@code GMT+3} is UTC-03:00.
-	 */
-	private static TimeZone resolveTimeZone(String id) {
-		if (id.startsWith("GMT+") || id.startsWith("GMT-")) {
-			TimeZone posix = PosixTimeZone.parse(id);
-			if (posix != null) {
-				return posix;
-			}
-		}
-		TimeZone zone = TimeZone.getTimeZone(id);
-		if ("GMT".equals(zone.getID()) && !"GMT".equals(id)) {
-			TimeZone posix = PosixTimeZone.parse(id);
-			if (posix != null) {
-				return posix;
-			}
-		}
-		return zone;
 	}
 
 	/** Returns {@code PROCINFO["strftime"]} when set, gawk's default format otherwise. */

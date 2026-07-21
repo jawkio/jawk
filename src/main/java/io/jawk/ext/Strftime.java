@@ -34,7 +34,9 @@ import java.util.TimeZone;
  * <p>
  * Day, month, and AM/PM names are the fixed C-locale (English) strings, like
  * gawk running under {@code LC_TIME=C}. Unsupported conversion specifiers are
- * copied to the output verbatim, as glibc does.
+ * copied to the output verbatim, as glibc does. Calendar arithmetic follows
+ * Java's rules: dates before the common era format with the JDK's year
+ * numbering rather than gawk's astronomical years.
  */
 final class Strftime {
 
@@ -280,7 +282,7 @@ final class Strftime {
 			appendFormat(out, "%a %b %e %H:%M:%S %Y", calendar);
 			break;
 		case 'C':
-			appendPadded(out, Math.floorDiv(year(calendar), 100), 2);
+			appendPadded(out, calendar.get(Calendar.YEAR) / 100, 2);
 			break;
 		case 'd':
 			appendPadded(out, calendar.get(Calendar.DAY_OF_MONTH), 2);
@@ -364,10 +366,10 @@ final class Strftime {
 			appendPadded(out, weekNumber(calendar, (dayOfWeek(calendar) + 6) % 7), 2);
 			break;
 		case 'y':
-			appendPadded(out, Math.floorMod(year(calendar), 100), 2);
+			appendPadded(out, calendar.get(Calendar.YEAR) % 100, 2);
 			break;
 		case 'Y':
-			out.append(year(calendar));
+			out.append(calendar.get(Calendar.YEAR));
 			break;
 		case 'z':
 			appendZoneOffset(out, calendar);
@@ -398,16 +400,6 @@ final class Strftime {
 		return calendar
 				.getTimeZone()
 				.getDisplayName(calendar.get(Calendar.DST_OFFSET) != 0, TimeZone.SHORT, Locale.US);
-	}
-
-	/**
-	 * Astronomical year: year zero and negative years for the BC era.
-	 * {@code getWeekYear()} needs no such conversion: it already returns the
-	 * signed astronomical week year.
-	 */
-	private static int year(GregorianCalendar calendar) {
-		int year = calendar.get(Calendar.YEAR);
-		return calendar.get(Calendar.ERA) == GregorianCalendar.BC ? 1 - year : year;
 	}
 
 	/** Day of week, 0 = Sunday, matching C's {@code tm_wday}. */

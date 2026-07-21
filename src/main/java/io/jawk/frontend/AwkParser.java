@@ -1602,7 +1602,6 @@ public class AwkParser {
 		}
 		Token idToken = token;
 		String id = text.toString();
-		boolean parens = c == '(';
 		lexer();
 
 		if (idToken == Token.EXTENSION) {
@@ -1635,8 +1634,10 @@ public class AwkParser {
 			 * }
 			 */
 
-			// if (extension.requiresParens() || parens)
-			if (parens) {
+			// like the built-in functions (and gawk's own builtins, which is
+			// what these keywords stand in for), an extension call accepts
+			// whitespace between the keyword and its argument list
+			if (token == Token.OPEN_PAREN) {
 				lexer();
 				if (token == Token.CLOSE_PAREN) {
 					params = null;

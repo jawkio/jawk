@@ -118,10 +118,15 @@ Differences with Traditional AWK
 
 Jawk aims to be a practical AWK implementation for JVM environments, but it is not a byte-for-byte clone of every historical AWK behavior. Some differences are deliberate and come from the way Jawk integrates with Java:
 
-- Regular expression behavior follows Java's regex engine, which may differ from traditional AWK regexes in edge cases.
+- Regular expression behavior follows Java's regex engine, which may differ from traditional AWK regexes in edge cases. Notably, alternation picks the first matching branch rather than the POSIX longest one, which can affect `match()`, field splitting with `patsplit()`, and similar content-driven matching: order alternatives longest-first.
 - `printf()` and `sprintf()` try to replicate C-style formatting but may have differences due to Java's formatting capabilities and limitations.
 - Some floating-point edge cases may differ due to Java's handling of floating-point arithmetic and representation.
 - Jawk resolves user-defined function calls during compilation. It does not defer all of that work to runtime.
+- The date and time functions (`mktime()`, `strftime()`) follow the Java platform's time zone data and calendar rules rather than the C library's, which differs from gawk in a few edge cases:
+  - `ENVIRON["TZ"]` accepts the zone IDs Java understands: Olson names such as `Europe/Paris` (optionally with a POSIX `:` prefix) and Java's custom `GMT+3` IDs with Java's sign convention (`GMT+3` is UTC+03:00, where POSIX would read UTC-03:00). POSIX TZ rule specifications such as `XXX3` or `CET-1CEST,M3.5.0,M10.5.0/3` are not parsed; unknown zones fall back to GMT. An explicitly empty TZ selects UTC, as in POSIX.
+  - An ambiguous wall time during a DST fall-back resolves to its standard-time occurrence; the explicit DST field of `mktime()` still selects either occurrence.
+  - A positive `mktime()` DST hint applies the zone's current daylight adjustment; zones without daylight saving time ignore the hint.
+  - `strftime()`'s `%Z` prints the zone's current designation (the JDK's time zone data records historical offsets and DST rules, but not historical zone names), and timestamps before the common era use the JDK's year numbering rather than astronomical (negative) years.
 
 Jawk also follows gawk in several places where gawk departs from historical AWK:
 

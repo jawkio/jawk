@@ -78,6 +78,8 @@ That keeps extension availability explicit and local to the embedding code.
 - `systime()` returns the current time in seconds since the epoch
 - `mktime(datespec [, utc-flag])` converts a `"YYYY MM DD HH MM SS [DST]"` specification into seconds since the epoch, normalizing out-of-range values, or returns -1 when the specification is invalid
 - `strftime([format [, timestamp [, utc-flag]]])` formats a timestamp with the C `strftime(3)` conversion specifiers (C-locale English names), including the GNU padding, case, and field-width flags (`%-d`, `%_d`, `%^a`, `%5d`); the format defaults to `PROCINFO["strftime"]` or gawk's `"%a %b %e %H:%M:%S %Z %Y"`
+
+`mktime()` and `strftime()` honor `ENVIRON["TZ"]` and follow the Java platform's time zone data and calendar rules; see the [differences with traditional AWK](index.html#Differences_with_Traditional_AWK) for the edge cases where this departs from gawk's C-library behavior.
 - `bindtextdomain(directory [, domain])`, `dcgettext(string [, domain [, category]])`, and `dcngettext(string1, string2, number [, domain [, category]])` implement gawk's internationalization interface; since Jawk ships no message catalogs, they behave exactly like gawk without a matching `.mo` file: text is returned untranslated and `dcngettext()` applies the English plural rule
 
 `asort()`, `asorti()`, and the `for (index in array)` statement honor `PROCINFO["sorted_in"]` with gawk's predefined comparison modes: `@unsorted`, `@ind_str_asc`, `@ind_num_asc`, `@val_str_asc`, `@val_num_asc`, `@val_type_asc`, and their `_desc` counterparts. String comparisons ignore case when `IGNORECASE` is non-zero.

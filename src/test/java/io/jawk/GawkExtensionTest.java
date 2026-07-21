@@ -780,6 +780,475 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void systimeReturnsCurrentEpochSeconds() throws Exception {
+		long before = System.currentTimeMillis() / 1000L;
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.awkTest("systime reports the current epoch time")
+				.script("BEGIN { print systime() }")
+				.run();
+		long after = System.currentTimeMillis() / 1000L;
+		long reported = Long.parseLong(result.output().trim());
+		assertTrue(
+				"systime() must report the current time",
+				reported >= before && reported <= after);
+	}
+
+	@Test
+	public void mktimeConvertsUtcDatespecs() throws Exception {
+		AwkTestSupport
+				.awkTest("mktime converts and normalizes UTC date specifications")
+				.script(
+						"BEGIN { "
+								+ "print mktime(\"2017 1 1 0 0 0\", 1); "
+								+ "print mktime(\"2016 13 1 0 0 0\", 1); "
+								+ "print mktime(\"2017 1 1 0 0 -30\", 1); "
+								+ "print mktime(strftime(\"%Y %m %d %H %M %S\", 1483228800, 1), 1) "
+								+ "}")
+				.expectLines("1483228800", "1483228800", "1483228770", "1483228800")
+				.runAndAssert();
+	}
+
+	@Test
+	public void mktimeRejectsMalformedDatespecs() throws Exception {
+		AwkTestSupport
+				.awkTest("mktime returns -1 on malformed date specifications")
+				.script(
+						"BEGIN { "
+								+ "print mktime(\"garbage\"); "
+								+ "print mktime(\"2017 1 1 0 0\"); "
+								+ "print mktime(\"2017 1 1 0 0 0 0 0\"); "
+								+ "print mktime(\"2017 1 1 0 0 x\") "
+								+ "}")
+				.expectLines("-1", "-1", "-1", "-1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void strftimeFormatsUtcTimestamps() throws Exception {
+		// 1483228800 is Sun Jan 1 2017 00:00:00 UTC
+		AwkTestSupport
+				.awkTest("strftime supports the C conversion specifiers")
+				.script(
+						"BEGIN { "
+								+ "t = 1483228800; "
+								+ "print strftime(\"%Y-%m-%d %H:%M:%S\", t, 1); "
+								+ "print strftime(\"%a %A %b %B %h\", t, 1); "
+								+ "print strftime(\"%d|%e|%j|%u|%w|%C|%y\", t, 1); "
+								+ "print strftime(\"%V %G %g %U %W\", t, 1); "
+								+ "print strftime(\"%z %Z %s %%\", t, 1); "
+								+ "print strftime(\"%c\", t, 1); "
+								+ "print strftime(\"%D %F %x %X %r %R %T\", t, 1); "
+								+ "t2 = mktime(\"2017 6 15 15 30 45\", 1); "
+								+ "print strftime(\"%a %u %j %e %I:%M:%S %p\", t2, 1); "
+								+ "print strftime(\"a%nb\", t, 1); "
+								+ "print strftime(\"%q %E\", t, 1) "
+								+ "}")
+				.expectLines(
+						"2017-01-01 00:00:00",
+						"Sun Sunday Jan January Jan",
+						"01| 1|001|7|0|20|17",
+						"52 2016 16 01 00",
+						"+0000 UTC 1483228800 %",
+						"Sun Jan  1 00:00:00 2017",
+						"01/01/17 2017-01-01 01/01/17 00:00:00 12:00:00 AM 00:00 00:00:00",
+						"Thu 4 166 15 03:30:45 PM",
+						"a",
+						"b",
+						"%q %E")
+				.runAndAssert();
+	}
+
+	@Test
+	public void timeFunctionsUseProlepticGregorianDates() throws Exception {
+		// gawk's civil dates never switch to the Julian calendar: 1500-01-01
+		// is 9 days away from what a default GregorianCalendar would compute
+		AwkTestSupport
+				.awkTest("mktime and strftime use the proleptic Gregorian calendar")
+				.script(
+						"BEGIN { "
+								+ "t = mktime(\"1500 1 1 0 0 0\", 1); "
+								+ "print t; "
+								+ "print strftime(\"%F\", t, 1) "
+								+ "}")
+				.expectLines("-14831769600", "1500-01-01")
+				.runAndAssert();
+	}
+
+	@Test
+	public void strftimeSupportsGnuFlagsAndWidths() throws Exception {
+		// the GNU extensions gawk exposes through glibc: '-' no padding,
+		// '_' space padding, '0' zero padding, '^' upper case, '#' swapped
+		// case, and a minimum field width
+		AwkTestSupport
+				.awkTest("strftime honors GNU padding and case flags")
+				.script(
+						"BEGIN { "
+								+ "t = 1483228800; "
+								+ "print \"[\" strftime(\"%-d\", t, 1) \"][\" strftime(\"%_d\", t, 1) \"][\" strftime(\"%5d\", t, 1) \"]\"; "
+								+ "print \"[\" strftime(\"%^a\", t, 1) \"][\" strftime(\"%#p\", t, 1) \"][\" strftime(\"%_j\", t, 1) \"]\"; "
+								+ "print \"[\" strftime(\"%08Y\", t, 1) \"][\" strftime(\"%-e\", t, 1) \"][\" strftime(\"%3a\", t, 1) \"]\"; "
+								+ "print \"[\" strftime(\"%-5d\", t, 1) \"][\" strftime(\"%-5a\", t, 1) \"][\" strftime(\"%#a\", t, 1) \"]\"; "
+								+ "print \"[\" strftime(\"%20D\", t, 1) \"]\" "
+								+ "}")
+				.expectLines(
+						"[1][ 1][00001]",
+						"[SUN][am][  1]",
+						"[00002017][1][Sun]",
+						// '-' drops the default padding but keeps an explicit
+						// width, space-padded; '#' applies the opposite of the
+						// conversion's usual case
+						"[    1][  Sun][SUN]",
+						// composite conversions pad with spaces, not zeros
+						"[            01/01/17]")
+				.runAndAssert();
+	}
+
+	@Test
+	public void mktimeDstHintSelectsTheOverlapOccurrence() throws Exception {
+		// 2021-11-07 01:30 happens twice in America/New_York: without a DST
+		// hint Java's calendar resolves it to the standard-time occurrence,
+		// and an explicit hint selects either one
+		java.util.TimeZone original = java.util.TimeZone.getDefault();
+		try {
+			java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("America/New_York"));
+			AwkTestSupport
+					.awkTest("the DST hint selects the fall-back occurrence")
+					.script(
+							"BEGIN { "
+									+ "print mktime(\"2021 11 7 1 30 0\"); "
+									+ "print mktime(\"2021 11 7 1 30 0 1\"); "
+									+ "print mktime(\"2021 11 7 1 30 0 0\") "
+									+ "}")
+					.expectLines("1636266600", "1636263000", "1636266600")
+					.runAndAssert();
+		} finally {
+			java.util.TimeZone.setDefault(original);
+		}
+	}
+
+	@Test
+	public void timeFunctionsHonorEnvironTz() throws Exception {
+		// gawk lets scripts switch time zones through ENVIRON["TZ"]. For
+		// zones renamed over time (America/Indiana/Knox was Eastern in 2000,
+		// Central today) the %z offset is the historical one while %Z uses
+		// the zone's current designation: the JDK's time zone data does not
+		// record historical designations.
+		AwkTestSupport
+				.awkTest("ENVIRON[\"TZ\"] selects the local time zone")
+				.script(
+						"BEGIN { "
+								+ "ENVIRON[\"TZ\"] = \"America/New_York\"; "
+								+ "print strftime(\"%z %Z\", 946684800); "
+								+ "print mktime(\"2000 1 1 0 0 0\"); "
+								+ "ENVIRON[\"TZ\"] = \"America/Indiana/Knox\"; "
+								+ "print \"[\" strftime(\"%z\", 946684800) \"]\" "
+								+ "}")
+				.expectLines("-0500 EST", "946702800", "[-0500]")
+				.runAndAssert();
+	}
+
+	@Test
+	public void patsplitAdvancesByCodePoints() throws Exception {
+		// zero-length matches must never step into the middle of a surrogate
+		// pair: one supplementary character yields two empty fields around it
+		AwkTestSupport
+				.awkTest("patsplit advances over supplementary characters atomically")
+				.script(
+						"BEGIN { "
+								+ "n = patsplit(\"😀\", f, \"^\", s); "
+								+ "line = n \":\"; "
+								+ "for (i = 1; i <= n; i++) line = line \"<\" f[i] \">\"; "
+								+ "line = line \";\"; "
+								+ "for (i = 0; i in s; i++) line = line \"<\" s[i] \">\"; "
+								+ "print line "
+								+ "}")
+				.expectLines("2:<><>;<><😀><>")
+				.runAndAssert();
+	}
+
+	@Test
+	public void environTzFollowsJavaZoneSemantics() throws Exception {
+		// TZ values are resolved with Java's time zone rules: GMT+3 is Java's
+		// custom UTC+03:00 ID (not the sign-inverted POSIX reading), and
+		// unknown zones or POSIX rule strings fall back to GMT
+		AwkTestSupport
+				.awkTest("ENVIRON[\"TZ\"] resolves with Java zone IDs")
+				.script(
+						"BEGIN { "
+								+ "ENVIRON[\"TZ\"] = \"GMT+3\"; "
+								+ "print \"[\" strftime(\"%z\", 0) \"]\"; "
+								+ "ENVIRON[\"TZ\"] = \"Not/AZone\"; "
+								+ "print \"[\" strftime(\"%z\", 0) \"]\" "
+								+ "}")
+				.expectLines("[+0300]", "[+0000]")
+				.runAndAssert();
+	}
+
+	@Test
+	public void mktimeResolvesOverlapToStandardTime() throws Exception {
+		// ambiguous fall-back wall times resolve to their standard-time
+		// occurrence, Java's calendar rule (a documented difference with
+		// gawk, whose choice follows the C library's internals)
+		AwkTestSupport
+				.awkTest("fall-back overlaps resolve to standard time")
+				.script(
+						"BEGIN { "
+								+ "ENVIRON[\"TZ\"] = \"Europe/Berlin\"; "
+								+ "print mktime(\"2021 10 31 2 30 0\") "
+								+ "}")
+				.expectLines("1635643800")
+				.runAndAssert();
+	}
+
+	@Test
+	public void emptyEnvironTzMeansUtc() throws Exception {
+		// POSIX: an explicitly empty TZ selects UTC, distinct from an unset
+		// TZ, which keeps the JVM default zone; a DST hint has no effect in
+		// zones without daylight saving
+		AwkTestSupport
+				.awkTest("ENVIRON[\"TZ\"] = \"\" switches to UTC")
+				.script(
+						"BEGIN { "
+								+ "ENVIRON[\"TZ\"] = \"\"; "
+								+ "print strftime(\"%z %Z\", 0); "
+								+ "print mktime(\"2021 1 1 12 0 0 1\") - mktime(\"2021 1 1 12 0 0 0\") "
+								+ "}")
+				.expectLines("+0000 UTC", "0")
+				.runAndAssert();
+	}
+
+	@Test
+	public void gettextFunctionsRejectInvalidLocaleCategories() throws Exception {
+		AwkTestSupport
+				.awkTest("dcgettext rejects an invalid locale category")
+				.script("BEGIN { dcgettext(\"x\", \"d\", \"BAD\") }")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
+		AwkTestSupport
+				.awkTest("dcngettext rejects an invalid locale category")
+				.script("BEGIN { dcngettext(\"a\", \"b\", 2, \"d\", \"BAD\") }")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
+		AwkTestSupport
+				.awkTest("all gawk locale categories are accepted")
+				.script(
+						"BEGIN { "
+								+ "print dcgettext(\"x\", \"d\", \"LC_ALL\"), "
+								+ "dcgettext(\"x\", \"d\", \"LC_COLLATE\"), "
+								+ "dcgettext(\"x\", \"d\", \"LC_CTYPE\"), "
+								+ "dcgettext(\"x\", \"d\", \"LC_MONETARY\"), "
+								+ "dcgettext(\"x\", \"d\", \"LC_NUMERIC\"), "
+								+ "dcgettext(\"x\", \"d\", \"LC_TIME\") "
+								+ "}")
+				.expectLines("x x x x x x")
+				.runAndAssert();
+	}
+
+	@Test
+	public void strftimeDefaultFormatComesFromProcinfo() throws Exception {
+		AwkTestSupport
+				.awkTest("strftime() without arguments uses PROCINFO[\"strftime\"]")
+				.script("BEGIN { PROCINFO[\"strftime\"] = \"fixed-format\"; print strftime() }")
+				.expectLines("fixed-format")
+				.runAndAssert();
+	}
+
+	@Test
+	public void strtonumConvertsNonDecimalStrings() throws Exception {
+		AwkTestSupport
+				.awkTest("strtonum understands hexadecimal and octal notation")
+				.script(
+						"BEGIN { "
+								+ "print strtonum(\"0x13\"), strtonum(\"013\"), strtonum(\"13\"), strtonum(13); "
+								+ "print strtonum(\"0x\"), strtonum(\"019\"), strtonum(\"0.5\"), strtonum(\"abc\"); "
+								+ "print strtonum(\"0xff\"), strtonum(\"0X1A\"), strtonum(\"017 \"); "
+								+ "print strtonum(\"011x\"), strtonum(\"077foo\"), strtonum(\"08x\"); "
+								+ "print strtonum(\"077foo.5\"), strtonum(\"011E2\") "
+								+ "}")
+				.expectLines("19 11 13 13", "0 19 0.5 0", "255 26 15", "9 63 8", "63 1100")
+				.runAndAssert();
+	}
+
+	@Test
+	public void strtonumResolvesNumericInputFieldsAsDecimal() throws Exception {
+		// gawk resolves numeric-looking strnums to plain numbers before
+		// looking at the base, so an input field "011" is decimal, while a
+		// script string constant "011" is octal (see the mixed case above)
+		AwkTestSupport
+				.awkTest("strtonum treats numeric strnum fields as decimal")
+				.script("{ print strtonum($1), strtonum($2) }")
+				.stdin("011 0x11\n")
+				.expectLines("11 17")
+				.runAndAssert();
+	}
+
+	@Test
+	public void patsplitSplitsByContent() throws Exception {
+		// fixture from gawk's own patsplit test: empty matches become empty
+		// fields, and seps[0]..seps[n] frame every field. The quoted-field
+		// alternative comes first because Java regexps pick the first matching
+		// alternative, not the POSIX longest one.
+		AwkTestSupport
+				.awkTest("patsplit implements gawk's FPAT splitting rules")
+				.script(
+						"function dump(n, f, s,    i, line) { "
+								+ "line = n \":\"; "
+								+ "for (i = 1; i <= n; i++) line = line \"<\" f[i] \">\"; "
+								+ "line = line \";\"; "
+								+ "for (i = 0; i in s; i++) line = line \"<\" s[i] \">\"; "
+								+ "print line "
+								+ "} "
+								+ "BEGIN { "
+								+ "csv = \"(\\\"[^\\\"]+\\\")|([^,]*)\"; "
+								+ "dump(patsplit(\"Robbins,,Arnold,\", f1, csv, s1), f1, s1); "
+								+ "dump(patsplit(\"Smith,,\\\"1234 A Pretty Place, NE\\\",Sometown,NY,12345-6789,USA\", f2, csv, s2), f2, s2); "
+								+ "dump(patsplit(\"bbbaaacccdddaaaaaqqqqa\", f3, \"aa+\", s3), f3, s3); "
+								+ "dump(patsplit(\"qqq\", f4, \"aa+\", s4), f4, s4); "
+								+ "dump(patsplit(\"\", f5, \"aa+\", s5), f5, s5); "
+								+ "dump(patsplit(\"abc\", f6, \"$\", s6), f6, s6); "
+								+ "dump(patsplit(\"abc\", f7, \"a+|$\", s7), f7, s7) "
+								+ "}")
+				.expectLines(
+						"4:<Robbins><><Arnold><>;<><,><,><,><>",
+						"7:<Smith><><\"1234 A Pretty Place, NE\"><Sometown><NY><12345-6789><USA>;<><,><,><,><,><,><,><>",
+						"2:<aaa><aaaaa>;<bbb><cccddd><qqqqa>",
+						"0:;<qqq>",
+						"0:;",
+						// anchored patterns match away from the scan position:
+						// the single end-of-string match yields one empty field
+						"1:<>;<abc><>",
+						"2:<a><>;<><bc><>")
+				.runAndAssert();
+	}
+
+	@Test
+	public void patsplitDefaultsToFpat() throws Exception {
+		AwkTestSupport
+				.awkTest("patsplit falls back to FPAT, then to non-whitespace runs")
+				.script(
+						"BEGIN { "
+								+ "n = patsplit(\"  a  b \", f); "
+								+ "print n, f[1], f[2]; "
+								+ "FPAT = \"[0-9]+\"; "
+								+ "n = patsplit(\"a1b22c\", g); "
+								+ "print n, g[1], g[2] "
+								+ "}")
+				.expectLines("2 a b", "2 1 22")
+				.runAndAssert();
+	}
+
+	@Test
+	public void patsplitRejectsEmptyFieldPatterns() throws Exception {
+		// gawk: an explicitly empty field pattern is fatal; only an unset
+		// FPAT stands in for gawk's built-in default
+		AwkTestSupport
+				.awkTest("an explicitly empty FPAT is a runtime error")
+				.script("BEGIN { FPAT = \"\"; patsplit(\"a b\", f) }")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
+		AwkTestSupport
+				.awkTest("an explicitly empty field pattern argument is a runtime error")
+				.script("BEGIN { patsplit(\"a b\", f, \"\") }")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
+	}
+
+	@Test
+	public void patsplitRejectsAliasedDestinationArrays() throws Exception {
+		// gawk: fatal "cannot use the same array for second and fourth args"
+		AwkTestSupport
+				.awkTest("patsplit rejects the same array for fields and separators")
+				.script("BEGIN { patsplit(\"abc\", a, \"b\", a) }")
+				.expectThrow(RuntimeException.class)
+				.runAndAssert();
+	}
+
+	@Test
+	public void patsplitHonorsIgnoreCase() throws Exception {
+		AwkTestSupport
+				.awkTest("IGNORECASE applies to patsplit field patterns")
+				.script(
+						"BEGIN { "
+								+ "print patsplit(\"xAx\", f, /a/); "
+								+ "IGNORECASE = 1; "
+								+ "print patsplit(\"xAx\", f, /a/), f[1] "
+								+ "}")
+				.expectLines("0", "1 A")
+				.runAndAssert();
+	}
+
+	@Test
+	public void extensionCallsAcceptSpaceBeforeArguments() throws Exception {
+		// gawk allows whitespace between a built-in function name and its
+		// argument list; the extension keywords standing in for gawk builtins
+		// accept it too (gawk's own nlstringtest fixture relies on this)
+		AwkTestSupport
+				.awkTest("whitespace between extension keyword and arguments")
+				.script("BEGIN { print typeof (1), strtonum (\"0x10\") }")
+				.expectLines("number 16")
+				.runAndAssert();
+	}
+
+	@Test
+	public void gettextFunctionsReturnUntranslatedText() throws Exception {
+		AwkTestSupport
+				.awkTest("dcgettext and dcngettext behave like gawk without catalogs")
+				.script(
+						"BEGIN { "
+								+ "print dcgettext(\"hello\"); "
+								+ "print dcgettext(\"hello\", \"dom\", \"LC_MESSAGES\"); "
+								+ "print dcngettext(\"one\", \"many\", 1), dcngettext(\"one\", \"many\", 2), dcngettext(\"one\", \"many\", 0) "
+								+ "}")
+				.expectLines("hello", "hello", "one many many")
+				.runAndAssert();
+	}
+
+	@Test
+	public void bindtextdomainTracksDirectoryBindings() throws Exception {
+		AwkTestSupport
+				.awkTest("bindtextdomain records and reports per-domain directories")
+				.script(
+						"BEGIN { "
+								+ "print bindtextdomain(\"/opt/locale\", \"mydom\"); "
+								+ "print bindtextdomain(\"\", \"mydom\"); "
+								+ "print bindtextdomain(\"\"); "
+								+ "TEXTDOMAIN = \"mydom\"; "
+								+ "print bindtextdomain(\"\"); "
+								+ "print \"<\" bindtextdomain(\"/elsewhere\", \"\") \">\"; "
+								+ "print bindtextdomain(\"\", \"mydom\") "
+								+ "}")
+				.expectLines(
+						"/opt/locale",
+						"/opt/locale",
+						"/usr/share/locale",
+						"/opt/locale",
+						// an explicitly empty domain is rejected: the result is
+						// empty and no binding changes, as with C bindtextdomain()
+						"<>",
+						"/opt/locale")
+				.runAndAssert();
+	}
+
+	@Test
+	public void functabListsBuiltinAndExtensionFunctions() throws Exception {
+		AwkTestSupport
+				.awkTest("FUNCTAB lists standard built-ins and gawk extension functions")
+				.script(
+						"BEGIN { "
+								+ "n = asorti(FUNCTAB, sorted); "
+								+ "line = \"\"; "
+								+ "for (i = 1; i <= n; i++) line = line (i > 1 ? \" \" : \"\") sorted[i]; "
+								+ "print line "
+								+ "}")
+				.expectLines(
+						"asort asorti atan2 bindtextdomain close cos dcgettext dcngettext exp gensub"
+								+ " gsub index int isarray length log match mkbool mktime patsplit rand sin"
+								+ " split sprintf sqrt srand strftime strtonum sub substr system systime"
+								+ " tolower toupper typeof")
+				.runAndAssert();
+	}
+
+	@Test
 	public void asortiWritesIndicesAsStrings() throws Exception {
 		// gawk: the destination values of asorti() are strings even when the
 		// source index looks numeric

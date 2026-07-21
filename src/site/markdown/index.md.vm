@@ -108,7 +108,7 @@ Key Capabilities
 - CLI-compatible AWK execution with inline scripts, script files, operands, and input files
 - Java entry points for script execution, expression evaluation, tuple compilation, and repeated reuse
 - Structured input through `InputSource` for row-oriented or already-tokenized data
-- Gawk builtins enabled by default: `asort()`, `asorti()`, `typeof()`, `isarray()`, `mkbool()`, `gensub()`, and `PROCINFO["sorted_in"]`
+- Gawk builtins enabled by default: `asort()`, `asorti()`, `typeof()`, `isarray()`, `mkbool()`, `gensub()`, `patsplit()`, `strtonum()`, `systime()`, `mktime()`, `strftime()`, the gettext functions, and `PROCINFO["sorted_in"]`
 - Explicit extension loading through the Java API or the CLI
 - Tuple serialization for CLI precompilation and later loading
 - Sandbox-specific tuples and runtime components through `SandboxedAwk`
@@ -118,17 +118,22 @@ Differences with Traditional AWK
 
 Jawk aims to be a practical AWK implementation for JVM environments, but it is not a byte-for-byte clone of every historical AWK behavior. Some differences are deliberate and come from the way Jawk integrates with Java:
 
-- Regular expression behavior follows Java's regex engine, which may differ from traditional AWK regexes in edge cases.
+- Regular expression behavior follows Java's regex engine, which may differ from traditional AWK regexes in edge cases. Notably, alternation picks the first matching branch rather than the POSIX longest one, which can affect `match()`, field splitting with `patsplit()`, and similar content-driven matching: order alternatives longest-first.
 - `printf()` and `sprintf()` try to replicate C-style formatting but may have differences due to Java's formatting capabilities and limitations.
 - Some floating-point edge cases may differ due to Java's handling of floating-point arithmetic and representation.
 - Jawk resolves user-defined function calls during compilation. It does not defer all of that work to runtime.
+- The date and time functions (`mktime()`, `strftime()`) follow the Java platform's time zone data and calendar rules rather than the C library's, which differs from gawk in a few edge cases:
+  - `ENVIRON["TZ"]` accepts the zone IDs Java understands: Olson names such as `Europe/Paris` (optionally with a POSIX `:` prefix) and Java's custom `GMT+3` IDs with Java's sign convention (`GMT+3` is UTC+03:00, where POSIX would read UTC-03:00). POSIX TZ rule specifications such as `XXX3` or `CET-1CEST,M3.5.0,M10.5.0/3` are not parsed; unknown zones fall back to GMT. An explicitly empty TZ selects UTC, as in POSIX.
+  - An ambiguous wall time during a DST fall-back resolves to its standard-time occurrence; the explicit DST field of `mktime()` still selects either occurrence.
+  - A positive `mktime()` DST hint applies the zone's current daylight adjustment; zones without daylight saving time ignore the hint.
+  - `strftime()`'s `%Z` prints the zone's current designation (the JDK's time zone data records historical offsets and DST rules, but not historical zone names), and timestamps before the common era use the JDK's year numbering rather than astronomical (negative) years.
 
 Jawk also follows gawk in several places where gawk departs from historical AWK:
 
 - A regexp literal used as an ordinary expression evaluates as `$0 ~ /re/`, per POSIX; `x = /re/` assigns 0 or 1, not the pattern text.
 - Typed regexp literals (`@/re/`) are accepted; `--posix` rejects them.
 - `IGNORECASE` is a built-in special variable managed by the runtime, like `FS` or `RS`: a truthy value makes regexp matching, field and `split()` separators, string comparisons, `index()`, and gawk array sorting case-insensitive.
-- Because the [gawk compatibility extension](extensions.html#gawk) is enabled by default, `gensub`, `typeof`, `isarray`, `asort`, `asorti`, and `mkbool` are function names and can no longer be used as variables. Load an explicit extension list without `GawkExtension` to reclaim those identifiers.
+- Because the [gawk compatibility extension](extensions.html#gawk) is enabled by default, `gensub`, `typeof`, `isarray`, `asort`, `asorti`, `mkbool`, `patsplit`, `strtonum`, `systime`, `mktime`, `strftime`, `bindtextdomain`, `dcgettext`, and `dcngettext` are function names and can no longer be used as variables. Load an explicit extension list without `GawkExtension` to reclaim those identifiers.
 - Calling a user-defined function with more arguments than it declares is accepted: the extra expressions are evaluated and discarded, and a gawk-style warning is printed to stderr.
 - Assigning a scalar value to an array element (`a[1] = z`) types that element as a scalar; later using it as a subarray (`a[1][2] = 3`) is a runtime error, exactly as in gawk.
 

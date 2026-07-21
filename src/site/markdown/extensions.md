@@ -73,15 +73,23 @@ That keeps extension availability explicit and local to the embedding code.
 - `isarray(x)` returns 1 when the value is an array, 0 otherwise
 - `mkbool(expression)` creates a gawk-style boolean-typed number
 - `gensub(regexp, replacement, how [, target])` returns the substituted text without modifying the target
+- `patsplit(string, array [, fieldpat [, seps]])` splits by content: pieces matching `fieldpat` (default: the `FPAT` variable, or any non-whitespace run) become fields, and the text between them lands in `seps[0]`..`seps[n]`. Note that Java regular expressions pick the first matching alternative rather than the POSIX longest one, so order alternatives longest-first
+- `strtonum(str)` converts a string to a number, recognizing gawk's `0x` hexadecimal and leading-zero octal notation
+- `systime()` returns the current time in seconds since the epoch
+- `mktime(datespec [, utc-flag])` converts a `"YYYY MM DD HH MM SS [DST]"` specification into seconds since the epoch, normalizing out-of-range values, or returns -1 when the specification is invalid
+- `strftime([format [, timestamp [, utc-flag]]])` formats a timestamp with the C `strftime(3)` conversion specifiers (C-locale English names), including the GNU padding, case, and field-width flags (`%-d`, `%_d`, `%^a`, `%5d`); the format defaults to `PROCINFO["strftime"]` or gawk's `"%a %b %e %H:%M:%S %Z %Y"`
+
+`mktime()` and `strftime()` honor `ENVIRON["TZ"]` and follow the Java platform's time zone data and calendar rules; see the [differences with traditional AWK](index.html#Differences_with_Traditional_AWK) for the edge cases where this departs from gawk's C-library behavior.
+- `bindtextdomain(directory [, domain])`, `dcgettext(string [, domain [, category]])`, and `dcngettext(string1, string2, number [, domain [, category]])` implement gawk's internationalization interface; since Jawk ships no message catalogs, they behave exactly like gawk without a matching `.mo` file: text is returned untranslated and `dcngettext()` applies the English plural rule
 
 `asort()`, `asorti()`, and the `for (index in array)` statement honor `PROCINFO["sorted_in"]` with gawk's predefined comparison modes: `@unsorted`, `@ind_str_asc`, `@ind_num_asc`, `@val_str_asc`, `@val_num_asc`, `@val_type_asc`, and their `_desc` counterparts. String comparisons ignore case when `IGNORECASE` is non-zero.
 
 Beyond the extension functions, the interpreter itself implements gawk's `BEGINFILE` / `ENDFILE` special patterns, the `nextfile` statement, and the `ERRNO` and `ARGIND` special variables (see the [CLI guide](cli.html#BEGINFILE_and_ENDFILE_Rules)). Like the other gawk-specific syntax, `BEGINFILE` and `ENDFILE` are not special in POSIX mode.
 
-Scripts that reference `SYMTAB` or `FUNCTAB` get honest, Jawk-shaped content, populated by the runtime itself (outside POSIX mode): `SYMTAB` holds the names of the program's globals, Jawk's special variables, and `-v`/host-supplied variables; `FUNCTAB` holds the names of the program's user-defined functions plus the loaded extensions' function keywords. Command-line `name=value` operand assignments update `SYMTAB` live, as in gawk; ordinary in-script assignments are not reflected (the array is a startup snapshot, not gawk's live view). As in gawk, assigning a scalar to `SYMTAB` or `FUNCTAB` is a runtime error.
+Scripts that reference `SYMTAB` or `FUNCTAB` get honest, Jawk-shaped content, populated by the runtime itself (outside POSIX mode): `SYMTAB` holds the names of the program's globals, Jawk's special variables, and `-v`/host-supplied variables; `FUNCTAB` holds the names of the standard built-in functions (`split`, `substr`, ...), the program's user-defined functions, and the loaded extensions' function keywords. Command-line `name=value` operand assignments update `SYMTAB` live, as in gawk; ordinary in-script assignments are not reflected (the array is a startup snapshot, not gawk's live view). As in gawk, assigning a scalar to `SYMTAB` or `FUNCTAB` is a runtime error.
 
 > [!NOTE]
-> Because these functions are registered by default, `gensub`, `typeof`, `isarray`, `asort`, `asorti`, and `mkbool` become reserved function names. A script that uses them as variable or function identifiers must be run with an explicit extension list that omits `GawkExtension`.
+> Because these functions are registered by default, `gensub`, `typeof`, `isarray`, `asort`, `asorti`, `mkbool`, `patsplit`, `strtonum`, `systime`, `mktime`, `strftime`, `bindtextdomain`, `dcgettext`, and `dcngettext` become reserved function names. A script that uses them as variable or function identifiers must be run with an explicit extension list that omits `GawkExtension`.
 
 The registry exposes the extension through identifiers such as:
 

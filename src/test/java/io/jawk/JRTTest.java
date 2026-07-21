@@ -227,6 +227,22 @@ public class JRTTest {
 	}
 
 	@Test
+	public void testGetAwkStringEntryReadsOptionalSettings() {
+		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
+		AssocArray aa = AssocArray.createHash();
+		aa.put("TZ", "Europe/Paris");
+		aa.put("N", 42L);
+		assertEquals("Europe/Paris", jrt.getAwkStringEntry(aa, "TZ"));
+		assertEquals("42", jrt.getAwkStringEntry(aa, "N"));
+		assertNull(jrt.getAwkStringEntry(aa, "MISSING"));
+
+		Map<Object, Object> map = new LinkedHashMap<>();
+		map.put("sorted_in", "@ind_num_asc");
+		assertEquals("@ind_num_asc", jrt.getAwkStringEntry(map, "sorted_in"));
+		assertNull(jrt.getAwkStringEntry(map, "absent"));
+	}
+
+	@Test
 	public void testSplitRegexWhitespace() {
 		AssocArray aa = AssocArray.createHash();
 		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);

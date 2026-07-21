@@ -8,3 +8,4 @@ dependency-reduced-pom.xml
 .checkstyle
 .vscode/
 .claude/
+*.stackdump

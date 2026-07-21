@@ -309,7 +309,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 			calendar.set(Calendar.DST_OFFSET, values[6] > 0 ? applicableDstSavings(timeZone, millis) : 0);
 			millis = calendar.getTimeInMillis();
 		} else if (!utc) {
-			millis = preferDaylightAtOverlap(millis, timeZone);
+			millis = resolveOverlapLikeGlibc(millis, timeZone);
 		}
 		return Long.valueOf(Math.floorDiv(millis, 1000L));
 	}
@@ -336,23 +336,24 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	}
 
 	/**
-	 * Resolves ambiguous fall-back wall times to their first (daylight
-	 * saving) occurrence, as glibc's {@code mktime()} does when
-	 * {@code tm_isdst} is unspecified; {@link GregorianCalendar} picks the
-	 * later standard-time occurrence instead.
+	 * Resolves ambiguous fall-back wall times the way glibc's {@code mktime()}
+	 * does when {@code tm_isdst} is unspecified: the chosen occurrence is the
+	 * one whose UTC offset is in effect at the instant obtained by reading the
+	 * wall time as UTC. That favors the daylight occurrence in zones west of
+	 * Greenwich (America/New_York) and the standard one east of it
+	 * (Europe/Berlin); {@link GregorianCalendar} would always pick the later
+	 * standard-time occurrence.
 	 */
-	private static long preferDaylightAtOverlap(long millis, TimeZone timeZone) {
-		int savings = timeZone.getDSTSavings();
-		if (savings <= 0) {
-			return millis;
-		}
+	private static long resolveOverlapLikeGlibc(long millis, TimeZone timeZone) {
+		int savings = applicableDstSavings(timeZone, millis);
 		long earlier = millis - savings;
 		// the shifted instant represents the same wall time exactly when it
 		// falls in daylight saving while the original resolution is standard
-		if (timeZone.getOffset(earlier) - timeZone.getOffset(millis) == savings) {
-			return earlier;
+		if (timeZone.getOffset(earlier) - timeZone.getOffset(millis) != savings) {
+			return millis;
 		}
-		return millis;
+		long wallReadAsUtc = millis + timeZone.getOffset(millis);
+		return timeZone.getOffset(wallReadAsUtc) == timeZone.getOffset(earlier) ? earlier : millis;
 	}
 
 	/**
@@ -406,8 +407,17 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * POSIX TZ specification such as {@code XXX3} or
 	 * {@code CET-1CEST,M3.5.0,M10.5.0/3}, which
 	 * {@link TimeZone#getTimeZone(String)} alone would silently turn into GMT.
+	 * Java's custom {@code GMT+3} IDs conflict with POSIX, where a positive
+	 * offset lies west of Greenwich: for TZ values the POSIX reading wins, as
+	 * in gawk, so {@code GMT+3} is UTC-03:00.
 	 */
 	private static TimeZone resolveTimeZone(String id) {
+		if (id.startsWith("GMT+") || id.startsWith("GMT-")) {
+			TimeZone posix = PosixTimeZone.parse(id);
+			if (posix != null) {
+				return posix;
+			}
+		}
 		TimeZone zone = TimeZone.getTimeZone(id);
 		if ("GMT".equals(zone.getID()) && !"GMT".equals(id)) {
 			TimeZone posix = PosixTimeZone.parse(id);

@@ -154,8 +154,13 @@ final class PosixTimeZone {
 				pos++;
 				dayOfYear = number(1, 365) - 1;
 			} else {
-				// the zero-based form counts leap days; treating it as a
-				// non-leap ordinal is the closest exact-date approximation
+				/*
+				 * The zero-based n form counts February 29, so in leap years
+				 * the transition should land one calendar day earlier after
+				 * February. SimpleTimeZone can only express year-independent
+				 * dates, so the non-leap ordinal is the closest exact-date
+				 * approximation; the form is essentially unused in practice.
+				 */
 				dayOfYear = number(0, 365);
 			}
 			int month = 11;

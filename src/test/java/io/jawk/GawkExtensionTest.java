@@ -1003,6 +1003,39 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void posixGmtOffsetsBeatJavaCustomIds() throws Exception {
+		// POSIX offsets are positive west of Greenwich: TZ=GMT+3 is UTC-03:00,
+		// the opposite of Java's custom GMT+3 zone ID
+		AwkTestSupport
+				.awkTest("TZ=GMT+3 follows POSIX, not Java's custom ID syntax")
+				.script(
+						"BEGIN { "
+								+ "ENVIRON[\"TZ\"] = \"GMT+3\"; "
+								+ "print \"[\" strftime(\"%z\", 0) \"]\"; "
+								+ "ENVIRON[\"TZ\"] = \"GMT-3\"; "
+								+ "print \"[\" strftime(\"%z\", 0) \"]\" "
+								+ "}")
+				.expectLines("[-0300]", "[+0300]")
+				.runAndAssert();
+	}
+
+	@Test
+	public void mktimeResolvesOverlapPerZoneLikeGlibc() throws Exception {
+		// glibc picks the occurrence whose offset is in effect at the wall
+		// time read as UTC: Berlin's repeated 02:30 resolves to standard
+		// time, while New York's repeated 01:30 resolves to daylight time
+		AwkTestSupport
+				.awkTest("Berlin's fall-back overlap resolves to standard time")
+				.script(
+						"BEGIN { "
+								+ "ENVIRON[\"TZ\"] = \"Europe/Berlin\"; "
+								+ "print mktime(\"2021 10 31 2 30 0\") "
+								+ "}")
+				.expectLines("1635643800")
+				.runAndAssert();
+	}
+
+	@Test
 	public void mktimeUsesHistoricalDstSavings() throws Exception {
 		// Australia/Lord_Howe saved a full hour in 1982 but only 30 minutes
 		// today: a forced DST hint must apply the adjustment of that era

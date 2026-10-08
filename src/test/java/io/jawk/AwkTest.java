@@ -1653,23 +1653,24 @@ public class AwkTest {
 		File tmp = File.createTempFile("jawk", ".tpl");
 		// the replacement \\ is a single backslash in POSIX mode, \\ in gawk's
 		String script = "BEGIN { s = \"x\"; gsub(/x/, \"\\\\\\\\\", s); print s }";
-		Cli
-				.create(
-						new String[]
-						{ "--posix", "-K", tmp.getAbsolutePath(), script },
-						new ByteArrayInputStream(new byte[0]),
-						System.out,
-						System.err);
+		AwkTestSupport
+				.cliTest("gsub follows gawk's backslash rules by default")
+				.script(script)
+				.expect("\\\\\n")
+				.runAndAssert();
 
-		Cli cli = Cli.parseCommandLineArguments(new String[] { "-L", tmp.getAbsolutePath() });
-		assertTrue(cli.getPrecompiledProgram().isPosix());
+		AwkTestSupport
+				.cliTest("--posix -K compiles the program to a file")
+				.argument("--posix", "-K", tmp.getAbsolutePath())
+				.script(script)
+				.expect("")
+				.runAndAssert();
 
-		String result = new Awk()
-				.script(cli.getPrecompiledProgram())
-				.execute();
-
-		assertEquals("\\\n", result);
-		assertEquals("\\\\\n", new Awk().script(script).execute());
+		AwkTestSupport
+				.cliTest("-L keeps the POSIX backslash rules of the compiled program")
+				.argument("-L", tmp.getAbsolutePath())
+				.expect("\\\n")
+				.runAndAssert();
 	}
 
 	/**

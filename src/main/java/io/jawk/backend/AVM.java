@@ -359,6 +359,7 @@ public class AVM implements VariableManager, Closeable {
 	public Object eval(AwkExpression expression) throws IOException {
 		AwkExpression compiledExpression = Objects.requireNonNull(expression, "expression");
 		installExpressionMetadata(compiledExpression);
+		jrt.setPosix(compiledExpression.isPosix());
 
 		try {
 			executeTuples(compiledExpression.top());

@@ -31,28 +31,9 @@ package io.jawk;
  */
 public class AwkProgram extends io.jawk.intermediate.AwkTuples {
 
-	private static final long serialVersionUID = 2L;
-
-	/** Whether the program was compiled in POSIX mode. */
-	private boolean posix;
+	private static final long serialVersionUID = 1L;
 
 	AwkProgram() {
 		super();
-	}
-
-	/**
-	 * Returns whether the program was compiled in POSIX mode, in which case
-	 * {@code sub()} and {@code gsub()} follow the POSIX backslash rules in
-	 * their replacement text at run time, even when the program is loaded
-	 * from a file.
-	 *
-	 * @return {@code true} when the program was compiled in POSIX mode
-	 */
-	public boolean isPosix() {
-		return posix;
-	}
-
-	void setPosix(boolean posix) {
-		this.posix = posix;
 	}
 }

@@ -53,13 +53,16 @@ public class AwkTuples implements Serializable {
 	// Bumped to 6 when the getline opcodes gained a no-record jump address:
 	// older tuple streams emit them without one and must be recompiled.
 	// (5 = exact 64-bit integral arithmetic.)
-	private static final long serialVersionUID = 7L;
+	private static final long serialVersionUID = 8L;
 
 	/** Address manager */
 	private final AddressManager addressManager = new AddressManager();
 
 	/** Description of the primary script source, used for runtime diagnostics. */
 	private String sourceDescription;
+
+	/** Whether the tuples were compiled in POSIX mode. */
+	private boolean posix;
 
 	/**
 	 * Creates an empty tuple list, ready for the front end to append to.
@@ -85,6 +88,27 @@ public class AwkTuples implements Serializable {
 	 */
 	public String getSourceDescription() {
 		return sourceDescription;
+	}
+
+	/**
+	 * Records whether the tuples were compiled in POSIX mode, so that the
+	 * runtime applies the matching semantics even when they are loaded from a
+	 * file: {@code sub()} and {@code gsub()} then follow the POSIX backslash
+	 * rules in their replacement text.
+	 *
+	 * @param posixParam {@code true} when compiled in POSIX mode
+	 */
+	public void setPosix(boolean posixParam) {
+		this.posix = posixParam;
+	}
+
+	/**
+	 * Returns whether the tuples were compiled in POSIX mode.
+	 *
+	 * @return {@code true} when compiled in POSIX mode
+	 */
+	public boolean isPosix() {
+		return posix;
 	}
 
 	// made public to access static members of AwkTuples via Java Reflection

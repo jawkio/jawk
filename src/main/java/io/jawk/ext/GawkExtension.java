@@ -238,7 +238,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 		pattern = getJrt().caseAwarePattern(pattern);
 		Object targetValue = target == null ? getJrt().getInputLine() : target;
 		Matcher matcher = pattern.matcher(toAwkString(targetValue));
-		String repl = JRT.prepareReplacement(toAwkString(replacement), pattern.matcher("").groupCount());
+		String repl = JRT.prepareGensubReplacement(toAwkString(replacement), pattern.matcher("").groupCount());
 		String selector = toAwkString(how);
 		// gawk: any string beginning with 'g' or 'G' selects a global replacement
 		if (!selector.isEmpty() && (selector.charAt(0) == 'g' || selector.charAt(0) == 'G')) {

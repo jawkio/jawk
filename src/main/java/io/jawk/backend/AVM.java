@@ -359,6 +359,7 @@ public class AVM implements VariableManager, Closeable {
 	public Object eval(AwkExpression expression) throws IOException {
 		AwkExpression compiledExpression = Objects.requireNonNull(expression, "expression");
 		installExpressionMetadata(compiledExpression);
+		jrt.setPosix(compiledExpression.isPosix());
 
 		try {
 			executeTuples(compiledExpression.top());
@@ -455,6 +456,7 @@ public class AVM implements VariableManager, Closeable {
 		resetRuntimeState(runtimeArguments, variableOverrides);
 		installProgramMetadata(compiledProgram);
 
+		jrt.setPosix(compiledProgram.isPosix());
 		jrt.prepareForExecution(settings.getFieldSeparator(), settings.getDefaultRS());
 		if (!executionSpecialVariables.isEmpty()) {
 			jrt.applySpecialVariables(executionSpecialVariables);
@@ -532,6 +534,7 @@ public class AVM implements VariableManager, Closeable {
 		InputSource resolvedSource = Objects.requireNonNull(inputSource, "inputSource");
 		mergeRuntimeState(runtimeArguments, variableOverrides, compiledProgram);
 
+		jrt.setPosix(compiledProgram.isPosix());
 		jrt.prepareForExecution(settings.getFieldSeparator(), settings.getDefaultRS());
 		if (!executionSpecialVariables.isEmpty()) {
 			jrt.applySpecialVariables(executionSpecialVariables);

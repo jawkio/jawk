@@ -256,6 +256,17 @@ public class AwkEvalTest {
 	}
 
 	@Test
+	public void testEvalAppliesPosixModeOfTheExpression() throws Exception {
+		// the replacement \\ is a single backslash in POSIX mode, \\ in gawk's
+		String expression = "gsub(/x/, \"\\\\\\\\\") ? $0 : $0";
+		assertEquals("\\\\", new Awk().eval(expression, "x"));
+
+		AwkSettings settings = new AwkSettings();
+		settings.setPosix(true);
+		assertEquals("\\", new Awk(settings).eval(expression, "x"));
+	}
+
+	@Test
 	public void testEvalStringInputRepresentsSingleRecord() throws Exception {
 		Awk awk = new Awk();
 

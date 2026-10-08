@@ -821,6 +821,22 @@ public class AwkTest {
 				.script("BEGIN { s = \"x x x\"; gsub(/x/, \"\\\\$\\\\1\\\\\", s); print s }")
 				.expect("\\$\\1\\ \\$\\1\\ \\$\\1\\\n")
 				.runAndAssert();
+
+		// issue #614: the replacement text \\\&|\\\\|\\&|\\q|\\ follows gawk's
+		// rules by default and the POSIX rules (as in mawk) with --posix
+		String backslashes = "BEGIN { s = \"x\"; gsub(/x/, \"\\\\\\\\\\\\&|\\\\\\\\\\\\\\\\|\\\\\\\\&|\\\\\\\\q|\\\\\\\\\", s); print s }";
+		AwkTestSupport
+				.awkTest("gsub follows gawk's backslash rules")
+				.script(backslashes)
+				.expect("\\&|\\\\|\\x|\\\\q|\\\\\n")
+				.runAndAssert();
+
+		AwkTestSupport
+				.cliTest("gsub follows the POSIX backslash rules with --posix")
+				.argument("--posix")
+				.script(backslashes)
+				.expect("\\&|\\\\|\\x|\\q|\\\n")
+				.runAndAssert();
 	}
 
 	@Test
@@ -1625,6 +1641,36 @@ public class AwkTest {
 				.execute();
 
 		assertEquals("ABC\n", result);
+	}
+
+	/**
+	 * A program compiled with <code>--posix -K</code> keeps the POSIX
+	 * sub()/gsub() replacement rules when loaded with <code>-L</code>, which
+	 * cannot be combined with <code>--posix</code> (issue #614).
+	 */
+	@Test
+	public void loadedProgramKeepsPosixMode() throws Exception {
+		File tmp = File.createTempFile("jawk", ".tpl");
+		// the replacement \\ is a single backslash in POSIX mode, \\ in gawk's
+		String script = "BEGIN { s = \"x\"; gsub(/x/, \"\\\\\\\\\", s); print s }";
+		AwkTestSupport
+				.cliTest("gsub follows gawk's backslash rules by default")
+				.script(script)
+				.expect("\\\\\n")
+				.runAndAssert();
+
+		AwkTestSupport
+				.cliTest("--posix -K compiles the program to a file")
+				.argument("--posix", "-K", tmp.getAbsolutePath())
+				.script(script)
+				.expect("")
+				.runAndAssert();
+
+		AwkTestSupport
+				.cliTest("-L keeps the POSIX backslash rules of the compiled program")
+				.argument("-L", tmp.getAbsolutePath())
+				.expect("\\\n")
+				.runAndAssert();
 	}
 
 	/**

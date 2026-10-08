@@ -240,6 +240,8 @@ jobs:
             target/benchmarks/jmh-results.json
             target/benchmarks/environment.json
 
+      # Keep Maven 3.10 Resolver metadata, tracking files, and locks out of the Central bundle.
+      # Apply these options only to the forked release build; snapshots need versions metadata.
       - name: Perform release to Maven Central
         id: release
         run: |
@@ -249,7 +251,7 @@ jobs:
             -Dgoals="deploy site" \
             -DworkingDirectory="${GITHUB_WORKSPACE}/target/release" \
             -Dgpg.passphraseServerId=gpg.passphrase \
-            -Darguments=-Dgpg.passphraseServerId=gpg.passphrase \
+            -Darguments="-Dgpg.passphraseServerId=gpg.passphrase -Daether.priority.VersionsMetadataGeneratorFactory=NaN -Daether.priority.EnhancedLocalRepositoryManagerFactory=NaN -Daether.syncContext.named.factory=rwlock-local" \
             -DreleaseVersion="${INPUT_RELEASE_VERSION}" \
             -DdevelopmentVersion="${INPUT_DEVELOPMENT_VERSION}"
         env:

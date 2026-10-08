@@ -246,6 +246,7 @@ public class AVM implements VariableManager, Closeable {
 		executionSpecialVariables = baseSpecialVariables;
 
 		jrt = createJrt();
+		jrt.setPosix(this.settings.isPosix());
 		initExtensions();
 	}
 

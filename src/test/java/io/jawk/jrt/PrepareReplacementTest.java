@@ -27,39 +27,77 @@ import static org.junit.Assert.assertEquals;
 import org.junit.Test;
 
 /**
- * Tests for {@link JRT#prepareReplacement(String, boolean)}.
+ * Tests for {@link JRT#prepareSubReplacement(String, boolean)} and
+ * {@link JRT#prepareGensubReplacement(String, int)}.
  */
 public class PrepareReplacementTest {
 
 	@Test
-	public void testPrepareReplacement() {
-		assertEquals("don't change", JRT.prepareReplacement("don't change", false));
-		assertEquals("a$0a", JRT.prepareReplacement("a&a", false));
-		assertEquals("1$01", JRT.prepareReplacement("1&1", false));
-		assertEquals("a$0b$0c", JRT.prepareReplacement("a&b&c", false));
-		// sub()/gsub(): \c stays a literal \c, including \digit and a trailing \
-		assertEquals("a\\\\b", JRT.prepareReplacement("a\\b", false));
-		assertEquals("a\\\\1", JRT.prepareReplacement("a\\1", false));
-		assertEquals("a&b", JRT.prepareReplacement("a\\&b", false));
-		assertEquals("a\\\\", JRT.prepareReplacement("a\\", false));
-		assertEquals("a\\$", JRT.prepareReplacement("a$", false));
-		assertEquals("a\\\\\\$", JRT.prepareReplacement("a\\$", false));
-		assertEquals("a\\\\\\$", JRT.prepareReplacement("a\\\\$", false));
-		assertEquals("a\\\\$0", JRT.prepareReplacement("a\\\\&", false));
-		assertEquals("a\\\\&", JRT.prepareReplacement("a\\\\\\&", false));
-		assertEquals("", JRT.prepareReplacement("", false));
-		assertEquals("", JRT.prepareReplacement(null, false));
+	public void testPrepareSubReplacementGawkRules() {
+		assertEquals("don't change", JRT.prepareSubReplacement("don't change", false));
+		assertEquals("a$0a", JRT.prepareSubReplacement("a&a", false));
+		assertEquals("1$01", JRT.prepareSubReplacement("1&1", false));
+		assertEquals("a$0b$0c", JRT.prepareSubReplacement("a&b&c", false));
+		assertEquals("a\\$", JRT.prepareSubReplacement("a$", false));
+		// \& is a literal &
+		assertEquals("a&b", JRT.prepareSubReplacement("a\\&b", false));
+		// \\& is a literal \ followed by the match
+		assertEquals("a\\\\$0", JRT.prepareSubReplacement("a\\\\&", false));
+		// \\\& is a literal \&
+		assertEquals("a\\\\&", JRT.prepareSubReplacement("a\\\\\\&", false));
+		// \\\\ is a literal \\, also when followed by &
+		assertEquals("a\\\\\\\\", JRT.prepareSubReplacement("a\\\\\\\\", false));
+		assertEquals("a\\\\\\\\$0", JRT.prepareSubReplacement("a\\\\\\\\&", false));
+		assertEquals("a\\\\\\\\&", JRT.prepareSubReplacement("a\\\\\\\\\\&", false));
+		// any other backslash is kept as is: \\ stays \\, \c stays \c
+		assertEquals("a\\\\\\\\", JRT.prepareSubReplacement("a\\\\", false));
+		assertEquals("a\\\\b", JRT.prepareSubReplacement("a\\b", false));
+		assertEquals("a\\\\\\\\q", JRT.prepareSubReplacement("a\\\\q", false));
+		assertEquals("a\\\\1", JRT.prepareSubReplacement("a\\1", false));
+		assertEquals("a\\\\", JRT.prepareSubReplacement("a\\", false));
+		assertEquals("a\\\\\\$", JRT.prepareSubReplacement("a\\$", false));
+		assertEquals("a\\\\\\\\\\$", JRT.prepareSubReplacement("a\\\\$", false));
+		assertEquals("", JRT.prepareSubReplacement("", false));
+		assertEquals("", JRT.prepareSubReplacement(null, false));
 	}
 
 	@Test
-	public void testPrepareReplacementWithBackreferences() {
-		// gensub mode: \N becomes a group reference, trailing backslash is literal
-		assertEquals("a$1b", JRT.prepareReplacement("a\\1b", true));
-		assertEquals("a\\\\", JRT.prepareReplacement("a\\", true));
-		assertEquals("a$0a", JRT.prepareReplacement("a&a", true));
-		assertEquals("a&b", JRT.prepareReplacement("a\\&b", true));
-		// gensub mode: any other \c is a plain c
-		assertEquals("aq", JRT.prepareReplacement("a\\q", true));
-		assertEquals("a\\$", JRT.prepareReplacement("a\\$", true));
+	public void testPrepareSubReplacementPosixRules() {
+		assertEquals("a$0a", JRT.prepareSubReplacement("a&a", true));
+		assertEquals("a\\$", JRT.prepareSubReplacement("a$", true));
+		// \& is a literal &, \\ a literal \
+		assertEquals("a&b", JRT.prepareSubReplacement("a\\&b", true));
+		assertEquals("a\\\\", JRT.prepareSubReplacement("a\\\\", true));
+		assertEquals("a\\\\$0", JRT.prepareSubReplacement("a\\\\&", true));
+		assertEquals("a\\\\&", JRT.prepareSubReplacement("a\\\\\\&", true));
+		assertEquals("a\\\\\\\\", JRT.prepareSubReplacement("a\\\\\\\\", true));
+		assertEquals("a\\\\q", JRT.prepareSubReplacement("a\\\\q", true));
+		// any other backslash is kept as is
+		assertEquals("a\\\\b", JRT.prepareSubReplacement("a\\b", true));
+		assertEquals("a\\\\1", JRT.prepareSubReplacement("a\\1", true));
+		assertEquals("a\\\\", JRT.prepareSubReplacement("a\\", true));
+		assertEquals("a\\\\\\$", JRT.prepareSubReplacement("a\\$", true));
+		assertEquals("a\\\\\\$", JRT.prepareSubReplacement("a\\\\$", true));
+		assertEquals("", JRT.prepareSubReplacement(null, true));
+	}
+
+	@Test
+	public void testPrepareGensubReplacement() {
+		assertEquals("don't change", JRT.prepareGensubReplacement("don't change", 0));
+		assertEquals("a$0a", JRT.prepareGensubReplacement("a&a", 0));
+		assertEquals("a\\$", JRT.prepareGensubReplacement("a$", 0));
+		// \N is a group reference, the empty string beyond the pattern's groups
+		assertEquals("a$1b", JRT.prepareGensubReplacement("a\\1b", 1));
+		assertEquals("a$0b", JRT.prepareGensubReplacement("a\\0b", 0));
+		assertEquals("ab", JRT.prepareGensubReplacement("a\\2b", 1));
+		// \& is a literal &, \\ a literal \, a trailing \ a literal \
+		assertEquals("a&b", JRT.prepareGensubReplacement("a\\&b", 0));
+		assertEquals("a\\\\b", JRT.prepareGensubReplacement("a\\\\b", 0));
+		assertEquals("a\\\\", JRT.prepareGensubReplacement("a\\", 0));
+		// any other \c is a plain c
+		assertEquals("aq", JRT.prepareGensubReplacement("a\\q", 0));
+		assertEquals("a\\$", JRT.prepareGensubReplacement("a\\$", 0));
+		assertEquals("", JRT.prepareGensubReplacement("", 0));
+		assertEquals("", JRT.prepareGensubReplacement(null, 0));
 	}
 }

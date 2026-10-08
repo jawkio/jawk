@@ -291,7 +291,9 @@ public class AwkSettings {
 	 * such as arrays of arrays ({@code a[i][j]}, subarray operands like
 	 * {@code split(..., a[i])}) and typed regexp literals ({@code @/re/}),
 	 * and treating the gawk-specific {@code BEGINFILE} / {@code ENDFILE}
-	 * patterns as ordinary identifiers.
+	 * patterns as ordinary identifiers. At run time, the backslashes in
+	 * {@code sub()} / {@code gsub()} replacement text then follow the POSIX
+	 * rules instead of gawk's.
 	 *
 	 * @return {@code true} when POSIX compile-time behavior is enforced
 	 */

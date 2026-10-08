@@ -143,6 +143,9 @@ public class JRT {
 	private Object ignorecase = Long.valueOf(0L);
 	/** Precomputed truth of IGNORECASE, consulted by every regexp operation. */
 	private boolean ignoreCase;
+
+	/** Whether sub()/gsub() replacement text follows the POSIX backslash rules instead of gawk's. */
+	private boolean posix;
 	/** Case-insensitive twins of precompiled patterns; created on first use. */
 	private Map<Pattern, Pattern> caseInsensitivePatterns;
 	/** Compiled case-sensitive dynamic (string) regexps, keyed by expression text; created on first use. */
@@ -297,6 +300,17 @@ public class JRT {
 		this.convfmt = Awk.DEFAULT_CONVFMT;
 		this.ofmt = Awk.DEFAULT_OFMT;
 		this.subsep = Awk.DEFAULT_SUBSEP;
+	}
+
+	/**
+	 * Selects the POSIX backslash rules for {@code sub()} and {@code gsub()}
+	 * replacement text instead of gawk's; see
+	 * {@link #prepareSubReplacement(String, boolean)}.
+	 *
+	 * @param posix {@code true} for the POSIX rules
+	 */
+	public void setPosix(boolean posix) {
+		this.posix = posix;
 	}
 
 	/**
@@ -1719,7 +1733,7 @@ public class JRT {
 
 	private int replace(String orig, String repl, String ere, boolean global) {
 		replaceResult.setLength(0);
-		String preparedReplacement = prepareReplacement(repl, false);
+		String preparedReplacement = prepareSubReplacement(repl, posix);
 		Matcher matcher = dynamicPattern(ere).matcher(orig);
 		int count = 0;
 		while (matcher.find()) {
@@ -1816,91 +1830,128 @@ public class JRT {
 	}
 
 	/**
-	 * Converts an AWK replacement text into a Java {@link Matcher} replacement:
-	 * {@code &} becomes the whole match, {@code \&} a literal ampersand,
-	 * {@code \\} a literal backslash, and {@code $} is escaped.
+	 * Converts the replacement text of {@code sub()} or {@code gsub()} into a
+	 * Java {@link Matcher} replacement. {@code &} becomes the whole match and
+	 * {@code \&} a literal ampersand. The remaining backslashes follow gawk's
+	 * documented rules by default: {@code \\\&} is a literal {@code \&},
+	 * {@code \\\\} a literal {@code \\}, {@code \\&} a literal backslash
+	 * followed by the match, and any other backslash is kept as is. Under the
+	 * POSIX rules, as in mawk and One True Awk, {@code \\} is a literal
+	 * backslash and any other backslash is kept as is.
 	 *
 	 * @param awkRepl AWK replacement text
-	 * @param backreferences whether {@code \N} denotes capture group {@code N}
-	 *        and any other {@code \c} a plain {@code c}, as in gawk's
-	 *        {@code gensub()}; when {@code false}, {@code \c} stays a literal
-	 *        {@code \c} as in {@code sub()} and {@code gsub()}
+	 * @param posix whether to apply the POSIX rules instead of gawk's
 	 * @return the equivalent Java replacement string
 	 */
-	public static String prepareReplacement(String awkRepl, boolean backreferences) {
-		return prepareReplacement(awkRepl, backreferences ? Integer.MAX_VALUE : -1);
-	}
-
-	/**
-	 * Converts an AWK replacement text into a Java {@link Matcher} replacement,
-	 * resolving gensub-style backreferences against a known number of capture
-	 * groups: {@code \N} beyond {@code maxGroup} is replaced by the empty
-	 * string, as gawk does, instead of producing a group reference that would
-	 * make the matcher throw.
-	 *
-	 * @param awkRepl AWK replacement text
-	 * @param maxGroup highest valid capture group number, or a negative value
-	 *        to disable backreferences entirely ({@code sub()}/{@code gsub()}
-	 *        semantics)
-	 * @return the equivalent Java replacement string
-	 */
-	public static String prepareReplacement(String awkRepl, int maxGroup) {
-		boolean backreferences = maxGroup >= 0;
+	public static String prepareSubReplacement(String awkRepl, boolean posix) {
 		if (awkRepl == null) {
 			return "";
 		}
-
-		if ((awkRepl.indexOf('\\') == -1) && (awkRepl.indexOf('$') == -1) && (awkRepl.indexOf('&') == -1)) {
+		if (awkRepl.indexOf('\\') == -1 && awkRepl.indexOf('$') == -1 && awkRepl.indexOf('&') == -1) {
 			return awkRepl;
 		}
-
 		StringBuilder javaRepl = new StringBuilder();
-		for (int i = 0; i < awkRepl.length(); i++) {
+		int length = awkRepl.length();
+		for (int i = 0; i < length; i++) {
 			char c = awkRepl.charAt(i);
-
-			if (c == '\\') {
-				if (i == awkRepl.length() - 1) {
-					// a trailing backslash is a literal backslash; left bare
-					// it would make Matcher.appendReplacement throw
-					javaRepl.append("\\\\");
-					continue;
-				}
-				i++;
-				c = awkRepl.charAt(i);
-				if (c == '&') {
-					javaRepl.append('&');
-					continue;
-				} else if (c == '\\') {
-					javaRepl.append("\\\\");
-					continue;
-				} else if (backreferences) {
-					if (Character.isDigit(c)) {
-						if (c - '0' <= maxGroup) {
-							javaRepl.append('$').append(c);
-						}
-						// references beyond the pattern's groups expand to
-						// the empty string, as in gawk
-						continue;
-					}
-					// gensub(): any other \c is a plain c, as in gawk
-				} else {
-					// sub()/gsub(): any other \c stays a literal \c, as in
-					// POSIX, gawk and mawk; a bare backslash would be eaten
-					// by Matcher.appendReplacement as an escape
-					javaRepl.append("\\\\");
-				}
+			if (c != '\\') {
+				appendLiteral(javaRepl, c);
+				continue;
 			}
-
-			if (c == '$') {
-				javaRepl.append("\\$");
-			} else if (c == '&') {
-				javaRepl.append("$0");
+			char next = i + 1 < length ? awkRepl.charAt(i + 1) : 0;
+			if (next == '&') {
+				// \& is a literal ampersand
+				javaRepl.append('&');
+				i++;
+			} else if (posix) {
+				// \\ is a literal backslash; any other backslash is kept as
+				// is, and must be escaped for Matcher.appendReplacement
+				javaRepl.append("\\\\");
+				if (next == '\\') {
+					i++;
+				}
+			} else if (awkRepl.startsWith("\\\\\\&", i)) {
+				// \\\& is a literal \&
+				javaRepl.append("\\\\&");
+				i += 3;
+			} else if (awkRepl.startsWith("\\\\\\\\", i)) {
+				// \\\\ is a literal \\
+				javaRepl.append("\\\\\\\\");
+				i += 3;
+			} else if (awkRepl.startsWith("\\\\&", i)) {
+				// \\& is a literal backslash followed by the match
+				javaRepl.append("\\\\$0");
+				i += 2;
 			} else {
-				javaRepl.append(c);
+				// any other backslash is kept as is, and must be escaped for
+				// Matcher.appendReplacement
+				javaRepl.append("\\\\");
 			}
 		}
-
 		return javaRepl.toString();
+	}
+
+	/**
+	 * Converts the replacement text of gawk's {@code gensub()} into a Java
+	 * {@link Matcher} replacement: {@code &} and {@code \0} become the whole
+	 * match, {@code \N} capture group {@code N}, {@code \&} a literal
+	 * ampersand, {@code \\} a literal backslash, and any other {@code \c} a
+	 * plain {@code c}, as in gawk. A {@code \N} beyond {@code maxGroup}
+	 * expands to the empty string, as gawk does, instead of producing a group
+	 * reference that would make the matcher throw.
+	 *
+	 * @param awkRepl AWK replacement text
+	 * @param maxGroup highest valid capture group number
+	 * @return the equivalent Java replacement string
+	 */
+	public static String prepareGensubReplacement(String awkRepl, int maxGroup) {
+		if (awkRepl == null) {
+			return "";
+		}
+		if (awkRepl.indexOf('\\') == -1 && awkRepl.indexOf('$') == -1 && awkRepl.indexOf('&') == -1) {
+			return awkRepl;
+		}
+		StringBuilder javaRepl = new StringBuilder();
+		int length = awkRepl.length();
+		for (int i = 0; i < length; i++) {
+			char c = awkRepl.charAt(i);
+			if (c != '\\') {
+				appendLiteral(javaRepl, c);
+			} else if (i == length - 1) {
+				// a trailing backslash is a literal backslash; left bare it
+				// would make Matcher.appendReplacement throw
+				javaRepl.append("\\\\");
+			} else {
+				c = awkRepl.charAt(++i);
+				if (c == '&') {
+					javaRepl.append('&');
+				} else if (c == '\\') {
+					javaRepl.append("\\\\");
+				} else if (Character.isDigit(c)) {
+					if (c - '0' <= maxGroup) {
+						javaRepl.append('$').append(c);
+					}
+				} else {
+					appendLiteral(javaRepl, c);
+				}
+			}
+		}
+		return javaRepl.toString();
+	}
+
+	/**
+	 * Appends a character that is literal in AWK replacement text, escaping
+	 * it for {@link Matcher#appendReplacement} and mapping {@code &} to the
+	 * whole match.
+	 */
+	private static void appendLiteral(StringBuilder javaRepl, char c) {
+		if (c == '$') {
+			javaRepl.append("\\$");
+		} else if (c == '&') {
+			javaRepl.append("$0");
+		} else {
+			javaRepl.append(c);
+		}
 	}
 
 	/**

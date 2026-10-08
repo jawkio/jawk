@@ -821,6 +821,22 @@ public class AwkTest {
 				.script("BEGIN { s = \"x x x\"; gsub(/x/, \"\\\\$\\\\1\\\\\", s); print s }")
 				.expect("\\$\\1\\ \\$\\1\\ \\$\\1\\\n")
 				.runAndAssert();
+
+		// issue #614: the replacement text \\\&|\\\\|\\&|\\q|\\ follows gawk's
+		// rules by default and the POSIX rules (as in mawk) with --posix
+		String backslashes = "BEGIN { s = \"x\"; gsub(/x/, \"\\\\\\\\\\\\&|\\\\\\\\\\\\\\\\|\\\\\\\\&|\\\\\\\\q|\\\\\\\\\", s); print s }";
+		AwkTestSupport
+				.awkTest("gsub follows gawk's backslash rules")
+				.script(backslashes)
+				.expect("\\&|\\\\|\\x|\\\\q|\\\\\n")
+				.runAndAssert();
+
+		AwkTestSupport
+				.cliTest("gsub follows the POSIX backslash rules with --posix")
+				.argument("--posix")
+				.script(backslashes)
+				.expect("\\&|\\\\|\\x|\\q|\\\n")
+				.runAndAssert();
 	}
 
 	@Test

@@ -1817,13 +1817,14 @@ public class JRT {
 
 	/**
 	 * Converts an AWK replacement text into a Java {@link Matcher} replacement:
-	 * {@code &} becomes the whole match, {@code \&} a literal ampersand, and
-	 * {@code $} is escaped.
+	 * {@code &} becomes the whole match, {@code \&} a literal ampersand,
+	 * {@code \\} a literal backslash, and {@code $} is escaped.
 	 *
 	 * @param awkRepl AWK replacement text
-	 * @param backreferences whether {@code \N} denotes capture group {@code N},
-	 *        as in gawk's {@code gensub()}; when {@code false}, {@code \N} stays
-	 *        literal as in {@code sub()} and {@code gsub()}
+	 * @param backreferences whether {@code \N} denotes capture group {@code N}
+	 *        and any other {@code \c} a plain {@code c}, as in gawk's
+	 *        {@code gensub()}; when {@code false}, {@code \c} stays a literal
+	 *        {@code \c} as in {@code sub()} and {@code gsub()}
 	 * @return the equivalent Java replacement string
 	 */
 	public static String prepareReplacement(String awkRepl, boolean backreferences) {
@@ -1857,15 +1858,13 @@ public class JRT {
 		for (int i = 0; i < awkRepl.length(); i++) {
 			char c = awkRepl.charAt(i);
 
-			if (c == '\\' && i == awkRepl.length() - 1) {
-				// In gensub mode a trailing backslash is a literal backslash;
-				// left bare it would make Matcher.appendReplacement throw. The
-				// sub()/gsub() mapping keeps its historical bare form.
-				javaRepl.append(backreferences ? "\\\\" : "\\");
-				continue;
-			}
-
 			if (c == '\\') {
+				if (i == awkRepl.length() - 1) {
+					// a trailing backslash is a literal backslash; left bare
+					// it would make Matcher.appendReplacement throw
+					javaRepl.append("\\\\");
+					continue;
+				}
 				i++;
 				c = awkRepl.charAt(i);
 				if (c == '&') {
@@ -1874,16 +1873,22 @@ public class JRT {
 				} else if (c == '\\') {
 					javaRepl.append("\\\\");
 					continue;
-				} else if (backreferences && Character.isDigit(c)) {
-					if (c - '0' <= maxGroup) {
-						javaRepl.append('$').append(c);
+				} else if (backreferences) {
+					if (Character.isDigit(c)) {
+						if (c - '0' <= maxGroup) {
+							javaRepl.append('$').append(c);
+						}
+						// references beyond the pattern's groups expand to
+						// the empty string, as in gawk
+						continue;
 					}
-					// references beyond the pattern's groups expand to the
-					// empty string, as in gawk
-					continue;
+					// gensub(): any other \c is a plain c, as in gawk
+				} else {
+					// sub()/gsub(): any other \c stays a literal \c, as in
+					// POSIX, gawk and mawk; a bare backslash would be eaten
+					// by Matcher.appendReplacement as an escape
+					javaRepl.append("\\\\");
 				}
-
-				javaRepl.append('\\');
 			}
 
 			if (c == '$') {

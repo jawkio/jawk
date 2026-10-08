@@ -20,7 +20,12 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
-_No user-visible behavior changes recorded yet._
+- In the replacement text of `sub()` and `gsub()`, a backslash followed by any character other
+  than `&` or `\` is now kept literally, as in POSIX, gawk and mawk: `gsub(/'/, "'\\''")` on `'`
+  now yields `'\''`. Previously the backslash was dropped (`'''`), and a `"\\$"` sequence or a
+  replacement ending in a lone backslash made the substitution fail with a Java
+  `IllegalArgumentException`. `gensub()` is unchanged: as in gawk, `\c` there still means a plain `c`
+  ([#613](https://github.com/jawkio/jawk/issues/613)).
 
 ## [v7.1.01](https://github.com/jawkio/jawk/releases/tag/v7.1.01) (2026-08-25)
 

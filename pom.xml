@@ -84,7 +84,7 @@
 
 		<!-- Reproducible Build -->
 		<!-- See https://maven.apache.org/guides/mini/guide-reproducible-builds.html -->
-		<project.build.outputTimestamp>2026-08-25T18:29:51Z</project.build.outputTimestamp>
+		<project.build.outputTimestamp>2026-10-08T21:51:29Z</project.build.outputTimestamp>
 		<jmh.version>1.37</jmh.version>
 
 		<!-- Same version for the verify-phase checks and the site-phase reports,

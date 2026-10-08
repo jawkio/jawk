@@ -20,6 +20,10 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
+_No user-visible behavior changes recorded yet._
+
+## [v7.1.02](https://github.com/jawkio/jawk/releases/tag/v7.1.02) (2026-10-08)
+
 - Backslashes in the replacement text of `sub()` and `gsub()` now follow gawk's documented rules
   instead of the POSIX ones: `\\` (the string written `"\\\\"` in the source) now produces `\\`
   where it previously produced `\`, `\\\&` produces `\&`, and `\\\\` produces `\\`. `\&` and `\\&`

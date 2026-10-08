@@ -1644,6 +1644,35 @@ public class AwkTest {
 	}
 
 	/**
+	 * A program compiled with <code>--posix -K</code> keeps the POSIX
+	 * sub()/gsub() replacement rules when loaded with <code>-L</code>, which
+	 * cannot be combined with <code>--posix</code> (issue #614).
+	 */
+	@Test
+	public void loadedProgramKeepsPosixMode() throws Exception {
+		File tmp = File.createTempFile("jawk", ".tpl");
+		// the replacement \\ is a single backslash in POSIX mode, \\ in gawk's
+		String script = "BEGIN { s = \"x\"; gsub(/x/, \"\\\\\\\\\", s); print s }";
+		Cli
+				.create(
+						new String[]
+						{ "--posix", "-K", tmp.getAbsolutePath(), script },
+						new ByteArrayInputStream(new byte[0]),
+						System.out,
+						System.err);
+
+		Cli cli = Cli.parseCommandLineArguments(new String[] { "-L", tmp.getAbsolutePath() });
+		assertTrue(cli.getPrecompiledProgram().isPosix());
+
+		String result = new Awk()
+				.script(cli.getPrecompiledProgram())
+				.execute();
+
+		assertEquals("\\\n", result);
+		assertEquals("\\\\\n", new Awk().script(script).execute());
+	}
+
+	/**
 	 * Ensures that the CLI rejects variable assignments with invalid identifiers.
 	 */
 	@Test

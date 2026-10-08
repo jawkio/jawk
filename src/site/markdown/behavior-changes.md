@@ -23,8 +23,10 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 - Backslashes in the replacement text of `sub()` and `gsub()` now follow gawk's documented rules
   instead of the POSIX ones: `\\` (the string written `"\\\\"` in the source) now produces `\\`
   where it previously produced `\`, `\\\&` produces `\&`, and `\\\\` produces `\\`. `\&` and `\\&`
-  are unchanged. With `--posix`, the previous POSIX behavior is kept, as in mawk and One True Awk.
-  `gensub()` is unchanged ([#614](https://github.com/jawkio/jawk/issues/614)).
+  are unchanged. With `--posix`, the previous POSIX behavior is kept, as in mawk and One True Awk,
+  and a program compiled with `--posix -K` keeps it when loaded with `-L` (the compiled program now
+  records its mode, so programs compiled by earlier versions must be recompiled). `gensub()` is
+  unchanged ([#614](https://github.com/jawkio/jawk/issues/614)).
 - For Java embedders, `JRT.prepareReplacement()` is replaced by `JRT.prepareSubReplacement()`,
   which takes the POSIX switch, and `JRT.prepareGensubReplacement()`, which takes the highest
   capture group number ([#614](https://github.com/jawkio/jawk/issues/614)).

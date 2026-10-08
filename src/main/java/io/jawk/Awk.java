@@ -556,6 +556,7 @@ public class Awk {
 				parser.populateGlobalVariableNameToOffsetMappings(tuples);
 			}
 		}
+		tuples.setPosix(settings.isPosix());
 		tuples.freezeMetadata();
 
 		return tuples;

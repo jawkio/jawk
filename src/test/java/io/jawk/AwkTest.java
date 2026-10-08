@@ -808,6 +808,19 @@ public class AwkTest {
 				.stdin("a b c d e")
 				.expect("a _$0_ _$0_ d e\n")
 				.runAndAssert();
+
+		// issue #613: a backslash before an ordinary character is kept
+		AwkTestSupport
+				.awkTest("gsub keeps backslash before ordinary character")
+				.script("BEGIN { s = \"'\"; gsub(/'/, \"'\\\\''\", s); print s }")
+				.expect("'\\''\n")
+				.runAndAssert();
+
+		AwkTestSupport
+				.awkTest("gsub keeps backslash before dollar, digit and at end")
+				.script("BEGIN { s = \"x x x\"; gsub(/x/, \"\\\\$\\\\1\\\\\", s); print s }")
+				.expect("\\$\\1\\ \\$\\1\\ \\$\\1\\\n")
+				.runAndAssert();
 	}
 
 	@Test

@@ -37,11 +37,13 @@ public class PrepareReplacementTest {
 		assertEquals("a$0a", JRT.prepareReplacement("a&a", false));
 		assertEquals("1$01", JRT.prepareReplacement("1&1", false));
 		assertEquals("a$0b$0c", JRT.prepareReplacement("a&b&c", false));
-		assertEquals("a\\b", JRT.prepareReplacement("a\\b", false));
+		// sub()/gsub(): \c stays a literal \c, including \digit and a trailing \
+		assertEquals("a\\\\b", JRT.prepareReplacement("a\\b", false));
+		assertEquals("a\\\\1", JRT.prepareReplacement("a\\1", false));
 		assertEquals("a&b", JRT.prepareReplacement("a\\&b", false));
-		assertEquals("a\\", JRT.prepareReplacement("a\\", false));
+		assertEquals("a\\\\", JRT.prepareReplacement("a\\", false));
 		assertEquals("a\\$", JRT.prepareReplacement("a$", false));
-		assertEquals("a\\\\$", JRT.prepareReplacement("a\\$", false));
+		assertEquals("a\\\\\\$", JRT.prepareReplacement("a\\$", false));
 		assertEquals("a\\\\\\$", JRT.prepareReplacement("a\\\\$", false));
 		assertEquals("a\\\\$0", JRT.prepareReplacement("a\\\\&", false));
 		assertEquals("a\\\\&", JRT.prepareReplacement("a\\\\\\&", false));
@@ -56,5 +58,8 @@ public class PrepareReplacementTest {
 		assertEquals("a\\\\", JRT.prepareReplacement("a\\", true));
 		assertEquals("a$0a", JRT.prepareReplacement("a&a", true));
 		assertEquals("a&b", JRT.prepareReplacement("a\\&b", true));
+		// gensub mode: any other \c is a plain c
+		assertEquals("aq", JRT.prepareReplacement("a\\q", true));
+		assertEquals("a\\$", JRT.prepareReplacement("a\\$", true));
 	}
 }

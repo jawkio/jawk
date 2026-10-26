@@ -1,0 +1,4 @@
+# Bulk reformats to skip in git blame (git config blame.ignoreRevsFile .git-blame-ignore-revs)
+
+# #627: formatter profile keeps short calls on one line
+1eeca28321bd3e3dd44d89a8f11bacc154cc6931

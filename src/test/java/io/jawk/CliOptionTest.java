@@ -73,8 +73,7 @@ public class CliOptionTest {
 
 	@Test
 	public void profileOptionPrintsReportToStderr() throws Exception {
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.cliTest("CLI --profile prints runtime report")
+		AwkTestSupport.TestResult result = AwkTestSupport.cliTest("CLI --profile prints runtime report")
 				.argument("--profile")
 				.script("function inc(x) { return x + 1 } BEGIN { print inc(1); print inc(2) }")
 				.expect("2\n3\n")
@@ -90,8 +89,7 @@ public class CliOptionTest {
 
 	@Test
 	public void profileOptionRecordsFunctionThatExitsWithoutReturning() throws Exception {
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.cliTest("CLI --profile records function exit")
+		AwkTestSupport.TestResult result = AwkTestSupport.cliTest("CLI --profile records function exit")
 				.argument("--profile")
 				.script("function stop() { exit } END { stop() }")
 				.expect("")
@@ -105,14 +103,11 @@ public class CliOptionTest {
 
 	@Test
 	public void profileOptionRecordsIndirectUserFunctions() throws Exception {
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.cliTest("CLI --profile records indirect user functions")
+		AwkTestSupport.TestResult result = AwkTestSupport.cliTest("CLI --profile records indirect user functions")
 				.argument("--profile")
 				.script(
-						"function inner() { return 1 } "
-								+ "function outer() { callback = \"inner\"; extension = \"typeof\"; "
-								+ "@extension(1); return @callback() } "
-								+ "BEGIN { print outer() }")
+						"function inner() { return 1 } " + "function outer() { callback = \"inner\"; extension = \"typeof\"; "
+								+ "@extension(1); return @callback() } " + "BEGIN { print outer() }")
 				.expectLines("1")
 				.run();
 
@@ -124,8 +119,7 @@ public class CliOptionTest {
 
 	@Test
 	public void profileOptionRecordsFunctionsUnwoundByNextfile() throws Exception {
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.cliTest("CLI --profile records functions unwound by nextfile")
+		AwkTestSupport.TestResult result = AwkTestSupport.cliTest("CLI --profile records functions unwound by nextfile")
 				.argument("--profile")
 				.script("function inner() { nextfile } function outer() { inner() } { outer() }")
 				.file("f1", "a1\na2\n")
@@ -144,8 +138,7 @@ public class CliOptionTest {
 
 	@Test
 	public void profileOptionRecordsFunctionsUnwoundByNext() throws Exception {
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.cliTest("CLI --profile records functions unwound by next")
+		AwkTestSupport.TestResult result = AwkTestSupport.cliTest("CLI --profile records functions unwound by next")
 				.argument("--profile")
 				.script("function inner() { next } function outer() { inner() } { outer() }")
 				.stdin("a\nb\nc\n")
@@ -168,12 +161,9 @@ public class CliOptionTest {
 	 * @return the reported execution count
 	 */
 	private static long profiledFunctionCount(String report, String functionName) {
-		Matcher matcher = Pattern
-				.compile("^\\s{2}" + Pattern.quote(functionName) + "\\s+(\\d+)\\s", Pattern.MULTILINE)
+		Matcher matcher = Pattern.compile("^\\s{2}" + Pattern.quote(functionName) + "\\s+(\\d+)\\s", Pattern.MULTILINE)
 				.matcher(report);
-		assertTrue(
-				"function `" + functionName + "' missing from profiling report:\n" + report,
-				matcher.find());
+		assertTrue("function `" + functionName + "' missing from profiling report:\n" + report, matcher.find());
 		return Long.parseLong(matcher.group(1));
 	}
 
@@ -182,8 +172,7 @@ public class CliOptionTest {
 		File profile = tempFolder.newFile("profile.txt");
 		assertTrue(profile.delete());
 
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.cliTest("CLI --profile=file writes runtime report")
+		AwkTestSupport.TestResult result = AwkTestSupport.cliTest("CLI --profile=file writes runtime report")
 				.argument("--profile=" + profile.getAbsolutePath())
 				.script("function inc(x) { return x + 1 } BEGIN { print inc(1) }")
 				.expect("2\n")
@@ -204,8 +193,7 @@ public class CliOptionTest {
 	public void profileOptionWriteFailureIsReportedAsIoFailure() throws Exception {
 		File profileDirectory = tempFolder.newFolder("profile-directory");
 
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.cliTest("CLI --profile=file reports write failure")
+		AwkTestSupport.TestResult result = AwkTestSupport.cliTest("CLI --profile=file reports write failure")
 				.argument("--profile=" + profileDirectory.getAbsolutePath())
 				.script("BEGIN { print 1 }")
 				.expectThrow(UncheckedIOException.class)
@@ -217,8 +205,7 @@ public class CliOptionTest {
 
 	@Test
 	public void profileOptionWithEmptyFilenameIsRejected() throws Exception {
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.cliTest("CLI --profile= rejects empty filename")
+		AwkTestSupport.TestResult result = AwkTestSupport.cliTest("CLI --profile= rejects empty filename")
 				.argument("--profile=")
 				.script("BEGIN { print 1 }")
 				.expectThrow(IllegalArgumentException.class)
@@ -230,8 +217,7 @@ public class CliOptionTest {
 
 	@Test
 	public void attachedProgramFileOptionLoadsScript() throws Exception {
-		AwkTestSupport
-				.cliTest("CLI -fprog.awk loads the script like -f prog.awk")
+		AwkTestSupport.cliTest("CLI -fprog.awk loads the script like -f prog.awk")
 				.file("prog.awk", "BEGIN { print \"attached\" }")
 				.argument("-f{{prog.awk}}")
 				.expectLines("attached")
@@ -240,8 +226,7 @@ public class CliOptionTest {
 
 	@Test
 	public void attachedProgramFileOptionCombinesWithSeparateForm() throws Exception {
-		AwkTestSupport
-				.cliTest("CLI mixes -fone.awk with -f two.awk")
+		AwkTestSupport.cliTest("CLI mixes -fone.awk with -f two.awk")
 				.file("one.awk", "BEGIN { print \"one\" }")
 				.file("two.awk", "BEGIN { print \"two\" }")
 				.argument("-f{{one.awk}}", "-f", "{{two.awk}}")
@@ -251,8 +236,7 @@ public class CliOptionTest {
 
 	@Test
 	public void attachedVariableAssignmentIsApplied() throws Exception {
-		AwkTestSupport
-				.cliTest("CLI -vx=42 assigns the variable like -v x=42")
+		AwkTestSupport.cliTest("CLI -vx=42 assigns the variable like -v x=42")
 				.argument("-vx=42")
 				.script("BEGIN { print x }")
 				.expectLines("42")
@@ -261,8 +245,7 @@ public class CliOptionTest {
 
 	@Test
 	public void attachedFieldSeparatorIsApplied() throws Exception {
-		AwkTestSupport
-				.cliTest("CLI -F: sets the field separator like -F :")
+		AwkTestSupport.cliTest("CLI -F: sets the field separator like -F :")
 				.argument("-F:")
 				.script("{ print $2 }")
 				.stdin("a:b:c\n")
@@ -272,8 +255,7 @@ public class CliOptionTest {
 
 	@Test
 	public void attachedOptionArgumentAfterDoubleDashStaysInArgv() throws Exception {
-		AwkTestSupport
-				.cliTest("CLI attached option-argument after -- is an operand")
+		AwkTestSupport.cliTest("CLI attached option-argument after -- is an operand")
 				.file("argv.awk", "BEGIN { for (i = 1; i < ARGC; i++) print i \"=\" ARGV[i] }")
 				.argument("-f", "{{argv.awk}}", "--")
 				.operand("-fnot-an-option.awk")
@@ -283,8 +265,7 @@ public class CliOptionTest {
 
 	@Test
 	public void attachedUnknownOptionWithoutScriptIsStillRejected() throws Exception {
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.cliTest("CLI unknown glued option without script is rejected")
+		AwkTestSupport.TestResult result = AwkTestSupport.cliTest("CLI unknown glued option without script is rejected")
 				.argument("-q2")
 				.script("{ print }")
 				.expectThrow(IllegalArgumentException.class)
@@ -298,8 +279,7 @@ public class CliOptionTest {
 	public void doubleDashEndsOptionProcessing() throws Exception {
 		// After "--", the dash-leading argument is no longer an option: it is
 		// the inline script (without "--" it would be rejected as unknown)
-		AwkTestSupport
-				.cliTest("CLI -- ends option processing")
+		AwkTestSupport.cliTest("CLI -- ends option processing")
 				.argument("--", "-1 { print \"ok\" }")
 				.stdin("x\n")
 				.expectLines("ok")
@@ -308,8 +288,7 @@ public class CliOptionTest {
 
 	@Test
 	public void doubleDashPassesRemainingArgumentsToArgv() throws Exception {
-		AwkTestSupport
-				.cliTest("CLI -- passes remaining arguments to ARGV")
+		AwkTestSupport.cliTest("CLI -- passes remaining arguments to ARGV")
 				.file("argv.awk", "BEGIN { for (i = 1; i < ARGC; i++) print i \"=\" ARGV[i] }")
 				.argument("-f", "{{argv.awk}}", "--")
 				.operand("-v", "x=1")
@@ -319,8 +298,7 @@ public class CliOptionTest {
 
 	@Test
 	public void singleDashOperandReadsStandardInput() throws Exception {
-		AwkTestSupport
-				.cliTest("CLI - operand reads standard input")
+		AwkTestSupport.cliTest("CLI - operand reads standard input")
 				.script("{ print FILENAME \":\" $0 }")
 				.operand("-")
 				.stdin("hello\n")
@@ -330,8 +308,7 @@ public class CliOptionTest {
 
 	@Test
 	public void singleDashOperandMixesWithRegularFiles() throws Exception {
-		AwkTestSupport
-				.cliTest("CLI - operand mixes with regular input files")
+		AwkTestSupport.cliTest("CLI - operand mixes with regular input files")
 				.script("{ print FILENAME \":\" FNR \":\" $0 }")
 				.file("data.txt", "a\n")
 				.operand("-", "{{data.txt}}")
@@ -342,8 +319,7 @@ public class CliOptionTest {
 
 	@Test
 	public void singleDashOperandWorksWithBeginFileRules() throws Exception {
-		AwkTestSupport
-				.cliTest("CLI - operand works with BEGINFILE rules")
+		AwkTestSupport.cliTest("CLI - operand works with BEGINFILE rules")
 				.script("BEGINFILE { print \"BF:\" FILENAME } { print $0 }")
 				.operand("-")
 				.stdin("s\n")
@@ -355,8 +331,7 @@ public class CliOptionTest {
 	public void singleDashBeforeScriptIsTreatedAsScript() throws Exception {
 		// "-" no longer terminates option processing while being skipped: it is
 		// an operand, so here it is (mis)used as the inline script, like gawk
-		AwkTestSupport
-				.cliTest("CLI - before script is treated as the script")
+		AwkTestSupport.cliTest("CLI - before script is treated as the script")
 				.argument("-", "BEGIN { print \"never\" }")
 				.expectThrow(ParserException.class)
 				.runAndAssert();
@@ -381,8 +356,7 @@ public class CliOptionTest {
 
 	@Test
 	public void unknownOptionAfterScriptFileIsPassedToArgv() throws Exception {
-		AwkTestSupport
-				.cliTest("CLI unknown option after -f is passed to ARGV")
+		AwkTestSupport.cliTest("CLI unknown option after -f is passed to ARGV")
 				.file("argv.awk", "BEGIN { for (i = 1; i < ARGC; i++) print i \"=\" ARGV[i] }")
 				.argument("-f", "{{argv.awk}}", "-q")
 				.operand("one")
@@ -392,8 +366,7 @@ public class CliOptionTest {
 
 	@Test
 	public void unknownOptionWithoutScriptIsRejected() throws Exception {
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.cliTest("CLI unknown option without script is rejected")
+		AwkTestSupport.TestResult result = AwkTestSupport.cliTest("CLI unknown option without script is rejected")
 				.argument("-q")
 				.script("{ print }")
 				.expectThrow(IllegalArgumentException.class)
@@ -413,8 +386,7 @@ public class CliOptionTest {
 
 	@Test
 	public void posixOptionRejectsNestedArrays() throws Exception {
-		AwkTestSupport
-				.cliTest("CLI --posix rejects nested arrays")
+		AwkTestSupport.cliTest("CLI --posix rejects nested arrays")
 				.argument("--posix")
 				.script("BEGIN { a[1][2] = 42 }")
 				.expectThrow(ParserException.class)
@@ -423,8 +395,7 @@ public class CliOptionTest {
 
 	@Test
 	public void posixOptionStillAllowsClassicMultidimensionalSubscripts() throws Exception {
-		AwkTestSupport
-				.cliTest("CLI --posix still allows classic multidimensional subscripts")
+		AwkTestSupport.cliTest("CLI --posix still allows classic multidimensional subscripts")
 				.argument("--posix")
 				.script("BEGIN { a[1,2] = 42; print a[1,2] }")
 				.expectLines("42")
@@ -436,16 +407,14 @@ public class CliOptionTest {
 		File compiled = tempFolder.newFile("program.ser");
 		writeProgram(compiled, "BEGIN { print 1 }");
 
-		AwkTestSupport.TestResult posixThenLoad = AwkTestSupport
-				.cliTest("CLI rejects --posix before -L")
+		AwkTestSupport.TestResult posixThenLoad = AwkTestSupport.cliTest("CLI rejects --posix before -L")
 				.argument("--posix", "-L", compiled.getAbsolutePath())
 				.expectThrow(IllegalArgumentException.class)
 				.run();
 		posixThenLoad.assertExpected();
 		assertTrue(posixThenLoad.thrownException().getMessage().contains("--posix cannot be combined with -L"));
 
-		AwkTestSupport.TestResult loadThenPosix = AwkTestSupport
-				.cliTest("CLI rejects --posix after -L")
+		AwkTestSupport.TestResult loadThenPosix = AwkTestSupport.cliTest("CLI rejects --posix after -L")
 				.argument("-L", compiled.getAbsolutePath(), "--posix")
 				.expectThrow(IllegalArgumentException.class)
 				.run();
@@ -523,8 +492,7 @@ public class CliOptionTest {
 	public void versionOptionAfterProgramTextStaysInArgv() throws Exception {
 		// Like any option after the program text, --version belongs to the
 		// script through ARGV (gawk behavior), not to the CLI
-		AwkTestSupport
-				.cliTest("CLI --version after the program text stays in ARGV")
+		AwkTestSupport.cliTest("CLI --version after the program text stays in ARGV")
 				.script("BEGIN { print ARGV[1] }")
 				.operand("--version")
 				.expectLines("--version")
@@ -584,11 +552,7 @@ public class CliOptionTest {
 		try (
 				PrintStream outputStream = new PrintStream(outputBytes, true, StandardCharsets.UTF_8.name());
 				PrintStream errorStream = new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8.name())) {
-			Cli cli = new Cli(
-					new ByteArrayInputStream(new byte[0]),
-					outputStream,
-					errorStream,
-					environment);
+			Cli cli = new Cli(new ByteArrayInputStream(new byte[0]), outputStream, errorStream, environment);
 			cli.parse(args);
 			cli.run();
 		}
@@ -615,16 +579,14 @@ public class CliOptionTest {
 	public void persistOptionPersistsUserGlobalsAcrossCliRuns() throws Exception {
 		File memory = new File(tempFolder.getRoot(), "memory.bin");
 
-		AwkTestSupport
-				.cliTest("CLI persist first run")
+		AwkTestSupport.cliTest("CLI persist first run")
 				.argument("--persist", memory.getAbsolutePath())
 				.script("BEGIN { print ++i }")
 				.expect("1\n")
 				.expectExit(0)
 				.runAndAssert();
 		assertTrue(memory.isFile());
-		AwkTestSupport
-				.cliTest("CLI persist second run")
+		AwkTestSupport.cliTest("CLI persist second run")
 				.argument("--persist", memory.getAbsolutePath())
 				.script("BEGIN { print ++i }")
 				.expect("2\n")
@@ -636,15 +598,13 @@ public class CliOptionTest {
 	public void persistOptionPersistsAssociativeArraysAcrossCliRuns() throws Exception {
 		File memory = new File(tempFolder.getRoot(), "array-memory.bin");
 
-		AwkTestSupport
-				.cliTest("CLI persist array first run")
+		AwkTestSupport.cliTest("CLI persist array first run")
 				.argument("--persist", memory.getAbsolutePath())
 				.script("BEGIN { arr[\"x\"] = 9 }")
 				.expect("")
 				.expectExit(0)
 				.runAndAssert();
-		AwkTestSupport
-				.cliTest("CLI persist array second run")
+		AwkTestSupport.cliTest("CLI persist array second run")
 				.argument("--persist", memory.getAbsolutePath())
 				.script("BEGIN { print arr[\"x\"] }")
 				.expect("9\n")
@@ -656,15 +616,13 @@ public class CliOptionTest {
 	public void persistOptionExcludesRuntimeMetaTables() throws Exception {
 		File memory = new File(tempFolder.getRoot(), "symtab-memory.bin");
 
-		AwkTestSupport
-				.cliTest("CLI persist excludes SYMTAB from its serialized snapshot")
+		AwkTestSupport.cliTest("CLI persist excludes SYMTAB from its serialized snapshot")
 				.argument("--persist", memory.getAbsolutePath())
 				.script("BEGIN { value = 7; print SYMTAB[\"value\"] }")
 				.expectLines("7")
 				.expectExit(0)
 				.runAndAssert();
-		AwkTestSupport
-				.cliTest("CLI persist restores user globals and rebuilds SYMTAB")
+		AwkTestSupport.cliTest("CLI persist restores user globals and rebuilds SYMTAB")
 				.argument("--persist", memory.getAbsolutePath())
 				.script("BEGIN { print value, SYMTAB[\"value\"] }")
 				.expectLines("7 7")
@@ -675,21 +633,16 @@ public class CliOptionTest {
 	@Test
 	public void persistentMemoryEnvironmentVariablePersistsUserGlobalsAcrossCliRuns() throws Exception {
 		File memory = new File(tempFolder.getRoot(), "env-memory.bin");
-		Map<String, String> environment = Collections
-				.singletonMap(
-						"JAWK_PERSISTENT_MEMORY",
-						memory.getAbsolutePath());
+		Map<String, String> environment = Collections.singletonMap("JAWK_PERSISTENT_MEMORY", memory.getAbsolutePath());
 
-		AwkTestSupport
-				.cliTest("CLI env persist first run")
+		AwkTestSupport.cliTest("CLI env persist first run")
 				.env(environment)
 				.script("BEGIN { print ++i }")
 				.expect("1\n")
 				.expectExit(0)
 				.runAndAssert();
 		assertTrue(memory.isFile());
-		AwkTestSupport
-				.cliTest("CLI env persist second run")
+		AwkTestSupport.cliTest("CLI env persist second run")
 				.env(environment)
 				.script("BEGIN { print ++i }")
 				.expect("2\n")
@@ -704,23 +657,20 @@ public class CliOptionTest {
 		Map<String, String> environment = new HashMap<>();
 		environment.put("JAWK_PERSISTENT_MEMORY", envMemory.getAbsolutePath());
 
-		AwkTestSupport
-				.cliTest("CLI persist option first run")
+		AwkTestSupport.cliTest("CLI persist option first run")
 				.env(environment)
 				.argument("--persist", optionMemory.getAbsolutePath())
 				.script("BEGIN { print ++i }")
 				.expect("1\n")
 				.expectExit(0)
 				.runAndAssert();
-		AwkTestSupport
-				.cliTest("CLI env-only persist run")
+		AwkTestSupport.cliTest("CLI env-only persist run")
 				.env(environment)
 				.script("BEGIN { print ++i }")
 				.expect("1\n")
 				.expectExit(0)
 				.runAndAssert();
-		AwkTestSupport
-				.cliTest("CLI persist option second run")
+		AwkTestSupport.cliTest("CLI persist option second run")
 				.env(environment)
 				.argument("--persist", optionMemory.getAbsolutePath())
 				.script("BEGIN { print ++i }")
@@ -736,8 +686,7 @@ public class CliOptionTest {
 			oos.writeObject("not persistent memory");
 		}
 
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.cliTest("CLI persist rejects wrong serialized type")
+		AwkTestSupport.TestResult result = AwkTestSupport.cliTest("CLI persist rejects wrong serialized type")
 				.argument("--persist", bad.getAbsolutePath())
 				.script("BEGIN { print 1 }")
 				.expectThrow(IllegalArgumentException.class)

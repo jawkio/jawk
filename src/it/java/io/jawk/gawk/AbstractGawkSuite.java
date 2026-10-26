@@ -59,8 +59,7 @@ abstract class AbstractGawkSuite {
 	}
 
 	protected static void assertGawkRuntimeFailure(String testName) throws Exception {
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.awkTest("GAWK " + testName)
+		AwkTestSupport.TestResult result = AwkTestSupport.awkTest("GAWK " + testName)
 				.script(gawkText(testName + ".awk"))
 				.expectThrow(AwkRuntimeException.class)
 				.run();
@@ -68,7 +67,8 @@ abstract class AbstractGawkSuite {
 
 		String expectedTranscript = gawkText(testName + ".ok");
 		String expectedMessage = expectedTranscript.contains(" as an array") ?
-				"scalar as an array" : "array in a scalar context";
+				"scalar as an array" :
+				"array in a scalar context";
 		String actualMessage = result.thrownException().getMessage();
 		assertTrue(actualMessage, actualMessage.contains(expectedMessage));
 	}

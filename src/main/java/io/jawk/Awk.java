@@ -267,21 +267,17 @@ public class Awk {
 			String className = extension.getClass().getName();
 			JawkExtension previousInstance = instanceMap.putIfAbsent(className, extension);
 			if (previousInstance != null) {
-				throw new IllegalArgumentException(
-						"Extension class '" + className + "' was provided multiple times");
+				throw new IllegalArgumentException("Extension class '" + className + "' was provided multiple times");
 			}
 			for (Map.Entry<String, ExtensionFunction> entry : extension.getExtensionFunctions().entrySet()) {
 				String keyword = entry.getKey();
 				ExtensionFunction previous = keywordMap.putIfAbsent(keyword, entry.getValue());
 				if (previous != null) {
-					throw new IllegalArgumentException(
-							"Keyword '" + keyword + "' already provided by another extension");
+					throw new IllegalArgumentException("Keyword '" + keyword + "' already provided by another extension");
 				}
 			}
 		}
-		return new ExtensionSetup(
-				Collections.unmodifiableMap(keywordMap),
-				Collections.unmodifiableMap(instanceMap));
+		return new ExtensionSetup(Collections.unmodifiableMap(keywordMap), Collections.unmodifiableMap(instanceMap));
 	}
 
 	private static final class ExtensionSetup {
@@ -303,8 +299,7 @@ public class Awk {
 		private final Map<String, ExtensionFunction> functions;
 		private final Map<String, JawkExtension> instances;
 
-		private ExtensionSetup(Map<String, ExtensionFunction> functionsParam,
-				Map<String, JawkExtension> instancesParam) {
+		private ExtensionSetup(Map<String, ExtensionFunction> functionsParam, Map<String, JawkExtension> instancesParam) {
 			this.functions = functionsParam;
 			this.instances = instancesParam;
 		}
@@ -465,9 +460,7 @@ public class Awk {
 	 * @throws IOException if an I/O error occurs during compilation
 	 */
 	AwkProgram compile(String script, boolean disableOptimizeParam) throws IOException {
-		ScriptSource source = new ScriptSource(
-				ScriptSource.DESCRIPTION_COMMAND_LINE_SCRIPT,
-				new StringReader(script));
+		ScriptSource source = new ScriptSource(ScriptSource.DESCRIPTION_COMMAND_LINE_SCRIPT, new StringReader(script));
 		return compile(Collections.singletonList(source), disableOptimizeParam);
 	}
 
@@ -480,9 +473,7 @@ public class Awk {
 	 * @throws IOException if an I/O error occurs during compilation
 	 */
 	AwkProgram compile(Reader script, boolean disableOptimizeParam) throws IOException {
-		ScriptSource source = new ScriptSource(
-				ScriptSource.DESCRIPTION_COMMAND_LINE_SCRIPT,
-				script);
+		ScriptSource source = new ScriptSource(ScriptSource.DESCRIPTION_COMMAND_LINE_SCRIPT, script);
 		return compile(Collections.singletonList(source), disableOptimizeParam);
 	}
 
@@ -495,8 +486,7 @@ public class Awk {
 	 * @throws IOException if an I/O error occurs while reading the
 	 *         scripts
 	 */
-	public AwkProgram compile(List<ScriptSource> scripts)
-			throws IOException {
+	public AwkProgram compile(List<ScriptSource> scripts) throws IOException {
 		return compile(scripts, false);
 	}
 
@@ -510,8 +500,7 @@ public class Awk {
 	 * @throws IOException if an I/O error occurs while reading the
 	 *         scripts
 	 */
-	public AwkProgram compile(List<ScriptSource> scripts, boolean disableOptimizeParam)
-			throws IOException {
+	public AwkProgram compile(List<ScriptSource> scripts, boolean disableOptimizeParam) throws IOException {
 		return compileProgram(scripts, disableOptimizeParam, new AwkProgram());
 	}
 
@@ -533,10 +522,7 @@ public class Awk {
 		lastAst = null;
 		if (!scripts.isEmpty()) {
 			// Parse all script sources into a single AST
-			AwkParser parser = new AwkParser(
-					this.extensionFunctions,
-					settings.isPosix(),
-					isSourceIncludeAllowed());
+			AwkParser parser = new AwkParser(this.extensionFunctions, settings.isPosix(), isSourceIncludeAllowed());
 			AstNode ast = parser.parse(scripts);
 			lastAst = ast;
 			if (ast != null) {
@@ -950,10 +936,7 @@ public class Awk {
 			if (this.variableOverrides == null) {
 				this.variableOverrides = new LinkedHashMap<String, Object>();
 			}
-			this.variableOverrides
-					.put(
-							Objects.requireNonNull(name, "name"),
-							value);
+			this.variableOverrides.put(Objects.requireNonNull(name, "name"), value);
 			return this;
 		}
 
@@ -1013,10 +996,7 @@ public class Awk {
 		 * @throws ExitException if the script terminates with a non-zero exit code
 		 */
 		public void execute(Appendable appendable) throws IOException, ExitException {
-			doExecute(
-					new AppendableAwkSink(
-							Objects.requireNonNull(appendable, "appendable"),
-							settings.getLocale()));
+			doExecute(new AppendableAwkSink(Objects.requireNonNull(appendable, "appendable"), settings.getLocale()));
 		}
 
 		private void doExecute(AwkSink sink) throws IOException, ExitException {
@@ -1064,11 +1044,7 @@ public class Awk {
 			}
 			List<ScriptSource> sources = new ArrayList<ScriptSource>(scripts.size());
 			for (int i = 0; i < scripts.size(); i++) {
-				sources
-						.add(
-								new ScriptSource(
-										ScriptSource.DESCRIPTION_COMMAND_LINE_SCRIPT,
-										new StringReader(scripts.get(i))));
+				sources.add(new ScriptSource(ScriptSource.DESCRIPTION_COMMAND_LINE_SCRIPT, new StringReader(scripts.get(i))));
 			}
 			return compile(sources);
 		}

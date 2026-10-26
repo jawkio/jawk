@@ -39,8 +39,7 @@ public class JRTConsumeInputTest {
 	 */
 	@Test
 	public void testVariableAssignmentBetweenFilesDoesNotAdvanceNR() throws Exception {
-		AwkTestSupport
-				.awkTest("variable assignments interleaved with filenames leave NR untouched")
+		AwkTestSupport.awkTest("variable assignments interleaved with filenames leave NR untouched")
 				.file("file1", "a\n")
 				.file("file2", "b\n")
 				.script("{ next } \nEND { print NR }")
@@ -57,8 +56,7 @@ public class JRTConsumeInputTest {
 	 */
 	@Test
 	public void testArgcOnlyScriptCanForceStdinTraversal() throws Exception {
-		AwkTestSupport
-				.awkTest("argc-only script forces stdin traversal")
+		AwkTestSupport.awkTest("argc-only script forces stdin traversal")
 				.file("file1", "from-file\n")
 				.script("BEGIN { ARGC = 0 } { print $0 }")
 				.operand("{{file1}}")
@@ -75,8 +73,7 @@ public class JRTConsumeInputTest {
 	 */
 	@Test
 	public void testOperandArgcAssignmentAffectsTraversalWithoutArgvOffset() throws Exception {
-		AwkTestSupport
-				.awkTest("operand argc assignment affects traversal without argv offset")
+		AwkTestSupport.awkTest("operand argc assignment affects traversal without argv offset")
 				.file("file1", "from-file\n")
 				.script("{ print $0 }")
 				.operand("ARGC=0", "{{file1}}")
@@ -93,8 +90,7 @@ public class JRTConsumeInputTest {
 	 */
 	@Test
 	public void testLargeOperandArgcAssignmentStillTraversesBoundedArgvView() throws Exception {
-		AwkTestSupport
-				.awkTest("large operand ARGC assignment remains bounded by ARGV view")
+		AwkTestSupport.awkTest("large operand ARGC assignment remains bounded by ARGV view")
 				.file("file1", "from-file\n")
 				.script("{ print FILENAME \":\" $0 } END { print NR }")
 				.operand("ARGC=5000000", "{{file1}}")
@@ -110,8 +106,7 @@ public class JRTConsumeInputTest {
 	 */
 	@Test
 	public void testOversizedOperandArgcAssignmentDoesNotOverflowTraversal() throws Exception {
-		AwkTestSupport
-				.awkTest("oversized operand ARGC assignment is clamped for traversal")
+		AwkTestSupport.awkTest("oversized operand ARGC assignment is clamped for traversal")
 				.file("file1", "from-file\n")
 				.script("{ print FILENAME \":\" $0 } END { print NR }")
 				.operand("ARGC=1e309", "{{file1}}")

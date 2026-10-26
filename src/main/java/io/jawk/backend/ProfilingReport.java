@@ -95,14 +95,13 @@ public final class ProfilingReport {
 		}
 		out.printf(Locale.ROOT, "  %-32s %12s %14s %14s%n", "Name", "Count", "Time (ms)", "Avg (ns)");
 		for (Entry entry : entries) {
-			out
-					.printf(
-							Locale.ROOT,
-							"  %-32s %12d %14.3f %14.0f%n",
-							entry.getName(),
-							entry.getCount(),
-							entry.getTotalNanos() / 1_000_000.0d,
-							entry.getAverageNanos());
+			out.printf(
+					Locale.ROOT,
+					"  %-32s %12d %14.3f %14.0f%n",
+					entry.getName(),
+					entry.getCount(),
+					entry.getTotalNanos() / 1_000_000.0d,
+					entry.getAverageNanos());
 		}
 	}
 
@@ -125,14 +124,12 @@ public final class ProfilingReport {
 	}
 
 	private static void sort(List<Entry> entries) {
-		Collections
-				.sort(
-						entries,
-						Comparator
-								.comparingLong(Entry::getTotalNanos)
-								.reversed()
-								.thenComparing(Comparator.comparingLong(Entry::getCount).reversed())
-								.thenComparing(Entry::getName));
+		Collections.sort(
+				entries,
+				Comparator.comparingLong(Entry::getTotalNanos)
+						.reversed()
+						.thenComparing(Comparator.comparingLong(Entry::getCount).reversed())
+						.thenComparing(Entry::getName));
 	}
 
 	static final class Accumulator {

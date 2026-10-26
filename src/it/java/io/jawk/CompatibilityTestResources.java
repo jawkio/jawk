@@ -43,8 +43,7 @@ public final class CompatibilityTestResources {
 	 */
 	public static Path projectDirectory(Class<?> anchor) {
 		try {
-			Path testClassesDirectory = Paths
-					.get(anchor.getProtectionDomain().getCodeSource().getLocation().toURI())
+			Path testClassesDirectory = Paths.get(anchor.getProtectionDomain().getCodeSource().getLocation().toURI())
 					.toAbsolutePath()
 					.normalize();
 			Path targetDirectory = testClassesDirectory.getParent();

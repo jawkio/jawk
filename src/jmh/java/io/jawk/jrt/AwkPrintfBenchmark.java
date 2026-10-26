@@ -145,14 +145,13 @@ public class AwkPrintfBenchmark {
 	 */
 	@Benchmark
 	public String sprintfMixed() {
-		return AwkPrintf
-				.sprintf(
-						this.locale,
-						AwkPrintf.DEFAULT_CONVFMT,
-						"%s: %05d (%.2f)\n",
-						this.stringValue,
-						this.longValue,
-						this.smallDouble);
+		return AwkPrintf.sprintf(
+				this.locale,
+				AwkPrintf.DEFAULT_CONVFMT,
+				"%s: %05d (%.2f)\n",
+				this.stringValue,
+				this.longValue,
+				this.smallDouble);
 	}
 
 	/**
@@ -163,13 +162,7 @@ public class AwkPrintfBenchmark {
 	@Benchmark
 	public String sprintfIntegerOnly() {
 		return AwkPrintf
-				.sprintf(
-						this.locale,
-						AwkPrintf.DEFAULT_CONVFMT,
-						"%8d|%-8d|%x",
-						this.longValue,
-						this.longValue,
-						this.longValue);
+				.sprintf(this.locale, AwkPrintf.DEFAULT_CONVFMT, "%8d|%-8d|%x", this.longValue, this.longValue, this.longValue);
 	}
 
 	/**
@@ -179,13 +172,7 @@ public class AwkPrintfBenchmark {
 	 */
 	@Benchmark
 	public String sprintfStringOnly() {
-		return AwkPrintf
-				.sprintf(
-						this.locale,
-						AwkPrintf.DEFAULT_CONVFMT,
-						"[%s] [%10s]",
-						this.stringValue,
-						this.stringValue);
+		return AwkPrintf.sprintf(this.locale, AwkPrintf.DEFAULT_CONVFMT, "[%s] [%10s]", this.stringValue, this.stringValue);
 	}
 
 	/**

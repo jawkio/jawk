@@ -280,12 +280,10 @@ public class AwkParser {
 	 * @param posix {@code true} to enforce POSIX compile-time behavior
 	 * @param sourceIncludeAllowed {@code true} to permit {@code @include}
 	 */
-	public AwkParser(
-			Map<String, ExtensionFunction> extensions,
-			boolean posix,
-			boolean sourceIncludeAllowed) {
+	public AwkParser(Map<String, ExtensionFunction> extensions, boolean posix, boolean sourceIncludeAllowed) {
 		this.extensions = extensions == null ?
-				Collections.emptyMap() : Collections.unmodifiableMap(new HashMap<>(extensions));
+				Collections.emptyMap() :
+				Collections.unmodifiableMap(new HashMap<>(extensions));
 		this.posix = posix;
 		this.sourceIncludeAllowed = sourceIncludeAllowed;
 	}
@@ -363,10 +361,7 @@ public class AwkParser {
 		private final int currentCharacter;
 		private final String namespace;
 
-		private SourceState(
-				ScriptSource scriptSourceParam,
-				LineNumberReader readerParam,
-				int currentCharacterParam,
+		private SourceState(ScriptSource scriptSourceParam, LineNumberReader readerParam, int currentCharacterParam,
 				String namespaceParam) {
 			scriptSource = scriptSourceParam;
 			reader = readerParam;
@@ -548,10 +543,7 @@ public class AwkParser {
 	}
 
 	private LexerException lexerException(String msg) {
-		return new LexerException(
-				msg,
-				currentScriptSource.getDescription(),
-				reader.getLineNumber());
+		return new LexerException(msg, currentScriptSource.getDescription(), reader.getLineNumber());
 	}
 
 	/**
@@ -735,8 +727,7 @@ public class AwkParser {
 
 	private Token lexer(Token expectedToken) throws IOException {
 		if (token != expectedToken) {
-			throw parserException(
-					"Expecting " + expectedToken.name() + ". Found: " + token.name() + " (" + text + ")");
+			throw parserException("Expecting " + expectedToken.name() + ". Found: " + token.name() + " (" + text + ")");
 		}
 		return lexer();
 	}
@@ -1119,11 +1110,8 @@ public class AwkParser {
 			int namespaceSeparator = sourceIdentifier.indexOf("::");
 			if (namespaceSeparator >= 0) {
 				String namespaceComponent = sourceIdentifier.substring(namespaceSeparator + 2);
-				if (KEYWORDS.containsKey(namespaceComponent)
-						|| BuiltinFunction.of(namespaceComponent) != null) {
-					throw lexerException(
-							"Reserved word cannot be used after a namespace separator: "
-									+ sourceIdentifier);
+				if (KEYWORDS.containsKey(namespaceComponent) || BuiltinFunction.of(namespaceComponent) != null) {
+					throw lexerException("Reserved word cannot be used after a namespace separator: " + sourceIdentifier);
 				}
 			}
 			String lookupIdentifier = awkNamespaceComponent(sourceIdentifier);
@@ -1140,8 +1128,7 @@ public class AwkParser {
 				token = kwToken;
 				return token;
 			}
-			if ((unqualifiedIdentifier || awkNamespaceIdentifier)
-					&& BuiltinFunction.of(lookupIdentifier) != null) {
+			if ((unqualifiedIdentifier || awkNamespaceIdentifier) && BuiltinFunction.of(lookupIdentifier) != null) {
 				text.setLength(0);
 				text.append(lookupIdentifier);
 				token = Token.BUILTIN_FUNC_NAME;
@@ -1314,8 +1301,7 @@ public class AwkParser {
 		boolean includeTerminatedByEndOfSource = validateIncludeTerminator();
 		Path includePath = resolveIncludePath(includeName);
 		if (topLevelSourcePaths.contains(includePath)) {
-			throw parserException(
-					"Cannot include a top-level program source: " + includeName);
+			throw parserException("Cannot include a top-level program source: " + includeName);
 		}
 		if (!includedSourcePaths.add(includePath)) {
 			lexer();
@@ -1354,9 +1340,7 @@ public class AwkParser {
 	}
 
 	private void validateNamespace(String namespace) {
-		if (namespace == null
-				|| namespace.isEmpty()
-				|| !Character.isJavaIdentifierStart(namespace.charAt(0))) {
+		if (namespace == null || namespace.isEmpty() || !Character.isJavaIdentifierStart(namespace.charAt(0))) {
 			throw parserException("Invalid gawk namespace name: " + namespace);
 		}
 		for (int i = 1; i < namespace.length(); i++) {
@@ -1364,9 +1348,7 @@ public class AwkParser {
 				throw parserException("Invalid gawk namespace name: " + namespace);
 			}
 		}
-		if (KEYWORDS.containsKey(namespace)
-				|| BuiltinFunction.of(namespace) != null
-				|| extensions.containsKey(namespace)) {
+		if (KEYWORDS.containsKey(namespace) || BuiltinFunction.of(namespace) != null || extensions.containsKey(namespace)) {
 			throw parserException("Reserved identifier cannot be used as a gawk namespace: " + namespace);
 		}
 	}
@@ -1497,9 +1479,7 @@ public class AwkParser {
 				lexer();
 				optNewline();
 				// true = allow comparators, allow IN keyword, do Token.NOT allow multidim indices expressions
-				optExpr = new ConditionPairAst(
-						optExpr,
-						ASSIGNMENT_EXPRESSION(null, true, true, false));
+				optExpr = new ConditionPairAst(optExpr, ASSIGNMENT_EXPRESSION(null, true, true, false));
 			}
 		} else {
 			optExpr = null;
@@ -1607,11 +1587,7 @@ public class AwkParser {
 			// An assignment RHS is a single expression: a following comma belongs to
 			// the enclosing grouping, as in ((y=1, 2) in a), where the group elements
 			// are (y=1) and (2)
-			AST assignmentExpression = ASSIGNMENT_EXPRESSION(
-					null,
-					allowComparison,
-					allowInKeyword,
-					false);
+			AST assignmentExpression = ASSIGNMENT_EXPRESSION(null, allowComparison, allowInKeyword, false);
 			result = new AssignmentExpressionAst(ternaryExpression, op, txt, assignmentExpression);
 		}
 		// ASSIGNMENT_EXPRESSION [, ASSIGNMENT_EXPRESSION] !!!ONLY IF!!! allowMultidimIndices is true
@@ -1691,18 +1667,12 @@ public class AwkParser {
 	// production will consume and the for statement will never have a chance
 	// of processing it
 	// all other times, it is true
-	private AST IN_EXPRESSION(
-			AST left,
-			boolean allowComparison,
-			boolean allowInKeyword,
-			boolean allowMultidimIndices)
+	private AST IN_EXPRESSION(AST left, boolean allowComparison, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
 		AST result = MATCHING_EXPRESSION(left, allowComparison, allowInKeyword, allowMultidimIndices);
 		if (allowInKeyword && token == Token.KW_IN) {
 			lexer();
-			result = new InExpressionAst(
-					result,
-					IN_EXPRESSION(null, allowComparison, allowInKeyword, allowMultidimIndices));
+			result = new InExpressionAst(result, IN_EXPRESSION(null, allowComparison, allowInKeyword, allowMultidimIndices));
 		}
 		return result;
 	}
@@ -1755,11 +1725,7 @@ public class AwkParser {
 	}
 
 	// CONCAT_EXPRESSION = EXPRESSION [ CONCAT_EXPRESSION ]
-	private AST CONCAT_EXPRESSION(
-			AST left,
-			boolean allowComparison,
-			boolean allowInKeyword,
-			boolean allowMultidimIndices)
+	private AST CONCAT_EXPRESSION(AST left, boolean allowComparison, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
 		AST result = EXPRESSION(left, allowComparison, allowInKeyword, allowMultidimIndices);
 		if (token == Token.INTEGER
@@ -1781,11 +1747,7 @@ public class AwkParser {
 	}
 
 	// EXPRESSION : TERM [ (+|-) EXPRESSION ]
-	private AST EXPRESSION(
-			AST left,
-			boolean allowComparison,
-			boolean allowInKeyword,
-			boolean allowMultidimIndices)
+	private AST EXPRESSION(AST left, boolean allowComparison, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
 		AST result = TERM(left, allowComparison, allowInKeyword, allowMultidimIndices);
 		while (token == Token.PLUS || token == Token.MINUS) {
@@ -1799,11 +1761,7 @@ public class AwkParser {
 	}
 
 	// TERM : UNARY_FACTOR [ (*|/|%) TERM ]
-	private AST TERM(
-			AST left,
-			boolean allowComparison,
-			boolean allowInKeyword,
-			boolean allowMultidimIndices)
+	private AST TERM(AST left, boolean allowComparison, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
 		AST result = (left == null) ? UNARY_FACTOR(allowComparison, allowInKeyword, allowMultidimIndices) : left;
 		while (token == Token.MULT || token == Token.DIVIDE || token == Token.MOD) {
@@ -1817,30 +1775,23 @@ public class AwkParser {
 	}
 
 	// UNARY_FACTOR : [ ! | - | + ] POWER_FACTOR
-	AST UNARY_FACTOR(boolean allowComparison, boolean allowInKeyword, boolean allowMultidimIndices)
-			throws IOException {
+	AST UNARY_FACTOR(boolean allowComparison, boolean allowInKeyword, boolean allowMultidimIndices) throws IOException {
 		if (token == Token.NOT) {
 			lexer();
 			return new NotExpressionAst(POWER_FACTOR(null, allowComparison, allowInKeyword, allowMultidimIndices));
 		} else if (token == Token.MINUS) {
 			lexer();
-			return new NegativeExpressionAst(
-					POWER_FACTOR(null, allowComparison, allowInKeyword, allowMultidimIndices));
+			return new NegativeExpressionAst(POWER_FACTOR(null, allowComparison, allowInKeyword, allowMultidimIndices));
 		} else if (token == Token.PLUS) {
 			lexer();
-			return new UnaryPlusExpressionAst(
-					POWER_FACTOR(null, allowComparison, allowInKeyword, allowMultidimIndices));
+			return new UnaryPlusExpressionAst(POWER_FACTOR(null, allowComparison, allowInKeyword, allowMultidimIndices));
 		} else {
 			return POWER_FACTOR(null, allowComparison, allowInKeyword, allowMultidimIndices);
 		}
 	}
 
 	// POWER_FACTOR : FACTOR_FOR_INCDEC [ ^ POWER_FACTOR ]
-	private AST POWER_FACTOR(
-			AST left,
-			boolean allowComparison,
-			boolean allowInKeyword,
-			boolean allowMultidimIndices)
+	private AST POWER_FACTOR(AST left, boolean allowComparison, boolean allowInKeyword, boolean allowMultidimIndices)
 			throws IOException {
 		AST result = (left == null) ? FACTOR_FOR_INCDEC(allowComparison, allowInKeyword, allowMultidimIndices) : left;
 		if (token == Token.POW) {
@@ -1960,8 +1911,7 @@ public class AwkParser {
 			if (token == Token.DOLLAR) {
 				lexer();
 				if (token == Token.INC || token == Token.DEC) {
-					return new DollarExpressionAst(
-							FACTOR_FOR_INCDEC(allowComparison, allowInKeyword, allowMultidimIndices));
+					return new DollarExpressionAst(FACTOR_FOR_INCDEC(allowComparison, allowInKeyword, allowMultidimIndices));
 				}
 				if (token == Token.NOT || token == Token.MINUS || token == Token.PLUS) {
 					return new DollarExpressionAst(UNARY_FACTOR(allowComparison, allowInKeyword, allowMultidimIndices));
@@ -2288,8 +2238,7 @@ public class AwkParser {
 			// in
 			lexer();
 			if (token != Token.ID) {
-				throw parserException(
-						"Expecting an array or subarray for 'in' statement. Got " + token.name() + ": " + text);
+				throw parserException("Expecting an array or subarray for 'in' statement. Got " + token.name() + ": " + text);
 			}
 			AST arrayAst = SYMBOL(true, true);
 			// close paren ...
@@ -2478,9 +2427,7 @@ public class AwkParser {
 			AST trueBlock = TERNARY_EXPRESSION(null, true, true, true);
 			lexer(Token.COLON);
 			AST falseBlock = TERNARY_EXPRESSION(null, true, true, true);
-			params = new FunctionCallParamListAst(
-					new TernaryExpressionAst(condExpr, trueBlock, falseBlock),
-					null);
+			params = new FunctionCallParamListAst(new TernaryExpressionAst(condExpr, trueBlock, falseBlock), null);
 		}
 
 		return new PrintAst(
@@ -2504,15 +2451,10 @@ public class AwkParser {
 			AST trueBlock = TERNARY_EXPRESSION(null, true, true, true);
 			lexer(Token.COLON);
 			AST falseBlock = TERNARY_EXPRESSION(null, true, true, true);
-			params = new FunctionCallParamListAst(
-					new TernaryExpressionAst(condExpr, trueBlock, falseBlock),
-					null);
+			params = new FunctionCallParamListAst(new TernaryExpressionAst(condExpr, trueBlock, falseBlock), null);
 		}
 
-		return new PrintfAst(
-				params,
-				parsedPrintStatement.getOutputToken(),
-				parsedPrintStatement.getOutputExpr());
+		return new PrintfAst(params, parsedPrintStatement.getOutputToken(), parsedPrintStatement.getOutputExpr());
 	}
 
 	AST GETLINE_EXPRESSION(AST pipeExpr, boolean allowComparison, boolean allowInKeyword) throws IOException {
@@ -2524,7 +2466,8 @@ public class AwkParser {
 																																																// multidim
 			// indices expressions
 			return pipeExpr == null ?
-					new GetlineAst(null, lvalue, assignmentExpr) : new GetlineAst(pipeExpr, lvalue, assignmentExpr);
+					new GetlineAst(null, lvalue, assignmentExpr) :
+					new GetlineAst(pipeExpr, lvalue, assignmentExpr);
 		} else {
 			return pipeExpr == null ? new GetlineAst(null, lvalue, null) : new GetlineAst(pipeExpr, lvalue, null);
 		}
@@ -2714,8 +2657,7 @@ public class AwkParser {
 			return 0;
 		}
 		AST argument = params.getAst1();
-		if (argument instanceof IDAst
-				&& !isJrtManagedSpecialName(((IDAst) argument).id)) {
+		if (argument instanceof IDAst && !isJrtManagedSpecialName(((IDAst) argument).id)) {
 			IDAst idAst = (IDAst) argument;
 			tuples.pushIndirectArgument(idAst.offset, idAst.isGlobal);
 		} else if (argument instanceof ArrayReferenceAst) {
@@ -2765,15 +2707,12 @@ public class AwkParser {
 		valueAst.populateTuples(tuples);
 	}
 
-	private int populateIndirectActualParameters(
-			AwkTuples tuples,
-			FunctionCallParamListAst params) {
+	private int populateIndirectActualParameters(AwkTuples tuples, FunctionCallParamListAst params) {
 		if (params == null) {
 			return 0;
 		}
 		AST argument = params.getAst1();
-		if (argument instanceof IDAst
-				&& !isJrtManagedSpecialName(((IDAst) argument).id)) {
+		if (argument instanceof IDAst && !isJrtManagedSpecialName(((IDAst) argument).id)) {
 			IDAst idAst = (IDAst) argument;
 			tuples.pushIndirectArgument(idAst.offset, idAst.isGlobal);
 		} else if (argument instanceof ArrayReferenceAst) {
@@ -2782,9 +2721,7 @@ public class AwkParser {
 		} else {
 			argument.populateTuples(tuples);
 		}
-		return 1 + populateIndirectActualParameters(
-				tuples,
-				(FunctionCallParamListAst) params.getAst2());
+		return 1 + populateIndirectActualParameters(tuples, (FunctionCallParamListAst) params.getAst2());
 	}
 
 	private Set<Integer> collectArrayParameterIndexes(FunctionDefAst functionDefAst) {
@@ -3285,12 +3222,7 @@ public class AwkParser {
 	}
 
 	private static boolean isRule(AST ast) {
-		return ast != null
-				&& !ast.isBegin()
-				&& !ast.isEnd()
-				&& !ast.isBeginFile()
-				&& !ast.isEndFile()
-				&& !ast.isFunction();
+		return ast != null && !ast.isBegin() && !ast.isEnd() && !ast.isBeginFile() && !ast.isEndFile() && !ast.isFunction();
 	}
 
 	/**
@@ -3475,8 +3407,7 @@ public class AwkParser {
 				ptr = ptr.getAst2();
 			}
 
-			boolean perFileScaffolding = reqInput
-					&& (hasBeginFileRules || hasEndFileRules || nextfileEncountered);
+			boolean perFileScaffolding = reqInput && (hasBeginFileRules || hasEndFileRules || nextfileEncountered);
 
 			// The per-file addresses are carried as properties of the tuple
 			// stream, so a nextfile executed from a user-defined function can
@@ -3698,8 +3629,7 @@ public class AwkParser {
 		@Override
 		public Address nextAddress() {
 			if (!isRule(this)) {
-				throw new SemanticException(
-						"`next' cannot be called from a `" + specialRuleName() + "' rule.");
+				throw new SemanticException("`next' cannot be called from a `" + specialRuleName() + "' rule.");
 			}
 			if (nextAddress == null) {
 				throw new SemanticException("Cannot call next here.");
@@ -4683,12 +4613,7 @@ public class AwkParser {
 				// gawk accepts the call but reports it each time it runs
 				tuples.warning(extraArgumentWarning());
 			}
-			tuples
-					.callFunction(
-							functionProxy,
-							functionProxy.getFunctionName(),
-							formalParamCount,
-							actualParamCountLocal);
+			tuples.callFunction(functionProxy, functionProxy.getFunctionName(), formalParamCount, actualParamCountLocal);
 			popSourceLineNumber(tuples);
 			return 1;
 		}
@@ -4704,12 +4629,11 @@ public class AwkParser {
 		}
 
 		private String extraArgumentWarning() {
-			return String
-					.format(
-							"gawk: %s:%d: warning: function `%s' called with more arguments than declared",
-							sourceBasename(),
-							warningLineNo(),
-							functionProxy.getFunctionName());
+			return String.format(
+					"gawk: %s:%d: warning: function `%s' called with more arguments than declared",
+					sourceBasename(),
+					warningLineNo(),
+					functionProxy.getFunctionName());
 		}
 
 		private int warningLineNo() {
@@ -4734,16 +4658,13 @@ public class AwkParser {
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
 			getAst1().populateTuples(tuples);
-			int actualParamCount = populateIndirectActualParameters(
-					tuples,
-					(FunctionCallParamListAst) getAst2());
-			tuples
-					.indirectCall(
-							symbolTable.indirectFunctionTargets(),
-							extensions,
-							actualParamCount,
-							sourceBasename(),
-							getLineNo());
+			int actualParamCount = populateIndirectActualParameters(tuples, (FunctionCallParamListAst) getAst2());
+			tuples.indirectCall(
+					symbolTable.indirectFunctionTargets(),
+					extensions,
+					actualParamCount,
+					sourceBasename(),
+					getLineNo());
 			popSourceLineNumber(tuples);
 			return 1;
 		}
@@ -4923,12 +4844,11 @@ public class AwkParser {
 				tuples.length(0);
 			} else {
 				AST params = getAst1();
-				AST argument = params instanceof FunctionCallParamListAst
-						&& params.getAst2() == null ?
-								params.getAst1() : params;
+				AST argument = params instanceof FunctionCallParamListAst && params.getAst2() == null ?
+						params.getAst1() :
+						params;
 				int ast1Result;
-				if (argument instanceof IDAst
-						&& !isJrtManagedSpecialName(((IDAst) argument).id)) {
+				if (argument instanceof IDAst && !isJrtManagedSpecialName(((IDAst) argument).id)) {
 					IDAst idAst = (IDAst) argument;
 					tuples.pushIndirectArgument(idAst.offset, idAst.isGlobal);
 					ast1Result = 1;
@@ -5058,11 +4978,7 @@ public class AwkParser {
 			}
 
 			getAst1().getAst1().populateTuples(tuples);
-			populateArrayOperandTuples(
-					ptr,
-					tuples,
-					true,
-					"split's 2nd arg must be an array or subarray reference");
+			populateArrayOperandTuples(ptr, tuples, true, "split's 2nd arg must be an array or subarray reference");
 			if (ast1Result == 3) {
 				populateRawRegexpParameterTuples(getAst1().getAst2().getAst2().getAst1(), tuples);
 			}
@@ -5989,10 +5905,7 @@ public class AwkParser {
 						IDAst idAst = (IDAst) paramAst;
 						if (idAst.isScalar()) {
 							throw new SemanticException(
-									"Extension '"
-											+ function.getKeyword()
-											+ "' requires parameter position "
-											+ idx
+									"Extension '" + function.getKeyword() + "' requires parameter position " + idx
 											+ " be an associative array, not a scalar.");
 						}
 						idAst.setArray(true);
@@ -6105,8 +6018,7 @@ public class AwkParser {
 				AST pattern = enclosingRule == null ? null : enclosingRule.getAst1();
 				if (pattern != null && (pattern.isBeginFile() || pattern.isEndFile())) {
 					throw new SemanticException(
-							"non-redirected `getline' invalid inside `"
-									+ (pattern.isBeginFile() ? "BEGINFILE" : "ENDFILE")
+							"non-redirected `getline' invalid inside `" + (pattern.isBeginFile() ? "BEGINFILE" : "ENDFILE")
 									+ "' rule");
 				}
 			}
@@ -6311,8 +6223,7 @@ public class AwkParser {
 				AST pattern = nextable.getAst1();
 				if (pattern != null && (pattern.isBegin() || pattern.isEnd() || pattern.isEndFile())) {
 					String ruleName = pattern.isBegin() ? "BEGIN" : pattern.isEnd() ? "END" : "ENDFILE";
-					throw new SemanticException(
-							"`nextfile' cannot be called from a `" + ruleName + "' rule.");
+					throw new SemanticException("`nextfile' cannot be called from a `" + ruleName + "' rule.");
 				}
 			}
 			tuples.execNextfile();
@@ -6545,7 +6456,8 @@ public class AwkParser {
 		int addFunctionParameter(String functionName, String id) {
 			int namespaceSeparator = functionName.indexOf("::");
 			String unqualifiedFunctionName = namespaceSeparator < 0 ?
-					functionName : functionName.substring(namespaceSeparator + 2);
+					functionName :
+					functionName.substring(namespaceSeparator + 2);
 			if (unqualifiedFunctionName.equals(id)) {
 				throw parserException("cannot use " + id + " as a parameter; it is the function name");
 			}
@@ -6617,13 +6529,12 @@ public class AwkParser {
 			for (Map.Entry<String, FunctionProxy> entry : functionProxies.entrySet()) {
 				FunctionProxy proxy = entry.getValue();
 				if (proxy.isDefined()) {
-					targets
-							.put(
-									entry.getKey(),
-									new Tuple.IndirectFunctionTarget(
-											proxy,
-											proxy.getFunctionParamCount(),
-											collectArrayParameterIndexes(proxy.functionDefAst)));
+					targets.put(
+							entry.getKey(),
+							new Tuple.IndirectFunctionTarget(
+									proxy,
+									proxy.getFunctionParamCount(),
+									collectArrayParameterIndexes(proxy.functionDefAst)));
 				}
 			}
 			cachedIndirectFunctionTargets = Collections.unmodifiableMap(targets);
@@ -6665,9 +6576,6 @@ public class AwkParser {
 	}
 
 	private ParserException parserException(String msg) {
-		return new ParserException(
-				msg,
-				currentScriptSource.getDescription(),
-				reader.getLineNumber());
+		return new ParserException(msg, currentScriptSource.getDescription(), reader.getLineNumber());
 	}
 }

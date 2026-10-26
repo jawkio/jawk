@@ -36,8 +36,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix11DefaultActionPrintsRecord() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 1.1 default action prints record")
+		AwkTestSupport.awkTest("POSIX 1.1 default action prints record")
 				.script("/.*/")
 				.stdin("alpha\nbeta\n")
 				.expectLines("alpha", "beta")
@@ -46,8 +45,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix12MissingPatternMatchesAllRecords() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 1.2 missing pattern matches all records")
+		AwkTestSupport.awkTest("POSIX 1.2 missing pattern matches all records")
 				.script("{ print $0 }")
 				.stdin("A\nB\n")
 				.expectLines("A", "B")
@@ -56,8 +54,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix13MultipleBeginEndExecuteInOrder() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 1.3 multiple BEGIN and END execute in program order")
+		AwkTestSupport.awkTest("POSIX 1.3 multiple BEGIN and END execute in program order")
 				.script("BEGIN { print \"one\" }\nBEGIN { print \"two\" }\nEND { print \"three\" }\nEND { print \"four\" }")
 				.expectLines("one", "two", "three", "four")
 				.runAndAssert();
@@ -65,8 +62,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix14BeginRunsBeforeFirstRecord() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 1.4 BEGIN runs before first record and -v applies before BEGIN")
+		AwkTestSupport.awkTest("POSIX 1.4 BEGIN runs before first record and -v applies before BEGIN")
 				.script(
 						"BEGIN{print \"BEGIN\", P; print \"FILENAME?\", (FILENAME==\"\"? \"unset\":\"set\")}\n{print \"REC\", $0}\nEND{print \"END\", P}")
 				.file("f1", "X")
@@ -78,8 +74,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix15EndRunsAfterLastRecord() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 1.5 END runs after last record")
+		AwkTestSupport.awkTest("POSIX 1.5 END runs after last record")
 				.script("END{print \"done\"}")
 				.stdin("a\nb\n")
 				.expectLines("done")
@@ -89,8 +84,7 @@ public class PosixConformanceTest {
 	@Test
 	public void posix16EmptyProgramExitsZero() throws Exception {
 		Assume.assumeTrue("Empty programs are not yet supported by the CLI", false);
-		AwkTestSupport
-				.cliTest("POSIX 1.6 empty program exits with zero")
+		AwkTestSupport.cliTest("POSIX 1.6 empty program exits with zero")
 				.file("empty.awk", "")
 				.argument("-f", "{{empty.awk}}")
 				.stdin("should_not_be_read\n")
@@ -101,8 +95,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix17PatternRangesInclusiveAndRepeat() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 1.7 pattern ranges inclusive and repeat")
+		AwkTestSupport.awkTest("POSIX 1.7 pattern ranges inclusive and repeat")
 				.script("/start/,/end/ {print $0}")
 				.stdin("a\nstart\nmid\nend\nb\nstart\nend\nc\n")
 				.expectLines("start", "mid", "end", "start", "end")
@@ -113,8 +106,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix21DashFDefinesFs() throws Exception {
-		AwkTestSupport
-				.cliTest("POSIX 2.1 -F defines FS")
+		AwkTestSupport.cliTest("POSIX 2.1 -F defines FS")
 				.argument("-F", ":")
 				.script("{print $2}")
 				.stdin("a:b:c\nd:e:f\n")
@@ -124,8 +116,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix22DashVAssignsBeforeBegin() throws Exception {
-		AwkTestSupport
-				.cliTest("POSIX 2.2 -v assigns before BEGIN")
+		AwkTestSupport.cliTest("POSIX 2.2 -v assigns before BEGIN")
 				.argument("-v", "x=42")
 				.script("BEGIN{print x}")
 				.expectLines("42")
@@ -134,10 +125,8 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix23AssignmentsOccurBeforeFollowingFile() throws Exception {
-		AwkTestSupport
-				.cliTest("POSIX 2.3 assignment operands per file")
-				.script(
-						"BEGIN{print \"B:\",x+0}\n{print FILENAME \":\" x}\nEND{print \"E:\",x+0}")
+		AwkTestSupport.cliTest("POSIX 2.3 assignment operands per file")
+				.script("BEGIN{print \"B:\",x+0}\n{print FILENAME \":\" x}\nEND{print \"E:\",x+0}")
 				.file("f1", "A\n")
 				.file("f2", "B\n")
 				.operand("x=1", "{{f1}}", "x=2", "{{f2}}", "x=3")
@@ -147,8 +136,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix24DashFConcatenatesProgramFiles() throws Exception {
-		AwkTestSupport
-				.cliTest("POSIX 2.4 -f concatenates program files")
+		AwkTestSupport.cliTest("POSIX 2.4 -f concatenates program files")
 				.argument("-f", "{{p1.awk}}", "-f", "{{p2.awk}}")
 				.file("p1.awk", "BEGIN{print \"P1\"}\n")
 				.file("p2.awk", "BEGIN{print \"P2\"}\n")
@@ -159,8 +147,7 @@ public class PosixConformanceTest {
 	@Test
 	public void posix26DashVSetsRegexFs() throws Exception {
 		Assume.assumeTrue("Jawk does not treat -v FS assignments as regular expressions yet", false);
-		AwkTestSupport
-				.cliTest("POSIX 2.6 -v FS ERE")
+		AwkTestSupport.cliTest("POSIX 2.6 -v FS ERE")
 				.argument("-v", "FS=[, ]+")
 				.script("{print $1 \"|\" $2 \"|\" $3}")
 				.stdin("a,,b   c\nx  y\n")
@@ -172,8 +159,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix31DefaultFsSkipsBlanks() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 3.1 default FS skips blanks")
+		AwkTestSupport.awkTest("POSIX 3.1 default FS skips blanks")
 				.script("{print NF \":\" $1 \"-\" $2 \"-\" $3}")
 				.stdin("    a   b\nc\nd     e      f\n")
 				.expectLines("2:a-b-", "1:c--", "3:d-e-f")
@@ -182,8 +168,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix32FsSingleCharacterSplitsEachOccurrence() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 3.2 FS single char splits each occurrence")
+		AwkTestSupport.awkTest("POSIX 3.2 FS single char splits each occurrence")
 				.script("BEGIN{FS=\"|\"}{print NF \":\" $2}")
 				.stdin("a|b||c\n")
 				.expectLines("4:b")
@@ -193,8 +178,7 @@ public class PosixConformanceTest {
 	@Test
 	public void posix33FsAsEre() throws Exception {
 		Assume.assumeTrue("Jawk does not yet normalize whitespace when FS is an ERE", false);
-		AwkTestSupport
-				.awkTest("POSIX 3.3 FS as ERE")
+		AwkTestSupport.awkTest("POSIX 3.3 FS as ERE")
 				.script("BEGIN{FS=\"[,;][[:space:]]*\"}{print $1 \"-\" $2 \"-\" $3}")
 				.stdin("a,  b; c\n")
 				.expectLines("a-b-c")
@@ -203,8 +187,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix34RsDefaultExcludesNewline() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 3.4 RS default newline excluded from $0")
+		AwkTestSupport.awkTest("POSIX 3.4 RS default newline excluded from $0")
 				.script("{print $0 \"~\"}")
 				.stdin("line1\nline2\n")
 				.expectLines("line1~", "line2~")
@@ -214,8 +197,7 @@ public class PosixConformanceTest {
 	@Test
 	public void posix35RsEmptyParagraphMode() throws Exception {
 		Assume.assumeTrue("RS=\"\" paragraph mode is not implemented", false);
-		AwkTestSupport
-				.awkTest("POSIX 3.5 RS empty string paragraph mode")
+		AwkTestSupport.awkTest("POSIX 3.5 RS empty string paragraph mode")
 				.script("BEGIN{RS=\"\"}{print \"REC[\" $0 \"]\"; print \"NF=\" NF}")
 				.stdin("a b\n\n\nc d\ne\n\n\n\nf\n")
 				.expectLines("REC[a b]", "NF=2", "REC[c d\ne]", "NF=3", "REC[f]", "NF=1")
@@ -224,8 +206,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix36AssigningToExistingFieldRecomputesDollarZero() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 3.6 assigning to existing field recomputes $0")
+		AwkTestSupport.awkTest("POSIX 3.6 assigning to existing field recomputes $0")
 				.script("BEGIN{OFS=\"|\"}{$2=\"X\"; print $0}")
 				.stdin("foo bar baz\n")
 				.expectLines("foo|X|baz")
@@ -234,8 +215,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix37AssigningToDollarZeroResetsFields() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 3.7 assigning to $0 resets fields")
+		AwkTestSupport.awkTest("POSIX 3.7 assigning to $0 resets fields")
 				.script("BEGIN{OFS=\",\"}{$0=\"x y\"; print NF \":\" $1 \"-\" $2 \"-\" $3}")
 				.stdin("a b c\n")
 				.expectLines("2:x-y-")
@@ -244,8 +224,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix38ReferencingNonexistentFieldIsUninitialized() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 3.8 referencing nonexistent field is uninitialized")
+		AwkTestSupport.awkTest("POSIX 3.8 referencing nonexistent field is uninitialized")
 				.script("{print \"[\" $(NF+1) \"]\", 0+$(NF+1), NF}")
 				.stdin("a b\n")
 				.expectLines("[] 0 2")
@@ -254,8 +233,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix39AssigningFutureFieldExpandsRecord() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 3.9 assigning future field expands record")
+		AwkTestSupport.awkTest("POSIX 3.9 assigning future field expands record")
 				.script("BEGIN{OFS=\":\"}{$(NF+2)=5; print NF \"|\" $0 \"|\" $(NF-1) \"|\" $(NF)}")
 				.stdin("a b\n")
 				.expectLines("4|a:b::5||5")
@@ -264,8 +242,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix310DynamicFieldSelection() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 3.10 dynamic field selection")
+		AwkTestSupport.awkTest("POSIX 3.10 dynamic field selection")
 				.script("{i=2; print $(i) \"-\" $(i+1)}")
 				.stdin("u v w\n")
 				.expectLines("v-w")
@@ -276,8 +253,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix41ConcatenationPrecedence() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 4.1 concatenation precedence")
+		AwkTestSupport.awkTest("POSIX 4.1 concatenation precedence")
 				.script("BEGIN{ x=1; y=2; print (x y) }")
 				.expectLines("12")
 				.runAndAssert();
@@ -285,8 +261,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix42ExponentiationRightAssociative() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 4.2 exponentiation is right associative")
+		AwkTestSupport.awkTest("POSIX 4.2 exponentiation is right associative")
 				.script("BEGIN{print 2^3^2}")
 				.expectLines("512")
 				.runAndAssert();
@@ -294,8 +269,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix43ModuloUsesFmod() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 4.3 modulo uses fmod semantics")
+		AwkTestSupport.awkTest("POSIX 4.3 modulo uses fmod semantics")
 				.script("BEGIN{print 5.5%2, -5.5%2}")
 				.expectLines("1.5 -1.5")
 				.runAndAssert();
@@ -303,8 +277,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix44CompoundAssignmentsModifyOnce() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 4.4 compound assignments modify once")
+		AwkTestSupport.awkTest("POSIX 4.4 compound assignments modify once")
 				.script("BEGIN{a=2; a^=3; b=5; b%=2; c=3; c*=4; d=8; d/=2; e=7; e-=1; f=1; f+=9; print a, b, c, d, e, f}")
 				.expectLines("8 1 12 4 6 10")
 				.runAndAssert();
@@ -312,8 +285,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix45PrePostIncrementDecrement() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 4.5 pre and post increment/decrement")
+		AwkTestSupport.awkTest("POSIX 4.5 pre and post increment/decrement")
 				.script("BEGIN{a=1; print a++, a; print ++a, a; print a--, a; print --a, a}")
 				.expectLines("1 2", "3 3", "3 2", "1 1")
 				.runAndAssert();
@@ -321,8 +293,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix46LogicalOperatorsShortCircuit() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 4.6 logical operators short circuit")
+		AwkTestSupport.awkTest("POSIX 4.6 logical operators short circuit")
 				.script("BEGIN{ i=0; j=0; (i && ++j); print i,j; (i || ++j); print i,j }")
 				.expectLines("0 0", "0 1")
 				.runAndAssert();
@@ -330,8 +301,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix47ConditionalOperatorRightAssociative() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 4.7 conditional operator right associative")
+		AwkTestSupport.awkTest("POSIX 4.7 conditional operator right associative")
 				.script("BEGIN{print 1?2:3?4:5}")
 				.expectLines("2")
 				.runAndAssert();
@@ -339,8 +309,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix48NumericVsStringComparison() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 4.8 numeric vs string comparison")
+		AwkTestSupport.awkTest("POSIX 4.8 numeric vs string comparison")
 				.script("BEGIN{print \"10\" < \"2\", 10 < \"2\", \"10\"==\"10\", \"10\"==10}")
 				.expectLines("1 1 1 1")
 				.runAndAssert();
@@ -348,8 +317,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix49StringConversionUsesConvfmt() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 4.9 string conversion uses CONVFMT")
+		AwkTestSupport.awkTest("POSIX 4.9 string conversion uses CONVFMT")
 				.script("BEGIN{CONVFMT=\"%.2f\"; x=3; y=3.14; s1=x \"\"; s2=y \"\"; print s1 \"|\" s2}")
 				.expectLines("3|3.14")
 				.runAndAssert();
@@ -357,8 +325,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix410PrintUsesOfmt() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 4.10 print uses OFMT")
+		AwkTestSupport.awkTest("POSIX 4.10 print uses OFMT")
 				.script("BEGIN{OFMT=\"%.2f\"; x=3.14159; print x}")
 				.expectLines("3.14")
 				.runAndAssert();
@@ -366,8 +333,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix410aPrintStringConstantsVerbatim() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 4.10a print outputs numeric-looking string constants verbatim")
+		AwkTestSupport.awkTest("POSIX 4.10a print outputs numeric-looking string constants verbatim")
 				.script("BEGIN { print \"0100\"; print \"1e3\"; print \"+0100\"; print \"-0500\"; print \"3.0\" }")
 				.expectLines("0100", "1e3", "+0100", "-0500", "3.0")
 				.runAndAssert();
@@ -375,8 +341,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix410bPrintInputFieldsVerbatim() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 4.10b print outputs numeric strings from input verbatim")
+		AwkTestSupport.awkTest("POSIX 4.10b print outputs numeric strings from input verbatim")
 				.script("{ print $1 }")
 				.stdin("0100\n1e3\n")
 				.expectLines("0100", "1e3")
@@ -385,8 +350,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix410cOfmtNotAppliedToStrings() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 4.10c OFMT applies to numbers only, not to numeric strings")
+		AwkTestSupport.awkTest("POSIX 4.10c OFMT applies to numbers only, not to numeric strings")
 				.script("BEGIN{OFMT=\"%.2f\"} { print $1; print $1 + 0 }")
 				.stdin("3.14159\n")
 				.expectLines("3.14159", "3.14")
@@ -395,8 +359,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix411DivisionOperator() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 4.11 division vs regex literal disambiguation")
+		AwkTestSupport.awkTest("POSIX 4.11 division vs regex literal disambiguation")
 				.script("BEGIN{print 12/2/3}")
 				.expectLines("2")
 				.runAndAssert();
@@ -406,8 +369,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix51NrAndFnrCounts() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 5.1 NR counts records across files")
+		AwkTestSupport.awkTest("POSIX 5.1 NR counts records across files")
 				.script("{print FILENAME \":\" FNR \"/\" NR}")
 				.file("f1", "a\nb\n")
 				.file("f2", "c\n")
@@ -418,8 +380,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix51FnrCountsRecordsOnStandardInput() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 5.1 FNR counts records read from standard input")
+		AwkTestSupport.awkTest("POSIX 5.1 FNR counts records read from standard input")
 				.script("{ print FNR, NR }")
 				.stdin("a\nb\nc\n")
 				.expectLines("1 1", "2 2", "3 3")
@@ -428,8 +389,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix51FnrCountsGetlineRecordsOnStandardInput() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 5.1 plain getline from standard input advances FNR and NR")
+		AwkTestSupport.awkTest("POSIX 5.1 plain getline from standard input advances FNR and NR")
 				.script("BEGIN { getline; getline line; print FNR, NR }")
 				.stdin("a\nb\nc\n")
 				.expectLines("2 2")
@@ -438,8 +398,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix52FilenameUnsetInBegin() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 5.2 FILENAME unset in BEGIN and holds last file in END")
+		AwkTestSupport.awkTest("POSIX 5.2 FILENAME unset in BEGIN and holds last file in END")
 				.script(
 						"BEGIN{print \"[\" FILENAME \"]\"}\n{if (NR==1) first=FILENAME}\nEND{print \"last=\" FILENAME \", first=\" first}")
 				.file("f1", "z\n")
@@ -450,8 +409,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix53MatchSetsRstartAndRlength() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 5.3 match sets RSTART and RLENGTH")
+		AwkTestSupport.awkTest("POSIX 5.3 match sets RSTART and RLENGTH")
 				.script(
 						"BEGIN{ s=\"abc123\"; print match(s, /[0-9]+/), RSTART, RLENGTH; print match(s, /XYZ/), RSTART, RLENGTH }")
 				.expectLines("4 4 3", "0 0 -1")
@@ -460,8 +418,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix54OfsAndOrsAffectPrint() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 5.4 OFS and ORS affect print")
+		AwkTestSupport.awkTest("POSIX 5.4 OFS and ORS affect print")
 				.script("BEGIN{OFS=\"|\"; ORS=\";\"} {print $1,$2}")
 				.stdin("a b\nc d\n")
 				.expect("a|b;c|d;")
@@ -470,8 +427,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix55DeletingArgvPreventsOperandProcessing() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 5.5 deleting ARGV prevents operand processing")
+		AwkTestSupport.awkTest("POSIX 5.5 deleting ARGV prevents operand processing")
 				.script("BEGIN{delete ARGV[2]} {print FILENAME \":\" $0}")
 				.file("f1", "x\n")
 				.file("f2", "y\n")
@@ -482,8 +438,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix56NoOperandsReadsStdinWithDashFilename() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 5.6 no operands reads stdin with FILENAME '-'")
+		AwkTestSupport.awkTest("POSIX 5.6 no operands reads stdin with FILENAME '-'")
 				.script("BEGIN{delete ARGV[1]; delete ARGV[2]} {print \"[\" FILENAME \"] \" $0}")
 				.stdin("s\n")
 				.operand("-")
@@ -495,8 +450,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix61RegexLiteralMatchesDollarZero() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 6.1 /ERE/ outside ~ matches $0")
+		AwkTestSupport.awkTest("POSIX 6.1 /ERE/ outside ~ matches $0")
 				.script("/o/ {print}")
 				.stdin("foo\nbar\n")
 				.expectLines("foo")
@@ -505,8 +459,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix62RegexEscapeSlash() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 6.2 regex escape slash")
+		AwkTestSupport.awkTest("POSIX 6.2 regex escape slash")
 				.script("$0 ~ /a\\/b/ {print $0}")
 				.stdin("a/b\na\\b\n")
 				.expectLines("a/b")
@@ -515,8 +468,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix63StringRegexDoubleEscapes() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 6.3 string regex double escape")
+		AwkTestSupport.awkTest("POSIX 6.3 string regex double escape")
 				.script("{ if ($0 ~ \"\\\\\\\\\") print \"yes\" }")
 				.stdin("back\\\\slash\n")
 				.expectLines("yes")
@@ -525,8 +477,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix64FsRegexRunsOfDelimiters() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 6.4 FS regex splits on runs")
+		AwkTestSupport.awkTest("POSIX 6.4 FS regex splits on runs")
 				.script("BEGIN{FS=\"[ ,]+\"}{print $1 \"-\" $2}")
 				.stdin("a,, ,b\n")
 				.expectLines("a-b")
@@ -535,8 +486,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix65RegexCannotMatchRsChar() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 6.5 regex cannot match RS char in $0")
+		AwkTestSupport.awkTest("POSIX 6.5 regex cannot match RS char in $0")
 				.script("{print ($0 ~ /\\n/)? \"match\":\"no\"}")
 				.stdin("x\ny\n")
 				.expectLines("no", "no")
@@ -547,8 +497,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix71ExpressionPatternTruthiness() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 7.1 expression pattern truthiness")
+		AwkTestSupport.awkTest("POSIX 7.1 expression pattern truthiness")
 				.script("$0+0 {print \"T\"}")
 				.stdin("1\n0\n2\n")
 				.expectLines("T", "T")
@@ -557,8 +506,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix72RangePatternRestarts() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 7.2 range pattern restarts after closing")
+		AwkTestSupport.awkTest("POSIX 7.2 range pattern restarts after closing")
 				.script("/a/,/c/ {print $0}")
 				.stdin("x\na\nb\nc\na\nc\ny\n")
 				.expectLines("a", "b", "c", "a", "c")
@@ -569,8 +517,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix81ElseBindsNearestIf() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 8.1 else binds to nearest if")
+		AwkTestSupport.awkTest("POSIX 8.1 else binds to nearest if")
 				.script("BEGIN{ if (1) if (0) x=1; else x=2; print x }")
 				.expectLines("2")
 				.runAndAssert();
@@ -578,8 +525,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix82WhileLoop() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 8.2 while loop")
+		AwkTestSupport.awkTest("POSIX 8.2 while loop")
 				.script("BEGIN{ i=0; while(i<3){print i; i++} }")
 				.expectLines("0", "1", "2")
 				.runAndAssert();
@@ -587,8 +533,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix83DoWhileLoopExecutesAtLeastOnce() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 8.3 do while executes body once")
+		AwkTestSupport.awkTest("POSIX 8.3 do while executes body once")
 				.script("BEGIN{ i=5; do {print i} while (i<0) }")
 				.expectLines("5")
 				.runAndAssert();
@@ -596,8 +541,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix84ForLoopClassic() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 8.4 classic for loop")
+		AwkTestSupport.awkTest("POSIX 8.4 classic for loop")
 				.script("BEGIN{ for(i=3;i>0;i--) print i }")
 				.expectLines("3", "2", "1")
 				.runAndAssert();
@@ -605,8 +549,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix85ForInDeleteAll() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 8.5 for in delete all elements")
+		AwkTestSupport.awkTest("POSIX 8.5 for in delete all elements")
 				.script("BEGIN{ split(\"a b c\", a, \" \" ); for (i in a) delete a[i]; print length(a) }")
 				.expectLines("0")
 				.runAndAssert();
@@ -614,8 +557,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix86BreakAndContinue() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 8.6 break and continue in loop")
+		AwkTestSupport.awkTest("POSIX 8.6 break and continue in loop")
 				.script("BEGIN{for(i=1;i<=5;i++){ if(i==3) continue; if(i==4) break; print i }}")
 				.expectLines("1", "2")
 				.runAndAssert();
@@ -623,8 +565,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix87NextSkipsCurrentRecord() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 8.7 next skips current record")
+		AwkTestSupport.awkTest("POSIX 8.7 next skips current record")
 				.script("/skip/ { next } { print \">\" $0 }")
 				.stdin("keep\nskip\nkeep2\n")
 				.expectLines(">keep", ">keep2")
@@ -633,8 +574,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix88NextfileSkipsRestOfCurrentFile() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 8.8 nextfile skips rest of current file")
+		AwkTestSupport.awkTest("POSIX 8.8 nextfile skips rest of current file")
 				.script("{print FILENAME \":\" $0; if (FNR==1) nextfile}")
 				.file("f1", "A1\nA2\n")
 				.file("f2", "B1\n")
@@ -645,8 +585,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix89ExitSetsStatus() throws Exception {
-		AwkTestSupport
-				.cliTest("POSIX 8.9 exit expr sets status")
+		AwkTestSupport.cliTest("POSIX 8.9 exit expr sets status")
 				.script("END{exit 7}")
 				.expectLines()
 				.expectExit(7)
@@ -657,8 +596,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix91PrintDefaultIsDollarZero() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 9.1 print with empty list prints $0")
+		AwkTestSupport.awkTest("POSIX 9.1 print with empty list prints $0")
 				.script("{print}")
 				.stdin("z\n")
 				.expectLines("z")
@@ -667,8 +605,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix92PrintfBasicConversions() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 9.2 printf conversions")
+		AwkTestSupport.awkTest("POSIX 9.2 printf conversions")
 				.script("BEGIN{ printf \"%d %u %o\\n\", 7, 7, 9 }")
 				.expectLines("7 7 11")
 				.runAndAssert();
@@ -676,8 +613,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix93PrintfPercentCUsesFirstCharacter() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 9.3 printf %c uses first character")
+		AwkTestSupport.awkTest("POSIX 9.3 printf %c uses first character")
 				.script("BEGIN{ printf \"%c\\n\", \"XYZ\" }")
 				.expectLines("X")
 				.runAndAssert();
@@ -685,8 +621,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix94PrintfStarWidthPrecision() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 9.4 printf star width and precision")
+		AwkTestSupport.awkTest("POSIX 9.4 printf star width and precision")
 				.script("BEGIN{ printf \"%*.*f\\n\", 6, 2, 3.14159 }")
 				.expectLines("  3.14")
 				.runAndAssert();
@@ -694,8 +629,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix95RedirectionTruncatesAndReuses() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 9.5 redirection truncates and reuses file")
+		AwkTestSupport.awkTest("POSIX 9.5 redirection truncates and reuses file")
 				.path("out.txt")
 				.script(
 						"BEGIN{ f=\"{{out.txt}}\"; print \"a\" > f; print \"b\" > f; close(f); while ((getline x < f) > 0) print x }")
@@ -705,8 +639,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix96AppendRedirection() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 9.6 append redirection")
+		AwkTestSupport.awkTest("POSIX 9.6 append redirection")
 				.path("app.txt")
 				.script(
 						"BEGIN{ f=\"{{app.txt}}\"; print \"first\" > f; close(f); print \"second\" >> f; close(f); while ((getline x < f) > 0) print x }")
@@ -716,8 +649,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix97CloseReturnsZeroOnSuccess() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 9.7 close returns zero")
+		AwkTestSupport.awkTest("POSIX 9.7 close returns zero")
 				.path("c.txt")
 				.script("BEGIN{ f=\"{{c.txt}}\"; print \"x\" > f; print (close(f)==0 ? \"ok\":\"bad\") }")
 				.expectLines("ok")
@@ -727,8 +659,7 @@ public class PosixConformanceTest {
 	@Test
 	public void posix98FflushReturnsZero() throws Exception {
 		Assume.assumeTrue("fflush() is not available in Jawk", false);
-		AwkTestSupport
-				.awkTest("POSIX 9.8 fflush returns zero")
+		AwkTestSupport.awkTest("POSIX 9.8 fflush returns zero")
 				.script("BEGIN{ printf \"x\"; print fflush()==0 ? \"OK\" : \"NO\" }")
 				.expectLines("xOK")
 				.runAndAssert();
@@ -736,8 +667,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix99PipelineWriteClose() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 9.9 pipeline write close")
+		AwkTestSupport.awkTest("POSIX 9.9 pipeline write close")
 				.posixOnly()
 				.path("pipe.txt")
 				.script(
@@ -748,8 +678,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix991PipelineWritesDataToFile() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 9.9 pipeline writes data")
+		AwkTestSupport.awkTest("POSIX 9.9 pipeline writes data")
 				.posixOnly()
 				.path("pipe.txt")
 				.script(
@@ -762,8 +691,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix101IntTruncatesTowardZero() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 10.1 int truncates toward zero")
+		AwkTestSupport.awkTest("POSIX 10.1 int truncates toward zero")
 				.script("BEGIN{ print int( 3.9), int(-3.9) }")
 				.expectLines("3 -3")
 				.runAndAssert();
@@ -771,8 +699,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix102SrandRepeatsSequence() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 10.2 srand repeats sequence")
+		AwkTestSupport.awkTest("POSIX 10.2 srand repeats sequence")
 				.script("BEGIN{ srand(123); a=rand(); srand(123); b=rand(); print (a==b) }")
 				.expectLines("1")
 				.runAndAssert();
@@ -780,8 +707,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix103LengthOnDollarZeroAndString() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 10.3 length on $0 and string")
+		AwkTestSupport.awkTest("POSIX 10.3 length on $0 and string")
 				.script("{print length($0), length(\"xx\") }")
 				.stdin("abcd\n")
 				.expectLines("4 2")
@@ -790,8 +716,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix104LengthOfArray() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 10.4 length of array")
+		AwkTestSupport.awkTest("POSIX 10.4 length of array")
 				.script("BEGIN{ split(\"a b c\", A, \" \" ); print length(A) }")
 				.expectLines("3")
 				.runAndAssert();
@@ -799,8 +724,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix105IndexFunction() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 10.5 index function")
+		AwkTestSupport.awkTest("POSIX 10.5 index function")
 				.script("BEGIN{ print index(\"banana\",\"na\"), index(\"banana\",\"x\") }")
 				.expectLines("3 0")
 				.runAndAssert();
@@ -808,8 +732,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix106SubstrFunction() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 10.6 substr function")
+		AwkTestSupport.awkTest("POSIX 10.6 substr function")
 				.script("BEGIN{ print substr(\"abcdef\",2,3), substr(\"abcdef\",5) }")
 				.expectLines("bcd ef")
 				.runAndAssert();
@@ -817,8 +740,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix107ToLowerUpper() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 10.7 tolower and toupper")
+		AwkTestSupport.awkTest("POSIX 10.7 tolower and toupper")
 				.script("BEGIN{ print tolower(\"AbC\"), toupper(\"mIx\") }")
 				.expectLines("abc MIX")
 				.runAndAssert();
@@ -826,8 +748,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix108MatchFunction() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 10.8 match function")
+		AwkTestSupport.awkTest("POSIX 10.8 match function")
 				.script("BEGIN{ s=\"abc def\"; print match(s,/def/), RSTART, RLENGTH }")
 				.expectLines("5 5 3")
 				.runAndAssert();
@@ -835,8 +756,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix109SubAndGsub() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 10.9 gsub and sub")
+		AwkTestSupport.awkTest("POSIX 10.9 gsub and sub")
 				.script(
 						"BEGIN{ s=\"axa xa\"; n1=gsub(/xa/,\"(&)\",s); print n1, s; s=\"xa xa\"; n2=sub(/xa/,\"\\\\&\",s); print n2, s }")
 				.expectLines("2 a(xa) (xa)", "1 & xa")
@@ -845,8 +765,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix1010SplitDeletesExistingElements() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 10.10 split deletes existing elements")
+		AwkTestSupport.awkTest("POSIX 10.10 split deletes existing elements")
 				.script("BEGIN{ a[99]=\"old\"; n=split(\"p,q\",a,\",\"); print n, a[1], a[2], (1 in a) && !(99 in a) }")
 				.expectLines("2 p q 1")
 				.runAndAssert();
@@ -854,8 +773,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix1011SprintfFormatting() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 10.11 sprintf formatting")
+		AwkTestSupport.awkTest("POSIX 10.11 sprintf formatting")
 				.script("BEGIN{ s=sprintf(\"-%04d- %.1f\", 7, 3.14); print s }")
 				.expectLines("-0007- 3.1")
 				.runAndAssert();
@@ -863,8 +781,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix1012CloseAndGetlineReuse() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 10.12 close and getline reuse")
+		AwkTestSupport.awkTest("POSIX 10.12 close and getline reuse")
 				.path("gf.txt")
 				.script(
 						"BEGIN{ f=\"gf.txt\"; print \"A\" > f; print \"B\" >> f; close(f); while ((getline x < f) > 0) print x; print (close(f)==0 ? \"ok\":\"bad\") }")
@@ -874,8 +791,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix1013GetlineSetsDollarZero() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 10.13 getline without var sets $0 and NF")
+		AwkTestSupport.awkTest("POSIX 10.13 getline without var sets $0 and NF")
 				.script("{ if (NR==1) { getline < \"{{data.txt}}\"; print \"Z:\" $0 \",NF=\" NF }; print \"S:\" $0 }")
 				.stdin("outer\n")
 				.file("data.txt", "inner\n")
@@ -885,8 +801,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix1014GetlineVarFromCurrentInput() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 10.14 getline var from current input")
+		AwkTestSupport.awkTest("POSIX 10.14 getline var from current input")
 				.script("{ if (NR==1){ getline z; print \"Z=\" z \",0=\" $0 \",NR=\" NR; } }")
 				.stdin("X\nY\n")
 				.expectLines("Z=Y,0=X,NR=2")
@@ -895,8 +810,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix1015CommandGetlineAndSystem() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 10.15 command getline and system")
+		AwkTestSupport.awkTest("POSIX 10.15 command getline and system")
 				.posixOnly()
 				.script(
 						"BEGIN{ cmd=\"printf hack\\n\"; if ( (cmd | getline z) > 0 ) print z; close(cmd); print system(\":\") }")
@@ -908,8 +822,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix111MultidimensionalIndexesUseSubsep() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 11.1 multidimensional indexes via SUBSEP")
+		AwkTestSupport.awkTest("POSIX 11.1 multidimensional indexes via SUBSEP")
 				.script("BEGIN{ SUBSEP=\"|\"; A[1,2]=\"x\"; print A[\"1\" SUBSEP \"2\"], A[1 SUBSEP 2]; }")
 				.expectLines("x x")
 				.runAndAssert();
@@ -917,8 +830,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix112InOperatorDoesNotCreateElements() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 11.2 in operator membership test")
+		AwkTestSupport.awkTest("POSIX 11.2 in operator membership test")
 				.script("BEGIN{ delete A; print (1 in A); A[1]=7; print (1 in A); print ((1,2) in A); }")
 				.expectLines("0", "1", "0")
 				.runAndAssert();
@@ -926,8 +838,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix113DeleteArrayClearsAll() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 11.3 delete array clears elements")
+		AwkTestSupport.awkTest("POSIX 11.3 delete array clears elements")
 				.script("BEGIN{ split(\"a b\", A, \" \" ); delete A; print length(A) }")
 				.expectLines("0")
 				.runAndAssert();
@@ -937,8 +848,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix121HashIntroducesComment() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 12.1 # comments")
+		AwkTestSupport.awkTest("POSIX 12.1 # comments")
 				.script("{ # print record\n  print $0 }")
 				.stdin("q\n")
 				.expectLines("q")
@@ -947,8 +857,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix122BackslashNewlineIgnored() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 12.2 backslash newline ignored")
+		AwkTestSupport.awkTest("POSIX 12.2 backslash newline ignored")
 				.script("BEGIN{ print \"x\"\\\n\"y\" }")
 				.expectLines("xy")
 				.runAndAssert();
@@ -956,8 +865,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix123OctalEscapesInString() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 12.3 octal escapes in string")
+		AwkTestSupport.awkTest("POSIX 12.3 octal escapes in string")
 				.script("BEGIN{ s=\"A\\101\"; print s }")
 				.expectLines("AA")
 				.runAndAssert();
@@ -967,8 +875,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix131ExitStatusZeroOnSuccess() throws Exception {
-		AwkTestSupport
-				.cliTest("POSIX 13.1 exit status zero when successful")
+		AwkTestSupport.cliTest("POSIX 13.1 exit status zero when successful")
 				.script("BEGIN{}")
 				.expectLines()
 				.expectExit(0)
@@ -978,8 +885,7 @@ public class PosixConformanceTest {
 	@Test
 	public void posix132UnreadableFileProducesDiagnostic() throws Exception {
 		Assume.assumeTrue("Jawk throws FileNotFoundException instead of reporting a diagnostic", false);
-		AwkTestSupport
-				.cliTest("POSIX 13.2 unreadable file yields diagnostic and non-zero exit")
+		AwkTestSupport.cliTest("POSIX 13.2 unreadable file yields diagnostic and non-zero exit")
 				.script("{print}")
 				.path("missing.txt")
 				.operand("{{missing.txt}}")
@@ -995,8 +901,7 @@ public class PosixConformanceTest {
 		Locale previous = Locale.getDefault();
 		try {
 			Locale.setDefault(Locale.FRANCE);
-			AwkTestSupport
-					.awkTest("POSIX 14.1 dot recognized as decimal point")
+			AwkTestSupport.awkTest("POSIX 14.1 dot recognized as decimal point")
 					.script("BEGIN{ print 1.5 + n }")
 					.preassign("n", 3.5)
 					.expectLines("5")
@@ -1012,8 +917,7 @@ public class PosixConformanceTest {
 		Locale previous = Locale.getDefault();
 		try {
 			Locale.setDefault(Locale.FRANCE);
-			AwkTestSupport
-					.awkTest("POSIX 14.2 locale numeric input")
+			AwkTestSupport.awkTest("POSIX 14.2 locale numeric input")
 					.script("{print ($1+0)==1.5 ? \"OK\":\"NO\"}")
 					.stdin("1,5\n")
 					.expectLines("OK")
@@ -1027,8 +931,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix151FunctionCallWithoutWhitespace() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 15.1 function call without whitespace")
+		AwkTestSupport.awkTest("POSIX 15.1 function call without whitespace")
 				.script("function f(x){return x+1}\nBEGIN{ print f(41) }")
 				.expectLines("42")
 				.runAndAssert();
@@ -1036,8 +939,7 @@ public class PosixConformanceTest {
 
 	@Test
 	public void posix152NewlineStatementTerminator() throws Exception {
-		AwkTestSupport
-				.awkTest("POSIX 15.2 newline as statement terminator")
+		AwkTestSupport.awkTest("POSIX 15.2 newline as statement terminator")
 				.script("BEGIN{\n    a=1\n    ; b=2\n    print a+b\n}")
 				.expectLines("3")
 				.runAndAssert();

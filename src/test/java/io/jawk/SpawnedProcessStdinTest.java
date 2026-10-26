@@ -42,21 +42,17 @@ public class SpawnedProcessStdinTest {
 
 	@Test
 	public void commandInputPipeChildReadsJawkStandardInput() throws Exception {
-		String output = AwkTestSupport
-				.runCliInFreshJvm(
-						"cmd|getline child reads Jawk stdin",
-						"BEGIN { \"sort\" | getline line; print \"[\" line \"]\" }",
-						"hello\n");
+		String output = AwkTestSupport.runCliInFreshJvm(
+				"cmd|getline child reads Jawk stdin",
+				"BEGIN { \"sort\" | getline line; print \"[\" line \"]\" }",
+				"hello\n");
 		assertEquals("[hello]\n", output);
 	}
 
 	@Test
 	public void systemChildReadsJawkStandardInput() throws Exception {
 		String output = AwkTestSupport
-				.runCliInFreshJvm(
-						"system() child reads Jawk stdin",
-						"BEGIN { system(\"sort\") }",
-						"zulu\nalpha\n");
+				.runCliInFreshJvm("system() child reads Jawk stdin", "BEGIN { system(\"sort\") }", "zulu\nalpha\n");
 		assertEquals("alpha\nzulu\n", output);
 	}
 
@@ -64,8 +60,7 @@ public class SpawnedProcessStdinTest {
 	public void embeddedExecutionKeepsChildStandardInputClosed() throws Exception {
 		// A custom input stream cannot be lent to another OS process, so the
 		// child sees end of input at once and getline returns 0
-		AwkTestSupport
-				.cliTest("embedded cmd|getline child gets no standard input")
+		AwkTestSupport.cliTest("embedded cmd|getline child gets no standard input")
 				.script("BEGIN { n = (\"sort\" | getline line); print n \"[\" line \"]\" }")
 				.stdin("never seen by the child\n")
 				.expectLines("0[]")

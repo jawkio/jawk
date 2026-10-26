@@ -45,8 +45,7 @@ public class BSDRandomTest {
 				0.3352227557148890,
 				0.7682295948119040,
 				0.2777747108031878,
-				0.5539699557954305
-		};
+				0.5539699557954305 };
 		for (double expectedValue : expected) {
 			assertEquals(expectedValue, rng.nextDouble(), 1e-15);
 		}

@@ -38,12 +38,9 @@ public class NextStatementTest {
 
 	@Test
 	public void nextInFunctionSkipsToTheNextRecord() throws Exception {
-		AwkTestSupport
-				.awkTest("next in a function abandons the current record")
+		AwkTestSupport.awkTest("next in a function abandons the current record")
 				.script(
-						"function f() { next; print \"in-f\" }"
-								+ " { f(); print \"unreached\" }"
-								+ " END { print \"end\", NR }")
+						"function f() { next; print \"in-f\" }" + " { f(); print \"unreached\" }" + " END { print \"end\", NR }")
 				.stdin("a\nb\n")
 				.expectLines("end 2")
 				.runAndAssert();
@@ -51,12 +48,9 @@ public class NextStatementTest {
 
 	@Test
 	public void nextInFunctionUnwindsNestedCalls() throws Exception {
-		AwkTestSupport
-				.awkTest("next in a function unwinds the whole call chain")
+		AwkTestSupport.awkTest("next in a function unwinds the whole call chain")
 				.script(
-						"function g() { f(); print \"g\" }"
-								+ " function f() { next }"
-								+ " { g(); print \"r\" }"
+						"function g() { f(); print \"g\" }" + " function f() { next }" + " { g(); print \"r\" }"
 								+ " END { print NR }")
 				.stdin("a\nb\n")
 				.expectLines("2")
@@ -65,8 +59,7 @@ public class NextStatementTest {
 
 	@Test
 	public void nextInFunctionSkipsTheRemainingRules() throws Exception {
-		AwkTestSupport
-				.awkTest("next in a function bypasses the later rules for the record")
+		AwkTestSupport.awkTest("next in a function bypasses the later rules for the record")
 				.script("function f() { next } NR == 1 { f() } { print $0 }")
 				.stdin("a\nb\n")
 				.expectLines("b")
@@ -75,12 +68,9 @@ public class NextStatementTest {
 
 	@Test
 	public void nextInFunctionWorksWithPerFileRules() throws Exception {
-		AwkTestSupport
-				.awkTest("next in a function resumes the per-file input loop")
+		AwkTestSupport.awkTest("next in a function resumes the per-file input loop")
 				.script(
-						"function f() { if ($0 ~ /2/) next }"
-								+ " BEGINFILE { print \"bf\" }"
-								+ " { f(); print \"r:\" $0 }"
+						"function f() { if ($0 ~ /2/) next }" + " BEGINFILE { print \"bf\" }" + " { f(); print \"r:\" $0 }"
 								+ " ENDFILE { print \"ef\" }")
 				.file("f1", "a1\na2\n")
 				.file("f2", "b1\n")
@@ -91,8 +81,7 @@ public class NextStatementTest {
 
 	@Test
 	public void nextInBeginViaFunctionIsARuntimeError() throws Exception {
-		AwkTestSupport
-				.awkTest("next reached from a BEGIN rule through a function is fatal")
+		AwkTestSupport.awkTest("next reached from a BEGIN rule through a function is fatal")
 				.script("function f() { next } BEGIN { f() } { print }")
 				.stdin("x\n")
 				.expectThrow(AwkRuntimeException.class)
@@ -101,8 +90,7 @@ public class NextStatementTest {
 
 	@Test
 	public void nextWithoutMainInputLoopViaFunctionIsARuntimeError() throws Exception {
-		AwkTestSupport
-				.awkTest("next in a function is fatal when the program consumes no input")
+		AwkTestSupport.awkTest("next in a function is fatal when the program consumes no input")
 				.script("function f() { next } BEGIN { f() }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -110,8 +98,7 @@ public class NextStatementTest {
 
 	@Test
 	public void nextInEndViaFunctionIsARuntimeError() throws Exception {
-		AwkTestSupport
-				.awkTest("next reached from an END rule through a function is fatal")
+		AwkTestSupport.awkTest("next reached from an END rule through a function is fatal")
 				.script("function f() { next } { } END { f() }")
 				.stdin("x\n")
 				.expectThrow(AwkRuntimeException.class)
@@ -120,8 +107,7 @@ public class NextStatementTest {
 
 	@Test
 	public void nextInBeginFileViaFunctionIsARuntimeError() throws Exception {
-		AwkTestSupport
-				.awkTest("next reached from a BEGINFILE rule through a function is fatal")
+		AwkTestSupport.awkTest("next reached from a BEGINFILE rule through a function is fatal")
 				.script("function f() { next } BEGINFILE { f() } { print }")
 				.file("f1", "x\n")
 				.operand("{{f1}}")
@@ -131,8 +117,7 @@ public class NextStatementTest {
 
 	@Test
 	public void nextInEndFileViaFunctionIsARuntimeError() throws Exception {
-		AwkTestSupport
-				.awkTest("next reached from an ENDFILE rule through a function is fatal")
+		AwkTestSupport.awkTest("next reached from an ENDFILE rule through a function is fatal")
 				.script("function f() { next } ENDFILE { f() } { print }")
 				.file("f1", "x\n")
 				.operand("{{f1}}")
@@ -142,14 +127,12 @@ public class NextStatementTest {
 
 	@Test
 	public void directNextInBeginAndEndRemainsACompileTimeError() throws Exception {
-		AwkTestSupport
-				.awkTest("next directly inside a BEGIN rule stays a compile-time error")
+		AwkTestSupport.awkTest("next directly inside a BEGIN rule stays a compile-time error")
 				.script("BEGIN { next } { print }")
 				.stdin("x\n")
 				.expectThrow(RuntimeException.class)
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("next directly inside an END rule stays a compile-time error")
+		AwkTestSupport.awkTest("next directly inside an END rule stays a compile-time error")
 				.script("{ print } END { next }")
 				.stdin("x\n")
 				.expectThrow(RuntimeException.class)

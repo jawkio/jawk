@@ -38,15 +38,10 @@ public class NullDeviceTest {
 
 	@Test
 	public void printToDevNullDiscardsTheOutput() throws Exception {
-		AwkTestSupport
-				.awkTest("print and printf to /dev/null produce no output")
+		AwkTestSupport.awkTest("print and printf to /dev/null produce no output")
 				.script(
-						"BEGIN {"
-								+ " print \"one\" > \"/dev/null\";"
-								+ " printf \"%s\\n\", \"two\" > \"/dev/null\";"
-								+ " print \"three\" >> \"/dev/null\";"
-								+ " print \"survived\""
-								+ " }")
+						"BEGIN {" + " print \"one\" > \"/dev/null\";" + " printf \"%s\\n\", \"two\" > \"/dev/null\";"
+								+ " print \"three\" >> \"/dev/null\";" + " print \"survived\"" + " }")
 				.expectLines("survived")
 				.runAndAssert();
 	}
@@ -56,36 +51,27 @@ public class NullDeviceTest {
 		// The strongest cross-platform statement that the records were discarded
 		// rather than kept in a file of that name: reading the same name back
 		// reports end of input and leaves the variable untouched.
-		AwkTestSupport
-				.awkTest("what /dev/null swallowed cannot be read back")
+		AwkTestSupport.awkTest("what /dev/null swallowed cannot be read back")
 				.script(
-						"BEGIN {"
-								+ " print \"written\" > \"/dev/null\";"
-								+ " close(\"/dev/null\");"
-								+ " print (getline line < \"/dev/null\"), \"[\" line \"]\""
-								+ " }")
+						"BEGIN {" + " print \"written\" > \"/dev/null\";" + " close(\"/dev/null\");"
+								+ " print (getline line < \"/dev/null\"), \"[\" line \"]\"" + " }")
 				.expectLines("0 []")
 				.runAndAssert();
 	}
 
 	@Test
 	public void appendToDevNullDiscardsTheOutput() throws Exception {
-		AwkTestSupport
-				.awkTest("an appending redirection to /dev/null accumulates nothing")
+		AwkTestSupport.awkTest("an appending redirection to /dev/null accumulates nothing")
 				.script(
-						"BEGIN {"
-								+ " for (i = 1; i <= 3; i++) print i >> \"/dev/null\";"
-								+ " close(\"/dev/null\");"
-								+ " print (getline line < \"/dev/null\")"
-								+ " }")
+						"BEGIN {" + " for (i = 1; i <= 3; i++) print i >> \"/dev/null\";" + " close(\"/dev/null\");"
+								+ " print (getline line < \"/dev/null\")" + " }")
 				.expectLines("0")
 				.runAndAssert();
 	}
 
 	@Test
 	public void getlineFromDevNullReportsEndOfInput() throws Exception {
-		AwkTestSupport
-				.awkTest("getline from /dev/null reports end of input, not an error")
+		AwkTestSupport.awkTest("getline from /dev/null reports end of input, not an error")
 				.script("BEGIN { print (getline x < \"/dev/null\"), \"[\" x \"]\" }")
 				.expectLines("0 []")
 				.runAndAssert();
@@ -93,8 +79,7 @@ public class NullDeviceTest {
 
 	@Test
 	public void getlineFromDevNullIntoDollarZeroReportsEndOfInput() throws Exception {
-		AwkTestSupport
-				.awkTest("a plain getline from /dev/null reports end of input and advances nothing")
+		AwkTestSupport.awkTest("a plain getline from /dev/null reports end of input and advances nothing")
 				.script("BEGIN { print (getline < \"/dev/null\"), NR, NF }")
 				.expectLines("0 0 0")
 				.runAndAssert();
@@ -105,24 +90,17 @@ public class NullDeviceTest {
 		// As with any other redirection: closing an open one reports success,
 		// closing it again reports that none is open, and the name can be used
 		// afterwards.
-		AwkTestSupport
-				.awkTest("close() of /dev/null succeeds and the name stays usable")
+		AwkTestSupport.awkTest("close() of /dev/null succeeds and the name stays usable")
 				.script(
-						"BEGIN {"
-								+ " print \"one\" > \"/dev/null\";"
-								+ " print close(\"/dev/null\");"
-								+ " print close(\"/dev/null\");"
-								+ " print \"two\" > \"/dev/null\";"
-								+ " print \"survived\""
-								+ " }")
+						"BEGIN {" + " print \"one\" > \"/dev/null\";" + " print close(\"/dev/null\");"
+								+ " print close(\"/dev/null\");" + " print \"two\" > \"/dev/null\";" + " print \"survived\"" + " }")
 				.expectLines("0", "-1", "survived")
 				.runAndAssert();
 	}
 
 	@Test
 	public void devNullAsAnOperandReadsAsAnEmptyFile() throws Exception {
-		AwkTestSupport
-				.awkTest("/dev/null in the file list contributes no record")
+		AwkTestSupport.awkTest("/dev/null in the file list contributes no record")
 				.script("{ print \"record:\" $0 } END { print NR, \"[\" FILENAME \"]\" }")
 				.operand("/dev/null")
 				.expectLines("0 [/dev/null]")
@@ -131,8 +109,7 @@ public class NullDeviceTest {
 
 	@Test
 	public void devNullAsAnOperandDoesNotInterruptTheFileList() throws Exception {
-		AwkTestSupport
-				.awkTest("/dev/null between two files is traversed like an empty file")
+		AwkTestSupport.awkTest("/dev/null between two files is traversed like an empty file")
 				.script("{ print FNR \":\" $0 } END { print \"NR=\" NR }")
 				.file("first", "a\n")
 				.file("second", "b\n")
@@ -147,12 +124,10 @@ public class NullDeviceTest {
 		// inspects each operand before opening it. The null device must not be
 		// mistaken for a missing file there: Windows does not report it as an
 		// existing file.
-		AwkTestSupport
-				.awkTest("BEGINFILE and ENDFILE see /dev/null as a readable empty file")
+		AwkTestSupport.awkTest("BEGINFILE and ENDFILE see /dev/null as a readable empty file")
 				.script(
 						"BEGINFILE { print \"bf[\" FILENAME \"] errno=[\" ERRNO \"]\" }"
-								+ " ENDFILE { print \"ef[\" FILENAME \"]\", FNR }"
-								+ " END { print \"NR=\" NR }")
+								+ " ENDFILE { print \"ef[\" FILENAME \"]\", FNR }" + " END { print \"NR=\" NR }")
 				.operand("/dev/null")
 				.expectLines("bf[/dev/null] errno=[]", "ef[/dev/null] 0", "NR=0")
 				.runAndAssert();
@@ -164,12 +139,10 @@ public class NullDeviceTest {
 		// it is no more stat-able than /dev/null is, so the per-file main input
 		// loop must recognize it too instead of reporting a missing file. The
 		// name is an ordinary filename on POSIX platforms, hence windowsOnly().
-		AwkTestSupport
-				.awkTest("the native NUL spelling is a readable empty file in the file list")
+		AwkTestSupport.awkTest("the native NUL spelling is a readable empty file in the file list")
 				.script(
 						"BEGINFILE { print \"bf[\" FILENAME \"] errno=[\" ERRNO \"]\" }"
-								+ " ENDFILE { print \"ef[\" FILENAME \"]\", FNR }"
-								+ " END { print \"NR=\" NR }")
+								+ " ENDFILE { print \"ef[\" FILENAME \"]\", FNR }" + " END { print \"NR=\" NR }")
 				.operand("NUL")
 				.windowsOnly()
 				.expectLines("bf[NUL] errno=[]", "ef[NUL] 0", "NR=0")
@@ -178,14 +151,10 @@ public class NullDeviceTest {
 
 	@Test
 	public void nulIsTheNullDeviceInRedirectionsOnWindows() throws Exception {
-		AwkTestSupport
-				.awkTest("the native NUL spelling discards output and reads as empty")
+		AwkTestSupport.awkTest("the native NUL spelling discards output and reads as empty")
 				.script(
-						"BEGIN {"
-								+ " print \"written\" > \"NUL\";"
-								+ " print close(\"NUL\");"
-								+ " print (getline line < \"NUL\"), \"[\" line \"]\""
-								+ " }")
+						"BEGIN {" + " print \"written\" > \"NUL\";" + " print close(\"NUL\");"
+								+ " print (getline line < \"NUL\"), \"[\" line \"]\"" + " }")
 				.windowsOnly()
 				.expectLines("0", "0 []")
 				.runAndAssert();
@@ -200,8 +169,7 @@ public class NullDeviceTest {
 		// earlier run of a broken build.
 		File regularFile = new File("/dev/null");
 		String before = describeRegularFile(regularFile);
-		AwkTestSupport
-				.awkTest("a redirection to /dev/null creates no regular file")
+		AwkTestSupport.awkTest("a redirection to /dev/null creates no regular file")
 				.script("BEGIN { print \"a record long enough to change any file length\" > \"/dev/null\" }")
 				.expect("")
 				.runAndAssert();

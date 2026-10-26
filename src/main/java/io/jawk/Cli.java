@@ -265,9 +265,7 @@ public final class Cli {
 							"File '" + file + "' does not contain a valid precompiled AwkProgram. Please recompile.",
 							ex);
 				} catch (IOException | ClassNotFoundException ex) {
-					throw new IllegalArgumentException(
-							"Failed to read program '" + file + "': " + ex.getMessage(),
-							ex);
+					throw new IllegalArgumentException("Failed to read program '" + file + "': " + ex.getMessage(), ex);
 				}
 			} else if (arg.equals("--persist")) {
 				// --persist filename : load and save persistent user globals
@@ -360,10 +358,7 @@ public final class Cli {
 			}
 			String scriptContent = args[argIdx++];
 			scriptSources
-					.add(
-							new ScriptSource(
-									ScriptSource.DESCRIPTION_COMMAND_LINE_SCRIPT,
-									new StringReader(scriptContent)));
+					.add(new ScriptSource(ScriptSource.DESCRIPTION_COMMAND_LINE_SCRIPT, new StringReader(scriptContent)));
 		} else if (!scriptSources.isEmpty()) {
 			for (ScriptSource scriptSource : scriptSources) {
 				try {
@@ -392,9 +387,7 @@ public final class Cli {
 	 * @return {@code true} when the argument must be split before dispatch
 	 */
 	private static boolean isAttachedOptionArgument(String arg) {
-		return arg.length() > 2
-				&& arg.charAt(0) == '-'
-				&& VALUE_OPTION_LETTERS.indexOf(arg.charAt(1)) >= 0;
+		return arg.length() > 2 && arg.charAt(0) == '-' && VALUE_OPTION_LETTERS.indexOf(arg.charAt(1)) >= 0;
 	}
 
 	/**
@@ -428,8 +421,7 @@ public final class Cli {
 	}
 
 	private static final Pattern INITIAL_VAR_PATTERN = Pattern
-			.compile(
-					"((?:[_a-zA-Z][_0-9a-zA-Z]*::)?[_a-zA-Z][_0-9a-zA-Z]*)=(.*)");
+			.compile("((?:[_a-zA-Z][_0-9a-zA-Z]*::)?[_a-zA-Z][_0-9a-zA-Z]*)=(.*)");
 
 	/**
 	 * Parses a variable assignment passed via <code>-v</code> and stores it in the
@@ -441,8 +433,7 @@ public final class Cli {
 	private static void addVariable(AwkSettings settings, String keyValue) {
 		Matcher m = INITIAL_VAR_PATTERN.matcher(keyValue);
 		if (!m.matches()) {
-			throw new IllegalArgumentException(
-					"keyValue \"" + keyValue + "\" must be of the form \"name=value\"");
+			throw new IllegalArgumentException("keyValue \"" + keyValue + "\" must be of the form \"name=value\"");
 		}
 		String name = m.group(1);
 		if (name.startsWith("awk::")) {
@@ -627,8 +618,7 @@ public final class Cli {
 			avm.restorePersistentMemory(snapshot);
 		} catch (java.io.InvalidClassException ex) {
 			throw new IllegalArgumentException(
-					"Persistent memory file '" + memoryFile + "' is not compatible with this version ("
-							+ ex.getMessage()
+					"Persistent memory file '" + memoryFile + "' is not compatible with this version (" + ex.getMessage()
 							+ "). Please discard it and rerun.",
 					ex);
 		} catch (ClassCastException ex) {
@@ -687,40 +677,22 @@ public final class Cli {
 	private void usage(PrintStream dest) {
 		String programName = resolveProgramName();
 		dest.println("Usage:");
-		dest
-				.println(
-						programName +
-								" [-F fs_val]" +
-								" [-f script-filename]" +
-								" [-L program-filename]" +
-								" [--persist memory-file]" +
-								" [-K program-filename]" +
-								" [-S|--sandbox]" +
-								" [--posix]" +
-								" [--dump-syntax]" +
-								" [--dump-intermediate]" +
-								" [-s|--no-optimize]" +
-								" [--profile[=filename]]" +
-								" [--locale locale]" +
-								" [-t]" +
-								" [-l extension]..." +
-								" [-v name=val]..." +
-								" [--]" +
-								" [script]" +
-								" [name=val | input_filename | -]...");
+		dest.println(
+				programName + " [-F fs_val]" + " [-f script-filename]" + " [-L program-filename]" + " [--persist memory-file]"
+						+ " [-K program-filename]" + " [-S|--sandbox]" + " [--posix]" + " [--dump-syntax]"
+						+ " [--dump-intermediate]" + " [-s|--no-optimize]" + " [--profile[=filename]]" + " [--locale locale]"
+						+ " [-t]" + " [-l extension]..." + " [-v name=val]..." + " [--]" + " [script]"
+						+ " [name=val | input_filename | -]...");
 		dest.println();
 		dest.println(programName + " --list-ext");
 		dest.println();
 		dest.println(" -F fs_val = Use fs_val for FS.");
 		dest.println(" -f filename = Use contents of filename for script.");
 		dest.println(" -L filename = Load precompiled program from filename.");
-		dest
-				.println(
-						" --persist filename = Load and save persistent user-defined globals from filename.");
-		dest
-				.println(
-						"                      When omitted, the " + PERSISTENT_MEMORY_ENVIRONMENT_VARIABLE
-								+ " environment variable can provide the backing file path.");
+		dest.println(" --persist filename = Load and save persistent user-defined globals from filename.");
+		dest.println(
+				"                      When omitted, the " + PERSISTENT_MEMORY_ENVIRONMENT_VARIABLE
+						+ " environment variable can provide the backing file path.");
 		dest.println(" -l extension = Load an extension by extension name or class name.");
 		dest.println(" --load extension = Same as -l.");
 		dest.println("                      Extensions must already be on the class path before loading them.");
@@ -730,20 +702,17 @@ public final class Cli {
 		dest.println();
 		dest.println(" -t = (extension) Maintain array keys in sorted order.");
 		dest.println(" -K filename = Compile to program file and halt.");
-		dest
-				.println(
-						" -S, --sandbox = (extension) Enable sandbox mode (no system(), redirection, pipelines, or"
-								+ " dynamic extensions).");
-		dest
-				.println(
-						" --posix = Enforce POSIX-compatible behavior such as disabling nested arrays and"
-								+ " BEGINFILE/ENDFILE rules.");
+		dest.println(
+				" -S, --sandbox = (extension) Enable sandbox mode (no system(), redirection, pipelines, or"
+						+ " dynamic extensions).");
+		dest.println(
+				" --posix = Enforce POSIX-compatible behavior such as disabling nested arrays and"
+						+ " BEGINFILE/ENDFILE rules.");
 		dest.println(" --dump-syntax = Print the syntax tree.");
 		dest.println(" --dump-intermediate = Print the intermediate code.");
 		dest.println(" -s, --no-optimize = (extension) Disable optimizations during compilation.");
-		dest
-				.println(
-						" --profile[=filename] = (extension) Print tuple and function execution statistics to stderr or file.");
+		dest.println(
+				" --profile[=filename] = (extension) Print tuple and function execution statistics to stderr or file.");
 		dest.println(" --locale Locale = (extension) Specify a locale to be used instead of US-English");
 		dest.println(" --list-ext = (extension) List available extensions.");
 		dest.println();
@@ -759,11 +728,9 @@ public final class Cli {
 	 */
 	private static void version(PrintStream dest) {
 		dest.println("jawk " + JawkVersion.getVersion());
-		dest
-				.println(
-						"Java " + System.getProperty("java.version")
-								+ " (" + System.getProperty("java.vendor")
-								+ " " + System.getProperty("java.vm.name") + ")");
+		dest.println(
+				"Java " + System.getProperty("java.version") + " (" + System.getProperty("java.vendor") + " "
+						+ System.getProperty("java.vm.name") + ")");
 	}
 
 	/**

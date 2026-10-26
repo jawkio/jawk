@@ -63,24 +63,11 @@ public class AwkScriptBenchmark {
 	public void setup() throws IOException {
 		this.awk = new Awk();
 		this.sumInputProgram = this.awk
-				.compile(
-						"BEGIN { total = 0; }\n"
-								+ "/^input/ { total += $2; }\n"
-								+ "END { print total; }\n");
-		this.projectMatchingProgram = this.awk
-				.compile(
-						"/^input/ { print $1, $2 + 1, ($2 ~ /^[0-9]/) }\n");
-		this.arithmeticLoopProgram = this.awk
-				.compile(
-						"BEGIN { s = 0; for (i = 0; i < 50000; i++) s = s + i; print s }\n");
-		this.mixedNumericInput = "input 10\n"
-				+ "input 3.14\n"
-				+ "input 0\n"
-				+ "input -2\n"
-				+ "input 1e02\n"
-				+ "input non-numeric\n"
-				+ "comment 1000000\n"
-				+ "input 0xff\n";
+				.compile("BEGIN { total = 0; }\n" + "/^input/ { total += $2; }\n" + "END { print total; }\n");
+		this.projectMatchingProgram = this.awk.compile("/^input/ { print $1, $2 + 1, ($2 ~ /^[0-9]/) }\n");
+		this.arithmeticLoopProgram = this.awk.compile("BEGIN { s = 0; for (i = 0; i < 50000; i++) s = s + i; print s }\n");
+		this.mixedNumericInput = "input 10\n" + "input 3.14\n" + "input 0\n" + "input -2\n" + "input 1e02\n"
+				+ "input non-numeric\n" + "comment 1000000\n" + "input 0xff\n";
 	}
 
 	/**

@@ -51,11 +51,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void removesTrailingPlaceholderNop() throws Exception {
 		String script = "BEGIN { print \"hello\" }\n";
-		AwkTestSupport
-				.awkTest("placeholder nop removal")
-				.script(script)
-				.expect("hello\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("placeholder nop removal").script(script).expect("hello\n").runAndAssert();
 
 		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
@@ -66,11 +62,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void foldsLiteralBinaryArithmetic() throws Exception {
 		String script = "BEGIN { print 1 + 2 }\n";
-		AwkTestSupport
-				.awkTest("folds literal binary arithmetic")
-				.script(script)
-				.expect("3\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("folds literal binary arithmetic").script(script).expect("3\n").runAndAssert();
 
 		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
@@ -81,11 +73,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void foldsLiteralUnaryArithmetic() throws Exception {
 		String script = "BEGIN { print -5 }\n";
-		AwkTestSupport
-				.awkTest("folds literal unary arithmetic")
-				.script(script)
-				.expect("-5\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("folds literal unary arithmetic").script(script).expect("-5\n").runAndAssert();
 
 		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
@@ -97,11 +85,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void foldsLiteralComparison() throws Exception {
 		String script = "BEGIN { print (4 < 7) }\n";
-		AwkTestSupport
-				.awkTest("folds literal comparison")
-				.script(script)
-				.expect("1\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("folds literal comparison").script(script).expect("1\n").runAndAssert();
 
 		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
@@ -115,8 +99,7 @@ public class AwkTupleOptimizationTest {
 		// (PUSH 2, MULTIPLY) that the true branch jumps to: folding
 		// 24 * 2 would land the true branch on the folded literal
 		String script = "BEGIN { v = 60; print \"size:\", (v ? v : 24) * 2 }\n";
-		AwkTestSupport
-				.awkTest("ternary result times literal takes the true branch")
+		AwkTestSupport.awkTest("ternary result times literal takes the true branch")
 				.script(script)
 				.expect("size: 120\n")
 				.runAndAssert();
@@ -128,8 +111,7 @@ public class AwkTupleOptimizationTest {
 
 	@Test
 	public void doesNotFoldBinaryOperatorAtTernaryJoinPointInAssignment() throws Exception {
-		AwkTestSupport
-				.awkTest("ternary result times literal assigns the true branch")
+		AwkTestSupport.awkTest("ternary result times literal assigns the true branch")
 				.script("BEGIN { v = 60; h = (v ? v : 24) * 2; print h }")
 				.expect("120\n")
 				.runAndAssert();
@@ -137,8 +119,7 @@ public class AwkTupleOptimizationTest {
 
 	@Test
 	public void stillTakesFalseBranchOfGuardedTernary() throws Exception {
-		AwkTestSupport
-				.awkTest("ternary result times literal takes the false branch")
+		AwkTestSupport.awkTest("ternary result times literal takes the false branch")
 				.script("BEGIN { v = 0; print (v ? v : 24) * 2 }")
 				.expect("48\n")
 				.runAndAssert();
@@ -148,11 +129,7 @@ public class AwkTupleOptimizationTest {
 	public void doesNotFoldUnaryOperatorAtTernaryJoinPoint() throws Exception {
 		// Same shape with NEGATE as the join point of the two branches
 		String script = "BEGIN { v = 1; print -(v ? 5 : 24) }\n";
-		AwkTestSupport
-				.awkTest("negated ternary takes the true branch")
-				.script(script)
-				.expect("-5\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("negated ternary takes the true branch").script(script).expect("-5\n").runAndAssert();
 
 		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
@@ -164,8 +141,7 @@ public class AwkTupleOptimizationTest {
 		// Here GET_INPUT_FIELD is the join point: fusing it with the false
 		// branch's literal field index would hijack the true branch
 		String script = "{ v = 1; print $(v ? 1 : 2) }\n";
-		AwkTestSupport
-				.awkTest("ternary field index takes the true branch")
+		AwkTestSupport.awkTest("ternary field index takes the true branch")
 				.script(script)
 				.stdin("a b\n")
 				.expect("a\n")
@@ -173,19 +149,13 @@ public class AwkTupleOptimizationTest {
 
 		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
-		assertTrue(
-				"GET_INPUT_FIELD at a jump target must survive folding",
-				opcodes.contains(Opcode.GET_INPUT_FIELD));
+		assertTrue("GET_INPUT_FIELD at a jump target must survive folding", opcodes.contains(Opcode.GET_INPUT_FIELD));
 	}
 
 	@Test
 	public void foldsNestedLiteralArithmetic() throws Exception {
 		String script = "BEGIN { print 1 + 2 + 3 }\n";
-		AwkTestSupport
-				.awkTest("folds nested literal arithmetic")
-				.script(script)
-				.expect("6\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("folds nested literal arithmetic").script(script).expect("6\n").runAndAssert();
 
 		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
@@ -196,11 +166,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void foldsLiteralStringConcatenation() throws Exception {
 		String script = "BEGIN { print \"foo\" \"bar\" }\n";
-		AwkTestSupport
-				.awkTest("folds literal string concatenation")
-				.script(script)
-				.expect("foobar\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("folds literal string concatenation").script(script).expect("foobar\n").runAndAssert();
 
 		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
@@ -212,8 +178,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void foldsChainedLiteralStringConcatenation() throws Exception {
 		String script = "BEGIN { print \"foo\" \"bar\" \"baz\" \"qux\" }\n";
-		AwkTestSupport
-				.awkTest("folds chained literal string concatenation")
+		AwkTestSupport.awkTest("folds chained literal string concatenation")
 				.script(script)
 				.expect("foobarbazqux\n")
 				.runAndAssert();
@@ -230,8 +195,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void optimizesChainedStringConcatenationAsSingleMultiConcat() throws Exception {
 		String script = "BEGIN { s1 = \"alpha\"; s2 = \"beta\"; print s1 \"-\" s2 \":\" }\n";
-		AwkTestSupport
-				.awkTest("counted chained string concatenation")
+		AwkTestSupport.awkTest("counted chained string concatenation")
 				.script(script)
 				.expect("alpha-beta:\n")
 				.runAndAssert();
@@ -286,27 +250,17 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void foldsScalarAssignmentPopIntoNonPushingAssignment() throws Exception {
 		String script = "BEGIN { a = -2; b = 2; c = 4; print a + b + c }\n";
-		AwkTestSupport
-				.awkTest("folds scalar assignment pop")
-				.script(script)
-				.expect("4\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("folds scalar assignment pop").script(script).expect("4\n").runAndAssert();
 
 		AwkProgram tuples = new Awk().compile(script);
-		assertFalse(
-				"ASSIGN followed by POP should be folded",
-				hasAdjacentOpcodes(tuples, Opcode.ASSIGN, Opcode.POP));
+		assertFalse("ASSIGN followed by POP should be folded", hasAdjacentOpcodes(tuples, Opcode.ASSIGN, Opcode.POP));
 		assertEquals("Expected one non-pushing assignment per statement", 3, countOpcode(tuples, Opcode.ASSIGN_NOPUSH));
 	}
 
 	@Test
 	public void keepsScalarAssignmentPushWhenResultIsUsed() throws Exception {
 		String script = "BEGIN { print (a = 7) + 1 }\n";
-		AwkTestSupport
-				.awkTest("assignment expression pushes result")
-				.script(script)
-				.expect("8\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("assignment expression pushes result").script(script).expect("8\n").runAndAssert();
 
 		AwkProgram tuples = new Awk().compile(script);
 		assertEquals("Assignment expression should still push its result", 1, countOpcode(tuples, Opcode.ASSIGN));
@@ -316,11 +270,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void keepsAssignmentPopWhenPopIsBranchTarget() throws Exception {
 		String script = "BEGIN { cond = 1; cond ? (a = 1) : (b = 2); print a + 0, b + 0 }\n";
-		AwkTestSupport
-				.awkTest("keeps branch-target assignment pop")
-				.script(script)
-				.expect("1 0\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("keeps branch-target assignment pop").script(script).expect("1 0\n").runAndAssert();
 
 		AwkProgram tuples = new Awk().compile(script);
 		assertTrue(
@@ -339,11 +289,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void doesNotFoldNumericConcatenation() throws Exception {
 		String script = "BEGIN { CONVFMT=\"%.2f\"; print 1 \"x\" }\n";
-		AwkTestSupport
-				.awkTest("skips numeric literal concatenation folding")
-				.script(script)
-				.expect("1x\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("skips numeric literal concatenation folding").script(script).expect("1x\n").runAndAssert();
 
 		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
@@ -359,11 +305,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void removesInstructionsAfterExit() throws Exception {
 		String script = "" + "BEGIN { print \"before\"; exit; print \"after\" }\n" + "END { print \"done\" }\n";
-		AwkTestSupport
-				.awkTest("exit removes trailing code")
-				.script(script)
-				.expect("before\ndone\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("exit removes trailing code").script(script).expect("before\ndone\n").runAndAssert();
 
 		AwkProgram tuples = new Awk().compile(script);
 		String dump = dumpTuples(tuples);
@@ -373,8 +315,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void removesUnconditionalRuleWrapperAndLeadingGoto() throws Exception {
 		String script = "{ print $0 }\n";
-		AwkTestSupport
-				.awkTest("unconditional rule wrapper removed")
+		AwkTestSupport.awkTest("unconditional rule wrapper removed")
 				.script(script)
 				.stdin("value")
 				.expectLines("value")
@@ -394,11 +335,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void retainsRecursiveFunctionBodies() throws Exception {
 		String script = "function fact(n){return n? n*fact(n-1):1}\n" + "BEGIN{print fact(5)}\n";
-		AwkTestSupport
-				.awkTest("recursive function survives optimization")
-				.script(script)
-				.expect("120\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("recursive function survives optimization").script(script).expect("120\n").runAndAssert();
 
 		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
@@ -448,9 +385,7 @@ public class AwkTupleOptimizationTest {
 
 		Field optimizedField = AwkTuples.class.getDeclaredField("optimized");
 		optimizedField.setAccessible(true);
-		assertTrue(
-				"optimize() should still run on tuples with existing next pointers",
-				optimizedField.getBoolean(tuples));
+		assertTrue("optimize() should still run on tuples with existing next pointers", optimizedField.getBoolean(tuples));
 	}
 
 	@Test
@@ -474,8 +409,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void foldsLabeledTernaryFieldAccessesInFullScript() throws Exception {
 		String script = "{ print ($1 == \"x\" ? $2 : $3) }\n";
-		AwkTestSupport
-				.awkTest("labeled ternary field accesses in full script")
+		AwkTestSupport.awkTest("labeled ternary field accesses in full script")
 				.script(script)
 				.stdin("x b c\ny b c")
 				.expectLines("b", "c")
@@ -494,8 +428,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void foldsLabeledTernaryLiteralBranchesInFullScript() throws Exception {
 		String script = "{ print ($1 == \"x\" ? (1 + 2) : (4 + 5)) }\n";
-		AwkTestSupport
-				.awkTest("labeled ternary literal branches in full script")
+		AwkTestSupport.awkTest("labeled ternary literal branches in full script")
 				.script(script)
 				.stdin("x b c\ny b c")
 				.expectLines("3", "9")
@@ -514,8 +447,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void retargetsBranchesAwayFromPlaceholderTuples() throws Exception {
 		String script = "$1 { print $2 }\n";
-		AwkTestSupport
-				.awkTest("conditional rule bypass retargeted")
+		AwkTestSupport.awkTest("conditional rule bypass retargeted")
 				.script(script)
 				.stdin("alpha beta")
 				.expectLines("beta")
@@ -544,11 +476,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void removesGotoImmediatelyBeforeFunctionReturn() throws Exception {
 		String script = "function inc(x){ return x + 1 }\nBEGIN { print inc(41) }\n";
-		AwkTestSupport
-				.awkTest("function return goto removed")
-				.script(script)
-				.expect("42\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("function return goto removed").script(script).expect("42\n").runAndAssert();
 
 		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
@@ -561,8 +489,7 @@ public class AwkTupleOptimizationTest {
 
 	@Test
 	public void rejectsNegativeLiteralFieldIndex() throws Exception {
-		AwkTestSupport
-				.awkTest("negative field literal is invalid")
+		AwkTestSupport.awkTest("negative field literal is invalid")
 				.script("BEGIN { print $-1 }\n")
 				.expectThrow(RuntimeException.class)
 				.runAndAssert();
@@ -576,15 +503,13 @@ public class AwkTupleOptimizationTest {
 
 		assertTrue("Expected folded negative field access in tuple dump", dump.contains("GET_INPUT_FIELD_CONST, -1"));
 
-		AwkTestSupport
-				.awkTest("negative field branch remains runtime failure")
+		AwkTestSupport.awkTest("negative field branch remains runtime failure")
 				.script(script)
 				.stdin("x b c")
 				.expectLines("b")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("negative field branch fails when executed")
+		AwkTestSupport.awkTest("negative field branch fails when executed")
 				.script(script)
 				.stdin("y b c")
 				.expectThrow(RuntimeException.class)
@@ -603,11 +528,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void emitsArgcOffsetWhenArgcReferencedOnly() throws Exception {
 		String script = "BEGIN { print ARGC }\n";
-		AwkTestSupport
-				.awkTest("argc offset emitted when argc referenced")
-				.script(script)
-				.expect("1\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("argc offset emitted when argc referenced").script(script).expect("1\n").runAndAssert();
 
 		AwkProgram tuples = new Awk().compile(script);
 		List<Opcode> opcodes = collectOpcodes(tuples);
@@ -618,8 +539,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void emitsArgcAndArgvOffsetsWhenArgvReferenced() throws Exception {
 		String script = "BEGIN { print ARGV[0] }\n";
-		AwkTestSupport
-				.awkTest("argc and argv offsets emitted when argv referenced")
+		AwkTestSupport.awkTest("argc and argv offsets emitted when argv referenced")
 				.script(script)
 				.expect("jawk\n")
 				.runAndAssert();
@@ -633,8 +553,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void consumesFileOperandsWithoutArgvOffset() throws Exception {
 		String script = "{ print FILENAME \":\" $0 }\n";
-		AwkTestSupport
-				.awkTest("file operands consumed without argv offset")
+		AwkTestSupport.awkTest("file operands consumed without argv offset")
 				.file("file1", "a\n")
 				.file("file2", "b\n")
 				.script(script)
@@ -651,11 +570,7 @@ public class AwkTupleOptimizationTest {
 	@Test
 	public void keepsArgcSynchronizedForPreIncrement() throws Exception {
 		String script = "BEGIN { ++ARGC; print ARGC }\n";
-		AwkTestSupport
-				.awkTest("argc preincrement stays synchronized")
-				.script(script)
-				.expect("2\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("argc preincrement stays synchronized").script(script).expect("2\n").runAndAssert();
 	}
 
 	private static List<Opcode> collectOpcodes(AwkProgram tuples) {
@@ -751,8 +666,7 @@ public class AwkTupleOptimizationTest {
 			String[] expectedLines,
 			int fieldIndex)
 			throws Exception {
-		AwkTestSupport
-				.awkTest("literal field optimization " + fieldIndex)
+		AwkTestSupport.awkTest("literal field optimization " + fieldIndex)
 				.script(script)
 				.stdin(input)
 				.expectLines(expectedLines)
@@ -760,21 +674,15 @@ public class AwkTupleOptimizationTest {
 
 		AwkProgram tuples = new Awk().compile(script);
 		String dump = dumpTuples(tuples);
-		assertTrue(
-				"Expected GET_INPUT_FIELD_CONST in tuple dump",
-				dump.contains("GET_INPUT_FIELD_CONST, " + fieldIndex));
-		assertFalse(
-				"Literal field index should not be pushed separately",
-				dump.contains("PUSH_LONG, " + fieldIndex));
+		assertTrue("Expected GET_INPUT_FIELD_CONST in tuple dump", dump.contains("GET_INPUT_FIELD_CONST, " + fieldIndex));
+		assertFalse("Literal field index should not be pushed separately", dump.contains("PUSH_LONG, " + fieldIndex));
 	}
 
 	private static boolean hasLiteralPush(AwkProgram tuples, Object expected) {
 		PositionTracker tracker = rawTuples(tuples).top();
 		while (!tracker.isEOF()) {
 			Opcode opcode = tracker.opcode();
-			if (opcode == Opcode.PUSH_LONG
-					|| opcode == Opcode.PUSH_DOUBLE
-					|| opcode == Opcode.PUSH_STRING) {
+			if (opcode == Opcode.PUSH_LONG || opcode == Opcode.PUSH_DOUBLE || opcode == Opcode.PUSH_STRING) {
 				Object value = literalValue(tracker.current());
 				if (expected instanceof Number && value instanceof Number) {
 					double actual = ((Number) value).doubleValue();

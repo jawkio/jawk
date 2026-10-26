@@ -40,18 +40,15 @@ public class NumberToStringComparisonTest {
 
 	@Test
 	public void testComputedIntegerMatchesItsDigits() throws Exception {
-		AwkTestSupport
-				.awkTest("A computed integer must match an anchored digit pattern")
+		AwkTestSupport.awkTest("A computed integer must match an anchored digit pattern")
 				.script("BEGIN { x = \"2\" * 3; print (x ~ /^[0-9]+$/) }")
 				.expectLines("1")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("A computed integer must not carry a fractional part into the match")
+		AwkTestSupport.awkTest("A computed integer must not carry a fractional part into the match")
 				.script("BEGIN { x = \"2\" * 3; print (x ~ /^6$/) (x ~ /\\./) }")
 				.expectLines("10")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("A large computed integer must not be matched in exponent notation")
+		AwkTestSupport.awkTest("A large computed integer must not be matched in exponent notation")
 				.script("BEGIN { big = \"97\" * 1024 * 1024 * 1024; print (big ~ /^104152956928$/) }")
 				.expectLines("1")
 				.runAndAssert();
@@ -59,18 +56,15 @@ public class NumberToStringComparisonTest {
 
 	@Test
 	public void testComputedIntegerComparesEqualToItsDigits() throws Exception {
-		AwkTestSupport
-				.awkTest("Equality against the digits of a computed integer must hold")
+		AwkTestSupport.awkTest("Equality against the digits of a computed integer must hold")
 				.script("BEGIN { x = \"2\" * 3; print (x == \"6\") (x != \"6\") }")
 				.expectLines("10")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("Ordering against the digits of a computed integer must be an equal comparison")
+		AwkTestSupport.awkTest("Ordering against the digits of a computed integer must be an equal comparison")
 				.script("BEGIN { x = \"2\" * 3; print (x > \"6\") (x < \"6\") (x >= \"6\") (x <= \"6\") }")
 				.expectLines("0011")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("A large computed integer must compare equal to its digits")
+		AwkTestSupport.awkTest("A large computed integer must compare equal to its digits")
 				.script("BEGIN { big = \"97\" * 1024 * 1024 * 1024; print (big == \"104152956928\") }")
 				.expectLines("1")
 				.runAndAssert();
@@ -78,15 +72,13 @@ public class NumberToStringComparisonTest {
 
 	@Test
 	public void testEveryArithmeticOperatorIsCovered() throws Exception {
-		AwkTestSupport
-				.awkTest("Every arithmetic operator must yield a value comparable to its digits")
+		AwkTestSupport.awkTest("Every arithmetic operator must yield a value comparable to its digits")
 				.script(
-						"BEGIN { print ((\"2\" * 3) == \"6\") ((\"2\" + 4) == \"6\") ((\"12\" / 2) == \"6\")" +
-								" ((\"16\" % 10) == \"6\") ((\"6\" ^ 1) == \"6\") }")
+						"BEGIN { print ((\"2\" * 3) == \"6\") ((\"2\" + 4) == \"6\") ((\"12\" / 2) == \"6\")"
+								+ " ((\"16\" % 10) == \"6\") ((\"6\" ^ 1) == \"6\") }")
 				.expectLines("11111")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("A field operand must behave like a string operand")
+		AwkTestSupport.awkTest("A field operand must behave like a string operand")
 				.script("{ x = $1 * 3; print (x == \"291\") (x ~ /^[0-9]+$/) }")
 				.stdin("97\n")
 				.expectLines("11")
@@ -99,19 +91,16 @@ public class NumberToStringComparisonTest {
 	 */
 	@Test
 	public void testNumericComparisonDoesNotEvaluateConvfmt() throws Exception {
-		AwkTestSupport
-				.awkTest("A number compared with a numeric field must ignore CONVFMT entirely")
+		AwkTestSupport.awkTest("A number compared with a numeric field must ignore CONVFMT entirely")
 				.script("{ CONVFMT = \"%f%f\"; x = 7 / 2; print (x == $1) }")
 				.stdin("3.5\n")
 				.expectLines("1")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("Two numbers must compare without evaluating CONVFMT")
+		AwkTestSupport.awkTest("Two numbers must compare without evaluating CONVFMT")
 				.script("BEGIN { CONVFMT = \"%f%f\"; print (7 / 2 == 3.5) (1 < 2) }")
 				.expectLines("11")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("An uninitialized value compared with a number must ignore CONVFMT")
+		AwkTestSupport.awkTest("An uninitialized value compared with a number must ignore CONVFMT")
 				.script("BEGIN { CONVFMT = \"%f%f\"; x = 7 / 2; print (unset == 0) (unset < x) }")
 				.expectLines("11")
 				.runAndAssert();
@@ -119,13 +108,11 @@ public class NumberToStringComparisonTest {
 
 	@Test
 	public void testNonIntegralValuesStillUseConvfmt() throws Exception {
-		AwkTestSupport
-				.awkTest("A non-integral value keeps its CONVFMT rendering")
+		AwkTestSupport.awkTest("A non-integral value keeps its CONVFMT rendering")
 				.script("BEGIN { x = 7 / 2; print (x == \"3.5\") (x ~ /^3\\.5$/) }")
 				.expectLines("11")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("A script-assigned CONVFMT must drive the comparison")
+		AwkTestSupport.awkTest("A script-assigned CONVFMT must drive the comparison")
 				.script("BEGIN { CONVFMT = \"%.2f\"; x = 7 / 2; print (x == \"3.50\") (x == \"3.5\") }")
 				.expectLines("10")
 				.runAndAssert();

@@ -734,10 +734,7 @@ public abstract class Tuple implements Serializable {
 		/** Number of arguments this call site evaluates. */
 		private final long numActualParams;
 
-		CallFunctionTuple(
-				Supplier<Address> addressSupplier,
-				String functionName,
-				long numFormalParams,
+		CallFunctionTuple(Supplier<Address> addressSupplier, String functionName, long numFormalParams,
 				long numActualParams) {
 			super(Opcode.CALL_FUNCTION, null);
 			this.addressSupplier = addressSupplier;
@@ -792,13 +789,7 @@ public abstract class Tuple implements Serializable {
 
 		@Override
 		public String toString() {
-			return getOpcode().name()
-					+ ", "
-					+ getAddress()
-					+ stringArgument(functionName)
-					+ ", "
-					+ numFormalParams
-					+ ", "
+			return getOpcode().name() + ", " + getAddress() + stringArgument(functionName) + ", " + numFormalParams + ", "
 					+ numActualParams;
 		}
 	}
@@ -827,9 +818,7 @@ public abstract class Tuple implements Serializable {
 		 * @param numFormalParamsParam formal parameter count
 		 * @param arrayParameterIndexesParam zero-based array parameter indexes
 		 */
-		public IndirectFunctionTarget(
-				Supplier<Address> addressSupplierParam,
-				long numFormalParamsParam,
+		public IndirectFunctionTarget(Supplier<Address> addressSupplierParam, long numFormalParamsParam,
 				Set<Integer> arrayParameterIndexesParam) {
 			addressSupplier = addressSupplierParam;
 			numFormalParams = numFormalParamsParam;
@@ -894,11 +883,8 @@ public abstract class Tuple implements Serializable {
 		/** Script source line this call site comes from, for runtime diagnostics. */
 		private final int sourceLine;
 
-		IndirectCallTuple(
-				Map<String, IndirectFunctionTarget> userFunctionsParam,
-				Map<String, ExtensionFunction> extensionFunctionsParam,
-				long numActualParamsParam,
-				String sourceNameParam,
+		IndirectCallTuple(Map<String, IndirectFunctionTarget> userFunctionsParam,
+				Map<String, ExtensionFunction> extensionFunctionsParam, long numActualParamsParam, String sourceNameParam,
 				int sourceLineParam) {
 			super(Opcode.INDIRECT_CALL);
 			userFunctions = userFunctionsParam;
@@ -1016,11 +1002,7 @@ public abstract class Tuple implements Serializable {
 
 		@Override
 		public String toString() {
-			return getOpcode().name()
-					+ ", "
-					+ function.getKeyword()
-					+ ", "
-					+ argCount;
+			return getOpcode().name() + ", " + function.getKeyword() + ", " + argCount;
 		}
 	}
 

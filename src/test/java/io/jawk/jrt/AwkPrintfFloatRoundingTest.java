@@ -148,10 +148,7 @@ public class AwkPrintfFloatRoundingTest {
 		for (int p : precisions) {
 			assertEquals("%." + p + "f of " + abs, exactFixed(abs, p), AwkPrintf.sprintf("%." + p + "f", abs));
 			assertEquals("%." + p + "e of " + abs, exactScientific(abs, p), AwkPrintf.sprintf("%." + p + "e", abs));
-			assertEquals(
-					"%." + p + "g of " + abs,
-					exactGeneral(abs, Math.max(p, 1)),
-					AwkPrintf.sprintf("%." + p + "g", abs));
+			assertEquals("%." + p + "g of " + abs, exactGeneral(abs, Math.max(p, 1)), AwkPrintf.sprintf("%." + p + "g", abs));
 		}
 	}
 

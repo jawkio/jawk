@@ -207,8 +207,7 @@ public class AVM implements VariableManager, Closeable {
 	 *        interpreter.
 	 * @param extensionInstances Map of the extensions to load
 	 */
-	public AVM(final AwkSettings parameters,
-			final Map<String, JawkExtension> extensionInstances) {
+	public AVM(final AwkSettings parameters, final Map<String, JawkExtension> extensionInstances) {
 		this(parameters, extensionInstances, false);
 	}
 
@@ -220,13 +219,12 @@ public class AVM implements VariableManager, Closeable {
 	 * @param extensionInstances Map of the extensions to load
 	 * @param profilingEnabled Whether to collect profiling statistics
 	 */
-	public AVM(
-			final AwkSettings parameters,
-			final Map<String, JawkExtension> extensionInstances,
+	public AVM(final AwkSettings parameters, final Map<String, JawkExtension> extensionInstances,
 			final boolean profilingEnabled) {
 		this.settings = parameters != null ? parameters : AwkSettings.DEFAULT_SETTINGS;
 		this.extensionInstances = extensionInstances == null ?
-				Collections.<String, JawkExtension>emptyMap() : extensionInstances;
+				Collections.<String, JawkExtension>emptyMap() :
+				extensionInstances;
 		this.profiling = profilingEnabled;
 		if (profilingEnabled) {
 			this.tupleProfilingStats = new java.util.EnumMap<Opcode, ProfilingReport.Accumulator>(Opcode.class);
@@ -396,10 +394,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @return the resulting value
 	 * @throws IOException if evaluation fails
 	 */
-	public Object eval(
-			AwkExpression expression,
-			InputSource inputSource,
-			Map<String, Object> variableOverrides)
+	public Object eval(AwkExpression expression, InputSource inputSource, Map<String, Object> variableOverrides)
 			throws IOException {
 		prepareForEval(inputSource, Collections.<String>emptyList(), variableOverrides);
 		return eval(expression);
@@ -478,9 +473,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @throws ExitException when the program terminates via {@code exit}
 	 * @throws IOException if execution fails
 	 */
-	public void executePersistingGlobals(AwkProgram program, InputSource inputSource)
-			throws ExitException,
-			IOException {
+	public void executePersistingGlobals(AwkProgram program, InputSource inputSource) throws ExitException, IOException {
 		executePersistingGlobals(program, inputSource, Collections.<String>emptyList(), null);
 	}
 
@@ -498,10 +491,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @throws ExitException when the program terminates via {@code exit}
 	 * @throws IOException if execution fails
 	 */
-	public void executePersistingGlobals(
-			AwkProgram program,
-			InputSource inputSource,
-			List<String> runtimeArguments)
+	public void executePersistingGlobals(AwkProgram program, InputSource inputSource, List<String> runtimeArguments)
 			throws ExitException,
 			IOException {
 		executePersistingGlobals(program, inputSource, runtimeArguments, null);
@@ -862,10 +852,7 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	private boolean hasCompatiblePersistentGlobalLayout(long numGlobals) {
 		Object[] globals = runtimeStack.getNumGlobals();
-		if (!mergedGlobalLayoutActive
-				|| globals == null
-				|| globalVariableOffsets == null
-				|| globals.length < numGlobals) {
+		if (!mergedGlobalLayoutActive || globals == null || globalVariableOffsets == null || globals.length < numGlobals) {
 			return false;
 		}
 		for (Map.Entry<String, Integer> entry : globalVariableOffsets.entrySet()) {
@@ -905,8 +892,7 @@ public class AVM implements VariableManager, Closeable {
 					if (obj instanceof Map) {
 						runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
 					} else {
-						throw new IllegalArgumentException(
-								"Cannot assign a scalar to a non-scalar variable (" + key + ").");
+						throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + key + ").");
 					}
 				} else {
 					runtimeStack.setFilelistVariable(offsetObj.intValue(), obj);
@@ -924,9 +910,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @param runtimeArguments name=value or filename entries for this execution
 	 * @param variableOverrides per-call variable overrides for this execution
 	 */
-	private void prepareExecutionInputs(
-			List<String> runtimeArguments,
-			Map<String, Object> variableOverrides) {
+	private void prepareExecutionInputs(List<String> runtimeArguments, Map<String, Object> variableOverrides) {
 		this.arguments = runtimeArguments != null ? new ArrayList<>(runtimeArguments) : Collections.<String>emptyList();
 
 		if (variableOverrides == null || variableOverrides.isEmpty()) {
@@ -1067,9 +1051,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @return {@code true} when the variable should persist across runs
 	 */
 	private boolean isPersistentEligibleGlobal(String name) {
-		return name != null
-				&& !isManagedSpecialVariable(name)
-				&& !NON_PERSISTENT_GLOBALS.contains(name);
+		return name != null && !isManagedSpecialVariable(name) && !NON_PERSISTENT_GLOBALS.contains(name);
 	}
 
 	/**
@@ -1127,9 +1109,7 @@ public class AVM implements VariableManager, Closeable {
 	 * @throws ExitException when the AWK program executes {@code exit}
 	 * @throws IOException when runtime input operations fail
 	 */
-	private void executeTuples(PositionTracker position)
-			throws ExitException,
-			IOException {
+	private void executeTuples(PositionTracker position) throws ExitException, IOException {
 		Map<Long, ConditionPair> conditionPairs = null;
 		Opcode opcode = null;
 		long tupleStartNanos = 0L;
@@ -1341,12 +1321,7 @@ public class AVM implements VariableManager, Closeable {
 					// stack[0] = value
 					VariableTuple variableTuple = (VariableTuple) tuple;
 					Object value = pop();
-					assign(
-							variableTuple.getVariableOffset(),
-							value,
-							variableTuple.isGlobal(),
-							position,
-							opcode == Opcode.ASSIGN);
+					assign(variableTuple.getVariableOffset(), value, variableTuple.isGlobal(), position, opcode == Opcode.ASSIGN);
 					position.next();
 					break;
 				}
@@ -1569,18 +1544,14 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case PEEK_DEREFERENCE: {
 					VariableTuple variableTuple = (VariableTuple) tuple;
-					Object value = runtimeStack
-							.getVariable(variableTuple.getVariableOffset(), variableTuple.isGlobal());
-					push(
-							value instanceof ArgumentReference ?
-									resolveRawArgumentReference((ArgumentReference) value) : value);
+					Object value = runtimeStack.getVariable(variableTuple.getVariableOffset(), variableTuple.isGlobal());
+					push(value instanceof ArgumentReference ? resolveRawArgumentReference((ArgumentReference) value) : value);
 					position.next();
 					break;
 				}
 				case PUSH_INDIRECT_ARGUMENT: {
 					VariableTuple variableTuple = (VariableTuple) tuple;
-					Object scalarValue = runtimeStack
-							.getVariable(variableTuple.getVariableOffset(), variableTuple.isGlobal());
+					Object scalarValue = runtimeStack.getVariable(variableTuple.getVariableOffset(), variableTuple.isGlobal());
 					// Typed values are passed as plain values; only untyped
 					// variables need a live link back to the caller's slot.
 					if (scalarValue instanceof ArgumentReference) {
@@ -1604,9 +1575,7 @@ public class AVM implements VariableManager, Closeable {
 					Object scalarValue = JRT.getAssocArrayValue(map, idx);
 					// Typed elements are passed as plain values; only untyped
 					// elements need a live link back to their containing array.
-					push(
-							isUntyped(scalarValue) ?
-									new IndirectArrayArgumentReference(map, idx, scalarValue) : scalarValue);
+					push(isUntyped(scalarValue) ? new IndirectArrayArgumentReference(map, idx, scalarValue) : scalarValue);
 					position.next();
 					break;
 				}
@@ -1999,7 +1968,8 @@ public class AVM implements VariableManager, Closeable {
 				case GETLINE_INPUT: {
 					checkGetlineAllowed(position);
 					boolean consumed = isMainInputFileBounded() ?
-							jrt.consumeCurrentFileInput(resolvedInputSource) : jrt.consumeInput(resolvedInputSource);
+							jrt.consumeCurrentFileInput(resolvedInputSource) :
+							jrt.consumeInput(resolvedInputSource);
 					push(consumed ? 1 : 0);
 					position.next();
 					break;
@@ -2008,7 +1978,8 @@ public class AVM implements VariableManager, Closeable {
 					// arg[0] = address to jump to when no record was read
 					checkGetlineAllowed(position);
 					Object input = isMainInputFileBounded() ?
-							jrt.consumeCurrentFileInputToTarget(resolvedInputSource) : jrt.consumeInputToTarget(resolvedInputSource);
+							jrt.consumeCurrentFileInputToTarget(resolvedInputSource) :
+							jrt.consumeInputToTarget(resolvedInputSource);
 					if (input != null) {
 						push(1);
 						push(input);
@@ -2347,11 +2318,7 @@ public class AVM implements VariableManager, Closeable {
 					ExtensionTuple extensionTuple = (ExtensionTuple) tuple;
 					ExtensionFunction function = extensionTuple.getFunction();
 					long numArgs = extensionTuple.getArgCount();
-					push(
-							invokeExtension(
-									function,
-									popArguments(numArgs),
-									position.lineNumber()));
+					push(invokeExtension(function, popArguments(numArgs), position.lineNumber()));
 
 					position.next();
 					break;
@@ -2796,15 +2763,9 @@ public class AVM implements VariableManager, Closeable {
 		if (target != null) {
 			long formalCount = target.getNumFormalParams();
 			if (actualArguments.length > formalCount) {
-				jrt
-						.printWarning(
-								"gawk: "
-										+ callTuple.getSourceName()
-										+ ":"
-										+ callTuple.getSourceLine()
-										+ ": warning: function `"
-										+ qualifiedName
-										+ "' called with more arguments than declared");
+				jrt.printWarning(
+						"gawk: " + callTuple.getSourceName() + ":" + callTuple.getSourceLine() + ": warning: function `"
+								+ qualifiedName + "' called with more arguments than declared");
 			}
 			if (profiling) {
 				activeProfilingFunctions.push(new ActiveFunction(qualifiedName, tupleStartNanos));
@@ -2819,8 +2780,7 @@ public class AVM implements VariableManager, Closeable {
 			return;
 		}
 
-		String awkName = requestedName.startsWith("awk::") ?
-				requestedName.substring("awk::".length()) : requestedName;
+		String awkName = requestedName.startsWith("awk::") ? requestedName.substring("awk::".length()) : requestedName;
 		BuiltinFunction builtin = BuiltinFunction.of(awkName);
 		if (builtin != null) {
 			resolveIndirectArguments(actualArguments, builtin);
@@ -2835,11 +2795,7 @@ public class AVM implements VariableManager, Closeable {
 				activeProfilingFunctions.push(new ActiveFunction(awkName, tupleStartNanos));
 			}
 			try {
-				push(
-						invokeExtension(
-								extensionFunction,
-								actualArguments,
-								position.lineNumber()));
+				push(invokeExtension(extensionFunction, actualArguments, position.lineNumber()));
 			} finally {
 				if (profiling) {
 					recordFunctionExit(System.nanoTime());
@@ -2848,9 +2804,7 @@ public class AVM implements VariableManager, Closeable {
 			position.next();
 			return;
 		}
-		throw new AwkRuntimeException(
-				position.lineNumber(),
-				"function `" + qualifiedName + "' is not defined");
+		throw new AwkRuntimeException(position.lineNumber(), "function `" + qualifiedName + "' is not defined");
 	}
 
 	private void execPrint(CountTuple tuple) throws IOException {
@@ -2861,12 +2815,11 @@ public class AVM implements VariableManager, Closeable {
 	private void execPrintToFile(CountAndAppendTuple tuple) throws IOException {
 		String key = jrt.toAwkString(pop());
 		long numArgs = tuple.getCount();
-		jrt
-				.printToFile(
-						key,
-						tuple.isAppend(),
-						numArgs == 0 ? new Object[]
-						{ jrt.jrtGetInputField(0) } : popArguments(numArgs));
+		jrt.printToFile(
+				key,
+				tuple.isAppend(),
+				numArgs == 0 ? new Object[]
+				{ jrt.jrtGetInputField(0) } : popArguments(numArgs));
 	}
 
 	private void execPrintToPipe(CountTuple tuple) throws IOException {
@@ -2913,7 +2866,8 @@ public class AVM implements VariableManager, Closeable {
 
 	private Object lengthOf(Object value) {
 		return value instanceof Map ?
-				Long.valueOf(((Map<?, ?>) value).size()) : Integer.valueOf(jrt.toAwkString(value).length());
+				Long.valueOf(((Map<?, ?>) value).size()) :
+				Integer.valueOf(jrt.toAwkString(value).length());
 	}
 
 	private String normalizeIndirectFunctionName(String functionName) {
@@ -2965,8 +2919,7 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	private void releaseElementArgumentReferences() {
 		int depth = runtimeStack.frameCount();
-		while (!elementArgumentReferences.isEmpty()
-				&& elementArgumentReferences.peek().ownerFrame == depth) {
+		while (!elementArgumentReferences.isEmpty() && elementArgumentReferences.peek().ownerFrame == depth) {
 			elementArgumentReferences.pop();
 		}
 	}
@@ -2983,21 +2936,14 @@ public class AVM implements VariableManager, Closeable {
 		return isUntyped(snapshot) ? reference : snapshot;
 	}
 
-	private void resolveIndirectArguments(
-			Object[] actualArgumentsParam,
-			BuiltinFunction builtin) {
+	private void resolveIndirectArguments(Object[] actualArgumentsParam, BuiltinFunction builtin) {
 		for (int index = 0; index < actualArgumentsParam.length; index++) {
 			boolean arrayArgument = builtin == BuiltinFunction.SPLIT && index == 1;
-			actualArgumentsParam[index] = resolveIndirectArgument(
-					actualArgumentsParam[index],
-					arrayArgument,
-					false);
+			actualArgumentsParam[index] = resolveIndirectArgument(actualArgumentsParam[index], arrayArgument, false);
 		}
 	}
 
-	private void resolveIndirectArguments(
-			Object[] actualArgumentsParam,
-			ExtensionFunction function) {
+	private void resolveIndirectArguments(Object[] actualArgumentsParam, ExtensionFunction function) {
 		boolean[] arrayArguments = new boolean[actualArgumentsParam.length];
 		boolean[] rawValueArguments = new boolean[actualArgumentsParam.length];
 		for (int index : function.collectAssocArrayIndexes(actualArgumentsParam.length)) {
@@ -3014,10 +2960,7 @@ public class AVM implements VariableManager, Closeable {
 		}
 	}
 
-	private Object resolveIndirectArgument(
-			Object argument,
-			boolean arrayArgument,
-			boolean rawValueArgument) {
+	private Object resolveIndirectArgument(Object argument, boolean arrayArgument, boolean rawValueArgument) {
 		if (!(argument instanceof ArgumentReference)) {
 			return argument;
 		}
@@ -3028,10 +2971,7 @@ public class AVM implements VariableManager, Closeable {
 		return resolveArgumentReference(reference, arrayArgument);
 	}
 
-	private Object invokeIndirectBuiltin(
-			BuiltinFunction builtin,
-			Object[] args,
-			int lineNumber) {
+	private Object invokeIndirectBuiltin(BuiltinFunction builtin, Object[] args, int lineNumber) {
 		switch (builtin) {
 		case ATAN2:
 			requireIndirectArgumentCount(builtin, args, 2, 2, lineNumber);
@@ -3048,10 +2988,7 @@ public class AVM implements VariableManager, Closeable {
 		case GSUB:
 		case SUB:
 			requireIndirectArgumentCount(builtin, args, 2, 2, lineNumber);
-			return substituteInputLine(
-					builtin == BuiltinFunction.GSUB,
-					args[0],
-					args[1]);
+			return substituteInputLine(builtin == BuiltinFunction.GSUB, args[0], args[1]);
 		case INDEX:
 			requireIndirectArgumentCount(builtin, args, 2, 2, lineNumber);
 			return jrt.index(jrt.toAwkString(args[0]), jrt.toAwkString(args[1]));
@@ -3075,17 +3012,10 @@ public class AVM implements VariableManager, Closeable {
 			return Math.sin(JRT.toDouble(args[0]));
 		case SPLIT:
 			requireIndirectArgumentCount(builtin, args, 2, 3, lineNumber);
-			return splitIntoArray(
-					args[0],
-					args[1],
-					args.length == 3 ? args[2] : jrt.getFSVar(),
-					lineNumber);
+			return splitIntoArray(args[0], args[1], args.length == 3 ? args[2] : jrt.getFSVar(), lineNumber);
 		case SPRINTF:
 			requireIndirectArgumentCount(builtin, args, 1, Integer.MAX_VALUE, lineNumber);
-			return jrt
-					.sprintf(
-							jrt.toAwkString(args[0]),
-							Arrays.copyOfRange(args, 1, args.length));
+			return jrt.sprintf(jrt.toAwkString(args[0]), Arrays.copyOfRange(args, 1, args.length));
 		case SQRT:
 			requireIndirectArgumentCount(builtin, args, 1, 1, lineNumber);
 			return Math.sqrt(JRT.toDouble(args[0]));
@@ -3097,10 +3027,7 @@ public class AVM implements VariableManager, Closeable {
 			return Integer.valueOf(previousSeed);
 		case SUBSTR:
 			requireIndirectArgumentCount(builtin, args, 2, 3, lineNumber);
-			return substring(
-					args[0],
-					args[1],
-					args.length == 3 ? args[2] : null);
+			return substring(args[0], args[1], args.length == 3 ? args[2] : null);
 		case SYSTEM:
 			requireIndirectArgumentCount(builtin, args, 1, 1, lineNumber);
 			return jrt.jrtSystem(jrt.toAwkString(args[0]));
@@ -3131,10 +3058,7 @@ public class AVM implements VariableManager, Closeable {
 		}
 	}
 
-	private Object invokeExtension(
-			ExtensionFunction function,
-			Object[] args,
-			int lineNumber) {
+	private Object invokeExtension(ExtensionFunction function, Object[] args, int lineNumber) {
 		// Let extensions report diagnostics at the call location.
 		currentLineNumber = lineNumber;
 		String extensionClassName = function.getExtensionClassName();
@@ -3147,8 +3071,7 @@ public class AVM implements VariableManager, Closeable {
 		if (!(extension instanceof AbstractExtension)) {
 			throw new AwkRuntimeException(
 					lineNumber,
-					"Extension instance for class '" + extensionClassName
-							+ "' does not extend "
+					"Extension instance for class '" + extensionClassName + "' does not extend "
 							+ AbstractExtension.class.getName());
 		}
 		Map<IndirectArrayArgumentReference, Object> attachedValues = captureAttachedArrayArgumentValues();
@@ -3161,9 +3084,7 @@ public class AVM implements VariableManager, Closeable {
 		if (result == null) {
 			return "";
 		}
-		if (result instanceof Number
-				|| result instanceof String
-				|| result instanceof Map) {
+		if (result instanceof Number || result instanceof String || result instanceof Map) {
 			return result;
 		}
 		return jrt.toAwkString(result);
@@ -3302,8 +3223,7 @@ public class AVM implements VariableManager, Closeable {
 		Object[] globals = runtimeStack.getNumGlobals();
 		if (mergedGlobalLayoutActive) {
 			if (!hasCompatiblePersistentGlobalLayout(numGlobals)) {
-				throw new IllegalStateException(
-						"AVM globals are already initialized for an incompatible persistent layout.");
+				throw new IllegalStateException("AVM globals are already initialized for an incompatible persistent layout.");
 			}
 			applyExecutionInitialVariablesToGlobalSlots(true);
 		} else if (globals == null) {
@@ -3441,8 +3361,7 @@ public class AVM implements VariableManager, Closeable {
 			String name = key == null ? "" : key.toString();
 			return active
 					&& !isMetaTableName(name)
-					&& (isLiveSpecialVariable(name)
-							|| (globalVariableOffsets != null && globalVariableOffsets.containsKey(name)))
+					&& (isLiveSpecialVariable(name) || (globalVariableOffsets != null && globalVariableOffsets.containsKey(name)))
 					|| entries.containsKey(key);
 		}
 
@@ -3499,9 +3418,7 @@ public class AVM implements VariableManager, Closeable {
 		}
 
 		private boolean isLiveSpecialVariable(String name) {
-			return isManagedSpecialVariable(name)
-					|| "RSTART".equals(name)
-					|| "RLENGTH".equals(name);
+			return isManagedSpecialVariable(name) || "RSTART".equals(name) || "RLENGTH".equals(name);
 		}
 
 		/** {@inheritDoc} */
@@ -3525,12 +3442,10 @@ public class AVM implements VariableManager, Closeable {
 		private void validateGlobalType(String name, Object value) {
 			Boolean array = globalVariableArrays == null ? null : globalVariableArrays.get(name);
 			if (Boolean.TRUE.equals(array) && !(value instanceof Map)) {
-				throw new AwkRuntimeException(
-						"Attempting to use array `" + name + "' in a scalar context.");
+				throw new AwkRuntimeException("Attempting to use array `" + name + "' in a scalar context.");
 			}
 			if (Boolean.FALSE.equals(array) && value instanceof Map) {
-				throw new AwkRuntimeException(
-						"Attempting to use scalar `" + name + "' as an array.");
+				throw new AwkRuntimeException("Attempting to use scalar `" + name + "' as an array.");
 			}
 		}
 
@@ -3757,9 +3672,7 @@ public class AVM implements VariableManager, Closeable {
 		}
 	}
 
-	private static <K> ProfilingReport.Accumulator statisticsFor(
-			Map<K, ProfilingReport.Accumulator> stats,
-			K key) {
+	private static <K> ProfilingReport.Accumulator statisticsFor(Map<K, ProfilingReport.Accumulator> stats, K key) {
 		ProfilingReport.Accumulator accumulator = stats.get(key);
 		if (accumulator == null) {
 			accumulator = new ProfilingReport.Accumulator();
@@ -3904,8 +3817,7 @@ public class AVM implements VariableManager, Closeable {
 		checkScalar(arrIdx);
 		rhs = JRT.untypedToBlank(rhs);
 		checkScalar(rhs);
-		if (JRT.containsAwkKey(array, arrIdx)
-				&& JRT.getAssocArrayValue(array, arrIdx) instanceof Map) {
+		if (JRT.containsAwkKey(array, arrIdx) && JRT.getAssocArrayValue(array, arrIdx) instanceof Map) {
 			throw new AwkRuntimeException("Attempting to use an array in a scalar context.");
 		}
 		array.put(arrIdx, rhs);
@@ -3995,7 +3907,8 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	public Set<String> getGlobalVariableNames() {
 		return globalVariableOffsets == null ?
-				Collections.<String>emptySet() : Collections.unmodifiableSet(globalVariableOffsets.keySet());
+				Collections.<String>emptySet() :
+				Collections.unmodifiableSet(globalVariableOffsets.keySet());
 	}
 
 	/**
@@ -4013,29 +3926,27 @@ public class AVM implements VariableManager, Closeable {
 	 * Must stay in sync with the switch in {@link #getVariable(String)}; a
 	 * unit test verifies that every listed name is answered.
 	 */
-	private static final Set<String> SPECIAL_VARIABLE_NAMES = Collections
-			.unmodifiableSet(
-					new LinkedHashSet<String>(
-							Arrays
-									.asList(
-											"FS",
-											"RS",
-											"OFS",
-											"ORS",
-											"FILENAME",
-											"SUBSEP",
-											"CONVFMT",
-											"OFMT",
-											"NF",
-											"NR",
-											"FNR",
-											"RSTART",
-											"RLENGTH",
-											"IGNORECASE",
-											"ERRNO",
-											"ARGIND",
-											"ARGC",
-											"ARGV")));
+	private static final Set<String> SPECIAL_VARIABLE_NAMES = Collections.unmodifiableSet(
+			new LinkedHashSet<String>(
+					Arrays.asList(
+							"FS",
+							"RS",
+							"OFS",
+							"ORS",
+							"FILENAME",
+							"SUBSEP",
+							"CONVFMT",
+							"OFMT",
+							"NF",
+							"NR",
+							"FNR",
+							"RSTART",
+							"RLENGTH",
+							"IGNORECASE",
+							"ERRNO",
+							"ARGIND",
+							"ARGC",
+							"ARGV")));
 
 	/**
 	 * Returns the names of the special variables that
@@ -4170,8 +4081,7 @@ public class AVM implements VariableManager, Closeable {
 
 		if (offsetObj != null) {
 			if (arrayObj.booleanValue() && !(normalized instanceof Map)) {
-				throw new IllegalArgumentException(
-						"Cannot assign a scalar to a non-scalar variable (" + name + ").");
+				throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + name + ").");
 			}
 			runtimeStack.setFilelistVariable(offsetObj.intValue(), normalized);
 		} else if (runtimeStack.hasGlobalVariable(name)) {
@@ -4199,24 +4109,17 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	private void executeNextfile(PositionTracker position) {
 		if (nextFileAddress == null || !inputFileLoopStarted) {
-			throw new AwkRuntimeException(
-					position.lineNumber(),
-					"`nextfile' cannot be called from a BEGIN rule");
+			throw new AwkRuntimeException(position.lineNumber(), "`nextfile' cannot be called from a BEGIN rule");
 		}
 		if (withinEndBlocks) {
-			throw new AwkRuntimeException(
-					position.lineNumber(),
-					"`nextfile' cannot be called from an END rule");
+			throw new AwkRuntimeException(position.lineNumber(), "`nextfile' cannot be called from an END rule");
 		}
 		if (withinEndFileBlocks) {
-			throw new AwkRuntimeException(
-					position.lineNumber(),
-					"`nextfile' cannot be called from an ENDFILE rule");
+			throw new AwkRuntimeException(position.lineNumber(), "`nextfile' cannot be called from an ENDFILE rule");
 		}
 		// nextfile can be invoked from user-defined functions: unwind them.
 		resetCallState();
-		if (endFileAddress == null
-				|| withinBeginFileBlocks && jrt.hasPendingInputFileError(resolvedInputSource)) {
+		if (endFileAddress == null || withinBeginFileBlocks && jrt.hasPendingInputFileError(resolvedInputSource)) {
 			// No ENDFILE rules to run, or the file could not be opened: skip
 			// the ENDFILE section (gawk BEGINFILE error handling) and go
 			// straight to the next file.
@@ -4249,24 +4152,16 @@ public class AVM implements VariableManager, Closeable {
 	 */
 	private void executeNext(PositionTracker position) {
 		if (withinEndBlocks) {
-			throw new AwkRuntimeException(
-					position.lineNumber(),
-					"`next' cannot be called from a `END' rule");
+			throw new AwkRuntimeException(position.lineNumber(), "`next' cannot be called from a `END' rule");
 		}
 		if (withinBeginFileBlocks) {
-			throw new AwkRuntimeException(
-					position.lineNumber(),
-					"`next' cannot be called from a `BEGINFILE' rule");
+			throw new AwkRuntimeException(position.lineNumber(), "`next' cannot be called from a `BEGINFILE' rule");
 		}
 		if (withinEndFileBlocks) {
-			throw new AwkRuntimeException(
-					position.lineNumber(),
-					"`next' cannot be called from a `ENDFILE' rule");
+			throw new AwkRuntimeException(position.lineNumber(), "`next' cannot be called from a `ENDFILE' rule");
 		}
 		if (nextAddress == null || !mainInputLoopStarted) {
-			throw new AwkRuntimeException(
-					position.lineNumber(),
-					"`next' cannot be called from a `BEGIN' rule");
+			throw new AwkRuntimeException(position.lineNumber(), "`next' cannot be called from a `BEGIN' rule");
 		}
 		// next can be invoked from user-defined functions: unwind them.
 		resetCallState();
@@ -4307,9 +4202,7 @@ public class AVM implements VariableManager, Closeable {
 		if (withinBeginFileBlocks || withinEndFileBlocks) {
 			throw new AwkRuntimeException(
 					position.lineNumber(),
-					"non-redirected `getline' invalid inside `"
-							+ (withinBeginFileBlocks ? "BEGINFILE" : "ENDFILE")
-							+ "' rule");
+					"non-redirected `getline' invalid inside `" + (withinBeginFileBlocks ? "BEGINFILE" : "ENDFILE") + "' rule");
 		}
 	}
 
@@ -4413,19 +4306,16 @@ public class AVM implements VariableManager, Closeable {
 	private Object resolveRawArgumentReference(ArgumentReference reference) {
 		Object currentValue = readCurrentArgumentValue(reference);
 		if (currentValue instanceof Map
-				|| currentValue instanceof UninitializedObject
-						&& !(currentValue instanceof UntypedObject)) {
+				|| currentValue instanceof UninitializedObject && !(currentValue instanceof UntypedObject)) {
 			return currentValue;
 		}
 		Object value = reference.snapshot();
-		return value instanceof ArgumentReference ?
-				resolveRawArgumentReference((ArgumentReference) value) : value;
+		return value instanceof ArgumentReference ? resolveRawArgumentReference((ArgumentReference) value) : value;
 	}
 
 	private Object readCurrentArgumentValue(ArgumentReference reference) {
 		Object value = reference.currentValue();
-		return value instanceof ArgumentReference ?
-				readCurrentArgumentValue((ArgumentReference) value) : value;
+		return value instanceof ArgumentReference ? readCurrentArgumentValue((ArgumentReference) value) : value;
 	}
 
 	private Object resolveArgumentReference(ArgumentReference reference, boolean arrayContext) {
@@ -4472,8 +4362,7 @@ public class AVM implements VariableManager, Closeable {
 		return values;
 	}
 
-	private void detachReplacedArrayArgumentReferences(
-			Map<IndirectArrayArgumentReference, Object> attachedValues) {
+	private void detachReplacedArrayArgumentReferences(Map<IndirectArrayArgumentReference, Object> attachedValues) {
 		for (Map.Entry<IndirectArrayArgumentReference, Object> entry : attachedValues.entrySet()) {
 			entry.getKey().detachIfReplaced(entry.getValue());
 		}
@@ -4614,10 +4503,7 @@ public class AVM implements VariableManager, Closeable {
 		// argument; negative until the call is entered.
 		private int ownerFrame = -1;
 
-		private IndirectArrayArgumentReference(
-				Map<Object, Object> mapParam,
-				Object keyParam,
-				Object scalarValueParam) {
+		private IndirectArrayArgumentReference(Map<Object, Object> mapParam, Object keyParam, Object scalarValueParam) {
 			map = mapParam;
 			key = keyParam;
 			detachedValue = scalarValueParam;
@@ -4631,8 +4517,7 @@ public class AVM implements VariableManager, Closeable {
 
 		@Override
 		public Object currentValue() {
-			return !detached && JRT.containsAwkKey(map, key) ?
-					JRT.getAssocArrayValue(map, key) : detachedValue;
+			return !detached && JRT.containsAwkKey(map, key) ? JRT.getAssocArrayValue(map, key) : detachedValue;
 		}
 
 		@Override
@@ -4664,9 +4549,7 @@ public class AVM implements VariableManager, Closeable {
 		}
 
 		private void detachIfReplaced(Object previousValue) {
-			if (!detached
-					&& (!JRT.containsAwkKey(map, key)
-							|| JRT.getAssocArrayValue(map, key) != previousValue)) {
+			if (!detached && (!JRT.containsAwkKey(map, key) || JRT.getAssocArrayValue(map, key) != previousValue)) {
 				detached = true;
 			}
 		}
@@ -4677,16 +4560,7 @@ public class AVM implements VariableManager, Closeable {
 	 * are technically user-visible variables.
 	 */
 	private static final Set<String> NON_PERSISTENT_GLOBALS = new HashSet<>(
-			Arrays
-					.asList(
-							"ARGV",
-							"ARGC",
-							"ENVIRON",
-							"RSTART",
-							"RLENGTH",
-							"IGNORECASE",
-							"SYMTAB",
-							"FUNCTAB"));
+			Arrays.asList("ARGV", "ARGC", "ENVIRON", "RSTART", "RLENGTH", "IGNORECASE", "SYMTAB", "FUNCTAB"));
 
 	private static final class SingleRecordInputSource implements InputSource {
 

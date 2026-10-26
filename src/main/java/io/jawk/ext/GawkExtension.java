@@ -82,18 +82,9 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	private static final String DEFAULT_LOCALE_DIRECTORY = "/usr/share/locale";
 
 	/** Locale categories accepted by the gettext functions, as in gawk. */
-	private static final Set<String> LOCALE_CATEGORIES = Collections
-			.unmodifiableSet(
-					new HashSet<String>(
-							Arrays
-									.asList(
-											"LC_ALL",
-											"LC_COLLATE",
-											"LC_CTYPE",
-											"LC_MESSAGES",
-											"LC_MONETARY",
-											"LC_NUMERIC",
-											"LC_TIME")));
+	private static final Set<String> LOCALE_CATEGORIES = Collections.unmodifiableSet(
+			new HashSet<String>(
+					Arrays.asList("LC_ALL", "LC_COLLATE", "LC_CTYPE", "LC_MESSAGES", "LC_MONETARY", "LC_NUMERIC", "LC_TIME")));
 
 	/** Interpreter this per-engine extension instance is bound to. */
 	private AVM avm;
@@ -232,8 +223,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 */
 	@JawkFunction("gensub")
 	public String gensub(@JawkRegexp Object regexp, Object replacement, Object how, @JawkOptional Object target) {
-		Pattern pattern = regexp instanceof Pattern ?
-				(Pattern) regexp : Pattern.compile(toAwkString(regexp));
+		Pattern pattern = regexp instanceof Pattern ? (Pattern) regexp : Pattern.compile(toAwkString(regexp));
 		// gawk: a truthy IGNORECASE makes all regexp operations case-insensitive
 		pattern = getJrt().caseAwarePattern(pattern);
 		Object targetValue = target == null ? getJrt().getInputLine() : target;
@@ -333,13 +323,9 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * @return formatted timestamp
 	 */
 	@JawkFunction("strftime")
-	public String strftime(
-			@JawkOptional Object format,
-			@JawkOptional Object timestamp,
-			@JawkOptional Object utcFlag) {
+	public String strftime(@JawkOptional Object format, @JawkOptional Object timestamp, @JawkOptional Object utcFlag) {
 		String formatString = format == null ? defaultStrftimeFormat() : toAwkString(format);
-		long seconds = timestamp == null ?
-				System.currentTimeMillis() / 1000L : (long) JRT.toDouble(timestamp);
+		long seconds = timestamp == null ? System.currentTimeMillis() / 1000L : (long) JRT.toDouble(timestamp);
 		boolean utc = utcFlag != null && getJrt().toBoolean(utcFlag);
 		TimeZone timeZone = utc ? TimeZone.getTimeZone("UTC") : localTimeZone();
 		return Strftime.format(formatString, seconds, timeZone);
@@ -696,14 +682,12 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	private void warnAtCurrentLine(String format, Object... args) {
 		String source = avm == null ? null : avm.getSourceDescription();
 		String basename = source == null ? "" : new File(source).getName();
-		getJrt()
-				.printWarning(
-						String
-								.format(
-										"gawk: %s:%d: warning: %s",
-										basename,
-										avm == null ? 0 : avm.getCurrentLineNumber(),
-										String.format(format, args)));
+		getJrt().printWarning(
+				String.format(
+						"gawk: %s:%d: warning: %s",
+						basename,
+						avm == null ? 0 : avm.getCurrentLineNumber(),
+						String.format(format, args)));
 	}
 
 	/**

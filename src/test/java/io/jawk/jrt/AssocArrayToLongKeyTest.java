@@ -159,8 +159,7 @@ public class AssocArrayToLongKeyTest {
 				"１２", // fullwidth "12"
 				"-١",
 				"١a",
-				"1٢",
-		};
+				"1٢", };
 		for (String sample : samples) {
 			Long expected;
 			try {

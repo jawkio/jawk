@@ -148,20 +148,17 @@ public abstract class AwkSink {
 
 	private static PrintStream newNullPrintStream() {
 		try {
-			return new PrintStream(
-					new OutputStream() {
-						@Override
-						public void write(int b) {
-							// discard
-						}
+			return new PrintStream(new OutputStream() {
+				@Override
+				public void write(int b) {
+					// discard
+				}
 
-						@Override
-						public void write(byte[] b, int off, int len) {
-							// discard
-						}
-					},
-					false,
-					"UTF-8") {
+				@Override
+				public void write(byte[] b, int off, int len) {
+					// discard
+				}
+			}, false, "UTF-8") {
 
 				@Override
 				public void close() {

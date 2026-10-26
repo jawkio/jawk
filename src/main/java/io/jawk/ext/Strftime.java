@@ -51,8 +51,7 @@ final class Strftime {
 			"Wednesday",
 			"Thursday",
 			"Friday",
-			"Saturday"
-	};
+			"Saturday" };
 
 	/** Abbreviated month names, as in the C locale. */
 	private static final String[] SHORT_MONTHS = {
@@ -67,8 +66,7 @@ final class Strftime {
 			"Sep",
 			"Oct",
 			"Nov",
-			"Dec"
-	};
+			"Dec" };
 
 	/** Full month names, as in the C locale. */
 	private static final String[] FULL_MONTHS = {
@@ -83,8 +81,7 @@ final class Strftime {
 			"September",
 			"October",
 			"November",
-			"December"
-	};
+			"December" };
 
 	private Strftime() {
 		// utility class
@@ -397,9 +394,7 @@ final class Strftime {
 	 * the historical one.
 	 */
 	private static String zoneName(GregorianCalendar calendar) {
-		return calendar
-				.getTimeZone()
-				.getDisplayName(calendar.get(Calendar.DST_OFFSET) != 0, TimeZone.SHORT, Locale.US);
+		return calendar.getTimeZone().getDisplayName(calendar.get(Calendar.DST_OFFSET) != 0, TimeZone.SHORT, Locale.US);
 	}
 
 	/** Day of week, 0 = Sunday, matching C's {@code tm_wday}. */

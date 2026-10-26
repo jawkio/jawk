@@ -307,7 +307,8 @@ public class StreamInputSource implements InputSource, Closeable {
 		Long longIndex = Long.valueOf(index);
 		if (arglistMap instanceof AssocArray) {
 			return JRT.containsAwkKey(arglistMap, longIndex) ?
-					JRT.getAssocArrayValue(arglistMap, longIndex) : MISSING_ARGV_VALUE;
+					JRT.getAssocArrayValue(arglistMap, longIndex) :
+					MISSING_ARGV_VALUE;
 		}
 		if (arglistMap.containsKey(longIndex)) {
 			return arglistMap.get(longIndex);

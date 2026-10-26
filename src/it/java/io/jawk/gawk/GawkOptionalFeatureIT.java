@@ -44,8 +44,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_escapebrace() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK escapebrace")
+		AwkTestSupport.cliTest("GAWK escapebrace")
 				.argument("--posix")
 				.argument("-f", gawkFile("escapebrace.awk"))
 				.stdin(gawkText("escapebrace.in"))
@@ -56,8 +55,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_gsubtst3() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK gsubtst3")
+		AwkTestSupport.cliTest("GAWK gsubtst3")
 				.argument("-f", gawkFile("gsubtst3.awk"))
 				.stdin(gawkText("gsubtst3.in"))
 				.expectLines(gawkPath("gsubtst3.ok"))
@@ -97,8 +95,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_posix2008sub() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK posix2008sub")
+		AwkTestSupport.cliTest("GAWK posix2008sub")
 				.argument("--posix")
 				.argument("-f", gawkFile("posix2008sub.awk"))
 				.expectLines(gawkPath("posix2008sub.ok"))
@@ -108,8 +105,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_posix_compare() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK posix_compare")
+		AwkTestSupport.cliTest("GAWK posix_compare")
 				.argument("--locale", "en-US")
 				.argument("--posix")
 				.argument("-f", gawkFile("posix_compare.awk"))
@@ -120,8 +116,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_printf0() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK printf0")
+		AwkTestSupport.cliTest("GAWK printf0")
 				.argument("--posix")
 				.argument("-f", gawkFile("printf0.awk"))
 				.expectLines(gawkPath("printf0.ok"))
@@ -136,8 +131,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_status_close() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK status-close")
+		AwkTestSupport.cliTest("GAWK status-close")
 				.argument("-f", gawkFile("status-close.awk"))
 				.expectLines(gawkPath("status-close.ok"))
 				.expectExit(0)
@@ -221,8 +215,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_forcenum() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK forcenum")
+		AwkTestSupport.cliTest("GAWK forcenum")
 				.argument("-f", gawkFile("forcenum.awk"))
 				.expectLines(gawkPath("forcenum.ok"))
 				.expectExit(0)
@@ -231,8 +224,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_intarray() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK intarray")
+		AwkTestSupport.cliTest("GAWK intarray")
 				.argument("-f", gawkFile("intarray.awk"))
 				.expectLines(gawkPath("intarray.ok"))
 				.expectExit(0)
@@ -281,8 +273,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_nondec2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK nondec2")
+		AwkTestSupport.cliTest("GAWK nondec2")
 				.argument("-f", gawkFile("nondec2.awk"))
 				.expectLines(gawkPath("nondec2.ok"))
 				.expectExit(0)
@@ -351,8 +342,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_reint() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK reint")
+		AwkTestSupport.cliTest("GAWK reint")
 				.argument("-f", gawkFile("reint.awk"))
 				.stdin(gawkText("reint.in"))
 				.expectLines(gawkPath("reint.ok"))
@@ -362,8 +352,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_reint2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK reint2")
+		AwkTestSupport.cliTest("GAWK reint2")
 				.argument("--locale", "en-US")
 				.argument("-f", gawkFile("reint2.awk"))
 				.stdin(gawkText("reint2.in"))
@@ -384,8 +373,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_double1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK double1")
+		AwkTestSupport.cliTest("GAWK double1")
 				.argument("-f", gawkFile("double1.awk"))
 				.expectLines(gawkPath("double1.ok"))
 				.expectExit(0)
@@ -394,8 +382,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_double2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK double2")
+		AwkTestSupport.cliTest("GAWK double2")
 				.argument("-f", gawkFile("double2.awk"))
 				.expectLines(gawkPath("double2.ok"))
 				.expectExit(0)
@@ -404,8 +391,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_inf_nan_torture() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK inf-nan-torture")
+		AwkTestSupport.cliTest("GAWK inf-nan-torture")
 				.argument("-f", gawkFile("inf-nan-torture.awk"))
 				.stdin(gawkText("inf-nan-torture.in"))
 				.expectLines(gawkPath("inf-nan-torture.ok"))
@@ -415,8 +401,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_intformat() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK intformat")
+		AwkTestSupport.cliTest("GAWK intformat")
 				.argument("-f", gawkFile("intformat.awk"))
 				.expectLines(gawkPath("intformat.ok"))
 				.expectExit(0)
@@ -425,8 +410,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_apiterm() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK apiterm")
+		AwkTestSupport.cliTest("GAWK apiterm")
 				.argument("-f", gawkFile("apiterm.awk"))
 				.stdin(gawkText("apiterm.in"))
 				.expectLines(gawkPath("apiterm.ok"))
@@ -436,8 +420,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_fnmatch() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fnmatch")
+		AwkTestSupport.cliTest("GAWK fnmatch")
 				.argument("-f", gawkFile("fnmatch.awk"))
 				.expectLines(gawkPath("fnmatch.ok"))
 				.expectExit(0)
@@ -446,8 +429,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_fork() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fork")
+		AwkTestSupport.cliTest("GAWK fork")
 				.argument("-f", gawkFile("fork.awk"))
 				.expectLines(gawkPath("fork.ok"))
 				.expectExit(0)
@@ -456,8 +438,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_fork2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fork2")
+		AwkTestSupport.cliTest("GAWK fork2")
 				.argument("-f", gawkFile("fork2.awk"))
 				.expectLines(gawkPath("fork2.ok"))
 				.expectExit(0)
@@ -466,8 +447,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_functab4() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK functab4")
+		AwkTestSupport.cliTest("GAWK functab4")
 				.argument("-f", gawkFile("functab4.awk"))
 				.expectLines(gawkPath("functab4.ok"))
 				.expectExit(0)
@@ -476,8 +456,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_functab5() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK functab5")
+		AwkTestSupport.cliTest("GAWK functab5")
 				.argument("-f", gawkFile("functab5.awk"))
 				.expectLines(gawkPath("functab5.ok"))
 				.expectExit(0)
@@ -486,8 +465,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_ordchr() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK ordchr")
+		AwkTestSupport.cliTest("GAWK ordchr")
 				.argument("-f", gawkFile("ordchr.awk"))
 				.expectLines(gawkPath("ordchr.ok"))
 				.expectExit(0)
@@ -496,8 +474,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_revout() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK revout")
+		AwkTestSupport.cliTest("GAWK revout")
 				.argument("-f", gawkFile("revout.awk"))
 				.expectLines(gawkPath("revout.ok"))
 				.expectExit(0)
@@ -506,8 +483,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_revtwoway() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK revtwoway")
+		AwkTestSupport.cliTest("GAWK revtwoway")
 				.argument("-f", gawkFile("revtwoway.awk"))
 				.expectLines(gawkPath("revtwoway.ok"))
 				.expectExit(0)
@@ -516,8 +492,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_rwarray() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK rwarray")
+		AwkTestSupport.cliTest("GAWK rwarray")
 				.argument("-f", gawkFile("rwarray.awk"))
 				.stdin(gawkText("rwarray.in"))
 				.expectLines(gawkPath("rwarray.ok"))
@@ -527,8 +502,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_time() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK time")
+		AwkTestSupport.cliTest("GAWK time")
 				.argument("-f", gawkFile("time.awk"))
 				.expectLines(gawkPath("time.ok"))
 				.expectExit(0)
@@ -605,16 +579,14 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 		Path memoryFile = Files.createTempFile("jawk-pma-", ".bin");
 		Files.deleteIfExists(memoryFile);
 		try {
-			AwkTestSupport
-					.cliTest("GAWK pma first run")
+			AwkTestSupport.cliTest("GAWK pma first run")
 					.env("JAWK_PERSISTENT_MEMORY", memoryFile.toString())
 					.script("BEGIN { print ++i }")
 					.expect("1\n")
 					.expectExit(0)
 					.runAndAssert();
 			assertTrue(Files.isRegularFile(memoryFile));
-			AwkTestSupport
-					.cliTest("GAWK pma second run")
+			AwkTestSupport.cliTest("GAWK pma second run")
 					.env("JAWK_PERSISTENT_MEMORY", memoryFile.toString())
 					.script("BEGIN { print ++i }")
 					.expect("2\n")
@@ -688,8 +660,7 @@ public class GawkOptionalFeatureIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_readfile2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK readfile2")
+		AwkTestSupport.cliTest("GAWK readfile2")
 				.argument("-f", gawkFile("readfile2.awk"))
 				.operand(gawkFile("readfile2.awk"), gawkFile("readdir.awk"))
 				.expectLines(gawkPath("readfile2.ok"))

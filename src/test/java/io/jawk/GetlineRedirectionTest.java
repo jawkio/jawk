@@ -38,8 +38,7 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void getlineVarFromFileSetsOnlyTheVariable() throws Exception {
-		AwkTestSupport
-				.awkTest("getline var < file leaves $0, NF, NR, FNR, and FILENAME alone")
+		AwkTestSupport.awkTest("getline var < file leaves $0, NF, NR, FNR, and FILENAME alone")
 				.script(
 						"{ getline extra < \"{{other}}\";"
 								+ " print NR, FNR, (FILENAME == \"{{main}}\"), NF, \"[\" $0 \"]\", extra }")
@@ -52,11 +51,8 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void getlineIntoRecordFromFileSetsOnlyRecordAndNF() throws Exception {
-		AwkTestSupport
-				.awkTest("getline < file replaces $0 and NF but leaves NR, FNR, and FILENAME alone")
-				.script(
-						"{ getline < \"{{other}}\";"
-								+ " print NR, FNR, (FILENAME == \"{{main}}\"), NF, \"[\" $0 \"]\" }")
+		AwkTestSupport.awkTest("getline < file replaces $0 and NF but leaves NR, FNR, and FILENAME alone")
+				.script("{ getline < \"{{other}}\";" + " print NR, FNR, (FILENAME == \"{{main}}\"), NF, \"[\" $0 \"]\" }")
 				.file("main", "from file\n")
 				.file("other", "one two three\n")
 				.operand("{{main}}")
@@ -66,8 +62,7 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void getlineFromFileInBeginLeavesNrAndFilenameAlone() throws Exception {
-		AwkTestSupport
-				.awkTest("a redirected getline in BEGIN does not invent NR or FILENAME")
+		AwkTestSupport.awkTest("a redirected getline in BEGIN does not invent NR or FILENAME")
 				.script("BEGIN { getline x < \"{{f}}\"; print NR, FNR, \"[\" FILENAME \"]\", \"[\" x \"]\" }")
 				.file("f", "a b c\n")
 				.expectLines("0 0 [] [a b c]")
@@ -76,8 +71,7 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void getlineVarFromFileYieldsAStringOfNumbersComparableAsNumber() throws Exception {
-		AwkTestSupport
-				.awkTest("a record read by getline var < file compares as a number, like main input")
+		AwkTestSupport.awkTest("a record read by getline var < file compares as a number, like main input")
 				.script("BEGIN { getline x < \"{{f}}\"; print (x == 12), (x == \"12\") }")
 				.file("f", "12\n")
 				.expectLines("1 1")
@@ -88,11 +82,8 @@ public class GetlineRedirectionTest {
 	public void commandGetlineIntoRecordLeavesCountersAndFilenameAlone() throws Exception {
 		// gawk documents cmd | getline as setting $0 and NF only: unlike the
 		// POSIX table, NR is not advanced, and FILENAME is not touched either.
-		AwkTestSupport
-				.awkTest("cmd | getline sets $0 and NF but leaves NR, FNR, and FILENAME alone")
-				.script(
-						"{ \"echo c1\" | getline;"
-								+ " print NR, FNR, (FILENAME == \"{{main}}\"), NF, \"[\" $0 \"]\" }")
+		AwkTestSupport.awkTest("cmd | getline sets $0 and NF but leaves NR, FNR, and FILENAME alone")
+				.script("{ \"echo c1\" | getline;" + " print NR, FNR, (FILENAME == \"{{main}}\"), NF, \"[\" $0 \"]\" }")
 				.file("main", "from file\n")
 				.operand("{{main}}")
 				.expectLines("1 1 1 1 [c1]")
@@ -101,11 +92,8 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void commandGetlineVarSetsOnlyTheVariable() throws Exception {
-		AwkTestSupport
-				.awkTest("cmd | getline var leaves $0, NF, NR, FNR, and FILENAME alone")
-				.script(
-						"{ \"echo c1\" | getline x;"
-								+ " print NR, FNR, (FILENAME == \"{{main}}\"), NF, \"[\" $0 \"]\", x }")
+		AwkTestSupport.awkTest("cmd | getline var leaves $0, NF, NR, FNR, and FILENAME alone")
+				.script("{ \"echo c1\" | getline x;" + " print NR, FNR, (FILENAME == \"{{main}}\"), NF, \"[\" $0 \"]\", x }")
 				.file("main", "from file\n")
 				.operand("{{main}}")
 				.expectLines("1 1 1 2 [from file] c1")
@@ -114,8 +102,7 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void getlineIntoRecordAtEndOfInputLeavesRecordUntouched() throws Exception {
-		AwkTestSupport
-				.awkTest("getline < file returning 0 leaves $0 and NF as they were")
+		AwkTestSupport.awkTest("getline < file returning 0 leaves $0 and NF as they were")
 				.script("BEGIN { $0 = \"a b c\"; print (getline < \"{{empty}}\"), NF, \"[\" $0 \"]\" }")
 				.file("empty", "")
 				.expectLines("0 3 [a b c]")
@@ -124,8 +111,7 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void commandGetlineIntoRecordAtEndOfInputLeavesRecordUntouched() throws Exception {
-		AwkTestSupport
-				.awkTest("cmd | getline returning 0 leaves $0 and NF as they were")
+		AwkTestSupport.awkTest("cmd | getline returning 0 leaves $0 and NF as they were")
 				.script("BEGIN { $0 = \"a b c\"; print (\"exit 0\" | getline), NF, \"[\" $0 \"]\" }")
 				.expectLines("0 3 [a b c]")
 				.runAndAssert();
@@ -133,8 +119,7 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void getlineVarAtEndOfInputLeavesVariableUntouched() throws Exception {
-		AwkTestSupport
-				.awkTest("getline var < file returning 0 leaves the variable as it was")
+		AwkTestSupport.awkTest("getline var < file returning 0 leaves the variable as it was")
 				.script("BEGIN { x = \"keep\"; print (getline x < \"{{empty}}\"), \"[\" x \"]\" }")
 				.file("empty", "")
 				.expectLines("0 [keep]")
@@ -143,8 +128,7 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void commandGetlineVarAtEndOfInputLeavesVariableUntouched() throws Exception {
-		AwkTestSupport
-				.awkTest("cmd | getline var returning 0 leaves the variable as it was")
+		AwkTestSupport.awkTest("cmd | getline var returning 0 leaves the variable as it was")
 				.script("BEGIN { x = \"keep\"; print (\"exit 0\" | getline x), \"[\" x \"]\" }")
 				.expectLines("0 [keep]")
 				.runAndAssert();
@@ -152,8 +136,7 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void unredirectedGetlineVarAtEndOfInputLeavesVariableUntouched() throws Exception {
-		AwkTestSupport
-				.awkTest("a plain getline var at the end of the main input leaves the variable as it was")
+		AwkTestSupport.awkTest("a plain getline var at the end of the main input leaves the variable as it was")
 				.script("{ x = \"keep\"; print (getline x), \"[\" x \"]\" }")
 				.stdin("one\n")
 				.expectLines("0 [keep]")
@@ -162,8 +145,7 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void getlineIntoFieldAtEndOfInputLeavesFieldsUntouched() throws Exception {
-		AwkTestSupport
-				.awkTest("getline $2 < file returning 0 leaves the fields as they were")
+		AwkTestSupport.awkTest("getline $2 < file returning 0 leaves the fields as they were")
 				.script("BEGIN { $0 = \"a b c\"; print (getline $2 < \"{{empty}}\"), NF, \"[\" $0 \"]\" }")
 				.file("empty", "")
 				.expectLines("0 3 [a b c]")
@@ -172,8 +154,7 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void getlineIntoArrayElementAtEndOfInputLeavesElementUntouched() throws Exception {
-		AwkTestSupport
-				.awkTest("getline arr[i] < file returning 0 leaves the element as it was")
+		AwkTestSupport.awkTest("getline arr[i] < file returning 0 leaves the element as it was")
 				.script("BEGIN { a[1] = \"keep\"; print (getline a[1] < \"{{empty}}\"), \"[\" a[1] \"]\" }")
 				.file("empty", "")
 				.expectLines("0 [keep]")
@@ -182,8 +163,7 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void getlineIntoFieldFromFileAssignsTheField() throws Exception {
-		AwkTestSupport
-				.awkTest("getline $n < file stores the record into field n and rebuilds $0")
+		AwkTestSupport.awkTest("getline $n < file stores the record into field n and rebuilds $0")
 				.script("BEGIN { $0 = \"x y\"; print (getline $2 < \"{{f}}\"), NF, \"[\" $0 \"]\" }")
 				.file("f", "o1\n")
 				.expectLines("1 2 [x o1]")
@@ -192,8 +172,7 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void getlineIntoFieldBeyondNFExtendsTheRecord() throws Exception {
-		AwkTestSupport
-				.awkTest("getline $n < file past NF extends the record with empty fields, like $n = v")
+		AwkTestSupport.awkTest("getline $n < file past NF extends the record with empty fields, like $n = v")
 				.script("BEGIN { $0 = \"x y\"; print (getline $5 < \"{{f}}\"), NF, \"[\" $0 \"]\" }")
 				.file("f", "o1\n")
 				.expectLines("1 5 [x y   o1]")
@@ -202,8 +181,7 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void commandGetlineIntoFieldAssignsTheField() throws Exception {
-		AwkTestSupport
-				.awkTest("cmd | getline $n stores the record into field n")
+		AwkTestSupport.awkTest("cmd | getline $n stores the record into field n")
 				.script("BEGIN { $0 = \"x y\"; print (\"echo piped\" | getline $2), NF, \"[\" $0 \"]\" }")
 				.expectLines("1 2 [x piped]")
 				.runAndAssert();
@@ -211,8 +189,7 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void unredirectedGetlineIntoFieldAssignsTheField() throws Exception {
-		AwkTestSupport
-				.awkTest("a plain getline $n reads the next main-input record into field n")
+		AwkTestSupport.awkTest("a plain getline $n reads the next main-input record into field n")
 				.script("NR == 1 { r = (getline $1); print r, NF, \"[\" $0 \"]\" }")
 				.stdin("a b\nc d\n")
 				.expectLines("1 2 [c d b]")
@@ -224,8 +201,7 @@ public class GetlineRedirectionTest {
 		// The gawk >= 4.0 dark corner its getline5 test pins: the subscript of
 		// an array target runs even when getline reads nothing, and the mere
 		// reference creates the element — but the read assigns it nothing.
-		AwkTestSupport
-				.awkTest("getline arr[++c] < file at end of input still evaluates ++c and creates the element")
+		AwkTestSupport.awkTest("getline arr[++c] < file at end of input still evaluates ++c and creates the element")
 				.script(
 						"BEGIN { while ((getline a[++c] < \"{{one}}\") > 0) { }"
 								+ " print c, length(a), (1 in a), (2 in a), \"[\" a[1] \"]\" }")
@@ -236,11 +212,8 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void fieldIndexOfFieldTargetIsEvaluatedWhenNothingIsRead() throws Exception {
-		AwkTestSupport
-				.awkTest("getline $(++n) < file at end of input still evaluates ++n and keeps the fields")
-				.script(
-						"BEGIN { $0 = \"x y\"; n = 1;"
-								+ " print (getline $(++n) < \"{{empty}}\"), n, NF, \"[\" $0 \"]\" }")
+		AwkTestSupport.awkTest("getline $(++n) < file at end of input still evaluates ++n and keeps the fields")
+				.script("BEGIN { $0 = \"x y\"; n = 1;" + " print (getline $(++n) < \"{{empty}}\"), n, NF, \"[\" $0 \"]\" }")
 				.file("empty", "")
 				.expectLines("0 2 2 [x y]")
 				.runAndAssert();
@@ -250,8 +223,7 @@ public class GetlineRedirectionTest {
 	public void negativeFieldTargetIsRejectedEvenWhenNothingIsRead() throws Exception {
 		// gawk rejects the invalid field target whether or not a record was
 		// available; the target reference is evaluated either way.
-		AwkTestSupport
-				.awkTest("getline $(-1) < file is fatal at end of input too")
+		AwkTestSupport.awkTest("getline $(-1) < file is fatal at end of input too")
 				.script("BEGIN { r = (getline $(-1) < \"{{empty}}\"); print r }")
 				.file("empty", "")
 				.expectThrow(AwkRuntimeException.class)
@@ -263,8 +235,7 @@ public class GetlineRedirectionTest {
 		// gawk: fatal: expression for `<' redirection has null string value.
 		// The empty name reports a fatal error rather than -1, so an unset
 		// filename variable is not mistaken for a merely missing file.
-		AwkTestSupport
-				.awkTest("getline from an empty filename is a fatal error, as in gawk")
+		AwkTestSupport.awkTest("getline from an empty filename is a fatal error, as in gawk")
 				.script("BEGIN { r = (getline x < \"\"); print r }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -273,8 +244,7 @@ public class GetlineRedirectionTest {
 	@Test
 	public void emptyCommandIsFatal() throws Exception {
 		// gawk: fatal: expression for `|' redirection has null string value.
-		AwkTestSupport
-				.awkTest("getline from an empty command is a fatal error, as in gawk")
+		AwkTestSupport.awkTest("getline from an empty command is a fatal error, as in gawk")
 				.script("BEGIN { r = (\"\" | getline x); print r }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -282,13 +252,10 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void getlineFromMissingFileReturnsMinusOneAndSetsErrno() throws Exception {
-		AwkTestSupport
-				.awkTest("getline var from a missing file returns -1, sets ERRNO, and the script continues")
+		AwkTestSupport.awkTest("getline var from a missing file returns -1, sets ERRNO, and the script continues")
 				.script(
-						"BEGIN { $0 = \"a b c\"; x = \"keep\";"
-								+ " r = (getline x < (TEMPDIR \"/no-such-file.txt\"));"
-								+ " print r, NF, \"[\" $0 \"]\", \"[\" x \"]\", \"[\" ERRNO \"]\";"
-								+ " print \"still running\" }")
+						"BEGIN { $0 = \"a b c\"; x = \"keep\";" + " r = (getline x < (TEMPDIR \"/no-such-file.txt\"));"
+								+ " print r, NF, \"[\" $0 \"]\", \"[\" x \"]\", \"[\" ERRNO \"]\";" + " print \"still running\" }")
 				.withTempDir()
 				.expectLines("-1 3 [a b c] [keep] [No such file or directory]", "still running")
 				.runAndAssert();
@@ -296,11 +263,8 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void getlineIntoRecordFromMissingFileReturnsMinusOne() throws Exception {
-		AwkTestSupport
-				.awkTest("getline into $0 from a missing file returns -1 and leaves the record alone")
-				.script(
-						"BEGIN { $0 = \"a b c\";"
-								+ " print (getline < (TEMPDIR \"/no-such-file.txt\")), NF, \"[\" $0 \"]\" }")
+		AwkTestSupport.awkTest("getline into $0 from a missing file returns -1 and leaves the record alone")
+				.script("BEGIN { $0 = \"a b c\";" + " print (getline < (TEMPDIR \"/no-such-file.txt\")), NF, \"[\" $0 \"]\" }")
 				.withTempDir()
 				.expectLines("-1 3 [a b c]")
 				.runAndAssert();
@@ -308,11 +272,8 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void getlineFromDirectoryReturnsMinusOneWithIsADirectory() throws Exception {
-		AwkTestSupport
-				.awkTest("getline from a directory returns -1 with the gawk ERRNO description")
-				.script(
-						"BEGIN { r = (getline x < TEMPDIR);"
-								+ " print r, \"[\" ERRNO \"]\" }")
+		AwkTestSupport.awkTest("getline from a directory returns -1 with the gawk ERRNO description")
+				.script("BEGIN { r = (getline x < TEMPDIR);" + " print r, \"[\" ERRNO \"]\" }")
 				.withTempDir()
 				.expectLines("-1 [Is a directory]")
 				.runAndAssert();
@@ -320,8 +281,7 @@ public class GetlineRedirectionTest {
 
 	@Test
 	public void getlineAtEndOfInputLeavesErrnoAlone() throws Exception {
-		AwkTestSupport
-				.awkTest("a getline that merely reaches end of input does not set ERRNO")
+		AwkTestSupport.awkTest("a getline that merely reaches end of input does not set ERRNO")
 				.script("BEGIN { print (getline < \"{{empty}}\"), \"[\" ERRNO \"]\" }")
 				.file("empty", "")
 				.expectLines("0 []")
@@ -332,14 +292,10 @@ public class GetlineRedirectionTest {
 	public void failedOpenIsRetriedOnceTheFileAppears() throws Exception {
 		// gawk does not cache a failed open: the same getline succeeds once the
 		// file exists.
-		AwkTestSupport
-				.awkTest("a getline that failed to open retries instead of reporting -1 forever")
+		AwkTestSupport.awkTest("a getline that failed to open retries instead of reporting -1 forever")
 				.script(
-						"BEGIN { f = (TEMPDIR \"/late.txt\");"
-								+ " r1 = (getline x < f);"
-								+ " print \"created\" > f; close(f);"
-								+ " r2 = (getline x < f);"
-								+ " print r1, r2, \"[\" x \"]\" }")
+						"BEGIN { f = (TEMPDIR \"/late.txt\");" + " r1 = (getline x < f);" + " print \"created\" > f; close(f);"
+								+ " r2 = (getline x < f);" + " print r1, r2, \"[\" x \"]\" }")
 				.withTempDir()
 				.expectLines("-1 1 [created]")
 				.runAndAssert();

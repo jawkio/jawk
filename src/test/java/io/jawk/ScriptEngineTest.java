@@ -86,9 +86,7 @@ public class ScriptEngineTest {
 		// had not shipped in eleven releases
 		assertNotEquals("3.3.06-SNAPSHOT", factory.getEngineVersion());
 		assertEquals(JawkVersion.getVersion(), factory.getEngineVersion());
-		assertEquals(
-				factory.getEngineVersion(),
-				factory.getParameter(ScriptEngine.ENGINE_VERSION));
+		assertEquals(factory.getEngineVersion(), factory.getParameter(ScriptEngine.ENGINE_VERSION));
 	}
 
 	@Test
@@ -97,9 +95,7 @@ public class ScriptEngineTest {
 
 		assertEquals("awk", factory.getLanguageName());
 		assertEquals("POSIX", factory.getLanguageVersion());
-		assertEquals(
-				factory.getLanguageVersion(),
-				factory.getParameter(ScriptEngine.LANGUAGE_VERSION));
+		assertEquals(factory.getLanguageVersion(), factory.getParameter(ScriptEngine.LANGUAGE_VERSION));
 	}
 
 	/**

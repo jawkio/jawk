@@ -41,8 +41,7 @@ public class StreamInputSourceTest {
 
 	@Test
 	public void testStdinReadsThroughStreamInputSource() throws Exception {
-		awkTest("StreamInputSource reads stdin")
-				.script("{ print $1, $2 }")
+		awkTest("StreamInputSource reads stdin").script("{ print $1, $2 }")
 				.stdin("hello world\nfoo bar\n")
 				.expectLines("hello world", "foo bar")
 				.runAndAssert();
@@ -50,8 +49,7 @@ public class StreamInputSourceTest {
 
 	@Test
 	public void testNrCountsRecordsFromStdin() throws Exception {
-		awkTest("StreamInputSource NR counts stdin lines")
-				.script("END { print NR }")
+		awkTest("StreamInputSource NR counts stdin lines").script("END { print NR }")
 				.stdin("a\nb\nc\n")
 				.expectLines("3")
 				.runAndAssert();
@@ -59,8 +57,7 @@ public class StreamInputSourceTest {
 
 	@Test
 	public void testFileInputThroughArgv() throws Exception {
-		awkTest("StreamInputSource reads file from ARGV")
-				.script("{ print $0 }")
+		awkTest("StreamInputSource reads file from ARGV").script("{ print $0 }")
 				.file("data.txt", "line1\nline2\n")
 				.operand("{{data.txt}}")
 				.expectLines("line1", "line2")
@@ -75,8 +72,7 @@ public class StreamInputSourceTest {
 		argv.put(0L, "jawk");
 		argv.put(1L, file.toString());
 
-		awkTest("StreamInputSource reads injected ARGV map with Long keys")
-				.script("BEGIN { _ = ARGV[0] } { print $0 }")
+		awkTest("StreamInputSource reads injected ARGV map with Long keys").script("BEGIN { _ = ARGV[0] } { print $0 }")
 				.preassign("ARGV", argv)
 				.file("operand.txt", "operand\n")
 				.operand("{{operand.txt}}")
@@ -94,8 +90,7 @@ public class StreamInputSourceTest {
 		argv.put(0, "jawk");
 		argv.put(1, file.toString());
 
-		awkTest("StreamInputSource reads injected ARGV map with Integer keys")
-				.script("BEGIN { _ = ARGV[0] } { print $0 }")
+		awkTest("StreamInputSource reads injected ARGV map with Integer keys").script("BEGIN { _ = ARGV[0] } { print $0 }")
 				.preassign("ARGV", argv)
 				.file("operand.txt", "operand\n")
 				.operand("{{operand.txt}}")
@@ -105,8 +100,7 @@ public class StreamInputSourceTest {
 
 	@Test
 	public void testMultipleFilesWithFnrReset() throws Exception {
-		awkTest("StreamInputSource resets FNR per file")
-				.script("{ print NR, FNR, $0 }")
+		awkTest("StreamInputSource resets FNR per file").script("{ print NR, FNR, $0 }")
 				.file("a.txt", "A1\nA2\n")
 				.file("b.txt", "B1\n")
 				.operand("{{a.txt}}")
@@ -117,8 +111,7 @@ public class StreamInputSourceTest {
 
 	@Test
 	public void testVariableAssignmentInArgv() throws Exception {
-		awkTest("StreamInputSource applies name=value operands")
-				.script("{ print x, $0 }")
+		awkTest("StreamInputSource applies name=value operands").script("{ print x, $0 }")
 				.file("data.txt", "row1\n")
 				.operand("x=42")
 				.operand("{{data.txt}}")
@@ -141,8 +134,7 @@ public class StreamInputSourceTest {
 
 	@Test
 	public void testGetlineFromStdin() throws Exception {
-		awkTest("StreamInputSource getline from stdin")
-				.script("NR==1 { getline; print $0; exit }")
+		awkTest("StreamInputSource getline from stdin").script("NR==1 { getline; print $0; exit }")
 				.stdin("first\nsecond\nthird\n")
 				.expectLines("second")
 				.runAndAssert();
@@ -150,8 +142,7 @@ public class StreamInputSourceTest {
 
 	@Test
 	public void testFsSplittingWorksWithStreamInputSource() throws Exception {
-		awkTest("StreamInputSource respects FS")
-				.script("BEGIN { FS = \",\" } { print $2 }")
+		awkTest("StreamInputSource respects FS").script("BEGIN { FS = \",\" } { print $2 }")
 				.stdin("a,b,c\nd,e,f\n")
 				.expectLines("b", "e")
 				.runAndAssert();
@@ -168,8 +159,7 @@ public class StreamInputSourceTest {
 
 	@Test
 	public void testRsChangeAppliedToStreamInputSource() throws Exception {
-		awkTest("RS change propagated to StreamInputSource")
-				.script("BEGIN { RS = \";\" } { print NR, $0 }")
+		awkTest("RS change propagated to StreamInputSource").script("BEGIN { RS = \";\" } { print NR, $0 }")
 				.stdin("a;b;c")
 				.expectLines("1 a", "2 b", "3 c")
 				.runAndAssert();
@@ -177,8 +167,7 @@ public class StreamInputSourceTest {
 
 	@Test
 	public void testEndCanReadLastRecordAfterFinalEofProbe() throws Exception {
-		awkTest("StreamInputSource preserves last record for END")
-				.script("{ seen = NR } END { print $0; print $1 }")
+		awkTest("StreamInputSource preserves last record for END").script("{ seen = NR } END { print $0; print $1 }")
 				.stdin("first line\nlast record\n")
 				.expectLines("last record", "last")
 				.runAndAssert();
@@ -186,8 +175,7 @@ public class StreamInputSourceTest {
 
 	@Test
 	public void testExpressionEvalThroughStreamInputSource() throws Exception {
-		awkTest("expression evaluation through StreamInputSource")
-				.script("$1 > 1 { print $0 }")
+		awkTest("expression evaluation through StreamInputSource").script("$1 > 1 { print $0 }")
 				.stdin("1 low\n2 high\n3 higher\n")
 				.expectLines("2 high", "3 higher")
 				.runAndAssert();
@@ -195,8 +183,7 @@ public class StreamInputSourceTest {
 
 	@Test
 	public void testMissingArgvFilePropagatesFileNotFoundException() throws Exception {
-		awkTest("missing ARGV file propagates FileNotFoundException")
-				.script("{ print $0 }")
+		awkTest("missing ARGV file propagates FileNotFoundException").script("{ print $0 }")
 				.path("missing.txt")
 				.operand("{{missing.txt}}")
 				.expectThrow(FileNotFoundException.class)

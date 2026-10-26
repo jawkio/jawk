@@ -43,10 +43,7 @@ public class ListInputSourceTest {
 	@Test
 	public void testNextRecordReturnsExpectedSequence() throws Exception {
 		ListInputSource source = new ListInputSource(
-				Arrays
-						.asList(
-								Collections.singletonList("a"),
-								Arrays.asList("b", "c")));
+				Arrays.asList(Collections.singletonList("a"), Arrays.asList("b", "c")));
 
 		assertTrue(source.nextRecord());
 		assertEquals("a", source.getRecordText());

@@ -301,8 +301,7 @@ public class AwkEvalTest {
 
 		try (
 				AVM prepared = awk
-						.prepareEval(
-								new TableInputSource(Collections.singletonList(Arrays.asList("left", "right", "tail"))))) {
+						.prepareEval(new TableInputSource(Collections.singletonList(Arrays.asList("left", "right", "tail"))))) {
 			assertEquals("right", prepared.eval(secondField));
 			assertEquals("3:tail", prepared.eval(sizeAndLastField));
 		}
@@ -508,11 +507,10 @@ public class AwkEvalTest {
 
 		assertEquals(
 				0,
-				avm
-						.eval(
-								expression,
-								new SingleRecordInputSource((String) null),
-								Collections.<String, Object>singletonMap("x", "set")));
+				avm.eval(
+						expression,
+						new SingleRecordInputSource((String) null),
+						Collections.<String, Object>singletonMap("x", "set")));
 		assertEquals(1, avm.eval(expression, new SingleRecordInputSource((String) null)));
 	}
 

@@ -34,8 +34,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_asort() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK asort")
+		AwkTestSupport.cliTest("GAWK asort")
 				.argument("-f", gawkFile("asort.awk"))
 				.expectLines(gawkPath("asort.ok"))
 				.expectExit(0)
@@ -44,8 +43,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_asorti() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK asorti")
+		AwkTestSupport.cliTest("GAWK asorti")
 				.argument("-f", gawkFile("asorti.awk"))
 				.expectLines(gawkPath("asorti.ok"))
 				.expectExit(0)
@@ -59,8 +57,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_backsmalls1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK backsmalls1")
+		AwkTestSupport.cliTest("GAWK backsmalls1")
 				.argument("--locale", "en-US")
 				.argument("-f", gawkFile("backsmalls1.awk"))
 				.stdin(gawkText("backsmalls1.in"))
@@ -71,8 +68,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_backsmalls2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK backsmalls2")
+		AwkTestSupport.cliTest("GAWK backsmalls2")
 				.argument("--locale", "en-US")
 				.argument("-f", gawkFile("backsmalls2.awk"))
 				.expectLines(gawkPath("backsmalls2.ok"))
@@ -82,8 +78,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_fmttest() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fmttest")
+		AwkTestSupport.cliTest("GAWK fmttest")
 				.argument("-f", gawkFile("fmttest.awk"))
 				.expectLines(gawkPath("fmttest.ok"))
 				.expectExit(0)
@@ -92,8 +87,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_fnarydel() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fnarydel")
+		AwkTestSupport.cliTest("GAWK fnarydel")
 				.argument("-f", gawkFile("fnarydel.awk"))
 				.expectLines(gawkPath("fnarydel.ok"))
 				.expectExit(0)
@@ -102,8 +96,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_fnparydl() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK fnparydl")
+		AwkTestSupport.cliTest("GAWK fnparydl")
 				.argument("-f", gawkFile("fnparydl.awk"))
 				.expectLines(gawkPath("fnparydl.ok"))
 				.expectExit(0)
@@ -112,8 +105,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_lc_num1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK lc_num1")
+		AwkTestSupport.cliTest("GAWK lc_num1")
 				.argument("--locale", "en-US")
 				.argument("-f", gawkFile("lc_num1.awk"))
 				.expectLines(gawkPath("lc_num1.ok"))
@@ -123,8 +115,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_mbfw1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mbfw1")
+		AwkTestSupport.cliTest("GAWK mbfw1")
 				.argument("--locale", "en-US")
 				.argument("-f", gawkFile("mbfw1.awk"))
 				.stdin(gawkText("mbfw1.in"))
@@ -135,8 +126,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_mbprintf1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mbprintf1")
+		AwkTestSupport.cliTest("GAWK mbprintf1")
 				.argument("--locale", "en-US")
 				.argument("-f", gawkFile("mbprintf1.awk"))
 				.stdin(gawkText("mbprintf1.in"))
@@ -147,8 +137,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_mbprintf2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mbprintf2")
+		AwkTestSupport.cliTest("GAWK mbprintf2")
 				.argument("--locale", "ja-JP")
 				.argument("-f", gawkFile("mbprintf2.awk"))
 				.expectLines(gawkPath("mbprintf2.ok"))
@@ -163,8 +152,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_mbprintf4() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mbprintf4")
+		AwkTestSupport.cliTest("GAWK mbprintf4")
 				.argument("--locale", "en-US")
 				.argument("-f", gawkFile("mbprintf4.awk"))
 				.stdin(gawkText("mbprintf4.in"))
@@ -175,8 +163,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_mtchi18n() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK mtchi18n")
+		AwkTestSupport.cliTest("GAWK mtchi18n")
 				.argument("--locale", "ru-RU")
 				.argument("-f", gawkFile("mtchi18n.awk"))
 				.stdin(gawkText("mtchi18n.in"))
@@ -187,8 +174,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_rebt8b2() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK rebt8b2")
+		AwkTestSupport.cliTest("GAWK rebt8b2")
 				.argument("-f", gawkFile("rebt8b2.awk"))
 				.expectLines(gawkPath("rebt8b2.ok"))
 				.expectExit(0)
@@ -197,8 +183,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_sort1() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK sort1")
+		AwkTestSupport.cliTest("GAWK sort1")
 				.argument("-f", gawkFile("sort1.awk"))
 				.expectLines(gawkPath("sort1.ok"))
 				.expectExit(0)
@@ -207,8 +192,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_sprintfc() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK sprintfc")
+		AwkTestSupport.cliTest("GAWK sprintfc")
 				.argument("-f", gawkFile("sprintfc.awk"))
 				.stdin(gawkText("sprintfc.in"))
 				.expectLines(gawkPath("sprintfc.ok"))
@@ -237,8 +221,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 		// built without gettext: compare against the untranslated
 		// nlstringtest-nogettext baseline (upstream runs the same script
 		// against it on gettext-less builds)
-		AwkTestSupport
-				.cliTest("GAWK nlstringtest")
+		AwkTestSupport.cliTest("GAWK nlstringtest")
 				.argument("-f", gawkFile("nlstringtest.awk"))
 				.operand(".")
 				.expectLines(gawkPath("nlstringtest-nogettext.ok"))
@@ -248,8 +231,7 @@ public class GawkLocaleIT extends AbstractGawkSuite {
 
 	@Test
 	public void test_spacere() throws Exception {
-		AwkTestSupport
-				.cliTest("GAWK spacere")
+		AwkTestSupport.cliTest("GAWK spacere")
 				.argument("-f", gawkFile("spacere.awk"))
 				.expectLines(gawkPath("spacere.ok"))
 				.expectExit(0)

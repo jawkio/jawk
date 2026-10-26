@@ -106,11 +106,7 @@ public class AwkTest {
 	@Test
 	public void test1() throws Exception {
 		final String devnull = IS_WINDOWS ? pathTo("empty.txt") : "/dev/null";
-		AwkTestSupport
-				.cliTest("awk 1 /dev/null")
-				.script("1")
-				.operand(devnull)
-				.runAndAssert();
+		AwkTestSupport.cliTest("awk 1 /dev/null").script("1").operand(devnull).runAndAssert();
 	}
 
 	/**
@@ -124,8 +120,7 @@ public class AwkTest {
 	 */
 	@Test
 	public void testDontPanic() throws Exception {
-		AwkTestSupport
-				.cliTest("print don't panic")
+		AwkTestSupport.cliTest("print don't panic")
 				.script("BEGIN { print \"Don\\47t Panic!\" }")
 				.expectLines("Don't Panic!")
 				.runAndAssert();
@@ -148,8 +143,7 @@ public class AwkTest {
 	 */
 	@Test
 	public void testDontPanicAdvice() throws Exception {
-		AwkTestSupport
-				.cliTest("advice.awk script")
+		AwkTestSupport.cliTest("advice.awk script")
 				.argument("-f", pathTo("advice.awk"))
 				.expectLines("Don't Panic!")
 				.runAndAssert();
@@ -168,8 +162,7 @@ public class AwkTest {
 	 */
 	@Test
 	public void testMailListLiList() throws Exception {
-		AwkTestSupport
-				.cliTest("mail-list li filter")
+		AwkTestSupport.cliTest("mail-list li filter")
 				.script("/li/ {print $0}")
 				.operand(pathTo("mail-list"))
 				.expectLines(
@@ -185,8 +178,7 @@ public class AwkTest {
 	 */
 	@Test
 	public void testTwoRules() throws Exception {
-		AwkTestSupport
-				.cliTest("two-rule filter")
+		AwkTestSupport.cliTest("two-rule filter")
 				.script("/12/ {print $0} /21/ {print $0}")
 				.operand(pathTo("mail-list"), pathTo("inventory-shipped"))
 				.expectLines(
@@ -202,8 +194,7 @@ public class AwkTest {
 
 	@Test
 	public void testEmptyPattern() throws Exception {
-		AwkTestSupport
-				.cliTest("empty pattern")
+		AwkTestSupport.cliTest("empty pattern")
 				.script("//")
 				.operand(pathTo("inventory-shipped"))
 				.expectLines(
@@ -229,8 +220,7 @@ public class AwkTest {
 
 	@Test
 	public void testUninitializedVarible() throws Exception {
-		AwkTestSupport
-				.cliTest("uninitialized variable prints message")
+		AwkTestSupport.cliTest("uninitialized variable prints message")
 				.script("//{ if (v == 0) {print \"uninitialize variable\"} else {print}}")
 				.operand(pathTo("inventory-shipped"))
 				.expectLines(monotoneArray("uninitialize variable", 17))
@@ -239,8 +229,7 @@ public class AwkTest {
 
 	@Test
 	public void testUninitializedVarible2() throws Exception {
-		AwkTestSupport
-				.cliTest("initialized variable prints record")
+		AwkTestSupport.cliTest("initialized variable prints record")
 				.script("//{ v = 1; if (v == 0) {print \"uninitialize variable\"} else {print}}")
 				.operand(pathTo("inventory-shipped"))
 				.expectLines(
@@ -266,8 +255,7 @@ public class AwkTest {
 
 	@Test
 	public void testArrayStringKey() throws Exception {
-		AwkTestSupport
-				.cliTest("array string key")
+		AwkTestSupport.cliTest("array string key")
 				.script("//{i=1; j=\"1\"; v[i] = 100; print v[i] v[j];}")
 				.operand(pathTo("inventory-shipped"))
 				.expectLines(monotoneArray("100100", 17))
@@ -276,8 +264,7 @@ public class AwkTest {
 
 	@Test
 	public void testArrayStringKey2() throws Exception {
-		AwkTestSupport
-				.cliTest("array string key via j")
+		AwkTestSupport.cliTest("array string key via j")
 				.script("//{i=1; j=\"1\"; v[j] = 100; print v[i] v[j];}")
 				.operand(pathTo("inventory-shipped"))
 				.expectLines(monotoneArray("100100", 17))
@@ -299,43 +286,33 @@ public class AwkTest {
 
 	@Test
 	public void testExit() throws Exception {
-		AwkTestSupport
-				.awkTest("exit with code")
-				.script("BEGIN { exit 17 }")
-				.stdin("")
-				.expectExit(17)
-				.runAndAssert();
+		AwkTestSupport.awkTest("exit with code").script("BEGIN { exit 17 }").stdin("").expectExit(17).runAndAssert();
 
-		AwkTestSupport
-				.awkTest("exit in BEGIN prevents rules")
+		AwkTestSupport.awkTest("exit in BEGIN prevents rules")
 				.script("BEGIN { exit 0 }\n{ print $0 }")
 				.stdin("failure")
 				.expect("")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("exit jumps to END")
+		AwkTestSupport.awkTest("exit jumps to END")
 				.script("BEGIN { exit 0 ; printf \"failure\" }\nEND { printf \"success\" }")
 				.stdin("")
 				.expect("success")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("exit in END stops immediately")
+		AwkTestSupport.awkTest("exit in END stops immediately")
 				.script("END { printf \"success\" ; exit 0 ; printf \"failure\" }")
 				.stdin("")
 				.expect("success")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("exit without code")
+		AwkTestSupport.awkTest("exit without code")
 				.script("BEGIN { exit }\n{ print $0 }")
 				.stdin("failure")
 				.expect("")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("exit retains previous code")
+		AwkTestSupport.awkTest("exit retains previous code")
 				.script("BEGIN { exit 2 }\nEND { exit }")
 				.stdin("")
 				.expectExit(2)
@@ -345,57 +322,37 @@ public class AwkTest {
 	@Test
 	public void testRanges() throws Exception {
 		String input = "aa\nbb\ncc\ndd\nee\naa\nbb\ncc\ndd\nee";
-		AwkTestSupport
-				.awkTest("range of regexp")
+		AwkTestSupport.awkTest("range of regexp")
 				.script("/b/, /d/")
 				.stdin(input)
 				.expect("bb\ncc\ndd\nbb\ncc\ndd\n")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("range of conditions")
+		AwkTestSupport.awkTest("range of conditions")
 				.script("NR == 2, NR == 4")
 				.stdin(input)
 				.expect("bb\ncc\ndd\n")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("non matching start range")
-				.script("/zz/, /cc/")
-				.stdin(input)
-				.expect("")
-				.runAndAssert();
+		AwkTestSupport.awkTest("non matching start range").script("/zz/, /cc/").stdin(input).expect("").runAndAssert();
 
-		AwkTestSupport
-				.awkTest("non matching end range")
+		AwkTestSupport.awkTest("non matching end range")
 				.script("/cc/, /zz/")
 				.stdin(input)
 				.expect("cc\ndd\nee\naa\nbb\ncc\ndd\nee\n")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("mixed range")
-				.script("NR == 2, /d/")
-				.stdin(input)
-				.expect("bb\ncc\ndd\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("mixed range").script("NR == 2, /d/").stdin(input).expect("bb\ncc\ndd\n").runAndAssert();
 
-		AwkTestSupport
-				.awkTest("invalid range")
+		AwkTestSupport.awkTest("invalid range")
 				.script("/a/, /b/, NR == 4")
 				.stdin(input)
 				.expectThrow(ParserException.class)
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("enter and leave range")
-				.script("/b/, /b/")
-				.stdin(input)
-				.expect("bb\nbb\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("enter and leave range").script("/b/, /b/").stdin(input).expect("bb\nbb\n").runAndAssert();
 
-		AwkTestSupport
-				.awkTest("range comma precedence")
+		AwkTestSupport.awkTest("range comma precedence")
 				.script("/b/, /d/ || /c/")
 				.stdin(input)
 				.expect("bb\ncc\nbb\ncc\n")
@@ -406,22 +363,19 @@ public class AwkTest {
 		// The end condition must not be evaluated until the range starts matching,
 		// and the start condition must not be evaluated while within the range
 		// (https://github.com/jawkio/jawk/issues/115)
-		AwkTestSupport
-				.awkTest("range with side effects")
+		AwkTestSupport.awkTest("range with side effects")
 				.script("a++ == 2, a++ == 5")
 				.stdin(numbers)
 				.expect("3\n4\n5\n")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("range end side effect on start record")
+		AwkTestSupport.awkTest("range end side effect on start record")
 				.script("NR == 2, b++ == 2 { print $0, b }")
 				.stdin(numbers)
 				.expect("2 1\n3 2\n4 3\n")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("multiple independent ranges")
+		AwkTestSupport.awkTest("multiple independent ranges")
 				.script("NR == 2, NR == 3 { print \"r1\", $0 } NR == 3, NR == 4 { print \"r2\", $0 }")
 				.stdin(numbers)
 				.expect("r1 2\nr1 3\nr2 3\nr2 4\n")
@@ -430,54 +384,35 @@ public class AwkTest {
 
 	@Test
 	public void testDavideBrini() throws Exception {
-		AwkTestSupport
-				.awkTest("Davide Brini signature")
+		AwkTestSupport.awkTest("Davide Brini signature")
 				.script(
 						"BEGIN{O=\"~\"~\"~\";o=\"==\"==\"==\";o+=+o;x=O\"\"O;while(X++<=x+o+o){c=c\"%c\";}"
-								+
-								"printf c,(x-O)*(x-O),x*(x-o)-o,x*(x-O)+x-O-o,+x*(x-O)-x+o,X*(o*o+O)+x-O,"
-								+
-								"X*(X-x)-o*o,(x+X)*o*o+o,x*(X-x)-O-O,x-O+(O+o+X+x)*(o+O),X*X-X*(x-O)-x+O,"
-								+
-								"O+X*(o*(o+O)+O),+x+O+X*o,x*(x-o),(o+X+x)*o*o-(x-O-O),O+(X-x)*(X+O),x-O}")
+								+ "printf c,(x-O)*(x-O),x*(x-o)-o,x*(x-O)+x-O-o,+x*(x-O)-x+o,X*(o*o+O)+x-O,"
+								+ "X*(X-x)-o*o,(x+X)*o*o+o,x*(X-x)-O-O,x-O+(O+o+X+x)*(o+O),X*X-X*(x-O)-x+O,"
+								+ "O+X*(o*(o+O)+O),+x+O+X*o,x*(x-o),(o+X+x)*o*o-(x-O-O),O+(X-x)*(X+O),x-O}")
 				.expect("dave_br@gmx.com\n")
 				.runAndAssert();
 	}
 
 	@Test
 	public void testIncDec() throws Exception {
-		AwkTestSupport
-				.awkTest("pre increment outputs 2")
-				.script("BEGIN { a = 1; printf ++a }")
-				.expect("2")
-				.runAndAssert();
+		AwkTestSupport.awkTest("pre increment outputs 2").script("BEGIN { a = 1; printf ++a }").expect("2").runAndAssert();
 
-		AwkTestSupport
-				.awkTest("post increment twice")
+		AwkTestSupport.awkTest("post increment twice")
 				.script("BEGIN { a = 1; printf a++ ; printf a++; }")
 				.expect("12")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("pre decrement outputs 0")
-				.script("BEGIN { a = 1; printf --a }")
-				.expect("0")
-				.runAndAssert();
+		AwkTestSupport.awkTest("pre decrement outputs 0").script("BEGIN { a = 1; printf --a }").expect("0").runAndAssert();
 
-		AwkTestSupport
-				.awkTest("post decrement twice")
+		AwkTestSupport.awkTest("post decrement twice")
 				.script("BEGIN { a = 1; printf a-- ; printf a--; }")
 				.expect("10")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("pre increment uninitialized")
-				.script("BEGIN { printf ++a }")
-				.expect("1")
-				.runAndAssert();
+		AwkTestSupport.awkTest("pre increment uninitialized").script("BEGIN { printf ++a }").expect("1").runAndAssert();
 
-		AwkTestSupport
-				.awkTest("post increment uninitialized twice")
+		AwkTestSupport.awkTest("post increment uninitialized twice")
 				.script("BEGIN { printf a++ ; printf a++; }")
 				.expect("01")
 				.runAndAssert();
@@ -495,8 +430,7 @@ public class AwkTest {
 
 	@Test
 	public void testFunctionArgumentsLeftAssociativity() throws Exception {
-		AwkTestSupport
-				.awkTest("function arguments left to right")
+		AwkTestSupport.awkTest("function arguments left to right")
 				.script("BEGIN { print a++, a++, a++, a++ }")
 				.expect("0 1 2 3\n")
 				.runAndAssert();
@@ -504,8 +438,7 @@ public class AwkTest {
 
 	@Test
 	public void testAtan2ArgumentsLeftAssociativity() throws Exception {
-		AwkTestSupport
-				.awkTest("atan2 arguments left to right")
+		AwkTestSupport.awkTest("atan2 arguments left to right")
 				.script("BEGIN { print atan2(a++, a++) }")
 				.expect("0\n")
 				.runAndAssert();
@@ -513,8 +446,7 @@ public class AwkTest {
 
 	@Test
 	public void testComparisonArgumentsLeftAssociativity() throws Exception {
-		AwkTestSupport
-				.awkTest("comparison arguments left to right")
+		AwkTestSupport.awkTest("comparison arguments left to right")
 				.script("BEGIN { r = (a++ < a++); printf r }")
 				.expect("1")
 				.runAndAssert();
@@ -522,8 +454,7 @@ public class AwkTest {
 
 	@Test
 	public void testAssignmentRightToLeft() throws Exception {
-		AwkTestSupport
-				.awkTest("assignment evaluated right to left")
+		AwkTestSupport.awkTest("assignment evaluated right to left")
 				.script("BEGIN { arr[a++] = a++; printf arr[1] }")
 				.expect("0")
 				.runAndAssert();
@@ -531,8 +462,7 @@ public class AwkTest {
 
 	@Test
 	public void testBinaryExpressionLeftAssociativity() throws Exception {
-		AwkTestSupport
-				.awkTest("binary expression left to right")
+		AwkTestSupport.awkTest("binary expression left to right")
 				.script("BEGIN { a = 1; printf a++ / a++ }")
 				.expect("0.5")
 				.runAndAssert();
@@ -560,8 +490,7 @@ public class AwkTest {
 
 	@Test
 	public void testChainedLogicalAndLeftAssociativity() throws Exception {
-		AwkTestSupport
-				.awkTest("logical and left to right")
+		AwkTestSupport.awkTest("logical and left to right")
 				.script("BEGIN { a = 0; r = (a++ && a++ && a++); printf r }")
 				.expect("0")
 				.runAndAssert();
@@ -569,8 +498,7 @@ public class AwkTest {
 
 	@Test
 	public void testChainedLogicalOrLeftAssociativity() throws Exception {
-		AwkTestSupport
-				.awkTest("logical or left to right")
+		AwkTestSupport.awkTest("logical or left to right")
 				.script("BEGIN { a = 1; r = (a++ || a++ || a++); printf r }")
 				.expect("1")
 				.runAndAssert();
@@ -578,8 +506,7 @@ public class AwkTest {
 
 	@Test
 	public void testChainedComparisonLeftAssociativity() throws Exception {
-		AwkTestSupport
-				.awkTest("comparison chaining left to right")
+		AwkTestSupport.awkTest("comparison chaining left to right")
 				.script("BEGIN { a = 1; r = (a++ < a++ < a++); printf r }")
 				.expect("0")
 				.runAndAssert();
@@ -618,18 +545,15 @@ public class AwkTest {
 
 	@Test
 	public void testPrintComparison() throws Exception {
-		AwkTestSupport
-				.awkTest("print comparison less than")
+		AwkTestSupport.awkTest("print comparison less than")
 				.script("BEGIN { print 1 < \"2\" }")
 				.expect("1\n")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("print comparison greater equal")
+		AwkTestSupport.awkTest("print comparison greater equal")
 				.script("BEGIN { print 1 >= \"2\" }")
 				.expect("0\n")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("print redirection suppresses stdout")
+		AwkTestSupport.awkTest("print redirection suppresses stdout")
 				.script("BEGIN { print 1 > TEMPDIR\"/printRedirect\" }")
 				.withTempDir()
 				.expect("")
@@ -637,13 +561,11 @@ public class AwkTest {
 		assertTrue(
 				"> in a print statement must write to the specified file",
 				Files.exists(Paths.get(AwkTestSupport.sharedTempDirectory().toString(), "printRedirect")));
-		AwkTestSupport
-				.awkTest("print parenthesized comparison")
+		AwkTestSupport.awkTest("print parenthesized comparison")
 				.script("BEGIN { print(1 > 0) }")
 				.expect("1\n")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("print concatenated comparison")
+		AwkTestSupport.awkTest("print concatenated comparison")
 				.script("BEGIN { print \"test\" (1 > 0) \"test\" }")
 				.expect("test1test\n")
 				.runAndAssert();
@@ -651,8 +573,7 @@ public class AwkTest {
 
 	@Test
 	public void testPrintParenthesizedExpressionConcatenation() throws Exception {
-		AwkTestSupport
-				.awkTest("print parenthesized concatenation")
+		AwkTestSupport.awkTest("print parenthesized concatenation")
 				.script("{ print ($1 - $2) \";\" $3 }")
 				.stdin("10 5 99")
 				.expect("5;99\n")
@@ -661,44 +582,37 @@ public class AwkTest {
 
 	@Test
 	public void testPrintParenthesizedExpressionOperators() throws Exception {
-		AwkTestSupport
-				.awkTest("print arithmetic multiplication")
+		AwkTestSupport.awkTest("print arithmetic multiplication")
 				.script("{ print ($1 - $2) * $3 }")
 				.stdin("10 5 4\n")
 				.expect("20\n")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("print equality comparison")
+		AwkTestSupport.awkTest("print equality comparison")
 				.script("{ print ($1 - $2) == $3 }")
 				.stdin("10 5 5\n")
 				.expect("1\n")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("print ternary expression")
+		AwkTestSupport.awkTest("print ternary expression")
 				.script("{ print ($1 - $2) ? \"yes\" : \"no\" }")
 				.stdin("10 5\n")
 				.expect("yes\n")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("print regex match")
+		AwkTestSupport.awkTest("print regex match")
 				.script("{ print ($1) ~ /foo/ }")
 				.stdin("foo\n")
 				.expect("1\n")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("print in operator")
+		AwkTestSupport.awkTest("print in operator")
 				.script("BEGIN { arr[\"foo\"] = 1 } { print ($1) in arr }")
 				.stdin("foo\n")
 				.expect("1\n")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("print logical expression")
+		AwkTestSupport.awkTest("print logical expression")
 				.script("{ print ($1) && ($2) }")
 				.stdin("1 1\\n0 1\\n")
 				.expect("1\n")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("print redirection with parentheses")
+		AwkTestSupport.awkTest("print redirection with parentheses")
 				.script("{ print ($1) > TEMPDIR\"/printParenRedirect\" }")
 				.stdin("value\n")
 				.withTempDir()
@@ -711,14 +625,12 @@ public class AwkTest {
 
 	@Test
 	public void testSubArray() throws Exception {
-		AwkTestSupport
-				.awkTest("sub modifies array element")
+		AwkTestSupport.awkTest("sub modifies array element")
 				.script("BEGIN { a[1] = \"ab:c:d\"; sub(/:/, \"\", a[1]); print a[1]; }")
 				.expect("abc:d\n")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("gsub modifies array element")
+		AwkTestSupport.awkTest("gsub modifies array element")
 				.script("BEGIN { a[1] = \"ab:c:d\"; gsub(/:/, \"\", a[1]); print a[1]; }")
 				.expect("abcd\n")
 				.runAndAssert();
@@ -726,15 +638,13 @@ public class AwkTest {
 
 	@Test
 	public void testSubDollarReference() throws Exception {
-		AwkTestSupport
-				.awkTest("sub modifies field")
+		AwkTestSupport.awkTest("sub modifies field")
 				.script("{ sub(/d/, \"Z\", $4); print $1, $2, $3, $4; }")
 				.stdin("aa bb cc dd")
 				.expect("aa bb cc Zd\n")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("gsub modifies field")
+		AwkTestSupport.awkTest("gsub modifies field")
 				.script("{ gsub(/d/, \"Z\", $4); print $1, $2, $3, $4; }")
 				.stdin("aa bb cc dd")
 				.expect("aa bb cc ZZ\n")
@@ -743,29 +653,25 @@ public class AwkTest {
 
 	@Test
 	public void testSubDollarZero() throws Exception {
-		AwkTestSupport
-				.awkTest("sub modifies $0")
+		AwkTestSupport.awkTest("sub modifies $0")
 				.script("{ sub(/d/, \"Z\"); print $0; print $4; }")
 				.stdin("aa bb cc dd")
 				.expect("aa bb cc Zd\nZd\n")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("gsub modifies $0")
+		AwkTestSupport.awkTest("gsub modifies $0")
 				.script("{ gsub(/d/, \"Z\"); print $0; print $4; }")
 				.stdin("aa bb cc dd")
 				.expect("aa bb cc ZZ\nZZ\n")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("sub modifies $0 with target")
+		AwkTestSupport.awkTest("sub modifies $0 with target")
 				.script("{ sub(/d/, \"Z\", $0); print $0; print $4; }")
 				.stdin("aa bb cc dd")
 				.expect("aa bb cc Zd\nZd\n")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("gsub modifies $0 with target")
+		AwkTestSupport.awkTest("gsub modifies $0 with target")
 				.script("{ gsub(/d/, \"Z\", $0); print $0; print $4; }")
 				.stdin("aa bb cc dd")
 				.expect("aa bb cc ZZ\nZZ\n")
@@ -774,13 +680,11 @@ public class AwkTest {
 
 	@Test
 	public void testSubVariable() throws Exception {
-		AwkTestSupport
-				.awkTest("sub modifies variable")
+		AwkTestSupport.awkTest("sub modifies variable")
 				.script("BEGIN { v = \"aa bb cc dd\"; sub(/d/, \"Z\", v); print v; }")
 				.expect("aa bb cc Zd\n")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("gsub modifies variable")
+		AwkTestSupport.awkTest("gsub modifies variable")
 				.script("BEGIN { v = \"aa bb cc dd\"; gsub(/d/, \"Z\", v); print v; }")
 				.expect("aa bb cc ZZ\n")
 				.runAndAssert();
@@ -788,36 +692,31 @@ public class AwkTest {
 
 	@Test
 	public void testSubReplaceWithMatchReference() throws Exception {
-		AwkTestSupport
-				.awkTest("gsub replaces ampersand")
+		AwkTestSupport.awkTest("gsub replaces ampersand")
 				.script("{ gsub(/[b-c]/, \"_&_\"); print $0; }")
 				.stdin("a b c d e")
 				.expect("a _b_ _c_ d e\n")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("gsub escapes ampersand")
+		AwkTestSupport.awkTest("gsub escapes ampersand")
 				.script("{ gsub(/[b-c]/, \"_\\\\&_\"); print $0; }")
 				.stdin("a b c d e")
 				.expect("a _&_ _&_ d e\n")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("gsub replaces dollar zero")
+		AwkTestSupport.awkTest("gsub replaces dollar zero")
 				.script("{ gsub(/[b-c]/, \"_$0_\"); print $0; }")
 				.stdin("a b c d e")
 				.expect("a _$0_ _$0_ d e\n")
 				.runAndAssert();
 
 		// issue #613: a backslash before an ordinary character is kept
-		AwkTestSupport
-				.awkTest("gsub keeps backslash before ordinary character")
+		AwkTestSupport.awkTest("gsub keeps backslash before ordinary character")
 				.script("BEGIN { s = \"'\"; gsub(/'/, \"'\\\\''\", s); print s }")
 				.expect("'\\''\n")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("gsub keeps backslash before dollar, digit and at end")
+		AwkTestSupport.awkTest("gsub keeps backslash before dollar, digit and at end")
 				.script("BEGIN { s = \"x x x\"; gsub(/x/, \"\\\\$\\\\1\\\\\", s); print s }")
 				.expect("\\$\\1\\ \\$\\1\\ \\$\\1\\\n")
 				.runAndAssert();
@@ -825,14 +724,12 @@ public class AwkTest {
 		// issue #614: the replacement text \\\&|\\\\|\\&|\\q|\\ follows gawk's
 		// rules by default and the POSIX rules (as in mawk) with --posix
 		String backslashes = "BEGIN { s = \"x\"; gsub(/x/, \"\\\\\\\\\\\\&|\\\\\\\\\\\\\\\\|\\\\\\\\&|\\\\\\\\q|\\\\\\\\\", s); print s }";
-		AwkTestSupport
-				.awkTest("gsub follows gawk's backslash rules")
+		AwkTestSupport.awkTest("gsub follows gawk's backslash rules")
 				.script(backslashes)
 				.expect("\\&|\\\\|\\x|\\\\q|\\\\\n")
 				.runAndAssert();
 
-		AwkTestSupport
-				.cliTest("gsub follows the POSIX backslash rules with --posix")
+		AwkTestSupport.cliTest("gsub follows the POSIX backslash rules with --posix")
 				.argument("--posix")
 				.script(backslashes)
 				.expect("\\&|\\\\|\\x|\\q|\\\n")
@@ -841,8 +738,7 @@ public class AwkTest {
 
 	@Test
 	public void testMultiDimensionalArrayWithSubsep() throws Exception {
-		AwkTestSupport
-				.awkTest("multi-dimensional array with subsep")
+		AwkTestSupport.awkTest("multi-dimensional array with subsep")
 				.script("BEGIN { SUBSEP=\"@\"; a[1,2]=42; print a[1 SUBSEP 2]; }")
 				.expect("42\n")
 				.runAndAssert();
@@ -850,8 +746,7 @@ public class AwkTest {
 
 	@Test
 	public void testSubsepChangeAfterIndexCreation() throws Exception {
-		AwkTestSupport
-				.awkTest("subsep change after index creation")
+		AwkTestSupport.awkTest("subsep change after index creation")
 				.script("BEGIN { SUBSEP=\"@\"; idx = 1 SUBSEP 2; a[idx]=42; SUBSEP=\":\"; print a[idx]; print a[1,2]; }")
 				.expect("42\n\n")
 				.runAndAssert();
@@ -859,8 +754,7 @@ public class AwkTest {
 
 	@Test
 	public void testArraysOfArraysAssignmentAndLookup() throws Exception {
-		AwkTestSupport
-				.awkTest("arrays of arrays assignment and lookup")
+		AwkTestSupport.awkTest("arrays of arrays assignment and lookup")
 				.script("BEGIN { a[1][2] = 42; print a[1][2] }")
 				.expect("42\n")
 				.runAndAssert();
@@ -868,8 +762,7 @@ public class AwkTest {
 
 	@Test
 	public void testArraysOfArraysSupportsMixedCommaSubscripts() throws Exception {
-		AwkTestSupport
-				.awkTest("arrays of arrays mixed with comma subscripts")
+		AwkTestSupport.awkTest("arrays of arrays mixed with comma subscripts")
 				.script("BEGIN { SUBSEP = \"@\"; a[1][2,3] = 42; print a[1][2 SUBSEP 3]; print a[1][2,3] }")
 				.expect("42\n42\n")
 				.runAndAssert();
@@ -877,8 +770,7 @@ public class AwkTest {
 
 	@Test
 	public void testArraysOfArraysRejectScalarAsArray() throws Exception {
-		AwkTestSupport
-				.awkTest("arrays of arrays reject scalar as array")
+		AwkTestSupport.awkTest("arrays of arrays reject scalar as array")
 				.script("BEGIN { a[1] = 5; print a[1][2] }")
 				.expectThrow(RuntimeException.class)
 				.runAndAssert();
@@ -886,8 +778,7 @@ public class AwkTest {
 
 	@Test
 	public void testDiscardedArrayExpressionRejectsScalarContext() throws Exception {
-		AwkTestSupport
-				.awkTest("discarded array expression rejects scalar context")
+		AwkTestSupport.awkTest("discarded array expression rejects scalar context")
 				.script("BEGIN { a[1] = 1; a; print \"continued\" }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -895,8 +786,7 @@ public class AwkTest {
 
 	@Test
 	public void testAssignedBlankRejectsForInArrayContext() throws Exception {
-		AwkTestSupport
-				.awkTest("assigned blank rejects for-in array context")
+		AwkTestSupport.awkTest("assigned blank rejects for-in array context")
 				.script("BEGIN { print \"[\" a \"]\"; for (i in a); print \"continued\" }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -904,8 +794,7 @@ public class AwkTest {
 
 	@Test
 	public void testAssignedBlankRejectsMembershipArrayContext() throws Exception {
-		AwkTestSupport
-				.awkTest("assigned blank rejects membership array context")
+		AwkTestSupport.awkTest("assigned blank rejects membership array context")
 				.script("BEGIN { print \"[\" a \"]\"; print (1 in a); print \"continued\" }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -913,8 +802,7 @@ public class AwkTest {
 
 	@Test
 	public void testSpecialScalarRejectsArrayElementAssignment() throws Exception {
-		AwkTestSupport
-				.awkTest("special scalar rejects array element assignment")
+		AwkTestSupport.awkTest("special scalar rejects array element assignment")
 				.script("BEGIN { FS[1] = 2; print FS }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -922,20 +810,17 @@ public class AwkTest {
 
 	@Test
 	public void testSpecialScalarRejectsArrayOnlyContexts() throws Exception {
-		AwkTestSupport
-				.awkTest("special scalar rejects array membership")
+		AwkTestSupport.awkTest("special scalar rejects array membership")
 				.script("BEGIN { print (1 in FS) }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("special scalar rejects for-in")
+		AwkTestSupport.awkTest("special scalar rejects for-in")
 				.script("BEGIN { for (key in NR); print \"continued\" }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("special scalar rejects split destination")
+		AwkTestSupport.awkTest("special scalar rejects split destination")
 				.script("BEGIN { split(\"a\", FS) }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -943,8 +828,7 @@ public class AwkTest {
 
 	@Test
 	public void testArrayParameterDefersUntypedActualUntilScalarUse() throws Exception {
-		AwkTestSupport
-				.awkTest("untyped array parameter follows caller scalarization")
+		AwkTestSupport.awkTest("untyped array parameter follows caller scalarization")
 				.script("function f(x) { a = 1; x[1] = 2 } BEGIN { f(a) }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -952,8 +836,7 @@ public class AwkTest {
 
 	@Test
 	public void testArrayParameterDefersUntypedActualUntilArrayUse() throws Exception {
-		AwkTestSupport
-				.awkTest("untyped array parameter follows caller array materialization")
+		AwkTestSupport.awkTest("untyped array parameter follows caller array materialization")
 				.script("function f(x) { x[1] = 2; a = 1 } BEGIN { f(a) }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -961,8 +844,7 @@ public class AwkTest {
 
 	@Test
 	public void testScalarParameterRejectsCallerArrayTransition() throws Exception {
-		AwkTestSupport
-				.awkTest("scalar parameter rejects caller array transition")
+		AwkTestSupport.awkTest("scalar parameter rejects caller array transition")
 				.script("function f(x, y) { x[1] = 1; print y } BEGIN { f(a, a) }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -970,8 +852,7 @@ public class AwkTest {
 
 	@Test
 	public void testLengthParameterObservesCallerArrayTransition() throws Exception {
-		AwkTestSupport
-				.awkTest("length parameter observes caller array transition")
+		AwkTestSupport.awkTest("length parameter observes caller array transition")
 				.script("function f(x, y) { y[1] = 1; print length(x) } BEGIN { f(a, a) }")
 				.expectLines("1")
 				.runAndAssert();
@@ -979,8 +860,7 @@ public class AwkTest {
 
 	@Test
 	public void testUntypedScalarParameterKeepsCallTimeValue() throws Exception {
-		AwkTestSupport
-				.awkTest("untyped scalar parameter keeps its call-time value")
+		AwkTestSupport.awkTest("untyped scalar parameter keeps its call-time value")
 				.script("function f(x) { a = 5; print \"[\" x \"]\"; print a } BEGIN { f(a) }")
 				.expectLines("[]", "5")
 				.runAndAssert();
@@ -988,8 +868,7 @@ public class AwkTest {
 
 	@Test
 	public void testUntypedScalarParameterScalarizesUnchangedCaller() throws Exception {
-		AwkTestSupport
-				.awkTest("untyped scalar parameter scalarizes its unchanged caller")
+		AwkTestSupport.awkTest("untyped scalar parameter scalarizes its unchanged caller")
 				.script("function f(x) { print x } BEGIN { f(a); a[1] = 1 }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -997,41 +876,31 @@ public class AwkTest {
 
 	@Test
 	public void testUntypedScalarParameterPreservesChangedArrayElement() throws Exception {
-		AwkTestSupport
-				.awkTest("untyped scalar parameter preserves a changed array element")
-				.script(
-						"function f(x) { a[1] = 7; print \"[\" x \"]\" } "
-								+ "BEGIN { f(a[1]); print a[1] }")
+		AwkTestSupport.awkTest("untyped scalar parameter preserves a changed array element")
+				.script("function f(x) { a[1] = 7; print \"[\" x \"]\" } " + "BEGIN { f(a[1]); print a[1] }")
 				.expectLines("[]", "7")
 				.runAndAssert();
 	}
 
 	@Test
 	public void testUntypedScalarParameterRejectsChangedSubarrayElement() throws Exception {
-		AwkTestSupport
-				.awkTest("untyped scalar parameter rejects a changed subarray element")
-				.script(
-						"function f(x) { a[1][2] = 7; print \"[\" x \"]\" } "
-								+ "BEGIN { f(a[1]); print a[1][2] }")
+		AwkTestSupport.awkTest("untyped scalar parameter rejects a changed subarray element")
+				.script("function f(x) { a[1][2] = 7; print \"[\" x \"]\" } " + "BEGIN { f(a[1]); print a[1][2] }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
 	}
 
 	@Test
 	public void testDeletedUntypedSubarrayParameterRemainsDetached() throws Exception {
-		AwkTestSupport
-				.awkTest("deleted untyped subarray parameter remains detached")
-				.script(
-						"function f(x) { delete a[1]; x[2] = 3; print x[2] } "
-								+ "BEGIN { f(a[1]); print (1 in a) }")
+		AwkTestSupport.awkTest("deleted untyped subarray parameter remains detached")
+				.script("function f(x) { delete a[1]; x[2] = 3; print x[2] } " + "BEGIN { f(a[1]); print (1 in a) }")
 				.expectLines("3", "0")
 				.runAndAssert();
 	}
 
 	@Test
 	public void testReinsertedUntypedSubarrayParameterRemainsDetached() throws Exception {
-		AwkTestSupport
-				.awkTest("reinserted untyped subarray parameter remains detached")
+		AwkTestSupport.awkTest("reinserted untyped subarray parameter remains detached")
 				.script(
 						"function f(x) { delete a[1]; a[1][9] = 9; x[2] = 2; print x[2] } "
 								+ "BEGIN { f(a[1]); print (2 in a[1]); print a[1][9] }")
@@ -1041,8 +910,7 @@ public class AwkTest {
 
 	@Test
 	public void testArrayParameterRejectsAlreadyScalarActualAtRuntime() throws Exception {
-		AwkTestSupport
-				.awkTest("scalar actual remains scalar in array parameter")
+		AwkTestSupport.awkTest("scalar actual remains scalar in array parameter")
 				.script("function f(x) { x[1] = 2 } BEGIN { a = 1; f(a) }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -1050,8 +918,7 @@ public class AwkTest {
 
 	@Test
 	public void testFunctionResultCannotOverwriteSubarray() throws Exception {
-		AwkTestSupport
-				.awkTest("function result cannot overwrite a subarray")
+		AwkTestSupport.awkTest("function result cannot overwrite a subarray")
 				.script("function f(x) { x[1] = 42 } BEGIN { a[0] = f(a[0]) }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -1062,16 +929,14 @@ public class AwkTest {
 		// Element arguments passed in a hot loop, combined with delete, must not
 		// accumulate tracking state across calls (quadratic before the
 		// frame-scoped reference lifecycle).
-		AwkTestSupport
-				.awkTest("untyped element argument tracking stays linear")
+		AwkTestSupport.awkTest("untyped element argument tracking stays linear")
 				.script(
 						"function f(x) { delete c[1]; c[1] = 1 } "
 								+ "BEGIN { c[1] = 1; for (i = 0; i < 50000; i++) f(a[i]); print \"done\" }")
 				.expectLines("done")
 				.runAndAssert();
 
-		AwkTestSupport
-				.awkTest("typed element argument tracking stays linear")
+		AwkTestSupport.awkTest("typed element argument tracking stays linear")
 				.script(
 						"function f(x) { delete c[1]; c[1] = 1 } "
 								+ "BEGIN { c[1] = 1; for (i = 0; i < 50000; i++) { a[i] = i; f(a[i]) } print \"done\" }")
@@ -1151,8 +1016,7 @@ public class AwkTest {
 
 	@Test
 	public void testArraysOfArraysReadAutovivifiesMissingParentSubarray() throws Exception {
-		AwkTestSupport
-				.awkTest("arrays of arrays read autovivifies missing parent subarray")
+		AwkTestSupport.awkTest("arrays of arrays read autovivifies missing parent subarray")
 				.script(
 						"BEGIN { print \"[\" a[1][2] \"]\"; print (((1 in a) ? \"yes\" : \"no\") \" \" ((2 in a[1]) ? \"yes\" : \"no\")) }")
 				.expectLines("[]", "yes yes")
@@ -1164,8 +1028,7 @@ public class AwkTest {
 		AwkSettings settings = new AwkSettings();
 		settings.setUseSortedArrayKeys(true);
 
-		AwkTestSupport
-				.awkTest("arrays of arrays membership delete and iteration")
+		AwkTestSupport.awkTest("arrays of arrays membership delete and iteration")
 				.withAwk(new Awk(settings))
 				.script(
 						"BEGIN { a[1][\"x\"] = 1; a[1][\"y\"] = 2; print ((\"x\" in a[1]) ? \"yes\" : \"no\"); delete a[1][\"x\"]; print ((\"x\" in a[1]) ? \"yes\" : \"no\"); for (k in a[1]) print k \":\" a[1][k] }")
@@ -1175,8 +1038,7 @@ public class AwkTest {
 
 	@Test
 	public void testArraysOfArraysInDoesNotAutovivifyMissingSubarray() throws Exception {
-		AwkTestSupport
-				.awkTest("arrays of arrays in does not autovivify missing subarray")
+		AwkTestSupport.awkTest("arrays of arrays in does not autovivify missing subarray")
 				.script("BEGIN { print ((\"x\" in a[1]) ? \"yes\" : \"no\"); print ((1 in a) ? \"yes\" : \"no\") }")
 				.expectLines("no", "no")
 				.runAndAssert();
@@ -1184,8 +1046,7 @@ public class AwkTest {
 
 	@Test
 	public void testArraysOfArraysForInDoesNotAutovivifyMissingSubarray() throws Exception {
-		AwkTestSupport
-				.awkTest("arrays of arrays for-in does not autovivify missing subarray")
+		AwkTestSupport.awkTest("arrays of arrays for-in does not autovivify missing subarray")
 				.script("BEGIN { for (k in a[1]) print k; print ((1 in a) ? \"yes\" : \"no\") }")
 				.expectLines("no")
 				.runAndAssert();
@@ -1193,8 +1054,7 @@ public class AwkTest {
 
 	@Test
 	public void testArraysOfArraysSupportsNestedIncrement() throws Exception {
-		AwkTestSupport
-				.awkTest("arrays of arrays nested increment")
+		AwkTestSupport.awkTest("arrays of arrays nested increment")
 				.script("BEGIN { old = a[1][2]++; print old, a[1][2]; ++a[1][2]; print a[1][2] }")
 				.expectLines("0 1", "2")
 				.runAndAssert();
@@ -1202,8 +1062,7 @@ public class AwkTest {
 
 	@Test
 	public void testArraysOfArraysPostfixOperatorsUseNumericOldValue() throws Exception {
-		AwkTestSupport
-				.awkTest("arrays of arrays postfix operators use numeric old value")
+		AwkTestSupport.awkTest("arrays of arrays postfix operators use numeric old value")
 				.script(
 						"BEGIN { a[1][1] = \"abc\"; oldInc = a[1][1]++; a[1][2] = \"abc\"; oldDec = a[1][2]--; print oldInc, a[1][1]; print oldDec, a[1][2] }")
 				.expectLines("0 1", "0 -1")
@@ -1212,8 +1071,7 @@ public class AwkTest {
 
 	@Test
 	public void testArraysOfArraysSupportsSplitIntoSubarray() throws Exception {
-		AwkTestSupport
-				.awkTest("split into subarray")
+		AwkTestSupport.awkTest("split into subarray")
 				.script("BEGIN { print split(\"x y\", a[1]), a[1][1], a[1][2] }")
 				.expectLines("2 x y")
 				.runAndAssert();
@@ -1221,8 +1079,7 @@ public class AwkTest {
 
 	@Test
 	public void testArraysOfArraysSupportsGetlineIntoSubarray() throws Exception {
-		AwkTestSupport
-				.awkTest("getline into subarray")
+		AwkTestSupport.awkTest("getline into subarray")
 				.script("BEGIN { getline a[1][2]; print a[1][2] }")
 				.stdin("hello\n")
 				.expect("hello\n")
@@ -1231,8 +1088,7 @@ public class AwkTest {
 
 	@Test
 	public void testArraysOfArraysSupportsSubOnNestedElement() throws Exception {
-		AwkTestSupport
-				.awkTest("sub on nested array element")
+		AwkTestSupport.awkTest("sub on nested array element")
 				.script("BEGIN { a[1][2] = \"abc\"; print sub(/b/, \"x\", a[1][2]), a[1][2] }")
 				.expectLines("1 axc")
 				.runAndAssert();
@@ -1240,8 +1096,7 @@ public class AwkTest {
 
 	@Test
 	public void testArraysOfArraysSupportsFunctionArrayParameters() throws Exception {
-		AwkTestSupport
-				.awkTest("subarray passed as array parameter")
+		AwkTestSupport.awkTest("subarray passed as array parameter")
 				.script("function fill(arr) { arr[\"key\"] = \"value\" } BEGIN { fill(a[1]); print a[1][\"key\"] }")
 				.expectLines("value")
 				.runAndAssert();
@@ -1249,8 +1104,7 @@ public class AwkTest {
 
 	@Test
 	public void testArraysOfArraysSupportsDeletingPassedSubarrays() throws Exception {
-		AwkTestSupport
-				.awkTest("delete passed subarray")
+		AwkTestSupport.awkTest("delete passed subarray")
 				.script(
 						"function f(c, b) { delete b; b[1] = 1; print c[1][1], b[1]; delete c[2] } BEGIN { a[1][1] = 11; a[1][2] = 12; a[2] = 2; delete a[1][1]; f(a, a[1]); print a[1][1]; print length(a), length(a[1]); delete a; print length(a), length(a[1]), length(a); a[1][1] = 11 }")
 				.expectLines("1 1", "1", "1 1", "0 0 1")
@@ -1259,18 +1113,15 @@ public class AwkTest {
 
 	@Test
 	public void testArraysOfArraysRejectArrayAsScalarSubscript() throws Exception {
-		AwkTestSupport
-				.awkTest("array value cannot be used as scalar subscript")
-				.script(
-						"function f(arr, s) { delete arr[s[1]][1] } BEGIN { a[1][1] = 1; b[1][1] = 11; f(b, a) }")
+		AwkTestSupport.awkTest("array value cannot be used as scalar subscript")
+				.script("function f(arr, s) { delete arr[s[1]][1] } BEGIN { a[1][1] = 1; b[1][1] = 11; f(b, a) }")
 				.expectThrow(RuntimeException.class)
 				.runAndAssert();
 	}
 
 	@Test
 	public void testArraysOfArraysHandlesNestedLengthIterationAndMutation() throws Exception {
-		AwkTestSupport
-				.awkTest("gawk-style arrays of arrays flow")
+		AwkTestSupport.awkTest("gawk-style arrays of arrays flow")
 				.script(
 						"function f(x, i) { for (i = 1; i <= length(x); i++) print x[i]; x[1] = 1001 } BEGIN { a[1][1] = 10; a[1][2] = 20; a[1][3] = 30; a[2] = \"hello world! we have multi-dimensional array\"; a[3, \"X\"] = \"Y\"; print length(a), length(a[1]); delete a[2]; delete a[3, \"X\"]; a[2][1] = 100; a[2][2] = 200; a[2][3] = 300; for (i in a) { sum[i] = 0; for (j in a[i]) sum[i] += a[i][j] } print sum[1], sum[2]; f(a[1]); print a[1][1] }")
 				.expectLines("3 3", "60 600", "10", "20", "30", "1001")
@@ -1280,8 +1131,7 @@ public class AwkTest {
 	@Test
 	public void testGetlineDefaultVariable() throws Exception {
 		String script = "BEGIN { while (getline && n++ < 2) print; exit }";
-		AwkTestSupport
-				.awkTest("getline default variable")
+		AwkTestSupport.awkTest("getline default variable")
 				.script(script)
 				.stdin("a\nb\nc\n")
 				.expect("a\nb\n")
@@ -1294,8 +1144,7 @@ public class AwkTest {
 			String expectedMessage,
 			String... scriptLines)
 			throws Exception {
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.awkTest(description)
+		AwkTestSupport.TestResult result = AwkTestSupport.awkTest(description)
 				.script(String.join("\n", scriptLines))
 				.expectThrow(AwkRuntimeException.class)
 				.run();
@@ -1356,19 +1205,14 @@ public class AwkTest {
 		String script = "{ print $0 }";
 		AwkProgram program = AWK.compile(script);
 
-		String result = new Awk()
-				.script(program)
-				.input("foo\nbar\n")
-				.execute();
+		String result = new Awk().script(program).input("foo\nbar\n").execute();
 
 		assertEquals("foo\nbar\n", result);
 	}
 
 	@Test
 	public void captureCollectsOutput() throws Exception {
-		String result = new Awk()
-				.script("BEGIN { print \"alpha\"; printf(\"beta\") }")
-				.execute();
+		String result = new Awk().script("BEGIN { print \"alpha\"; printf(\"beta\") }").execute();
 
 		assertEquals("alpha\nbeta", result);
 	}
@@ -1378,9 +1222,7 @@ public class AwkTest {
 		AwkSettings settings = new AwkSettings();
 		settings.setLocale(java.util.Locale.FRANCE);
 
-		String result = new Awk(settings)
-				.script("BEGIN { print 1.5 }")
-				.execute();
+		String result = new Awk(settings).script("BEGIN { print 1.5 }").execute();
 
 		assertEquals("1,5\n", result);
 	}
@@ -1390,9 +1232,7 @@ public class AwkTest {
 		StructuredOutputSink sink = new StructuredOutputSink();
 		Awk awk = new Awk();
 
-		awk
-				.script("BEGIN { print 1, \"two\", 3; printf(\"<%s>\", \"done\") }")
-				.execute(sink);
+		awk.script("BEGIN { print 1, \"two\", 3; printf(\"<%s>\", \"done\") }").execute(sink);
 
 		assertEquals(1, sink.printedValues.size());
 		assertEquals(3, sink.printedValues.get(0).size());
@@ -1409,9 +1249,7 @@ public class AwkTest {
 	public void executeToOutputStream() throws Exception {
 		ByteArrayOutputStream output = new ByteArrayOutputStream();
 
-		new Awk()
-				.script("BEGIN { print \"alpha\" }")
-				.execute(output);
+		new Awk().script("BEGIN { print \"alpha\" }").execute(output);
 
 		assertEquals("alpha\n", output.toString(StandardCharsets.UTF_8.name()));
 	}
@@ -1420,9 +1258,7 @@ public class AwkTest {
 	public void executeToAppendable() throws Exception {
 		StringBuilder output = new StringBuilder();
 
-		new Awk()
-				.script("BEGIN { print \"alpha\" }")
-				.execute(output);
+		new Awk().script("BEGIN { print \"alpha\" }").execute(output);
 
 		assertEquals("alpha\n", output.toString());
 	}
@@ -1431,9 +1267,7 @@ public class AwkTest {
 	public void perExecutionSinkOverridesDefault() throws Exception {
 		StringBuilder perCallOutput = new StringBuilder();
 
-		new Awk()
-				.script("BEGIN { print \"alpha\" }")
-				.execute(new AppendableAwkSink(perCallOutput, java.util.Locale.US));
+		new Awk().script("BEGIN { print \"alpha\" }").execute(new AppendableAwkSink(perCallOutput, java.util.Locale.US));
 
 		assertEquals("alpha\n", perCallOutput.toString());
 	}
@@ -1457,8 +1291,7 @@ public class AwkTest {
 
 	@Test
 	public void crlfInputFileProducesCleanRecords() throws Exception {
-		AwkTestSupport
-				.awkTest("CRLF input produces clean records")
+		AwkTestSupport.awkTest("CRLF input produces clean records")
 				.script("{ print $0 }")
 				.file("input.txt", "alpha\r\nbeta\r\ngamma\r\n")
 				.operand("{{input.txt}}")
@@ -1468,18 +1301,14 @@ public class AwkTest {
 
 	@Test
 	public void executeDefaultOrsIsNewline() throws Exception {
-		String result = new Awk()
-				.script("BEGIN { print \"alpha\" }")
-				.execute();
+		String result = new Awk().script("BEGIN { print \"alpha\" }").execute();
 
 		assertEquals("alpha\n", result);
 	}
 
 	@Test
 	public void publicRunSuppressesZeroExitCode() throws Exception {
-		String result = new Awk()
-				.script("BEGIN { print \"alpha\"; exit 0 }")
-				.execute();
+		String result = new Awk().script("BEGIN { print \"alpha\"; exit 0 }").execute();
 
 		assertEquals("alpha\n", result);
 	}
@@ -1532,10 +1361,7 @@ public class AwkTest {
 		String script = "{ print $0 }";
 		AwkProgram program = AWK.compile(new StringReader(script));
 
-		String result = new Awk()
-				.script(program)
-				.input("one\n")
-				.execute();
+		String result = new Awk().script(program).input("one\n").execute();
 
 		assertEquals("one\n", result);
 	}
@@ -1549,8 +1375,7 @@ public class AwkTest {
 		Path scriptPath = Files.createTempFile("jawk-script", ".awk");
 		try {
 			Files.write(scriptPath, "{ print toupper($0) }\n".getBytes(StandardCharsets.UTF_8));
-			AwkTestSupport
-					.awkTest("script from path")
+			AwkTestSupport.awkTest("script from path")
 					.script(scriptPath)
 					.stdin("alpha\n")
 					.expectLines("ALPHA")
@@ -1567,8 +1392,7 @@ public class AwkTest {
 	 */
 	@Test
 	public void zeroLengthRegexRecordSeparatorConsumesWholeInput() throws Exception {
-		AwkTestSupport
-				.awkTest("zero-length regex RS")
+		AwkTestSupport.awkTest("zero-length regex RS")
 				.script("BEGIN { RS = \"()\" }\n{ printf(\"<<%s>>\\n<%s>\\n\", $0, RT) }")
 				.stdin("foo\n")
 				.expect("<<foo\n>>\n<>\n")
@@ -1584,10 +1408,7 @@ public class AwkTest {
 		String script = "{ print $0 }";
 		AwkProgram program = AWK.compile(script);
 
-		String result = new Awk()
-				.script(program)
-				.input("value\n")
-				.execute();
+		String result = new Awk().script(program).input("value\n").execute();
 
 		assertEquals("value\n", result);
 	}
@@ -1608,10 +1429,7 @@ public class AwkTest {
 
 		Cli cli = Cli.parseCommandLineArguments(new String[] { "-L", tmp.getAbsolutePath() });
 
-		String result = new Awk()
-				.script(cli.getPrecompiledProgram())
-				.input("abc\n")
-				.execute();
+		String result = new Awk().script(cli.getPrecompiledProgram()).input("abc\n").execute();
 
 		assertEquals("ABC\n", result);
 	}
@@ -1625,20 +1443,16 @@ public class AwkTest {
 		File tmp = File.createTempFile("jawk", ".tpl");
 		// Cli.main is reserved for the process launch (its children may inherit
 		// the JVM's standard input); programmatic callers go through create()
-		Cli
-				.create(
-						new String[]
-						{ "-K", tmp.getAbsolutePath(), "{ print toupper($0) }" },
-						new ByteArrayInputStream(new byte[0]),
-						System.out,
-						System.err);
+		Cli.create(
+				new String[]
+				{ "-K", tmp.getAbsolutePath(), "{ print toupper($0) }" },
+				new ByteArrayInputStream(new byte[0]),
+				System.out,
+				System.err);
 
 		Cli cli = Cli.parseCommandLineArguments(new String[] { "-L", tmp.getAbsolutePath() });
 
-		String result = new Awk()
-				.script(cli.getPrecompiledProgram())
-				.input("abc\n")
-				.execute();
+		String result = new Awk().script(cli.getPrecompiledProgram()).input("abc\n").execute();
 
 		assertEquals("ABC\n", result);
 	}
@@ -1653,21 +1467,18 @@ public class AwkTest {
 		File tmp = File.createTempFile("jawk", ".tpl");
 		// the replacement \\ is a single backslash in POSIX mode, \\ in gawk's
 		String script = "BEGIN { s = \"x\"; gsub(/x/, \"\\\\\\\\\", s); print s }";
-		AwkTestSupport
-				.cliTest("gsub follows gawk's backslash rules by default")
+		AwkTestSupport.cliTest("gsub follows gawk's backslash rules by default")
 				.script(script)
 				.expect("\\\\\n")
 				.runAndAssert();
 
-		AwkTestSupport
-				.cliTest("--posix -K compiles the program to a file")
+		AwkTestSupport.cliTest("--posix -K compiles the program to a file")
 				.argument("--posix", "-K", tmp.getAbsolutePath())
 				.script(script)
 				.expect("")
 				.runAndAssert();
 
-		AwkTestSupport
-				.cliTest("-L keeps the POSIX backslash rules of the compiled program")
+		AwkTestSupport.cliTest("-L keeps the POSIX backslash rules of the compiled program")
 				.argument("-L", tmp.getAbsolutePath())
 				.expect("\\\n")
 				.runAndAssert();
@@ -1692,43 +1503,34 @@ public class AwkTest {
 	public void compileTuplesRequiresFilename() {
 		assertThrows(
 				IllegalArgumentException.class,
-				() -> Cli
-						.create(
-								new String[]
-								{ "-K" },
-								new ByteArrayInputStream(new byte[0]),
-								new PrintStream(new ByteArrayOutputStream(), false, StandardCharsets.UTF_8.name()),
-								new PrintStream(new ByteArrayOutputStream(), false, StandardCharsets.UTF_8.name())));
+				() -> Cli.create(new String[]
+				{ "-K" },
+						new ByteArrayInputStream(new byte[0]),
+						new PrintStream(new ByteArrayOutputStream(), false, StandardCharsets.UTF_8.name()),
+						new PrintStream(new ByteArrayOutputStream(), false, StandardCharsets.UTF_8.name())));
 	}
 
 	@Test
 	public void sandboxRejectsSystemFunction() {
 		Awk awk = new SandboxedAwk();
-		assertThrows(
-				AwkSandboxException.class,
-				() -> awk.compile("BEGIN { system(\"true\") }"));
+		assertThrows(AwkSandboxException.class, () -> awk.compile("BEGIN { system(\"true\") }"));
 	}
 
 	@Test
 	public void sandboxRejectsOutputRedirectionDuringCompile() {
 		Awk awk = new SandboxedAwk();
-		assertThrows(
-				AwkSandboxException.class,
-				() -> awk.compile("{ print \"hi\" > \"file\" }"));
+		assertThrows(AwkSandboxException.class, () -> awk.compile("{ print \"hi\" > \"file\" }"));
 	}
 
 	@Test
 	public void sandboxRejectsInputRedirectionDuringCompile() {
 		Awk awk = new SandboxedAwk();
-		assertThrows(
-				AwkSandboxException.class,
-				() -> awk.compile("BEGIN { getline x < \"file\" }"));
+		assertThrows(AwkSandboxException.class, () -> awk.compile("BEGIN { getline x < \"file\" }"));
 	}
 
 	@Test
 	public void sandboxRejectsSourceInclusionDuringCompile() throws Exception {
-		AwkTestSupport
-				.awkTest("sandbox rejects source inclusion")
+		AwkTestSupport.awkTest("sandbox rejects source inclusion")
 				.withAwk(new SandboxedAwk())
 				.file("included.awk", "BEGIN { print \"included\" }\n")
 				.script("@include \"{{included.awk}}\"\nBEGIN { print \"main\" }")
@@ -1741,11 +1543,7 @@ public class AwkTest {
 		AwkProgram program = AWK.compile("BEGIN { print \"hi\" > \"sandbox_out.txt\" } ");
 
 		Awk sandboxAwk = new SandboxedAwk();
-		assertThrows(
-				AwkSandboxException.class,
-				() -> sandboxAwk
-						.script(program)
-						.execute());
+		assertThrows(AwkSandboxException.class, () -> sandboxAwk.script(program).execute());
 	}
 
 	@Test
@@ -1757,15 +1555,12 @@ public class AwkTest {
 	@Test
 	public void sandboxRejectsArgcAssignment() {
 		Awk awk = new SandboxedAwk();
-		assertThrows(
-				AwkSandboxException.class,
-				() -> awk.compile("BEGIN { ARGC = 5 }"));
+		assertThrows(AwkSandboxException.class, () -> awk.compile("BEGIN { ARGC = 5 }"));
 	}
 
 	@Test
 	public void sandboxAllowsReadingArgc() throws Exception {
-		AwkTestSupport
-				.awkTest("sandbox allows reading ARGC")
+		AwkTestSupport.awkTest("sandbox allows reading ARGC")
 				.withAwk(new SandboxedAwk())
 				.script("BEGIN { print ARGC }")
 				.expect("1\n")
@@ -1778,8 +1573,7 @@ public class AwkTest {
 		// direct references to ARGV[n] in the script see an empty array.
 		// The JRT input traversal still works correctly through the
 		// AVM.getARGV() fallback.
-		AwkTestSupport
-				.awkTest("sandbox ARGV reads return empty strings")
+		AwkTestSupport.awkTest("sandbox ARGV reads return empty strings")
 				.withAwk(new SandboxedAwk())
 				.script("BEGIN { print ARGV[0] }")
 				.expect("\n")
@@ -1913,12 +1707,7 @@ public class AwkTest {
 		try (AVM avm = AWK.createAvm()) {
 			assertThrows(
 					IllegalArgumentException.class,
-					() -> executePersistent(
-							avm,
-							program,
-							Collections.<String>emptyList(),
-							overrides,
-							emptyInputSource()));
+					() -> executePersistent(avm, program, Collections.<String>emptyList(), overrides, emptyInputSource()));
 		}
 
 		assertTrue(data.get("items") instanceof List);
@@ -1933,12 +1722,7 @@ public class AwkTest {
 		try (AVM avm = AWK.createAvm()) {
 			assertEquals(
 					"aaa ccc\n",
-					executePersistent(
-							avm,
-							program,
-							Collections.<String>emptyList(),
-							overrides,
-							emptyInputSource()));
+					executePersistent(avm, program, Collections.<String>emptyList(), overrides, emptyInputSource()));
 		}
 	}
 
@@ -1947,9 +1731,7 @@ public class AwkTest {
 		AwkProgram writeBuiltIn = AWK.compile("BEGIN { NR = 99; print NR }");
 		AwkProgram readBuiltIn = AWK.compile("BEGIN { print NR }");
 		AwkProgram readIgnoreCase = AWK.compile("BEGIN { print IGNORECASE + 0, match(\"Abc\", \"abc\") }");
-		AwkProgram seedArrayAndLocal = AWK
-				.compile(
-						"function seed(tmp) { tmp = 7; arr[\"x\"] = 9 } BEGIN { seed() }");
+		AwkProgram seedArrayAndLocal = AWK.compile("function seed(tmp) { tmp = 7; arr[\"x\"] = 9 } BEGIN { seed() }");
 		AwkProgram readArrayAndLocal = AWK.compile("BEGIN { print arr[\"x\"]; print tmp }");
 		Map<String, Object> ignoreCaseOverride = new LinkedHashMap<String, Object>();
 		ignoreCaseOverride.put("IGNORECASE", Long.valueOf(1L));
@@ -2176,8 +1958,7 @@ public class AwkTest {
 
 	@Test
 	public void sandboxSkipsArgcAndArgvOffsetsWhenUnreferenced() throws Exception {
-		AwkTestSupport
-				.awkTest("sandbox with unreferenced ARGC/ARGV still processes stdin")
+		AwkTestSupport.awkTest("sandbox with unreferenced ARGC/ARGV still processes stdin")
 				.withAwk(new SandboxedAwk())
 				.script("{ print \"got:\" $0 }")
 				.stdin("hello\n")
@@ -2195,10 +1976,7 @@ public class AwkTest {
 	public void systemStderrGoesToExplicitErrorStream() throws Exception {
 		ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
 		PrintStream errStream = new PrintStream(errBytes, true, StandardCharsets.UTF_8.name());
-		String output = new Awk()
-				.script("BEGIN { system(\"echo stderrText >&2\") }")
-				.errorStream(errStream)
-				.execute();
+		String output = new Awk().script("BEGIN { system(\"echo stderrText >&2\") }").errorStream(errStream).execute();
 		assertFalse("subprocess stderr should not appear in main output", output.contains("stderrText"));
 		assertTrue(
 				"subprocess stderr should appear in error stream",

@@ -71,10 +71,7 @@ import io.jawk.jrt.StreamInputSource;
  */
 public final class AwkTestSupport {
 
-	private static final boolean IS_POSIX = !System
-			.getProperty("os.name", "")
-			.toLowerCase(Locale.ROOT)
-			.contains("win");
+	private static final boolean IS_POSIX = !System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
 
 	/**
 	 * The platform a test case needs in order to be meaningful. Most behavior is
@@ -253,15 +250,8 @@ public final class AwkTestSupport {
 		private final Class<? extends Throwable> expectedException;
 		private final Throwable thrownException;
 
-		TestResult(
-				String description,
-				String output,
-				String errorOutput,
-				int exitCode,
-				String expectedOutput,
-				List<String> expectedLines,
-				Integer expectedExitCode,
-				Class<? extends Throwable> expectedException,
+		TestResult(String description, String output, String errorOutput, int exitCode, String expectedOutput,
+				List<String> expectedLines, Integer expectedExitCode, Class<? extends Throwable> expectedException,
 				Throwable thrownException) {
 			this.description = description;
 			this.output = output;
@@ -331,19 +321,12 @@ public final class AwkTestSupport {
 			if (expectedException != null) {
 				if (thrownException == null) {
 					throw new AssertionError(
-							"Expected exception "
-									+ expectedException.getName()
-									+ " for "
-									+ description
+							"Expected exception " + expectedException.getName() + " for " + description
 									+ " but execution completed successfully");
 				}
 				if (!expectedException.isInstance(thrownException)) {
 					throw new AssertionError(
-							"Expected exception "
-									+ expectedException.getName()
-									+ " for "
-									+ description
-									+ " but got "
+							"Expected exception " + expectedException.getName() + " for " + description + " but got "
 									+ thrownException.getClass().getName());
 				}
 				return;
@@ -1054,13 +1037,8 @@ public final class AwkTestSupport {
 		private final List<String> pathPlaceholders;
 		private final PlatformRequirement platformRequirement;
 
-		BaseTestCase(
-				TestLayout layout,
-				Map<String, String> fileContents,
-				Map<String, String> symbolicLinks,
-				List<String> operandSpecs,
-				List<String> pathPlaceholders,
-				PlatformRequirement platformRequirement) {
+		BaseTestCase(TestLayout layout, Map<String, String> fileContents, Map<String, String> symbolicLinks,
+				List<String> operandSpecs, List<String> pathPlaceholders, PlatformRequirement platformRequirement) {
 			this.layout = layout;
 			this.fileContents = fileContents;
 			this.symbolicLinks = symbolicLinks;
@@ -1192,10 +1170,7 @@ public final class AwkTestSupport {
 		}
 
 		protected List<String> resolvedOperands(ExecutionEnvironment env) {
-			return operandSpecs
-					.stream()
-					.map(env::resolve)
-					.collect(Collectors.toList());
+			return operandSpecs.stream().map(env::resolve).collect(Collectors.toList());
 		}
 
 		protected String resolvedScript(ExecutionEnvironment env) {
@@ -1216,20 +1191,10 @@ public final class AwkTestSupport {
 		private final Path scriptPath;
 		private final List<String> sharedRuntimeInputs;
 
-		AwkTestCase(
-				TestLayout layout,
-				Map<String, String> fileContents,
-				Map<String, String> symbolicLinks,
-				List<String> operandSpecs,
-				List<String> pathPlaceholders,
-				PlatformRequirement platformRequirement,
-				Map<String, Object> preAssignments,
-				Awk customAwk,
-				List<JawkExtension> extensions,
-				InputSource inputSource,
-				Reader scriptReader,
-				Path scriptPath,
-				List<String> sharedRuntimeInputs) {
+		AwkTestCase(TestLayout layout, Map<String, String> fileContents, Map<String, String> symbolicLinks,
+				List<String> operandSpecs, List<String> pathPlaceholders, PlatformRequirement platformRequirement,
+				Map<String, Object> preAssignments, Awk customAwk, List<JawkExtension> extensions, InputSource inputSource,
+				Reader scriptReader, Path scriptPath, List<String> sharedRuntimeInputs) {
 			super(layout, fileContents, symbolicLinks, operandSpecs, pathPlaceholders, platformRequirement);
 			this.preAssignments = new LinkedHashMap<>(preAssignments);
 			this.customAwk = customAwk;
@@ -1268,10 +1233,7 @@ public final class AwkTestSupport {
 			if (!sharedRuntimeInputs.isEmpty()) {
 				return executeOnSharedRuntime(awk, program, env, out);
 			}
-			Awk.AwkRunBuilder builder = awk
-					.script(program)
-					.arguments(resolvedOperands(env))
-					.variables(preAssignments);
+			Awk.AwkRunBuilder builder = awk.script(program).arguments(resolvedOperands(env)).variables(preAssignments);
 			if (inputSource != null) {
 				builder.input(inputSource);
 			} else {
@@ -1314,8 +1276,7 @@ public final class AwkTestSupport {
 				// order the sources were constructed in.
 				List<InputSource> sources = new ArrayList<>(sharedRuntimeInputs.size());
 				for (String input : sharedRuntimeInputs) {
-					InputStream stream = new ByteArrayInputStream(
-							env.resolve(input).getBytes(StandardCharsets.UTF_8));
+					InputStream stream = new ByteArrayInputStream(env.resolve(input).getBytes(StandardCharsets.UTF_8));
 					sources.add(new StreamInputSource(stream, avm, avm.getJrt()));
 				}
 				for (InputSource source : sources) {
@@ -1338,18 +1299,10 @@ public final class AwkTestSupport {
 		private final boolean redirectErrorStream;
 		private final InputStream stdinStream;
 
-		CliTestCase(
-				TestLayout layout,
-				Map<String, String> fileContents,
-				Map<String, String> symbolicLinks,
-				List<String> operandSpecs,
-				List<String> pathPlaceholders,
-				PlatformRequirement platformRequirement,
-				List<String> argumentSpecs,
-				Map<String, Object> assignments,
-				Map<String, String> environment,
-				boolean redirectErrorStream,
-				InputStream stdinStream) {
+		CliTestCase(TestLayout layout, Map<String, String> fileContents, Map<String, String> symbolicLinks,
+				List<String> operandSpecs, List<String> pathPlaceholders, PlatformRequirement platformRequirement,
+				List<String> argumentSpecs, Map<String, Object> assignments, Map<String, String> environment,
+				boolean redirectErrorStream, InputStream stdinStream) {
 			super(layout, fileContents, symbolicLinks, operandSpecs, pathPlaceholders, platformRequirement);
 			this.argumentSpecs = new ArrayList<>(argumentSpecs);
 			this.assignments = new LinkedHashMap<>(assignments);
@@ -1379,11 +1332,7 @@ public final class AwkTestSupport {
 			PrintStream errStream = redirectErrorStream ?
 					outStream :
 					new PrintStream(errBytes, true, StandardCharsets.UTF_8.name());
-			Cli cli = new Cli(
-					in,
-					outStream,
-					errStream,
-					resolvedEnvironment);
+			Cli cli = new Cli(in, outStream, errStream, resolvedEnvironment);
 
 			List<String> args = new ArrayList<>();
 			for (Map.Entry<String, Object> entry : assignments.entrySet()) {
@@ -1471,20 +1420,15 @@ public final class AwkTestSupport {
 		final Integer expectedExitCode;
 		final Class<? extends Throwable> expectedException;
 
-		TestLayout(
-				String description,
-				String script,
-				String stdin,
-				List<Function<String, String>> postProcessors,
-				String expectedOutput,
-				List<String> expectedLines,
-				Integer expectedExitCode,
+		TestLayout(String description, String script, String stdin, List<Function<String, String>> postProcessors,
+				String expectedOutput, List<String> expectedLines, Integer expectedExitCode,
 				Class<? extends Throwable> expectedException) {
 			this.description = description;
 			this.script = script;
 			this.stdin = stdin;
 			this.postProcessors = postProcessors != null ?
-					Collections.unmodifiableList(new ArrayList<>(postProcessors)) : null;
+					Collections.unmodifiableList(new ArrayList<>(postProcessors)) :
+					null;
 			this.expectedOutput = expectedOutput;
 			this.expectedLines = expectedLines != null ? Collections.unmodifiableList(new ArrayList<>(expectedLines)) : null;
 			this.expectedExitCode = expectedExitCode;

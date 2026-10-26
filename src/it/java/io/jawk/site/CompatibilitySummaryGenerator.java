@@ -73,23 +73,17 @@ public final class CompatibilitySummaryGenerator {
 		final SuiteSummary bwk = summarize(reportDirectory, "TEST-io.jawk.onetrueawk.");
 		final SuiteSummary gawk = summarize(reportDirectory, "TEST-io.jawk.gawk.");
 
-		final String xml = ""
-				+ "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-				+ "<compatibility-summary>\n"
-				+ suiteXml("posix", "POSIX", posix)
-				+ suiteXml("bwk", "BWK / One True Awk", bwk)
-				+ suiteXml("gawk", "gawk", gawk)
-				+ "</compatibility-summary>\n";
+		final String xml = "" + "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + "<compatibility-summary>\n"
+				+ suiteXml("posix", "POSIX", posix) + suiteXml("bwk", "BWK / One True Awk", bwk)
+				+ suiteXml("gawk", "gawk", gawk) + "</compatibility-summary>\n";
 
 		Files.write(outputFile, xml.getBytes(StandardCharsets.UTF_8));
 	}
 
 	private static SuiteSummary summarize(final Path reportDirectory, final String prefix) throws Exception {
 
-		final File[] reports = reportDirectory
-				.toFile()
-				.listFiles(
-						file -> file.isFile() && file.getName().startsWith(prefix) && file.getName().endsWith(".xml"));
+		final File[] reports = reportDirectory.toFile()
+				.listFiles(file -> file.isFile() && file.getName().startsWith(prefix) && file.getName().endsWith(".xml"));
 
 		if (reports == null || reports.length == 0) {
 			return new SuiteSummary(0, 0, 0, 0, new ArrayList<TestCaseSummary>(), "");
@@ -126,12 +120,8 @@ public final class CompatibilitySummaryGenerator {
 
 		for (int index = 0; index < testCaseNodes.getLength(); index++) {
 			final Element testCase = (Element) testCaseNodes.item(index);
-			testCases
-					.add(
-							new TestCaseSummary(
-									testCase.getAttribute("classname"),
-									testCase.getAttribute("name"),
-									getStatus(testCase)));
+			testCases.add(
+					new TestCaseSummary(testCase.getAttribute("classname"), testCase.getAttribute("name"), getStatus(testCase)));
 		}
 	}
 
@@ -157,10 +147,7 @@ public final class CompatibilitySummaryGenerator {
 		configureFeature(documentBuilderFactory, "http://apache.org/xml/features/disallow-doctype-decl", true);
 		configureFeature(documentBuilderFactory, "http://xml.org/sax/features/external-general-entities", false);
 		configureFeature(documentBuilderFactory, "http://xml.org/sax/features/external-parameter-entities", false);
-		configureFeature(
-				documentBuilderFactory,
-				"http://apache.org/xml/features/nonvalidating/load-external-dtd",
-				false);
+		configureFeature(documentBuilderFactory, "http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
 		return documentBuilderFactory.newDocumentBuilder().parse(file.toFile());
 	}
 
@@ -178,31 +165,27 @@ public final class CompatibilitySummaryGenerator {
 
 	private static String suiteXml(final String id, final String title, final SuiteSummary summary) {
 		final StringBuilder builder = new StringBuilder();
-		builder
-				.append(
-						String
-								.format(
-										Locale.ROOT,
-										"  <suite id=\"%s\" title=\"%s\" tests=\"%d\" failures=\"%d\" errors=\"%d\" skipped=\"%d\" passed=\"%d\" percent=\"%d\" files=\"%s\">\n",
-										escape(id),
-										escape(title),
-										summary.tests,
-										summary.failures,
-										summary.errors,
-										summary.skipped,
-										summary.getPassed(),
-										summary.getPercent(),
-										escape(summary.files)));
+		builder.append(
+				String.format(
+						Locale.ROOT,
+						"  <suite id=\"%s\" title=\"%s\" tests=\"%d\" failures=\"%d\" errors=\"%d\" skipped=\"%d\" passed=\"%d\" percent=\"%d\" files=\"%s\">\n",
+						escape(id),
+						escape(title),
+						summary.tests,
+						summary.failures,
+						summary.errors,
+						summary.skipped,
+						summary.getPassed(),
+						summary.getPercent(),
+						escape(summary.files)));
 		for (final TestCaseSummary testCase : summary.testCases) {
-			builder
-					.append(
-							String
-									.format(
-											Locale.ROOT,
-											"    <testcase classname=\"%s\" name=\"%s\" status=\"%s\"/>\n",
-											escape(testCase.className),
-											escape(testCase.name),
-											escape(testCase.status)));
+			builder.append(
+					String.format(
+							Locale.ROOT,
+							"    <testcase classname=\"%s\" name=\"%s\" status=\"%s\"/>\n",
+							escape(testCase.className),
+							escape(testCase.name),
+							escape(testCase.status)));
 		}
 		builder.append("  </suite>\n");
 		return builder.toString();
@@ -221,8 +204,7 @@ public final class CompatibilitySummaryGenerator {
 		private final String files;
 
 		private SuiteSummary(final int tests, final int failures, final int errors, final int skipped,
-				final List<TestCaseSummary> testCases,
-				final String files) {
+				final List<TestCaseSummary> testCases, final String files) {
 			this.tests = tests;
 			this.failures = failures;
 			this.errors = errors;

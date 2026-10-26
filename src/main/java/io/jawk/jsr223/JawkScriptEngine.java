@@ -85,12 +85,7 @@ public class JawkScriptEngine extends AbstractScriptEngine {
 			try (AVM avm = awk.createAvm()) {
 				avm.setAwkSink(new AppendableAwkSink(result, settings.getLocale()));
 				InputSource inputSource = new StreamInputSource(input, avm, avm.getJrt());
-				avm
-						.execute(
-								awk.compile(scriptReader),
-								inputSource,
-								Collections.<String>emptyList(),
-								variableOverrides);
+				avm.execute(awk.compile(scriptReader), inputSource, Collections.<String>emptyList(), variableOverrides);
 			}
 			String out = result.toString();
 			Writer writer = context.getWriter();

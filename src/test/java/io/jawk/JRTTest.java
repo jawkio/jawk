@@ -331,8 +331,7 @@ public class JRTTest {
 	@Test
 	public void testSpawnProcessCat() throws Exception {
 		Assume.assumeFalse(IS_WINDOWS);
-		AwkTestSupport
-				.awkTest("cat process")
+		AwkTestSupport.awkTest("cat process")
 				.script("BEGIN { print \"Hello\" | \"cat\"; close(\"cat\") }")
 				.expectLines("Hello")
 				.runAndAssert();
@@ -341,8 +340,7 @@ public class JRTTest {
 	@Test
 	public void testSpawnProcessMore() throws Exception {
 		Assume.assumeTrue(IS_WINDOWS);
-		AwkTestSupport
-				.awkTest("more process")
+		AwkTestSupport.awkTest("more process")
 				.script("BEGIN { print \"Hello\" | \"more\"; close(\"more\") }")
 				.expectLines("Hello", "")
 				.runAndAssert();
@@ -351,8 +349,7 @@ public class JRTTest {
 	@Test
 	public void testSystemPipe() throws Exception {
 		Assume.assumeFalse(IS_WINDOWS);
-		AwkTestSupport
-				.awkTest("system pipe")
+		AwkTestSupport.awkTest("system pipe")
 				.script("BEGIN { print(system(\"echo test | grep test\")) }")
 				.expectLines("test", "0")
 				.runAndAssert();
@@ -361,8 +358,7 @@ public class JRTTest {
 	@Test
 	public void testSystemPipeWindows() throws Exception {
 		Assume.assumeTrue(IS_WINDOWS);
-		AwkTestSupport
-				.awkTest("system pipe windows")
+		AwkTestSupport.awkTest("system pipe windows")
 				.script("BEGIN { print(system(\"echo test|findstr test\")) }")
 				.expectLines("test", "0")
 				.runAndAssert();
@@ -370,8 +366,7 @@ public class JRTTest {
 
 	@Test
 	public void testPrintfSpecialCharacters() throws Exception {
-		AwkTestSupport
-				.awkTest("printf special characters")
+		AwkTestSupport.awkTest("printf special characters")
 				.script("BEGIN { printf \"%c\\n\", 17379 }")
 				.expectLines("\u43e3")
 				.runAndAssert();
@@ -455,8 +450,7 @@ public class JRTTest {
 
 	@Test
 	public void testRegexFsKeepsLeadingAndTrailingSeparators() throws Exception {
-		AwkTestSupport
-				.awkTest("regex fs retains separators")
+		AwkTestSupport.awkTest("regex fs retains separators")
 				.script("BEGIN { FS = \"[ \\t\\n]+\" } { print $2 }")
 				.stdin("  a  b  c  d ")
 				.expectLines("a")

@@ -61,9 +61,7 @@ public class AvailableExtensionsTest {
 
 	@Test
 	public void testExtensionKeywords() {
-		Map<String, ExtensionFunction> keywordMap = Awk
-				.createExtensionFunctionMap(
-						new GawkExtension());
+		Map<String, ExtensionFunction> keywordMap = Awk.createExtensionFunctionMap(new GawkExtension());
 		assertSame(GawkExtension.class, keywordMap.get("typeof").getDeclaringType());
 
 		JawkExtension customGawk = new GawkExtension();

@@ -38,8 +38,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testArithmeticKeepsNumericPrefixConversion() throws Exception {
-		awkTest("arithmetic parses numeric prefixes")
-				.script("{ print($1 + 1) }")
+		awkTest("arithmetic parses numeric prefixes").script("{ print($1 + 1) }")
 				.stdin("2x\n2.3x\n2x.3x\n2e+02\n0x10\n")
 				.expectLines("3", "3.3", "3", "201", "1")
 				.runAndAssert();
@@ -47,8 +46,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testInputComparisonsUseStrNumAttribute() throws Exception {
-		awkTest("input-derived values compare as strnum only when fully numeric")
-				.script("{ print($1 < 10) }")
+		awkTest("input-derived values compare as strnum only when fully numeric").script("{ print($1 < 10) }")
 				.stdin("2x\n2x.3x\n2e01\n9\n0x10\n")
 				.expectLines("0", "0", "0", "1", "1")
 				.runAndAssert();
@@ -56,8 +54,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testAssignmentPreservesStrNumAttribute() throws Exception {
-		awkTest("assignment preserves strnum attribute")
-				.script("{ x = $1; print(x < 10) }")
+		awkTest("assignment preserves strnum attribute").script("{ x = $1; print(x < 10) }")
 				.stdin("9\n")
 				.expectLines("1")
 				.runAndAssert();
@@ -65,8 +62,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testStringOperationProducesPlainString() throws Exception {
-		awkTest("concatenation produces plain string")
-				.script("{ x = $1 \"\"; print(x < 10) }")
+		awkTest("concatenation produces plain string").script("{ x = $1 \"\"; print(x < 10) }")
 				.stdin("9\n")
 				.expectLines("0")
 				.runAndAssert();
@@ -74,16 +70,14 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testStringLiteralsArePlainStrings() throws Exception {
-		awkTest("string literals force string comparison")
-				.script("BEGIN { print(\"9\" < 10); print(9 < \"10\") }")
+		awkTest("string literals force string comparison").script("BEGIN { print(\"9\" < 10); print(9 < \"10\") }")
 				.expectLines("0", "0")
 				.runAndAssert();
 	}
 
 	@Test
 	public void testNumericOperationProducesNumber() throws Exception {
-		awkTest("numeric operation produces numeric value")
-				.script("{ x = $1 + 0; print(x < 10) }")
+		awkTest("numeric operation produces numeric value").script("{ x = $1 + 0; print(x < 10) }")
 				.stdin("9\n")
 				.expectLines("1")
 				.runAndAssert();
@@ -91,8 +85,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testUninitializedEqualsNumericZeroStrNum() throws Exception {
-		awkTest("uninitialized equals numeric zero strnum")
-				.script("{ print($1 == undefined) }")
+		awkTest("uninitialized equals numeric zero strnum").script("{ print($1 == undefined) }")
 				.stdin("0.000\n")
 				.expectLines("1")
 				.runAndAssert();
@@ -109,8 +102,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testAssigningDollarZeroCreatesNumericStringFields() throws Exception {
-		awkTest("assigning dollar zero creates numeric string fields")
-				.script("{ $0 = \"2.00 3.00\"; print($1 < 10) }")
+		awkTest("assigning dollar zero creates numeric string fields").script("{ $0 = \"2.00 3.00\"; print($1 < 10) }")
 				.stdin("ignored\n")
 				.expectLines("1")
 				.runAndAssert();
@@ -136,8 +128,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testArgvValuesAreInputDerived() throws Exception {
-		awkTest("ARGV values are input-derived")
-				.script("BEGIN { $0 = ARGV[1]; print($0 < 10); print($1 < 10); exit }")
+		awkTest("ARGV values are input-derived").script("BEGIN { $0 = ARGV[1]; print($0 < 10); print($1 < 10); exit }")
 				.operand("9")
 				.expectLines("1", "1")
 				.runAndAssert();
@@ -153,8 +144,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testCommandLineVariableAssignmentsAreInputDerived() throws Exception {
-		cliTest("CLI variable assignments are numeric strings")
-				.preassign("x", "9")
+		cliTest("CLI variable assignments are numeric strings").preassign("x", "9")
 				.script("BEGIN { print(x < 10) }")
 				.expectLines("1")
 				.runAndAssert();
@@ -162,8 +152,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testFilelistVariableAssignmentsAreInputDerived() throws Exception {
-		awkTest("filelist variable assignments are numeric strings")
-				.script("{ print(x < 10); exit }")
+		awkTest("filelist variable assignments are numeric strings").script("{ print(x < 10); exit }")
 				.operand("x=9")
 				.stdin("ignored\n")
 				.expectLines("1")
@@ -172,8 +161,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testProgrammaticStringPreassignmentIsInputDerived() throws Exception {
-		awkTest("programmatic string preassignments are numeric strings")
-				.preassign("x", "9")
+		awkTest("programmatic string preassignments are numeric strings").preassign("x", "9")
 				.script("BEGIN { print(x < 10) }")
 				.expectLines("1")
 				.runAndAssert();
@@ -181,8 +169,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testBlankPaddedRecordIsNumericString() throws Exception {
-		awkTest("blank-padded record compares numerically")
-				.script("{ print($0 == 12), ($1 == 12) }")
+		awkTest("blank-padded record compares numerically").script("{ print($0 == 12), ($1 == 12) }")
 				.stdin(" 12 \n\t12\t\n")
 				.expectLines("1 1", "1 1")
 				.runAndAssert();
@@ -190,8 +177,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testBlankPaddedRecordWithNonNumericTextStaysString() throws Exception {
-		awkTest("internal blanks or trailing text keep the record a string")
-				.script("{ print($0 == 12) }")
+		awkTest("internal blanks or trailing text keep the record a string").script("{ print($0 == 12) }")
 				.stdin(" 1 2 \n 12x \n")
 				.expectLines("0", "0")
 				.runAndAssert();
@@ -199,8 +185,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testBlankOnlyRecordIsNotNumeric() throws Exception {
-		awkTest("blank-only record is neither zero nor the empty string")
-				.script("{ print($0 == 0), ($0 == \"\") }")
+		awkTest("blank-only record is neither zero nor the empty string").script("{ print($0 == 0), ($0 == \"\") }")
 				.stdin("  \n")
 				.expectLines("0 0")
 				.runAndAssert();
@@ -208,8 +193,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testBlankPaddedStringConstantStaysString() throws Exception {
-		awkTest("blank-padded string constants are never numeric strings")
-				.script("BEGIN { x = \" 12 \"; print(x == 12) }")
+		awkTest("blank-padded string constants are never numeric strings").script("BEGIN { x = \" 12 \"; print(x == 12) }")
 				.expectLines("0")
 				.runAndAssert();
 	}
@@ -233,8 +217,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testBlankPaddedPreassignmentIsNumericString() throws Exception {
-		awkTest("blank-padded preassignments compare numerically")
-				.preassign("x", " 12 ")
+		awkTest("blank-padded preassignments compare numerically").preassign("x", " 12 ")
 				.script("BEGIN { print(x == 12) }")
 				.expectLines("1")
 				.runAndAssert();
@@ -242,8 +225,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testBlankPaddedRecordTruthinessUsesNumericValue() throws Exception {
-		awkTest("blank-padded numeric records are truthy by numeric value")
-				.script("{ print($0 ? \"true\" : \"false\") }")
+		awkTest("blank-padded numeric records are truthy by numeric value").script("{ print($0 ? \"true\" : \"false\") }")
 				.stdin(" 0 \n 12 \n")
 				.expectLines("false", "true")
 				.runAndAssert();
@@ -254,8 +236,7 @@ public class StrNumSemanticsTest {
 		AwkSettings settings = new AwkSettings();
 		settings.setLocale(Locale.FRANCE);
 
-		awkTest("strnum comparison uses runtime locale")
-				.withAwk(new Awk(settings))
+		awkTest("strnum comparison uses runtime locale").withAwk(new Awk(settings))
 				.script("{ print($1 < 10) }")
 				.stdin("3,14\n")
 				.expectLines("1")
@@ -264,8 +245,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testNumericStrNumTruthinessUsesNumericValue() throws Exception {
-		awkTest("input-derived numeric string truthiness uses numeric value")
-				.script("{ print($1 ? \"true\" : \"false\") }")
+		awkTest("input-derived numeric string truthiness uses numeric value").script("{ print($1 ? \"true\" : \"false\") }")
 				.stdin("0\n2\n2a\n")
 				.expectLines("false", "true", "true")
 				.runAndAssert();
@@ -315,8 +295,7 @@ public class StrNumSemanticsTest {
 
 	@Test
 	public void testExtensionInputUsesStrNumAttribute() throws Exception {
-		awkTest("extension-published records are input-derived")
-				.withExtensions(new LineFeedExtension("9", "0"))
+		awkTest("extension-published records are input-derived").withExtensions(new LineFeedExtension("9", "0"))
 				.script("BEGIN { FeedLine(); print($0 < 10); FeedLine(); print($0 ? \"true\" : \"false\") }")
 				.expectLines("1", "false")
 				.runAndAssert();

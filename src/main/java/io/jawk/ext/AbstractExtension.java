@@ -189,8 +189,8 @@ public abstract class AbstractExtension implements JawkExtension {
 			}
 			if (java.lang.reflect.Modifier.isStatic(method.getModifiers())) {
 				throw new IllegalStateException(
-						"@" + JawkBeforeStart.class.getSimpleName()
-								+ " does not support static methods: " + method.toGenericString());
+						"@" + JawkBeforeStart.class.getSimpleName() + " does not support static methods: "
+								+ method.toGenericString());
 			}
 			Class<?>[] parameterTypes = method.getParameterTypes();
 			if (method.getReturnType() != Void.TYPE
@@ -198,8 +198,8 @@ public abstract class AbstractExtension implements JawkExtension {
 					|| parameterTypes[0] != AVM.class
 					|| parameterTypes[1] != JRT.class) {
 				throw new IllegalStateException(
-						"@" + JawkBeforeStart.class.getSimpleName()
-								+ " method must declare void method(AVM, JRT): " + method.toGenericString());
+						"@" + JawkBeforeStart.class.getSimpleName() + " method must declare void method(AVM, JRT): "
+								+ method.toGenericString());
 			}
 			method.setAccessible(true);
 			discovered.add(method);
@@ -231,9 +231,7 @@ public abstract class AbstractExtension implements JawkExtension {
 				if (cause instanceof Error) {
 					throw (Error) cause;
 				}
-				throw new IllegalStateException(
-						"Extension before-start method failed: " + method.toGenericString(),
-						cause);
+				throw new IllegalStateException("Extension before-start method failed: " + method.toGenericString(), cause);
 			}
 		}
 	}

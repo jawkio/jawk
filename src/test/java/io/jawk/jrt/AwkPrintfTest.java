@@ -945,15 +945,11 @@ public class AwkPrintfTest {
 		AwkRuntimeException missingFirst = assertThrows(AwkRuntimeException.class, () -> sprintf("%d %*2d"));
 		assertEquals("not enough arguments to satisfy format string `%d %*2d'", missingFirst.getMessage());
 		AwkRuntimeException invalidStar = assertThrows(AwkRuntimeException.class, () -> sprintf("%d %*2d", 1, 2));
-		assertEquals(
-				"no `$' supplied for positional field width or precision in `%d %*2d'",
-				invalidStar.getMessage());
+		assertEquals("no `$' supplied for positional field width or precision in `%d %*2d'", invalidStar.getMessage());
 		AwkRuntimeException widthBeforeError = assertThrows(AwkRuntimeException.class, () -> sprintf("%*.*2d"));
 		assertEquals("not enough arguments to satisfy format string `%*.*2d'", widthBeforeError.getMessage());
 		AwkRuntimeException precisionStar = assertThrows(AwkRuntimeException.class, () -> sprintf("%*.*2d", 5, 3));
-		assertEquals(
-				"no `$' supplied for positional field width or precision in `%*.*2d'",
-				precisionStar.getMessage());
+		assertEquals("no `$' supplied for positional field width or precision in `%*.*2d'", precisionStar.getMessage());
 	}
 
 	@Test

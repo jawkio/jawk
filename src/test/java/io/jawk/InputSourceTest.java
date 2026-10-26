@@ -41,44 +41,35 @@ public class InputSourceTest {
 
 	@Test
 	public void testBasicFieldAccess() throws Exception {
-		awkTest("input source basic field access")
-				.script("{ print $1, $2, $3 }")
+		awkTest("input source basic field access").script("{ print $1, $2, $3 }")
 				.withInputSource(
-						new TableInputSource(
-								Arrays
-										.asList(
-												Arrays.asList("a", "b", "c"),
-												Arrays.asList("d", "e", "f"))))
+						new TableInputSource(Arrays.asList(Arrays.asList("a", "b", "c"), Arrays.asList("d", "e", "f"))))
 				.expectLines("a b c", "d e f")
 				.runAndAssert();
 	}
 
 	@Test
 	public void testNfReflectsInputRowSize() throws Exception {
-		awkTest("input source NF matches row width")
-				.script("{ print NF }")
+		awkTest("input source NF matches row width").script("{ print NF }")
 				.withInputSource(
 						new TableInputSource(
-								Arrays
-										.asList(
-												Arrays.asList("a", "b", "c"),
-												Collections.singletonList("d"),
-												Collections.<String>emptyList())))
+								Arrays.asList(
+										Arrays.asList("a", "b", "c"),
+										Collections.singletonList("d"),
+										Collections.<String>emptyList())))
 				.expectLines("3", "1", "0")
 				.runAndAssert();
 	}
 
 	@Test
 	public void testNrCountsRecordsFromInputSource() throws Exception {
-		awkTest("input source contributes to NR")
-				.script("END { print NR }")
+		awkTest("input source contributes to NR").script("END { print NR }")
 				.withInputSource(
 						new TableInputSource(
-								Arrays
-										.asList(
-												Collections.singletonList("r1"),
-												Collections.singletonList("r2"),
-												Collections.singletonList("r3"))))
+								Arrays.asList(
+										Collections.singletonList("r1"),
+										Collections.singletonList("r2"),
+										Collections.singletonList("r3"))))
 				.expectLines("3")
 				.runAndAssert();
 	}
@@ -88,26 +79,18 @@ public class InputSourceTest {
 		// For custom InputSource implementations, isFromFilenameList() keeps
 		// controlling whether records advance FNR (unlike the built-in
 		// stream input, where stdin also counts).
-		awkTest("input source FNR gated by isFromFilenameList")
-				.script("{ print FNR, NR }")
+		awkTest("input source FNR gated by isFromFilenameList").script("{ print FNR, NR }")
 				.withInputSource(
-						new TableInputSource(
-								Arrays
-										.asList(
-												Collections.singletonList("r1"),
-												Collections.singletonList("r2"))))
+						new TableInputSource(Arrays.asList(Collections.singletonList("r1"), Collections.singletonList("r2"))))
 				.expectLines("0 1", "0 2")
 				.runAndAssert();
 	}
 
 	@Test
 	public void testDollarZeroUsesInputSourceRecord() throws Exception {
-		awkTest("input source controls dollar zero text")
-				.script("{ print $0, $2 }")
+		awkTest("input source controls dollar zero text").script("{ print $0, $2 }")
 				.withInputSource(
-						new TableInputSource(
-								Collections.singletonList(Arrays.asList("alice", "30", "engineering")),
-								"|"))
+						new TableInputSource(Collections.singletonList(Arrays.asList("alice", "30", "engineering")), "|"))
 				.expectLines("alice|30|engineering 30")
 				.runAndAssert();
 	}
@@ -116,8 +99,7 @@ public class InputSourceTest {
 	public void testFieldOnlyAccessAvoidsRecordTextLookup() throws Exception {
 		TrackingInputSource source = new TrackingInputSource(
 				Collections.singletonList(new ExplicitRecord("left|right", Arrays.asList("left", "right"))));
-		awkTest("field-only access avoids record text lookup")
-				.script("{ print $2 }")
+		awkTest("field-only access avoids record text lookup").script("{ print $2 }")
 				.withInputSource(source)
 				.expectLines("right")
 				.runAndAssert();
@@ -129,8 +111,7 @@ public class InputSourceTest {
 	public void testDynamicFieldAccessAvoidsRecordTextLookup() throws Exception {
 		TrackingInputSource source = new TrackingInputSource(
 				Collections.singletonList(new ExplicitRecord("left|right", Arrays.asList("left", "right"))));
-		awkTest("dynamic field access avoids record text lookup")
-				.script("{ field = 2; print $field }")
+		awkTest("dynamic field access avoids record text lookup").script("{ field = 2; print $field }")
 				.withInputSource(source)
 				.expectLines("right")
 				.runAndAssert();
@@ -142,8 +123,7 @@ public class InputSourceTest {
 	public void testDollarZeroAccessAvoidsFieldLookup() throws Exception {
 		TrackingInputSource source = new TrackingInputSource(
 				Collections.singletonList(new ExplicitRecord("left|right", Arrays.asList("left", "right"))));
-		awkTest("dollar-zero access avoids field lookup")
-				.script("{ print }")
+		awkTest("dollar-zero access avoids field lookup").script("{ print }")
 				.withInputSource(source)
 				.expectLines("left|right")
 				.runAndAssert();
@@ -153,8 +133,7 @@ public class InputSourceTest {
 
 	@Test
 	public void testOfsUsedWhenDollarZeroIsRebuilt() throws Exception {
-		awkTest("OFS applies when fields rebuild dollar zero")
-				.script("BEGIN { OFS = \",\" } { $1 = $1; print $0 }")
+		awkTest("OFS applies when fields rebuild dollar zero").script("BEGIN { OFS = \",\" } { $1 = $1; print $0 }")
 				.withInputSource(new TableInputSource(Collections.singletonList(Arrays.asList("a", "b", "c"))))
 				.expectLines("a,b,c")
 				.runAndAssert();
@@ -162,8 +141,7 @@ public class InputSourceTest {
 
 	@Test
 	public void testFieldModificationRebuildsDollarZero() throws Exception {
-		awkTest("field assignment rebuilds dollar zero")
-				.script("{ $2 = \"X\"; print $0 }")
+		awkTest("field assignment rebuilds dollar zero").script("{ $2 = \"X\"; print $0 }")
 				.withInputSource(new TableInputSource(Collections.singletonList(Arrays.asList("a", "b", "c"))))
 				.expectLines("a X c")
 				.runAndAssert();
@@ -180,8 +158,7 @@ public class InputSourceTest {
 
 	@Test
 	public void testNullFieldsFallsBackToFsSplitting() throws Exception {
-		awkTest("input source fallback to FS splitting")
-				.script("BEGIN { FS = \",\" } { print $2 }")
+		awkTest("input source fallback to FS splitting").script("BEGIN { FS = \",\" } { print $2 }")
 				.withInputSource(new RecordOnlyInputSource("a,b,c", "d,e,f"))
 				.expectLines("b", "e")
 				.runAndAssert();
@@ -189,15 +166,13 @@ public class InputSourceTest {
 
 	@Test
 	public void testGetlineConsumesNextRecord() throws Exception {
-		awkTest("getline advances input source")
-				.script("NR==1 { getline; print $0; exit }")
+		awkTest("getline advances input source").script("NR==1 { getline; print $0; exit }")
 				.withInputSource(
 						new TableInputSource(
-								Arrays
-										.asList(
-												Collections.singletonList("first"),
-												Collections.singletonList("second"),
-												Collections.singletonList("third"))))
+								Arrays.asList(
+										Collections.singletonList("first"),
+										Collections.singletonList("second"),
+										Collections.singletonList("third"))))
 				.expectLines("second")
 				.runAndAssert();
 	}
@@ -208,10 +183,9 @@ public class InputSourceTest {
 				.script("BEGIN { FS = \",\" } NR==1 { getline; print $1, $2; exit }")
 				.withInputSource(
 						new ExplicitRecordInputSource(
-								Arrays
-										.asList(
-												new ExplicitRecord("ignored", Arrays.asList("first", "record")),
-												new ExplicitRecord("left|right", Arrays.asList("left", "right")))))
+								Arrays.asList(
+										new ExplicitRecord("ignored", Arrays.asList("first", "record")),
+										new ExplicitRecord("left|right", Arrays.asList("left", "right")))))
 				.expectLines("left right")
 				.runAndAssert();
 	}
@@ -219,10 +193,9 @@ public class InputSourceTest {
 	@Test
 	public void testGetlineIntoVariableMaterializesCurrentRecordBeforeAdvance() throws Exception {
 		TrackingInputSource source = new TrackingInputSource(
-				Arrays
-						.asList(
-								new ExplicitRecord("trigger", Collections.singletonList("trigger")),
-								new ExplicitRecord("left|right", Arrays.asList("left", "right"))));
+				Arrays.asList(
+						new ExplicitRecord("trigger", Collections.singletonList("trigger")),
+						new ExplicitRecord("left|right", Arrays.asList("left", "right"))));
 		awkTest("getline into variable materializes current record before advance")
 				.script("NR == 1 { getline line; print line; exit }")
 				.withInputSource(source)
@@ -237,8 +210,7 @@ public class InputSourceTest {
 		// name=value operands belong to the ARGV file-list traversal, which a
 		// custom InputSource replaces entirely: they are never applied and
 		// remain visible only as plain ARGV entries.
-		awkTest("input source ignores name=value operands")
-				.script("{ print \"[\" x \"]\" ARGV[1] }")
+		awkTest("input source ignores name=value operands").script("{ print \"[\" x \"]\" ARGV[1] }")
 				.operand("x=42")
 				.withInputSource(new TableInputSource(Collections.singletonList(Collections.singletonList("row"))))
 				.expectLines("[]x=42")
@@ -247,24 +219,21 @@ public class InputSourceTest {
 
 	@Test
 	public void testRedirectedGetlineDoesNotReuseInputSourceFields() throws Exception {
-		awkTest("redirected getline parses fields from redirected stream")
-				.script(
-						"BEGIN { FS = \",\" } NR == 1 { getline x; getline < \"{{side.txt}}\"; print \"[\" $1 \"]\", \"[\" $2 \"]\"; exit }")
+		awkTest("redirected getline parses fields from redirected stream").script(
+				"BEGIN { FS = \",\" } NR == 1 { getline x; getline < \"{{side.txt}}\"; print \"[\" $1 \"]\", \"[\" $2 \"]\"; exit }")
 				.file("side.txt", "left|right\n")
 				.withInputSource(
 						new ExplicitRecordInputSource(
-								Arrays
-										.asList(
-												new ExplicitRecord("trigger", Collections.singletonList("trigger")),
-												new ExplicitRecord("left|right", Arrays.asList("left", "right")))))
+								Arrays.asList(
+										new ExplicitRecord("trigger", Collections.singletonList("trigger")),
+										new ExplicitRecord("left|right", Arrays.asList("left", "right")))))
 				.expectLines("[left|right] []")
 				.runAndAssert();
 	}
 
 	@Test
 	public void testNfModificationTruncatesRecord() throws Exception {
-		awkTest("NF assignment truncates pre-split records")
-				.script("{ NF = 2; print $0 }")
+		awkTest("NF assignment truncates pre-split records").script("{ NF = 2; print $0 }")
 				.withInputSource(new TableInputSource(Collections.singletonList(Arrays.asList("a", "b", "c", "d"))))
 				.expectLines("a b")
 				.runAndAssert();
@@ -272,8 +241,7 @@ public class InputSourceTest {
 
 	@Test
 	public void testFieldsOnlyInputSourceSupportsFieldAccessWithoutRecordText() throws Exception {
-		awkTest("fields only input source supports field access")
-				.script("{ print $2 }")
+		awkTest("fields only input source supports field access").script("{ print $2 }")
 				.withInputSource(new FieldsOnlyInputSource(Collections.singletonList(Arrays.asList("left", "right"))))
 				.expectLines("right")
 				.runAndAssert();
@@ -287,8 +255,7 @@ public class InputSourceTest {
 
 	@Test
 	public void testFieldsOnlyInputSourceSupportsBareRegexpRules() throws Exception {
-		awkTest("fields only input source supports bare regexp conditions")
-				.script("/right/ { print $2 }")
+		awkTest("fields only input source supports bare regexp conditions").script("/right/ { print $2 }")
 				.withInputSource(new FieldsOnlyInputSource(Collections.singletonList(Arrays.asList("left", "right"))))
 				.expectLines("right")
 				.runAndAssert();
@@ -296,8 +263,7 @@ public class InputSourceTest {
 
 	@Test
 	public void testFieldsOnlyInputSourceRegexpUsesCurrentDollarZeroAfterFieldMutation() throws Exception {
-		awkTest("fields only input source regexp uses rebuilt dollar zero")
-				.script("{ $1 = \"x\"; if (/x/) print \"hit\" }")
+		awkTest("fields only input source regexp uses rebuilt dollar zero").script("{ $1 = \"x\"; if (/x/) print \"hit\" }")
 				.withInputSource(new FieldsOnlyInputSource(Collections.singletonList(Arrays.asList("left", "right"))))
 				.expectLines("hit")
 				.runAndAssert();
@@ -305,8 +271,7 @@ public class InputSourceTest {
 
 	@Test
 	public void testTextOnlyInputSourceUsesFsActiveWhenRecordWasRead() throws Exception {
-		awkTest("text only input source keeps FS semantics at record read time")
-				.script("{ FS = \":\"; print $1 }")
+		awkTest("text only input source keeps FS semantics at record read time").script("{ FS = \":\"; print $1 }")
 				.withInputSource(new RecordOnlyInputSource("a b"))
 				.expectLines("a")
 				.runAndAssert();
@@ -547,15 +512,13 @@ public class InputSourceTest {
 
 	@Test
 	public void testEvalWithInputSourceFieldAccess() throws Exception {
-		InputSource source = new TableInputSource(
-				Collections.singletonList(Arrays.asList("Alice", "30", "Engineering")));
+		InputSource source = new TableInputSource(Collections.singletonList(Arrays.asList("Alice", "30", "Engineering")));
 		assertEquals("Alice-Engineering", AWK.eval("$1 \"-\" $3", source));
 	}
 
 	@Test
 	public void testEvalWithInputSourcePreSplitFields() throws Exception {
-		InputSource source = new TableInputSource(
-				Collections.singletonList(Arrays.asList("x", "y", "z")));
+		InputSource source = new TableInputSource(Collections.singletonList(Arrays.asList("x", "y", "z")));
 		assertEquals(3, ((Number) AWK.eval("NF", source)).intValue());
 	}
 
@@ -574,23 +537,20 @@ public class InputSourceTest {
 	public void testEvalWithInputSourceAndSettingsFieldSeparator() throws Exception {
 		// When InputSource provides pre-split fields, FS is not used for splitting,
 		// but it still comes from the Awk instance settings.
-		InputSource source = new TableInputSource(
-				Collections.singletonList(Arrays.asList("a", "b", "c")));
+		InputSource source = new TableInputSource(Collections.singletonList(Arrays.asList("a", "b", "c")));
 		assertEquals("a", commaSeparatedAwk().eval("$1", source));
 	}
 
 	@Test
 	public void testEvalWithPrecompiledTuplesAndInputSource() throws Exception {
-		InputSource source = new TableInputSource(
-				Collections.singletonList(Arrays.asList("10", "20", "30")));
+		InputSource source = new TableInputSource(Collections.singletonList(Arrays.asList("10", "20", "30")));
 		AwkExpression expression = AWK.compileExpression("$1 + $2 + $3");
 		assertEquals(60, ((Number) AWK.eval(expression, source)).intValue());
 	}
 
 	@Test
 	public void testDeprecatedGetRecordCompatibilityStillWorks() throws Exception {
-		awkTest("deprecated getRecord input source compatibility")
-				.script("BEGIN { FS = \",\" } { print $2 }")
+		awkTest("deprecated getRecord input source compatibility").script("BEGIN { FS = \",\" } { print $2 }")
 				.withInputSource(new DeprecatedRecordInputSource("a,b,c"))
 				.expectLines("b")
 				.runAndAssert();
@@ -602,10 +562,9 @@ public class InputSourceTest {
 				.script("NR == 1 { getline; print \"[\" $0 \"]\"; exit }")
 				.withInputSource(
 						new ExplicitRecordInputSource(
-								Arrays
-										.asList(
-												new ExplicitRecord("trigger", Collections.singletonList("trigger")),
-												new ExplicitRecord(null, Arrays.asList("left", null, "right")))))
+								Arrays.asList(
+										new ExplicitRecord("trigger", Collections.singletonList("trigger")),
+										new ExplicitRecord(null, Arrays.asList("left", null, "right")))))
 				.expectLines("[left  right]")
 				.runAndAssert();
 	}

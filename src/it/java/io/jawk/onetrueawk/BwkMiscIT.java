@@ -81,8 +81,7 @@ public class BwkMiscIT {
 			throw new IOException("Couldn't list files in " + scriptsDirectory);
 		}
 
-		return Arrays
-				.stream(scriptFiles)
+		return Arrays.stream(scriptFiles)
 				.filter(scriptFile -> scriptFile.getName().endsWith(".awk"))
 				.map(File::getName)
 				.sorted()
@@ -106,8 +105,7 @@ public class BwkMiscIT {
 		Path inputFile = bwkMiscDirectory.resolve("inputs/" + shortName + ".in");
 		Path okFile = bwkMiscDirectory.resolve("results/" + shortName + ".ok");
 
-		AwkTestSupport
-				.cliTest("BWK.misc " + awkName)
+		AwkTestSupport.cliTest("BWK.misc " + awkName)
 				.argument("-f", awkFile.toString())
 				.operand(inputFile.toString())
 				.expectLines(okFile)

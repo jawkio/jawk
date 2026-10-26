@@ -42,10 +42,7 @@ public class GawkExtensionTest {
 	public void defaultExtensionSetIsPerEngine() throws Exception {
 		Object first = new Awk().getExtensionInstances().get(GawkExtension.class.getName());
 		Object second = new Awk().getExtensionInstances().get(GawkExtension.class.getName());
-		assertNotSame(
-				"each engine must get its own GawkExtension instance",
-				first,
-				second);
+		assertNotSame("each engine must get its own GawkExtension instance", first, second);
 	}
 
 	@Test
@@ -53,16 +50,14 @@ public class GawkExtensionTest {
 		// An explicit empty extension list must free gawk builtin identifiers
 		// such as typeof for use as ordinary variables.
 		StringBuilder out = new StringBuilder();
-		new Awk(java.util.Collections.<io.jawk.ext.JawkExtension>emptyList())
-				.script("BEGIN { typeof = 3; print typeof }")
+		new Awk(java.util.Collections.<io.jawk.ext.JawkExtension>emptyList()).script("BEGIN { typeof = 3; print typeof }")
 				.execute(out);
 		assertEquals("3\n", out.toString());
 	}
 
 	@Test
 	public void extraFunctionArgumentsAreEvaluatedForSideEffects() throws Exception {
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.cliTest("extra arguments are evaluated then discarded")
+		AwkTestSupport.TestResult result = AwkTestSupport.cliTest("extra arguments are evaluated then discarded")
 				.script("function f(a) { return a } BEGIN { f(1, x = 5); print x }")
 				.expect("5\n")
 				.run();
@@ -74,8 +69,7 @@ public class GawkExtensionTest {
 
 	@Test
 	public void gensubTreatsAnyGPrefixedSelectorAsGlobal() throws Exception {
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.cliTest("gensub global selector accepts any g-prefixed string")
+		AwkTestSupport.TestResult result = AwkTestSupport.cliTest("gensub global selector accepts any g-prefixed string")
 				.script("BEGIN { print gensub(/o/, \"0\", \"gg\", \"foo\") }")
 				.expect("f00\n")
 				.run();
@@ -85,14 +79,10 @@ public class GawkExtensionTest {
 
 	@Test
 	public void gensubHonorsIgnoreCase() throws Exception {
-		AwkTestSupport
-				.awkTest("IGNORECASE makes gensub matching case-insensitive")
+		AwkTestSupport.awkTest("IGNORECASE makes gensub matching case-insensitive")
 				.script(
-						"BEGIN { "
-								+ "print gensub(/a/, \"x\", \"g\", \"A\"); "
-								+ "IGNORECASE = 1; "
-								+ "print gensub(/a/, \"x\", \"g\", \"A\") "
-								+ "}")
+						"BEGIN { " + "print gensub(/a/, \"x\", \"g\", \"A\"); " + "IGNORECASE = 1; "
+								+ "print gensub(/a/, \"x\", \"g\", \"A\") " + "}")
 				.expectLines("A", "x")
 				.runAndAssert();
 	}
@@ -108,8 +98,7 @@ public class GawkExtensionTest {
 
 	@Test
 	public void gensubReplacesOnlyRequestedOccurrence() throws Exception {
-		AwkTestSupport
-				.awkTest("gensub numeric selector targets one occurrence")
+		AwkTestSupport.awkTest("gensub numeric selector targets one occurrence")
 				.script("BEGIN { print gensub(/o/, \"0\", 2, \"foo\") }")
 				.expectLines("fo0")
 				.runAndAssert();
@@ -117,8 +106,7 @@ public class GawkExtensionTest {
 
 	@Test
 	public void ignoreCasePreassignedOnCommandLineAffectsSorting() throws Exception {
-		AwkTestSupport
-				.cliTest("-v IGNORECASE=1 is honored even when unreferenced")
+		AwkTestSupport.cliTest("-v IGNORECASE=1 is honored even when unreferenced")
 				.preassign("IGNORECASE", 1)
 				.script("BEGIN { a[\"B\"] = 1; a[\"a\"] = 2; n = asorti(a, d); for (i = 1; i <= n; i++) print d[i] }")
 				.expectLines("a", "B")
@@ -129,13 +117,10 @@ public class GawkExtensionTest {
 	public void incrementAndDecrementWorkOnSpecialVariables() throws Exception {
 		// JRT-managed specials are read/written through dedicated opcodes, so
 		// ++/-- must route through them instead of the slot-based INC/DEC.
-		AwkTestSupport
-				.awkTest("prefix and postfix inc/dec apply to special variables")
+		AwkTestSupport.awkTest("prefix and postfix inc/dec apply to special variables")
 				.script(
-						"BEGIN { "
-								+ "NR = 5; print NR++, NR, ++NR, NR--, --NR; "
-								+ "for (IGNORECASE = 0; IGNORECASE < 2; IGNORECASE++) printf \"%d\", IGNORECASE; "
-								+ "print \"\" "
+						"BEGIN { " + "NR = 5; print NR++, NR, ++NR, NR--, --NR; "
+								+ "for (IGNORECASE = 0; IGNORECASE < 2; IGNORECASE++) printf \"%d\", IGNORECASE; " + "print \"\" "
 								+ "}")
 				.expectLines("5 6 7 7 5", "01")
 				.runAndAssert();
@@ -145,21 +130,17 @@ public class GawkExtensionTest {
 	public void ignoreCaseUsesAwkTruthiness() throws Exception {
 		// gawk: IGNORECASE is active when "nonzero or non-null", so a
 		// non-numeric string is truthy.
-		AwkTestSupport
-				.awkTest("IGNORECASE follows AWK truthiness")
+		AwkTestSupport.awkTest("IGNORECASE follows AWK truthiness")
 				.script(
-						"BEGIN { "
-								+ "IGNORECASE = \"yes\"; print match(\"ABC\", \"b\"); "
-								+ "IGNORECASE = 0; print match(\"ABC\", \"b\") "
-								+ "}")
+						"BEGIN { " + "IGNORECASE = \"yes\"; print match(\"ABC\", \"b\"); "
+								+ "IGNORECASE = 0; print match(\"ABC\", \"b\") " + "}")
 				.expectLines("2", "0")
 				.runAndAssert();
 	}
 
 	@Test
 	public void ignoreCaseOperandAssignmentAppliesBetweenFiles() throws Exception {
-		AwkTestSupport
-				.cliTest("IGNORECASE=1 operand takes effect for later files")
+		AwkTestSupport.cliTest("IGNORECASE=1 operand takes effect for later files")
 				.file("f1", "ABC\n")
 				.file("f2", "ABC\n")
 				.script("{ print match($0, \"b\") }")
@@ -172,8 +153,7 @@ public class GawkExtensionTest {
 	public void fsOperandAssignmentAppliesBetweenFiles() throws Exception {
 		// JRT-managed specials assigned as command-line operands must reach
 		// the JRT, not a (nonexistent) global slot.
-		AwkTestSupport
-				.cliTest("FS=: operand takes effect for later files")
+		AwkTestSupport.cliTest("FS=: operand takes effect for later files")
 				.file("f1", "a:b\n")
 				.script("{ print $2 }")
 				.operand("FS=:", "{{f1}}")
@@ -185,12 +165,10 @@ public class GawkExtensionTest {
 	public void ignoreCaseAppliesToRegexpConstants() throws Exception {
 		// gawk applies IGNORECASE to regexp constants at runtime: patterns,
 		// match expressions, and sub/gsub.
-		AwkTestSupport
-				.awkTest("IGNORECASE affects precompiled regexp literals")
+		AwkTestSupport.awkTest("IGNORECASE affects precompiled regexp literals")
 				.script(
 						"BEGIN { IGNORECASE = 1; s = \"AAA\"; n = gsub(/a/, \"x\", s); print n, s } "
-								+ "/foo/ { print \"pattern\" } "
-								+ "$0 ~ /foo/ { print \"expr\" }")
+								+ "/foo/ { print \"pattern\" } " + "$0 ~ /foo/ { print \"expr\" }")
 				.stdin("FOO\n")
 				.expectLines("3 xxx", "pattern", "expr")
 				.runAndAssert();
@@ -200,8 +178,7 @@ public class GawkExtensionTest {
 	public void gensubMissingBackreferenceExpandsToEmpty() throws Exception {
 		// gawk substitutes an empty string for \N beyond the pattern's groups;
 		// a bare $N would make Java's Matcher throw
-		AwkTestSupport
-				.awkTest("gensub backreference beyond group count is empty")
+		AwkTestSupport.awkTest("gensub backreference beyond group count is empty")
 				.script(
 						"BEGIN { print \"x\" gensub(/a/, \"\\\\1\", \"g\", \"a\") \"y\"; print gensub(/(o)/, \"[\\\\1]\", \"g\", \"foo\") }")
 				.expectLines("xy", "f[o][o]")
@@ -210,17 +187,11 @@ public class GawkExtensionTest {
 
 	@Test
 	public void splitAndFieldSplittingHonorIgnoreCase() throws Exception {
-		AwkTestSupport
-				.awkTest("IGNORECASE applies to split() delimiters and FS")
+		AwkTestSupport.awkTest("IGNORECASE applies to split() delimiters and FS")
 				.script(
-						"BEGIN { "
-								+ "n = split(\"aBa\", a, /b/); print n; "
-								+ "IGNORECASE = 1; "
-								+ "n = split(\"aBa\", a, /b/); print n, a[1], a[2]; "
-								+ "n = split(\"aXBa\", a, \"xb\"); print n; "
-								+ "FS = \"[bc]\" "
-								+ "} "
-								+ "{ print NF, $2 }")
+						"BEGIN { " + "n = split(\"aBa\", a, /b/); print n; " + "IGNORECASE = 1; "
+								+ "n = split(\"aBa\", a, /b/); print n, a[1], a[2]; " + "n = split(\"aXBa\", a, \"xb\"); print n; "
+								+ "FS = \"[bc]\" " + "} " + "{ print NF, $2 }")
 				.stdin("xByCz\n")
 				.expectLines("1", "2 a a", "2", "3 y")
 				.runAndAssert();
@@ -233,37 +204,25 @@ public class GawkExtensionTest {
 		AwkTestSupport.TestResult result = AwkTestSupport
 				.cliTest("gensub occurrence selector follows AWK numeric conversion")
 				.script(
-						"BEGIN { "
-								+ "print gensub(/o/, \"0\", \"1e1\", \"foo\"); "
-								+ "print gensub(/o/, \"0\", \" 2\", \"foo\"); "
-								+ "print gensub(/o/, \"0\", \"abc\", \"foo\"); "
-								+ "print gensub(/o/, \"0\", 0, \"foo\") "
-								+ "}")
+						"BEGIN { " + "print gensub(/o/, \"0\", \"1e1\", \"foo\"); " + "print gensub(/o/, \"0\", \" 2\", \"foo\"); "
+								+ "print gensub(/o/, \"0\", \"abc\", \"foo\"); " + "print gensub(/o/, \"0\", 0, \"foo\") " + "}")
 				.expectLines("foo", "fo0", "f0o", "f0o")
 				.run();
 		result.assertExpected();
-		assertTrue(
-				"non-numeric selector must warn",
-				result.errorOutput().contains("third argument `abc' treated as 1"));
-		assertTrue(
-				"selector below 1 must warn",
-				result.errorOutput().contains("third argument `0' treated as 1"));
-		assertFalse(
-				"valid numeric selectors must not warn",
-				result.errorOutput().contains("` 2'"));
+		assertTrue("non-numeric selector must warn", result.errorOutput().contains("third argument `abc' treated as 1"));
+		assertTrue("selector below 1 must warn", result.errorOutput().contains("third argument `0' treated as 1"));
+		assertFalse("valid numeric selectors must not warn", result.errorOutput().contains("` 2'"));
 	}
 
 	@Test
 	public void misspelledUnsortedModeIsFatal() throws Exception {
 		// only the exact "@unsorted" skips sorting; anything else with an
 		// @-prefix is an undefined comparison mode, fatal as in gawk
-		AwkTestSupport
-				.awkTest("@unsorted with a suffix is rejected")
+		AwkTestSupport.awkTest("@unsorted with a suffix is rejected")
 				.script("BEGIN { a[1] = 2; asort(a, d, \"@unsortedx\") }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("@unsorted with a suffix is rejected in for-in")
+		AwkTestSupport.awkTest("@unsorted with a suffix is rejected in for-in")
 				.script("BEGIN { a[1] = 2; PROCINFO[\"sorted_in\"] = \"@unsorted_asc\"; for (k in a) print k }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -272,8 +231,7 @@ public class GawkExtensionTest {
 	@Test
 	public void invalidSortModeIsFatal() throws Exception {
 		// gawk treats undefined sort comparison names as a fatal error
-		AwkTestSupport
-				.awkTest("invalid asort mode is rejected")
+		AwkTestSupport.awkTest("invalid asort mode is rejected")
 				.script("BEGIN { a[1] = 2; asort(a, d, \"@bogus\") }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -281,14 +239,10 @@ public class GawkExtensionTest {
 
 	@Test
 	public void ignoreCaseIsLiveForMatchAndReadable() throws Exception {
-		AwkTestSupport
-				.awkTest("IGNORECASE assignment applies immediately and reads back")
+		AwkTestSupport.awkTest("IGNORECASE assignment applies immediately and reads back")
 				.script(
-						"BEGIN { "
-								+ "print match(\"ABC\", \"b\"); "
-								+ "IGNORECASE = 1; "
-								+ "print match(\"ABC\", \"b\"), IGNORECASE "
-								+ "}")
+						"BEGIN { " + "print match(\"ABC\", \"b\"); " + "IGNORECASE = 1; "
+								+ "print match(\"ABC\", \"b\"), IGNORECASE " + "}")
 				.expectLines("0", "2 1")
 				.runAndAssert();
 	}
@@ -297,8 +251,7 @@ public class GawkExtensionTest {
 	public void argvWorksWithoutReferencingArgc() throws Exception {
 		// ARGV population derives its count from the argument list itself and
 		// must not depend on the ARGC slot being materialized first.
-		AwkTestSupport
-				.cliTest("ARGV is populated even when ARGC is unreferenced")
+		AwkTestSupport.cliTest("ARGV is populated even when ARGC is unreferenced")
 				.script("BEGIN { print ARGV[0] }")
 				.expectLines("jawk")
 				.runAndAssert();
@@ -329,19 +282,13 @@ public class GawkExtensionTest {
 		Awk awk = new Awk();
 		AwkProgram program = awk.compile("BEGIN { }");
 		try (io.jawk.backend.AVM avm = awk.createAvm()) {
-			avm
-					.execute(
-							program,
-							new io.jawk.jrt.StreamInputSource(
-									new java.io.ByteArrayInputStream(new byte[0]),
-									avm,
-									avm.getJrt()),
-							java.util.Collections.<String>emptyList(),
-							null);
+			avm.execute(
+					program,
+					new io.jawk.jrt.StreamInputSource(new java.io.ByteArrayInputStream(new byte[0]), avm, avm.getJrt()),
+					java.util.Collections.<String>emptyList(),
+					null);
 			for (String name : avm.getSpecialVariableNames()) {
-				assertTrue(
-						"getVariable must answer special variable " + name,
-						avm.getVariable(name) != null);
+				assertTrue("getVariable must answer special variable " + name, avm.getVariable(name) != null);
 			}
 		}
 	}
@@ -350,8 +297,7 @@ public class GawkExtensionTest {
 	public void symtabReflectsInitialVariablesAndOperandAssignments() throws Exception {
 		// gawk parity: -v variables without a compiled slot appear in SYMTAB,
 		// and name=value operand assignments update it live between files.
-		AwkTestSupport
-				.cliTest("SYMTAB sees -v variables and live operand assignments")
+		AwkTestSupport.cliTest("SYMTAB sees -v variables and live operand assignments")
 				.preassign("toto", "tata")
 				.file("f1", "a\n")
 				.file("f2", "b\n")
@@ -363,8 +309,7 @@ public class GawkExtensionTest {
 
 	@Test
 	public void symtabAndFunctabAreNotMaterializedInPosixMode() throws Exception {
-		AwkTestSupport
-				.cliTest("POSIX mode leaves SYMTAB and FUNCTAB empty")
+		AwkTestSupport.cliTest("POSIX mode leaves SYMTAB and FUNCTAB empty")
 				.argument("--posix")
 				.script("BEGIN { print length(SYMTAB), length(FUNCTAB) }")
 				.expectLines("0 0")
@@ -375,8 +320,7 @@ public class GawkExtensionTest {
 	public void symtabSeesRuntimeManagedGlobals() throws Exception {
 		// ARGC/ARGV are populated before the beforeStart hooks run, so the
 		// SYMTAB snapshot must observe their real values.
-		AwkTestSupport
-				.awkTest("SYMTAB snapshots ARGC and ARGV after initialization")
+		AwkTestSupport.awkTest("SYMTAB snapshots ARGC and ARGV after initialization")
 				.script("BEGIN { print SYMTAB[\"ARGC\"], SYMTAB[\"ARGV\"][0] }")
 				.expectLines("1 jawk")
 				.runAndAssert();
@@ -384,20 +328,17 @@ public class GawkExtensionTest {
 
 	@Test
 	public void symtabReadsAndWritesRuntimeValuesLive() throws Exception {
-		AwkTestSupport
-				.awkTest("SYMTAB reads globals live and writes through to them")
+		AwkTestSupport.awkTest("SYMTAB reads globals live and writes through to them")
 				.script(
 						"BEGIN { x = 1; before = SYMTAB[\"x\"]; x = 2; "
 								+ "after = SYMTAB[\"x\"]; SYMTAB[\"x\"] = 7; print before, after, x }")
 				.expectLines("1 2 7")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("Reading an unknown SYMTAB element returns an empty value")
+		AwkTestSupport.awkTest("Reading an unknown SYMTAB element returns an empty value")
 				.script("BEGIN { print \"[\" SYMTAB[\"xyzzy\"] \"]\" }")
 				.expectLines("[]")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("SYMTAB rejects assignments to arbitrary elements")
+		AwkTestSupport.awkTest("SYMTAB rejects assignments to arbitrary elements")
 				.script("BEGIN { SYMTAB[\"xyzzy\"] = 5 }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -405,8 +346,7 @@ public class GawkExtensionTest {
 
 	@Test
 	public void symtabCannotReplaceArrayGlobalsWithScalars() throws Exception {
-		AwkTestSupport
-				.awkTest("SYMTAB preserves array global types")
+		AwkTestSupport.awkTest("SYMTAB preserves array global types")
 				.script("BEGIN { values[1] = 1; SYMTAB[\"values\"] = 3 }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -414,8 +354,7 @@ public class GawkExtensionTest {
 
 	@Test
 	public void symtabCannotReplaceScalarGlobalsWithArrays() throws Exception {
-		AwkTestSupport
-				.awkTest("SYMTAB preserves scalar global types")
+		AwkTestSupport.awkTest("SYMTAB preserves scalar global types")
 				.script("BEGIN { if (0) value = 1; SYMTAB[\"value\"][1] = 3 }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -423,20 +362,17 @@ public class GawkExtensionTest {
 
 	@Test
 	public void symtabRoundTripsSpecialVariables() throws Exception {
-		AwkTestSupport
-				.awkTest("SYMTAB reads and writes managed special variables")
+		AwkTestSupport.awkTest("SYMTAB reads and writes managed special variables")
 				.script(
 						"BEGIN { SYMTAB[\"NR\"] = 9; SYMTAB[\"OFS\"] = \":\"; "
 								+ "print NR, SYMTAB[\"NR\"]; print 1, 2; print SYMTAB[\"OFS\"] }")
 				.expectLines("9:9", "1:2", ":")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("SYMTAB writes ARGC without recursive assignment")
+		AwkTestSupport.awkTest("SYMTAB writes ARGC without recursive assignment")
 				.script("BEGIN { SYMTAB[\"ARGC\"] = 4; print ARGC, SYMTAB[\"ARGC\"] }")
 				.expectLines("4 4")
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("SYMTAB writes match result variables")
+		AwkTestSupport.awkTest("SYMTAB writes match result variables")
 				.script(
 						"BEGIN { SYMTAB[\"RSTART\"] = 7; SYMTAB[\"RLENGTH\"] = 3; "
 								+ "print RSTART, SYMTAB[\"RSTART\"], RLENGTH, SYMTAB[\"RLENGTH\"] }")
@@ -446,11 +382,9 @@ public class GawkExtensionTest {
 
 	@Test
 	public void symtabIterationUsesItsMaterializedKeysAndLiveValues() throws Exception {
-		AwkTestSupport
-				.awkTest("SYMTAB iteration exposes declared globals with live values")
+		AwkTestSupport.awkTest("SYMTAB iteration exposes declared globals with live values")
 				.script(
-						"BEGIN { x = 1; x = 7; "
-								+ "for (key in SYMTAB) if (key == \"x\") { seen++; value = SYMTAB[key] } "
+						"BEGIN { x = 1; x = 7; " + "for (key in SYMTAB) if (key == \"x\") { seen++; value = SYMTAB[key] } "
 								+ "print seen, value }")
 				.expectLines("1 7")
 				.runAndAssert();
@@ -458,20 +392,16 @@ public class GawkExtensionTest {
 
 	@Test
 	public void symtabIterationHonorsSortedArrayKeys() throws Exception {
-		AwkTestSupport
-				.cliTest("SYMTAB uses sorted iteration when -t is enabled")
+		AwkTestSupport.cliTest("SYMTAB uses sorted iteration when -t is enabled")
 				.argument("-t")
-				.script(
-						"BEGIN { a = 1; aa = 2; "
-								+ "for (key in SYMTAB) if (key == \"a\" || key == \"aa\") print key }")
+				.script("BEGIN { a = 1; aa = 2; " + "for (key in SYMTAB) if (key == \"a\" || key == \"aa\") print key }")
 				.expectLines("a", "aa")
 				.runAndAssert();
 	}
 
 	@Test
 	public void symtabEntrySetExposesLiveValues() throws Exception {
-		AwkTestSupport
-				.awkTest("SYMTAB value sorting uses live global values")
+		AwkTestSupport.awkTest("SYMTAB value sorting uses live global values")
 				.script(
 						"BEGIN { a = 2; z = 1; PROCINFO[\"sorted_in\"] = \"@val_num_asc\"; "
 								+ "for (key in SYMTAB) if (key == \"a\" || key == \"z\") print key }")
@@ -483,18 +413,12 @@ public class GawkExtensionTest {
 	public void ignoreCaseAppliesToComparisonsAndIndex() throws Exception {
 		// gawk's IGNORECASE covers string relational operators and index(),
 		// not just regexp operations; numeric (strnum) comparisons stay numeric
-		AwkTestSupport
-				.awkTest("IGNORECASE folds case in ==, < and index()")
+		AwkTestSupport.awkTest("IGNORECASE folds case in ==, < and index()")
 				.script(
-						"BEGIN { "
-								+ "IGNORECASE = 1; "
-								+ "eq = (\"a\" == \"A\"); ix = index(\"Ab\", \"a\"); lt = (\"B\" < \"a\"); "
-								+ "print eq, ix, lt; "
-								+ "IGNORECASE = 0; "
-								+ "eq = (\"a\" == \"A\"); ix = index(\"Ab\", \"a\"); lt = (\"B\" < \"a\"); "
-								+ "print eq, ix, lt "
-								+ "} "
-								+ "{ e = ($1 == $2); print e }")
+						"BEGIN { " + "IGNORECASE = 1; " + "eq = (\"a\" == \"A\"); ix = index(\"Ab\", \"a\"); lt = (\"B\" < \"a\"); "
+								+ "print eq, ix, lt; " + "IGNORECASE = 0; "
+								+ "eq = (\"a\" == \"A\"); ix = index(\"Ab\", \"a\"); lt = (\"B\" < \"a\"); " + "print eq, ix, lt "
+								+ "} " + "{ e = ($1 == $2); print e }")
 				.stdin("10 10.0\n")
 				.expectLines("1 1 0", "0 0 1", "1")
 				.runAndAssert();
@@ -504,13 +428,11 @@ public class GawkExtensionTest {
 	public void metaTablesCannotBeUsedAsScalars() throws Exception {
 		// gawk: fatal "attempt to use array `SYMTAB' in a scalar context"; the
 		// meta tables are array-typed from the moment they exist
-		AwkTestSupport
-				.awkTest("assigning a scalar to SYMTAB is a semantic error")
+		AwkTestSupport.awkTest("assigning a scalar to SYMTAB is a semantic error")
 				.script("BEGIN { SYMTAB = 1 }")
 				.expectThrow(RuntimeException.class)
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("assigning a scalar to FUNCTAB is a semantic error")
+		AwkTestSupport.awkTest("assigning a scalar to FUNCTAB is a semantic error")
 				.script("BEGIN { FUNCTAB = 1 }")
 				.expectThrow(RuntimeException.class)
 				.runAndAssert();
@@ -518,13 +440,11 @@ public class GawkExtensionTest {
 
 	@Test
 	public void symtabCannotBeDeleted() throws Exception {
-		AwkTestSupport
-				.awkTest("SYMTAB elements cannot be deleted")
+		AwkTestSupport.awkTest("SYMTAB elements cannot be deleted")
 				.script("BEGIN { value = 1; delete SYMTAB[\"value\"] }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("SYMTAB cannot be cleared")
+		AwkTestSupport.awkTest("SYMTAB cannot be cleared")
 				.script("BEGIN { delete SYMTAB }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -532,13 +452,11 @@ public class GawkExtensionTest {
 
 	@Test
 	public void functabIsReadOnly() throws Exception {
-		AwkTestSupport
-				.awkTest("FUNCTAB elements cannot be assigned")
+		AwkTestSupport.awkTest("FUNCTAB elements cannot be assigned")
 				.script("BEGIN { FUNCTAB[\"length\"] = \"replacement\" }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("FUNCTAB elements cannot be deleted")
+		AwkTestSupport.awkTest("FUNCTAB elements cannot be deleted")
 				.script("BEGIN { delete FUNCTAB[\"length\"] }")
 				.expectThrow(AwkRuntimeException.class)
 				.runAndAssert();
@@ -549,10 +467,7 @@ public class GawkExtensionTest {
 		// Per-run overrides without a compiled slot must be observable through
 		// SYMTAB and by-name lookups from extensions.
 		StringBuilder out = new StringBuilder();
-		new Awk()
-				.script("BEGIN { print SYMTAB[\"toto\"] }")
-				.variable("toto", "tata")
-				.execute(out);
+		new Awk().script("BEGIN { print SYMTAB[\"toto\"] }").variable("toto", "tata").execute(out);
 		assertEquals("tata\n", out.toString());
 
 		// a host-supplied PROCINFO drives for-in ordering even when the script
@@ -560,8 +475,7 @@ public class GawkExtensionTest {
 		java.util.Map<String, Object> procinfo = new java.util.HashMap<String, Object>();
 		procinfo.put("sorted_in", "@ind_str_desc");
 		out.setLength(0);
-		new Awk()
-				.script("BEGIN { a[\"x\"] = 1; a[\"y\"] = 2; for (k in a) print k }")
+		new Awk().script("BEGIN { a[\"x\"] = 1; a[\"y\"] = 2; for (k in a) print k }")
 				.variable("PROCINFO", procinfo)
 				.execute(out);
 		assertEquals("y\nx\n", out.toString());
@@ -570,16 +484,10 @@ public class GawkExtensionTest {
 	@Test
 	public void symtabExcludesTheMetaTablesThemselves() throws Exception {
 		// gawk keeps SYMTAB and FUNCTAB out of the SYMTAB snapshot
-		AwkTestSupport
-				.awkTest("SYMTAB does not contain SYMTAB or FUNCTAB entries")
+		AwkTestSupport.awkTest("SYMTAB does not contain SYMTAB or FUNCTAB entries")
 				.script(
-						"function foo() { return 1 } "
-								+ "BEGIN { "
-								+ "x = (\"SYMTAB\" in SYMTAB); "
-								+ "y = (\"FUNCTAB\" in SYMTAB); "
-								+ "z = (\"foo\" in FUNCTAB); "
-								+ "print x, y, z "
-								+ "}")
+						"function foo() { return 1 } " + "BEGIN { " + "x = (\"SYMTAB\" in SYMTAB); "
+								+ "y = (\"FUNCTAB\" in SYMTAB); " + "z = (\"foo\" in FUNCTAB); " + "print x, y, z " + "}")
 				.expectLines("0 0 1")
 				.runAndAssert();
 	}
@@ -589,38 +497,29 @@ public class GawkExtensionTest {
 		// gawk's @ind_num_* breaks numeric ties (all non-numeric indexes
 		// coerce to 0) with a string comparison, so the order is
 		// deterministic regardless of insertion order
-		AwkTestSupport
-				.awkTest("@ind_num orders equal-valued indexes as text")
+		AwkTestSupport.awkTest("@ind_num orders equal-valued indexes as text")
 				.script(
-						"BEGIN { "
-								+ "a[\"b\"] = 1; a[\"a\"] = 1; a[\"0\"] = 1; a[\"B\"] = 1; "
-								+ "n = asorti(a, d, \"@ind_num_asc\"); "
-								+ "print d[1], d[2], d[3], d[4]; "
-								+ "n = asorti(a, d, \"@ind_num_desc\"); "
-								+ "print d[1], d[2], d[3], d[4] "
-								+ "}")
+						"BEGIN { " + "a[\"b\"] = 1; a[\"a\"] = 1; a[\"0\"] = 1; a[\"B\"] = 1; "
+								+ "n = asorti(a, d, \"@ind_num_asc\"); " + "print d[1], d[2], d[3], d[4]; "
+								+ "n = asorti(a, d, \"@ind_num_desc\"); " + "print d[1], d[2], d[3], d[4] " + "}")
 				.expectLines("0 B a b", "b a B 0")
 				.runAndAssert();
 	}
 
 	@Test
 	public void symtabAndFunctabExposeRealNames() throws Exception {
-		AwkTestSupport
-				.awkTest("SYMTAB and FUNCTAB hold real symbol names")
+		AwkTestSupport.awkTest("SYMTAB and FUNCTAB hold real symbol names")
 				.script(
-						"function myfunc() { return 1 } "
-								+ "BEGIN { "
+						"function myfunc() { return 1 } " + "BEGIN { "
 								+ "nr = (\"NR\" in SYMTAB); fs = (\"FS\" in SYMTAB); print nr, fs; "
-								+ "mf = (\"myfunc\" in FUNCTAB); gs = (\"gensub\" in FUNCTAB); print mf, gs "
-								+ "}")
+								+ "mf = (\"myfunc\" in FUNCTAB); gs = (\"gensub\" in FUNCTAB); print mf, gs " + "}")
 				.expectLines("1 1", "1 1")
 				.runAndAssert();
 	}
 
 	@Test
 	public void gensubWarningGoesToErrorStreamNotOutput() throws Exception {
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.cliTest("gensub third-argument warning targets stderr")
+		AwkTestSupport.TestResult result = AwkTestSupport.cliTest("gensub third-argument warning targets stderr")
 				.script("BEGIN { print gensub(/o/, \"0\", \"a\", \"foo\") }")
 				.expect("f0o\n")
 				.run();
@@ -632,8 +531,7 @@ public class GawkExtensionTest {
 
 	@Test
 	public void extraFunctionArgumentWarningGoesToErrorStreamNotOutput() throws Exception {
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.cliTest("extra-argument warning targets stderr")
+		AwkTestSupport.TestResult result = AwkTestSupport.cliTest("extra-argument warning targets stderr")
 				.script("function f(a) { return a } BEGIN { print f(1, 2) }")
 				.expect("1\n")
 				.run();
@@ -650,74 +548,53 @@ public class GawkExtensionTest {
 		indirectResult.assertExpected();
 		assertTrue(
 				"indirect warning should include a source line: " + indirectResult.errorOutput(),
-				indirectResult
-						.errorOutput()
-						.matches("(?s).*gawk: .+:\\d+: warning: function `f'.*"));
+				indirectResult.errorOutput().matches("(?s).*gawk: .+:\\d+: warning: function `f'.*"));
 	}
 
 	@Test
 	public void asortSortsValuesAndRenumbersIndices() throws Exception {
-		AwkTestSupport
-				.awkTest("asort sorts by value with integer indices from 1")
+		AwkTestSupport.awkTest("asort sorts by value with integer indices from 1")
 				.script(
-						"BEGIN { "
-								+ "a[\"x\"] = 30; a[\"y\"] = 10; a[\"z\"] = 20; "
-								+ "n = asort(a); "
-								+ "for (i = 1; i <= n; i++) print i, a[i] "
-								+ "}")
+						"BEGIN { " + "a[\"x\"] = 30; a[\"y\"] = 10; a[\"z\"] = 20; " + "n = asort(a); "
+								+ "for (i = 1; i <= n; i++) print i, a[i] " + "}")
 				.expectLines("1 10", "2 20", "3 30")
 				.runAndAssert();
 	}
 
 	@Test
 	public void asortWithDestinationLeavesSourceUntouched() throws Exception {
-		AwkTestSupport
-				.awkTest("asort second argument receives the sorted copy")
+		AwkTestSupport.awkTest("asort second argument receives the sorted copy")
 				.script(
-						"BEGIN { "
-								+ "a[\"x\"] = \"b\"; a[\"y\"] = \"a\"; "
-								+ "n = asort(a, dest); "
-								+ "print n, dest[1], dest[2], a[\"x\"], a[\"y\"] "
-								+ "}")
+						"BEGIN { " + "a[\"x\"] = \"b\"; a[\"y\"] = \"a\"; " + "n = asort(a, dest); "
+								+ "print n, dest[1], dest[2], a[\"x\"], a[\"y\"] " + "}")
 				.expectLines("2 a b b a")
 				.runAndAssert();
 	}
 
 	@Test
 	public void asortReplacementKeepsElementArgumentsDetached() throws Exception {
-		AwkTestSupport
-				.awkTest("asort replacement keeps element arguments detached")
-				.script(
-						"function f(x) { b[3][4] = 9; asort(b, a); x[2] = 2; print (2 in a[1]) } "
-								+ "BEGIN { f(a[1]) }")
+		AwkTestSupport.awkTest("asort replacement keeps element arguments detached")
+				.script("function f(x) { b[3][4] = 9; asort(b, a); x[2] = 2; print (2 in a[1]) } " + "BEGIN { f(a[1]) }")
 				.expectLines("0")
 				.runAndAssert();
 	}
 
 	@Test
 	public void asortiSortsByIndex() throws Exception {
-		AwkTestSupport
-				.awkTest("asorti sorts array indices into values")
+		AwkTestSupport.awkTest("asorti sorts array indices into values")
 				.script(
-						"BEGIN { "
-								+ "a[\"banana\"] = 1; a[\"apple\"] = 1; a[\"cherry\"] = 1; "
-								+ "n = asorti(a, dest); "
-								+ "for (i = 1; i <= n; i++) print dest[i] "
-								+ "}")
+						"BEGIN { " + "a[\"banana\"] = 1; a[\"apple\"] = 1; a[\"cherry\"] = 1; " + "n = asorti(a, dest); "
+								+ "for (i = 1; i <= n; i++) print dest[i] " + "}")
 				.expectLines("apple", "banana", "cherry")
 				.runAndAssert();
 	}
 
 	@Test
 	public void asortHonorsPredefinedDescendingMode() throws Exception {
-		AwkTestSupport
-				.awkTest("asort third argument selects a predefined sort mode")
+		AwkTestSupport.awkTest("asort third argument selects a predefined sort mode")
 				.script(
-						"BEGIN { "
-								+ "a[1] = 10; a[2] = 30; a[3] = 20; "
-								+ "n = asort(a, dest, \"@val_num_desc\"); "
-								+ "for (i = 1; i <= n; i++) print dest[i] "
-								+ "}")
+						"BEGIN { " + "a[1] = 10; a[2] = 30; a[3] = 20; " + "n = asort(a, dest, \"@val_num_desc\"); "
+								+ "for (i = 1; i <= n; i++) print dest[i] " + "}")
 				.expectLines("30", "20", "10")
 				.runAndAssert();
 	}
@@ -726,14 +603,10 @@ public class GawkExtensionTest {
 	public void valueStringModeComparesAllValuesAsText() throws Exception {
 		// gawk's @val_str_* compares string representations regardless of the
 		// runtime type: no numbers-before-strings ranking
-		AwkTestSupport
-				.awkTest("@val_str_asc orders the number 2 after the string \"10\"")
+		AwkTestSupport.awkTest("@val_str_asc orders the number 2 after the string \"10\"")
 				.script(
-						"BEGIN { "
-								+ "a[1] = 2; a[2] = \"10\"; "
-								+ "n = asort(a, d, \"@val_str_asc\"); "
-								+ "for (i = 1; i <= n; i++) print d[i] "
-								+ "}")
+						"BEGIN { " + "a[1] = 2; a[2] = \"10\"; " + "n = asort(a, d, \"@val_str_asc\"); "
+								+ "for (i = 1; i <= n; i++) print d[i] " + "}")
 				.expectLines("10", "2")
 				.runAndAssert();
 	}
@@ -742,31 +615,19 @@ public class GawkExtensionTest {
 	public void valueNumberModeCoercesStringsAndBreaksTiesAsText() throws Exception {
 		// gawk's @val_num_* coerces every scalar to a number (non-numeric
 		// strings count as 0) and breaks numeric ties with a string comparison
-		AwkTestSupport
-				.awkTest("@val_num_asc sorts string values numerically")
+		AwkTestSupport.awkTest("@val_num_asc sorts string values numerically")
 				.script(
-						"BEGIN { "
-								+ "a[1] = \"10\"; a[2] = \"2\"; "
-								+ "n = asort(a, d, \"@val_num_asc\"); "
-								+ "print d[1], d[2]; "
-								+ "b[1] = \"abc\"; b[2] = 5; b[3] = 0; b[4] = \"zz\"; "
-								+ "n = asort(b, d2, \"@val_num_asc\"); "
-								+ "print d2[1], d2[2], d2[3], d2[4] "
-								+ "}")
+						"BEGIN { " + "a[1] = \"10\"; a[2] = \"2\"; " + "n = asort(a, d, \"@val_num_asc\"); " + "print d[1], d[2]; "
+								+ "b[1] = \"abc\"; b[2] = 5; b[3] = 0; b[4] = \"zz\"; " + "n = asort(b, d2, \"@val_num_asc\"); "
+								+ "print d2[1], d2[2], d2[3], d2[4] " + "}")
 				.expectLines("2 10", "0 abc zz 5")
 				.runAndAssert();
 	}
 
 	@Test
 	public void emptySortModeMeansDefault() throws Exception {
-		AwkTestSupport
-				.awkTest("an empty third argument behaves like an omitted one")
-				.script(
-						"BEGIN { "
-								+ "a[1] = 2; a[2] = 1; "
-								+ "n = asort(a, d, \"\"); "
-								+ "print d[1], d[2] "
-								+ "}")
+		AwkTestSupport.awkTest("an empty third argument behaves like an omitted one")
+				.script("BEGIN { " + "a[1] = 2; a[2] = 1; " + "n = asort(a, d, \"\"); " + "print d[1], d[2] " + "}")
 				.expectLines("1 2")
 				.runAndAssert();
 	}
@@ -775,86 +636,60 @@ public class GawkExtensionTest {
 	public void asortiDefaultsToStringIndexOrder() throws Exception {
 		// gawk's default for asorti() is @ind_str_asc: numeric-looking indexes
 		// stay in string order ("10" < "2")
-		AwkTestSupport
-				.awkTest("asorti default keeps string index order")
+		AwkTestSupport.awkTest("asorti default keeps string index order")
 				.script(
-						"BEGIN { "
-								+ "a[\"10\"] = 1; a[\"2\"] = 1; a[\"b\"] = 1; "
-								+ "n = asorti(a, d); "
-								+ "print d[1], d[2], d[3] "
-								+ "}")
+						"BEGIN { " + "a[\"10\"] = 1; a[\"2\"] = 1; a[\"b\"] = 1; " + "n = asorti(a, d); "
+								+ "print d[1], d[2], d[3] " + "}")
 				.expectLines("10 2 b")
 				.runAndAssert();
 	}
 
 	@Test
 	public void forInHonorsProcinfoSortedIn() throws Exception {
-		AwkTestSupport
-				.awkTest("for-in traversal follows PROCINFO[\"sorted_in\"]")
+		AwkTestSupport.awkTest("for-in traversal follows PROCINFO[\"sorted_in\"]")
 				.script(
-						"BEGIN { "
-								+ "a[3] = \"c\"; a[1] = \"a\"; a[2] = \"b\"; "
-								+ "PROCINFO[\"sorted_in\"] = \"@ind_num_desc\"; "
-								+ "for (i in a) print i, a[i] "
-								+ "}")
+						"BEGIN { " + "a[3] = \"c\"; a[1] = \"a\"; a[2] = \"b\"; " + "PROCINFO[\"sorted_in\"] = \"@ind_num_desc\"; "
+								+ "for (i in a) print i, a[i] " + "}")
 				.expectLines("3 c", "2 b", "1 a")
 				.runAndAssert();
 	}
 
 	@Test
 	public void sortedInChangesApplyMidExecution() throws Exception {
-		AwkTestSupport
-				.awkTest("PROCINFO[\"sorted_in\"] is re-read by each for-in loop")
+		AwkTestSupport.awkTest("PROCINFO[\"sorted_in\"] is re-read by each for-in loop")
 				.script(
-						"BEGIN { "
-								+ "a[1] = \"x\"; a[2] = \"y\"; a[3] = \"z\"; "
-								+ "PROCINFO[\"sorted_in\"] = \"@ind_num_desc\"; "
-								+ "s = \"\"; for (i in a) s = s i; print s; "
-								+ "PROCINFO[\"sorted_in\"] = \"@ind_num_asc\"; "
-								+ "s = \"\"; for (i in a) s = s i; print s "
-								+ "}")
+						"BEGIN { " + "a[1] = \"x\"; a[2] = \"y\"; a[3] = \"z\"; " + "PROCINFO[\"sorted_in\"] = \"@ind_num_desc\"; "
+								+ "s = \"\"; for (i in a) s = s i; print s; " + "PROCINFO[\"sorted_in\"] = \"@ind_num_asc\"; "
+								+ "s = \"\"; for (i in a) s = s i; print s " + "}")
 				.expectLines("321", "123")
 				.runAndAssert();
 	}
 
 	@Test
 	public void unsortedModeKeepsNaturalTraversalOrder() throws Exception {
-		AwkTestSupport
-				.awkTest("@unsorted traverses in the array's natural order")
+		AwkTestSupport.awkTest("@unsorted traverses in the array's natural order")
 				.script(
-						"BEGIN { "
-								+ "for (i = 1; i <= 20; i++) a[\"key\" i] = 21 - i; "
-								+ "before = \"\"; "
-								+ "for (k in a) before = before SUBSEP k; "
-								+ "PROCINFO[\"sorted_in\"] = \"@unsorted\"; "
-								+ "after = \"\"; "
-								+ "for (k in a) after = after SUBSEP k; "
-								+ "print (before == after ? \"same\" : \"different\") "
-								+ "}")
+						"BEGIN { " + "for (i = 1; i <= 20; i++) a[\"key\" i] = 21 - i; " + "before = \"\"; "
+								+ "for (k in a) before = before SUBSEP k; " + "PROCINFO[\"sorted_in\"] = \"@unsorted\"; "
+								+ "after = \"\"; " + "for (k in a) after = after SUBSEP k; "
+								+ "print (before == after ? \"same\" : \"different\") " + "}")
 				.expectLines("same")
 				.runAndAssert();
 	}
 
 	@Test
 	public void typeofReturnsGawkCategories() throws Exception {
-		AwkTestSupport
-				.awkTest("typeof reports gawk type categories")
+		AwkTestSupport.awkTest("typeof reports gawk type categories")
 				.script(
-						"BEGIN { "
-								+ "n = 42; s = \"text\"; arr[1] = 1; "
-								+ "print typeof(n); "
-								+ "print typeof(s); "
-								+ "print typeof(arr); "
-								+ "print typeof(unset) "
-								+ "}")
+						"BEGIN { " + "n = 42; s = \"text\"; arr[1] = 1; " + "print typeof(n); " + "print typeof(s); "
+								+ "print typeof(arr); " + "print typeof(unset) " + "}")
 				.expectLines("number", "string", "array", "untyped")
 				.runAndAssert();
 	}
 
 	@Test
 	public void indirectTypeofPreservesUntypedVariables() throws Exception {
-		AwkTestSupport
-				.awkTest("indirect typeof receives an untyped variable")
+		AwkTestSupport.awkTest("indirect typeof receives an untyped variable")
 				.script("BEGIN { callback = \"typeof\"; print @callback(unset), typeof(unset) }")
 				.expectLines("untyped untyped")
 				.runAndAssert();
@@ -862,33 +697,25 @@ public class GawkExtensionTest {
 
 	@Test
 	public void rawValueExtensionsUnwrapForwardedUntypedArguments() throws Exception {
-		AwkTestSupport
-				.awkTest("raw value extensions receive forwarded untyped arguments")
+		AwkTestSupport.awkTest("raw value extensions receive forwarded untyped arguments")
 				.script(
-						"function forward(value) { inspect(value) } "
-								+ "function inspect(value) { "
-								+ "callback = \"typeof\"; print typeof(value), @callback(value) "
-								+ "} "
-								+ "BEGIN { forward(unset) }")
+						"function forward(value) { inspect(value) } " + "function inspect(value) { "
+								+ "callback = \"typeof\"; print typeof(value), @callback(value) " + "} " + "BEGIN { forward(unset) }")
 				.expectLines("untyped untyped")
 				.runAndAssert();
 	}
 
 	@Test
 	public void rawValueExtensionsObserveCallerArrayTransitions() throws Exception {
-		AwkTestSupport
-				.awkTest("raw value extensions observe caller array transitions")
-				.script(
-						"function f(x) { a[1] = 1; print typeof(x), isarray(x) } "
-								+ "BEGIN { f(a) }")
+		AwkTestSupport.awkTest("raw value extensions observe caller array transitions")
+				.script("function f(x) { a[1] = 1; print typeof(x), isarray(x) } " + "BEGIN { f(a) }")
 				.expectLines("array 1")
 				.runAndAssert();
 	}
 
 	@Test
 	public void rawValueExtensionsObserveCallerScalarization() throws Exception {
-		AwkTestSupport
-				.awkTest("raw value extensions observe caller scalarization")
+		AwkTestSupport.awkTest("raw value extensions observe caller scalarization")
 				.script("function f(x, y) { print x; print typeof(y) } BEGIN { f(a, a) }")
 				.expect("\nunassigned\n")
 				.runAndAssert();
@@ -896,8 +723,7 @@ public class GawkExtensionTest {
 
 	@Test
 	public void typeofReportsStrnumForNumericInputFields() throws Exception {
-		AwkTestSupport
-				.awkTest("typeof reports strnum for numeric-looking input")
+		AwkTestSupport.awkTest("typeof reports strnum for numeric-looking input")
 				.script("{ print typeof($1), typeof($2) }")
 				.stdin("3.14 text\n")
 				.expectLines("strnum string")
@@ -906,52 +732,32 @@ public class GawkExtensionTest {
 
 	@Test
 	public void typeofOnMissingElementCreatesItLikeGawk() throws Exception {
-		AwkTestSupport
-				.awkTest("typeof on a missing element brings it into existence")
-				.script(
-						"BEGIN { "
-								+ "t = typeof(a[1]); present = (1 in a); "
-								+ "print t, present "
-								+ "}")
+		AwkTestSupport.awkTest("typeof on a missing element brings it into existence")
+				.script("BEGIN { " + "t = typeof(a[1]); present = (1 in a); " + "print t, present " + "}")
 				.expectLines("untyped 1")
 				.runAndAssert();
 	}
 
 	@Test
 	public void isarrayOnMissingElementCreatesItLikeGawk() throws Exception {
-		AwkTestSupport
-				.awkTest("isarray on a missing element brings it into existence")
-				.script(
-						"BEGIN { "
-								+ "r = isarray(a[1]); present = (1 in a); "
-								+ "print r, present "
-								+ "}")
+		AwkTestSupport.awkTest("isarray on a missing element brings it into existence")
+				.script("BEGIN { " + "r = isarray(a[1]); present = (1 in a); " + "print r, present " + "}")
 				.expectLines("0 1")
 				.runAndAssert();
 	}
 
 	@Test
 	public void isarrayDistinguishesArraysFromScalars() throws Exception {
-		AwkTestSupport
-				.awkTest("isarray returns 1 only for arrays")
-				.script(
-						"BEGIN { "
-								+ "arr[1] = 1; scalar = \"x\"; "
-								+ "print isarray(arr), isarray(scalar) "
-								+ "}")
+		AwkTestSupport.awkTest("isarray returns 1 only for arrays")
+				.script("BEGIN { " + "arr[1] = 1; scalar = \"x\"; " + "print isarray(arr), isarray(scalar) " + "}")
 				.expectLines("1 0")
 				.runAndAssert();
 	}
 
 	@Test
 	public void mkboolCreatesBooleanTypedNumbers() throws Exception {
-		AwkTestSupport
-				.awkTest("mkbool values are numbers flagged as booleans")
-				.script(
-						"BEGIN { "
-								+ "t = mkbool(1); f = mkbool(0); "
-								+ "print t, f, typeof(t), typeof(f) "
-								+ "}")
+		AwkTestSupport.awkTest("mkbool values are numbers flagged as booleans")
+				.script("BEGIN { " + "t = mkbool(1); f = mkbool(0); " + "print t, f, typeof(t), typeof(f) " + "}")
 				.expectLines("1 0 number|bool number|bool")
 				.runAndAssert();
 	}
@@ -960,11 +766,9 @@ public class GawkExtensionTest {
 	public void mkboolUsesAwkTruthiness() throws Exception {
 		// gawk applies ordinary AWK truth rules: any non-empty string
 		// constant (even "0") is true; a strnum is judged numerically
-		AwkTestSupport
-				.awkTest("mkbool follows AWK truthiness, not numeric coercion")
+		AwkTestSupport.awkTest("mkbool follows AWK truthiness, not numeric coercion")
 				.script(
-						"{ s = mkbool($1); print s } "
-								+ "END { print mkbool(\"abc\"), mkbool(\"\"), mkbool(\"0\"), mkbool(0) }")
+						"{ s = mkbool($1); print s } " + "END { print mkbool(\"abc\"), mkbool(\"\"), mkbool(\"0\"), mkbool(0) }")
 				.stdin("0\n")
 				.expectLines("0", "1 0 1 0")
 				.runAndAssert();
@@ -973,43 +777,31 @@ public class GawkExtensionTest {
 	@Test
 	public void systimeReturnsCurrentEpochSeconds() throws Exception {
 		long before = System.currentTimeMillis() / 1000L;
-		AwkTestSupport.TestResult result = AwkTestSupport
-				.awkTest("systime reports the current epoch time")
+		AwkTestSupport.TestResult result = AwkTestSupport.awkTest("systime reports the current epoch time")
 				.script("BEGIN { print systime() }")
 				.run();
 		long after = System.currentTimeMillis() / 1000L;
 		long reported = Long.parseLong(result.output().trim());
-		assertTrue(
-				"systime() must report the current time",
-				reported >= before && reported <= after);
+		assertTrue("systime() must report the current time", reported >= before && reported <= after);
 	}
 
 	@Test
 	public void mktimeConvertsUtcDatespecs() throws Exception {
-		AwkTestSupport
-				.awkTest("mktime converts and normalizes UTC date specifications")
+		AwkTestSupport.awkTest("mktime converts and normalizes UTC date specifications")
 				.script(
-						"BEGIN { "
-								+ "print mktime(\"2017 1 1 0 0 0\", 1); "
-								+ "print mktime(\"2016 13 1 0 0 0\", 1); "
+						"BEGIN { " + "print mktime(\"2017 1 1 0 0 0\", 1); " + "print mktime(\"2016 13 1 0 0 0\", 1); "
 								+ "print mktime(\"2017 1 1 0 0 -30\", 1); "
-								+ "print mktime(strftime(\"%Y %m %d %H %M %S\", 1483228800, 1), 1) "
-								+ "}")
+								+ "print mktime(strftime(\"%Y %m %d %H %M %S\", 1483228800, 1), 1) " + "}")
 				.expectLines("1483228800", "1483228800", "1483228770", "1483228800")
 				.runAndAssert();
 	}
 
 	@Test
 	public void mktimeRejectsMalformedDatespecs() throws Exception {
-		AwkTestSupport
-				.awkTest("mktime returns -1 on malformed date specifications")
+		AwkTestSupport.awkTest("mktime returns -1 on malformed date specifications")
 				.script(
-						"BEGIN { "
-								+ "print mktime(\"garbage\"); "
-								+ "print mktime(\"2017 1 1 0 0\"); "
-								+ "print mktime(\"2017 1 1 0 0 0 0 0\"); "
-								+ "print mktime(\"2017 1 1 0 0 x\") "
-								+ "}")
+						"BEGIN { " + "print mktime(\"garbage\"); " + "print mktime(\"2017 1 1 0 0\"); "
+								+ "print mktime(\"2017 1 1 0 0 0 0 0\"); " + "print mktime(\"2017 1 1 0 0 x\") " + "}")
 				.expectLines("-1", "-1", "-1", "-1")
 				.runAndAssert();
 	}
@@ -1017,23 +809,14 @@ public class GawkExtensionTest {
 	@Test
 	public void strftimeFormatsUtcTimestamps() throws Exception {
 		// 1483228800 is Sun Jan 1 2017 00:00:00 UTC
-		AwkTestSupport
-				.awkTest("strftime supports the C conversion specifiers")
+		AwkTestSupport.awkTest("strftime supports the C conversion specifiers")
 				.script(
-						"BEGIN { "
-								+ "t = 1483228800; "
-								+ "print strftime(\"%Y-%m-%d %H:%M:%S\", t, 1); "
-								+ "print strftime(\"%a %A %b %B %h\", t, 1); "
-								+ "print strftime(\"%d|%e|%j|%u|%w|%C|%y\", t, 1); "
-								+ "print strftime(\"%V %G %g %U %W\", t, 1); "
-								+ "print strftime(\"%z %Z %s %%\", t, 1); "
-								+ "print strftime(\"%c\", t, 1); "
-								+ "print strftime(\"%D %F %x %X %r %R %T\", t, 1); "
-								+ "t2 = mktime(\"2017 6 15 15 30 45\", 1); "
-								+ "print strftime(\"%a %u %j %e %I:%M:%S %p\", t2, 1); "
-								+ "print strftime(\"a%nb\", t, 1); "
-								+ "print strftime(\"%q %E\", t, 1) "
-								+ "}")
+						"BEGIN { " + "t = 1483228800; " + "print strftime(\"%Y-%m-%d %H:%M:%S\", t, 1); "
+								+ "print strftime(\"%a %A %b %B %h\", t, 1); " + "print strftime(\"%d|%e|%j|%u|%w|%C|%y\", t, 1); "
+								+ "print strftime(\"%V %G %g %U %W\", t, 1); " + "print strftime(\"%z %Z %s %%\", t, 1); "
+								+ "print strftime(\"%c\", t, 1); " + "print strftime(\"%D %F %x %X %r %R %T\", t, 1); "
+								+ "t2 = mktime(\"2017 6 15 15 30 45\", 1); " + "print strftime(\"%a %u %j %e %I:%M:%S %p\", t2, 1); "
+								+ "print strftime(\"a%nb\", t, 1); " + "print strftime(\"%q %E\", t, 1) " + "}")
 				.expectLines(
 						"2017-01-01 00:00:00",
 						"Sun Sunday Jan January Jan",
@@ -1053,14 +836,9 @@ public class GawkExtensionTest {
 	public void timeFunctionsUseProlepticGregorianDates() throws Exception {
 		// gawk's civil dates never switch to the Julian calendar: 1500-01-01
 		// is 9 days away from what a default GregorianCalendar would compute
-		AwkTestSupport
-				.awkTest("mktime and strftime use the proleptic Gregorian calendar")
+		AwkTestSupport.awkTest("mktime and strftime use the proleptic Gregorian calendar")
 				.script(
-						"BEGIN { "
-								+ "t = mktime(\"1500 1 1 0 0 0\", 1); "
-								+ "print t; "
-								+ "print strftime(\"%F\", t, 1) "
-								+ "}")
+						"BEGIN { " + "t = mktime(\"1500 1 1 0 0 0\", 1); " + "print t; " + "print strftime(\"%F\", t, 1) " + "}")
 				.expectLines("-14831769600", "1500-01-01")
 				.runAndAssert();
 	}
@@ -1070,17 +848,14 @@ public class GawkExtensionTest {
 		// the GNU extensions gawk exposes through glibc: '-' no padding,
 		// '_' space padding, '0' zero padding, '^' upper case, '#' swapped
 		// case, and a minimum field width
-		AwkTestSupport
-				.awkTest("strftime honors GNU padding and case flags")
+		AwkTestSupport.awkTest("strftime honors GNU padding and case flags")
 				.script(
-						"BEGIN { "
-								+ "t = 1483228800; "
+						"BEGIN { " + "t = 1483228800; "
 								+ "print \"[\" strftime(\"%-d\", t, 1) \"][\" strftime(\"%_d\", t, 1) \"][\" strftime(\"%5d\", t, 1) \"]\"; "
 								+ "print \"[\" strftime(\"%^a\", t, 1) \"][\" strftime(\"%#p\", t, 1) \"][\" strftime(\"%_j\", t, 1) \"]\"; "
 								+ "print \"[\" strftime(\"%08Y\", t, 1) \"][\" strftime(\"%-e\", t, 1) \"][\" strftime(\"%3a\", t, 1) \"]\"; "
 								+ "print \"[\" strftime(\"%-5d\", t, 1) \"][\" strftime(\"%-5a\", t, 1) \"][\" strftime(\"%#a\", t, 1) \"]\"; "
-								+ "print \"[\" strftime(\"%20D\", t, 1) \"]\" "
-								+ "}")
+								+ "print \"[\" strftime(\"%20D\", t, 1) \"]\" " + "}")
 				.expectLines(
 						"[1][ 1][00001]",
 						"[SUN][am][  1]",
@@ -1102,14 +877,10 @@ public class GawkExtensionTest {
 		java.util.TimeZone original = java.util.TimeZone.getDefault();
 		try {
 			java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("America/New_York"));
-			AwkTestSupport
-					.awkTest("the DST hint selects the fall-back occurrence")
+			AwkTestSupport.awkTest("the DST hint selects the fall-back occurrence")
 					.script(
-							"BEGIN { "
-									+ "print mktime(\"2021 11 7 1 30 0\"); "
-									+ "print mktime(\"2021 11 7 1 30 0 1\"); "
-									+ "print mktime(\"2021 11 7 1 30 0 0\") "
-									+ "}")
+							"BEGIN { " + "print mktime(\"2021 11 7 1 30 0\"); " + "print mktime(\"2021 11 7 1 30 0 1\"); "
+									+ "print mktime(\"2021 11 7 1 30 0 0\") " + "}")
 					.expectLines("1636266600", "1636263000", "1636266600")
 					.runAndAssert();
 		} finally {
@@ -1124,16 +895,11 @@ public class GawkExtensionTest {
 		// Central today) the %z offset is the historical one while %Z uses
 		// the zone's current designation: the JDK's time zone data does not
 		// record historical designations.
-		AwkTestSupport
-				.awkTest("ENVIRON[\"TZ\"] selects the local time zone")
+		AwkTestSupport.awkTest("ENVIRON[\"TZ\"] selects the local time zone")
 				.script(
-						"BEGIN { "
-								+ "ENVIRON[\"TZ\"] = \"America/New_York\"; "
-								+ "print strftime(\"%z %Z\", 946684800); "
-								+ "print mktime(\"2000 1 1 0 0 0\"); "
-								+ "ENVIRON[\"TZ\"] = \"America/Indiana/Knox\"; "
-								+ "print \"[\" strftime(\"%z\", 946684800) \"]\" "
-								+ "}")
+						"BEGIN { " + "ENVIRON[\"TZ\"] = \"America/New_York\"; " + "print strftime(\"%z %Z\", 946684800); "
+								+ "print mktime(\"2000 1 1 0 0 0\"); " + "ENVIRON[\"TZ\"] = \"America/Indiana/Knox\"; "
+								+ "print \"[\" strftime(\"%z\", 946684800) \"]\" " + "}")
 				.expectLines("-0500 EST", "946702800", "[-0500]")
 				.runAndAssert();
 	}
@@ -1142,17 +908,11 @@ public class GawkExtensionTest {
 	public void patsplitAdvancesByCodePoints() throws Exception {
 		// zero-length matches must never step into the middle of a surrogate
 		// pair: one supplementary character yields two empty fields around it
-		AwkTestSupport
-				.awkTest("patsplit advances over supplementary characters atomically")
+		AwkTestSupport.awkTest("patsplit advances over supplementary characters atomically")
 				.script(
-						"BEGIN { "
-								+ "n = patsplit(\"😀\", f, \"^\", s); "
-								+ "line = n \":\"; "
-								+ "for (i = 1; i <= n; i++) line = line \"<\" f[i] \">\"; "
-								+ "line = line \";\"; "
-								+ "for (i = 0; i in s; i++) line = line \"<\" s[i] \">\"; "
-								+ "print line "
-								+ "}")
+						"BEGIN { " + "n = patsplit(\"😀\", f, \"^\", s); " + "line = n \":\"; "
+								+ "for (i = 1; i <= n; i++) line = line \"<\" f[i] \">\"; " + "line = line \";\"; "
+								+ "for (i = 0; i in s; i++) line = line \"<\" s[i] \">\"; " + "print line " + "}")
 				.expectLines("2:<><>;<><😀><>")
 				.runAndAssert();
 	}
@@ -1162,15 +922,10 @@ public class GawkExtensionTest {
 		// TZ values are resolved with Java's time zone rules: GMT+3 is Java's
 		// custom UTC+03:00 ID (not the sign-inverted POSIX reading), and
 		// unknown zones or POSIX rule strings fall back to GMT
-		AwkTestSupport
-				.awkTest("ENVIRON[\"TZ\"] resolves with Java zone IDs")
+		AwkTestSupport.awkTest("ENVIRON[\"TZ\"] resolves with Java zone IDs")
 				.script(
-						"BEGIN { "
-								+ "ENVIRON[\"TZ\"] = \"GMT+3\"; "
-								+ "print \"[\" strftime(\"%z\", 0) \"]\"; "
-								+ "ENVIRON[\"TZ\"] = \"Not/AZone\"; "
-								+ "print \"[\" strftime(\"%z\", 0) \"]\" "
-								+ "}")
+						"BEGIN { " + "ENVIRON[\"TZ\"] = \"GMT+3\"; " + "print \"[\" strftime(\"%z\", 0) \"]\"; "
+								+ "ENVIRON[\"TZ\"] = \"Not/AZone\"; " + "print \"[\" strftime(\"%z\", 0) \"]\" " + "}")
 				.expectLines("[+0300]", "[+0000]")
 				.runAndAssert();
 	}
@@ -1180,13 +935,8 @@ public class GawkExtensionTest {
 		// ambiguous fall-back wall times resolve to their standard-time
 		// occurrence, Java's calendar rule (a documented difference with
 		// gawk, whose choice follows the C library's internals)
-		AwkTestSupport
-				.awkTest("fall-back overlaps resolve to standard time")
-				.script(
-						"BEGIN { "
-								+ "ENVIRON[\"TZ\"] = \"Europe/Berlin\"; "
-								+ "print mktime(\"2021 10 31 2 30 0\") "
-								+ "}")
+		AwkTestSupport.awkTest("fall-back overlaps resolve to standard time")
+				.script("BEGIN { " + "ENVIRON[\"TZ\"] = \"Europe/Berlin\"; " + "print mktime(\"2021 10 31 2 30 0\") " + "}")
 				.expectLines("1635643800")
 				.runAndAssert();
 	}
@@ -1196,49 +946,36 @@ public class GawkExtensionTest {
 		// POSIX: an explicitly empty TZ selects UTC, distinct from an unset
 		// TZ, which keeps the JVM default zone; a DST hint has no effect in
 		// zones without daylight saving
-		AwkTestSupport
-				.awkTest("ENVIRON[\"TZ\"] = \"\" switches to UTC")
+		AwkTestSupport.awkTest("ENVIRON[\"TZ\"] = \"\" switches to UTC")
 				.script(
-						"BEGIN { "
-								+ "ENVIRON[\"TZ\"] = \"\"; "
-								+ "print strftime(\"%z %Z\", 0); "
-								+ "print mktime(\"2021 1 1 12 0 0 1\") - mktime(\"2021 1 1 12 0 0 0\") "
-								+ "}")
+						"BEGIN { " + "ENVIRON[\"TZ\"] = \"\"; " + "print strftime(\"%z %Z\", 0); "
+								+ "print mktime(\"2021 1 1 12 0 0 1\") - mktime(\"2021 1 1 12 0 0 0\") " + "}")
 				.expectLines("+0000 UTC", "0")
 				.runAndAssert();
 	}
 
 	@Test
 	public void gettextFunctionsRejectInvalidLocaleCategories() throws Exception {
-		AwkTestSupport
-				.awkTest("dcgettext rejects an invalid locale category")
+		AwkTestSupport.awkTest("dcgettext rejects an invalid locale category")
 				.script("BEGIN { dcgettext(\"x\", \"d\", \"BAD\") }")
 				.expectThrow(RuntimeException.class)
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("dcngettext rejects an invalid locale category")
+		AwkTestSupport.awkTest("dcngettext rejects an invalid locale category")
 				.script("BEGIN { dcngettext(\"a\", \"b\", 2, \"d\", \"BAD\") }")
 				.expectThrow(RuntimeException.class)
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("all gawk locale categories are accepted")
+		AwkTestSupport.awkTest("all gawk locale categories are accepted")
 				.script(
-						"BEGIN { "
-								+ "print dcgettext(\"x\", \"d\", \"LC_ALL\"), "
-								+ "dcgettext(\"x\", \"d\", \"LC_COLLATE\"), "
-								+ "dcgettext(\"x\", \"d\", \"LC_CTYPE\"), "
-								+ "dcgettext(\"x\", \"d\", \"LC_MONETARY\"), "
-								+ "dcgettext(\"x\", \"d\", \"LC_NUMERIC\"), "
-								+ "dcgettext(\"x\", \"d\", \"LC_TIME\") "
-								+ "}")
+						"BEGIN { " + "print dcgettext(\"x\", \"d\", \"LC_ALL\"), " + "dcgettext(\"x\", \"d\", \"LC_COLLATE\"), "
+								+ "dcgettext(\"x\", \"d\", \"LC_CTYPE\"), " + "dcgettext(\"x\", \"d\", \"LC_MONETARY\"), "
+								+ "dcgettext(\"x\", \"d\", \"LC_NUMERIC\"), " + "dcgettext(\"x\", \"d\", \"LC_TIME\") " + "}")
 				.expectLines("x x x x x x")
 				.runAndAssert();
 	}
 
 	@Test
 	public void strftimeDefaultFormatComesFromProcinfo() throws Exception {
-		AwkTestSupport
-				.awkTest("strftime() without arguments uses PROCINFO[\"strftime\"]")
+		AwkTestSupport.awkTest("strftime() without arguments uses PROCINFO[\"strftime\"]")
 				.script("BEGIN { PROCINFO[\"strftime\"] = \"fixed-format\"; print strftime() }")
 				.expectLines("fixed-format")
 				.runAndAssert();
@@ -1246,16 +983,13 @@ public class GawkExtensionTest {
 
 	@Test
 	public void strtonumConvertsNonDecimalStrings() throws Exception {
-		AwkTestSupport
-				.awkTest("strtonum understands hexadecimal and octal notation")
+		AwkTestSupport.awkTest("strtonum understands hexadecimal and octal notation")
 				.script(
-						"BEGIN { "
-								+ "print strtonum(\"0x13\"), strtonum(\"013\"), strtonum(\"13\"), strtonum(13); "
+						"BEGIN { " + "print strtonum(\"0x13\"), strtonum(\"013\"), strtonum(\"13\"), strtonum(13); "
 								+ "print strtonum(\"0x\"), strtonum(\"019\"), strtonum(\"0.5\"), strtonum(\"abc\"); "
 								+ "print strtonum(\"0xff\"), strtonum(\"0X1A\"), strtonum(\"017 \"); "
 								+ "print strtonum(\"011x\"), strtonum(\"077foo\"), strtonum(\"08x\"); "
-								+ "print strtonum(\"077foo.5\"), strtonum(\"011E2\") "
-								+ "}")
+								+ "print strtonum(\"077foo.5\"), strtonum(\"011E2\") " + "}")
 				.expectLines("19 11 13 13", "0 19 0.5 0", "255 26 15", "9 63 8", "63 1100")
 				.runAndAssert();
 	}
@@ -1265,8 +999,7 @@ public class GawkExtensionTest {
 		// gawk resolves numeric-looking strnums to plain numbers before
 		// looking at the base, so an input field "011" is decimal, while a
 		// script string constant "011" is octal (see the mixed case above)
-		AwkTestSupport
-				.awkTest("strtonum treats numeric strnum fields as decimal")
+		AwkTestSupport.awkTest("strtonum treats numeric strnum fields as decimal")
 				.script("{ print strtonum($1), strtonum($2) }")
 				.stdin("011 0x11\n")
 				.expectLines("11 17")
@@ -1279,26 +1012,18 @@ public class GawkExtensionTest {
 		// fields, and seps[0]..seps[n] frame every field. The quoted-field
 		// alternative comes first because Java regexps pick the first matching
 		// alternative, not the POSIX longest one.
-		AwkTestSupport
-				.awkTest("patsplit implements gawk's FPAT splitting rules")
+		AwkTestSupport.awkTest("patsplit implements gawk's FPAT splitting rules")
 				.script(
-						"function dump(n, f, s,    i, line) { "
-								+ "line = n \":\"; "
-								+ "for (i = 1; i <= n; i++) line = line \"<\" f[i] \">\"; "
-								+ "line = line \";\"; "
-								+ "for (i = 0; i in s; i++) line = line \"<\" s[i] \">\"; "
-								+ "print line "
-								+ "} "
-								+ "BEGIN { "
+						"function dump(n, f, s,    i, line) { " + "line = n \":\"; "
+								+ "for (i = 1; i <= n; i++) line = line \"<\" f[i] \">\"; " + "line = line \";\"; "
+								+ "for (i = 0; i in s; i++) line = line \"<\" s[i] \">\"; " + "print line " + "} " + "BEGIN { "
 								+ "csv = \"(\\\"[^\\\"]+\\\")|([^,]*)\"; "
 								+ "dump(patsplit(\"Robbins,,Arnold,\", f1, csv, s1), f1, s1); "
 								+ "dump(patsplit(\"Smith,,\\\"1234 A Pretty Place, NE\\\",Sometown,NY,12345-6789,USA\", f2, csv, s2), f2, s2); "
 								+ "dump(patsplit(\"bbbaaacccdddaaaaaqqqqa\", f3, \"aa+\", s3), f3, s3); "
 								+ "dump(patsplit(\"qqq\", f4, \"aa+\", s4), f4, s4); "
-								+ "dump(patsplit(\"\", f5, \"aa+\", s5), f5, s5); "
-								+ "dump(patsplit(\"abc\", f6, \"$\", s6), f6, s6); "
-								+ "dump(patsplit(\"abc\", f7, \"a+|$\", s7), f7, s7) "
-								+ "}")
+								+ "dump(patsplit(\"\", f5, \"aa+\", s5), f5, s5); " + "dump(patsplit(\"abc\", f6, \"$\", s6), f6, s6); "
+								+ "dump(patsplit(\"abc\", f7, \"a+|$\", s7), f7, s7) " + "}")
 				.expectLines(
 						"4:<Robbins><><Arnold><>;<><,><,><,><>",
 						"7:<Smith><><\"1234 A Pretty Place, NE\"><Sometown><NY><12345-6789><USA>;<><,><,><,><,><,><,><>",
@@ -1314,16 +1039,10 @@ public class GawkExtensionTest {
 
 	@Test
 	public void patsplitDefaultsToFpat() throws Exception {
-		AwkTestSupport
-				.awkTest("patsplit falls back to FPAT, then to non-whitespace runs")
+		AwkTestSupport.awkTest("patsplit falls back to FPAT, then to non-whitespace runs")
 				.script(
-						"BEGIN { "
-								+ "n = patsplit(\"  a  b \", f); "
-								+ "print n, f[1], f[2]; "
-								+ "FPAT = \"[0-9]+\"; "
-								+ "n = patsplit(\"a1b22c\", g); "
-								+ "print n, g[1], g[2] "
-								+ "}")
+						"BEGIN { " + "n = patsplit(\"  a  b \", f); " + "print n, f[1], f[2]; " + "FPAT = \"[0-9]+\"; "
+								+ "n = patsplit(\"a1b22c\", g); " + "print n, g[1], g[2] " + "}")
 				.expectLines("2 a b", "2 1 22")
 				.runAndAssert();
 	}
@@ -1332,13 +1051,11 @@ public class GawkExtensionTest {
 	public void patsplitRejectsEmptyFieldPatterns() throws Exception {
 		// gawk: an explicitly empty field pattern is fatal; only an unset
 		// FPAT stands in for gawk's built-in default
-		AwkTestSupport
-				.awkTest("an explicitly empty FPAT is a runtime error")
+		AwkTestSupport.awkTest("an explicitly empty FPAT is a runtime error")
 				.script("BEGIN { FPAT = \"\"; patsplit(\"a b\", f) }")
 				.expectThrow(RuntimeException.class)
 				.runAndAssert();
-		AwkTestSupport
-				.awkTest("an explicitly empty field pattern argument is a runtime error")
+		AwkTestSupport.awkTest("an explicitly empty field pattern argument is a runtime error")
 				.script("BEGIN { patsplit(\"a b\", f, \"\") }")
 				.expectThrow(RuntimeException.class)
 				.runAndAssert();
@@ -1347,8 +1064,7 @@ public class GawkExtensionTest {
 	@Test
 	public void patsplitRejectsAliasedDestinationArrays() throws Exception {
 		// gawk: fatal "cannot use the same array for second and fourth args"
-		AwkTestSupport
-				.awkTest("patsplit rejects the same array for fields and separators")
+		AwkTestSupport.awkTest("patsplit rejects the same array for fields and separators")
 				.script("BEGIN { patsplit(\"abc\", a, \"b\", a) }")
 				.expectThrow(RuntimeException.class)
 				.runAndAssert();
@@ -1356,14 +1072,10 @@ public class GawkExtensionTest {
 
 	@Test
 	public void patsplitHonorsIgnoreCase() throws Exception {
-		AwkTestSupport
-				.awkTest("IGNORECASE applies to patsplit field patterns")
+		AwkTestSupport.awkTest("IGNORECASE applies to patsplit field patterns")
 				.script(
-						"BEGIN { "
-								+ "print patsplit(\"xAx\", f, /a/); "
-								+ "IGNORECASE = 1; "
-								+ "print patsplit(\"xAx\", f, /a/), f[1] "
-								+ "}")
+						"BEGIN { " + "print patsplit(\"xAx\", f, /a/); " + "IGNORECASE = 1; "
+								+ "print patsplit(\"xAx\", f, /a/), f[1] " + "}")
 				.expectLines("0", "1 A")
 				.runAndAssert();
 	}
@@ -1373,8 +1085,7 @@ public class GawkExtensionTest {
 		// gawk allows whitespace between a built-in function name and its
 		// argument list; the extension keywords standing in for gawk builtins
 		// accept it too (gawk's own nlstringtest fixture relies on this)
-		AwkTestSupport
-				.awkTest("whitespace between extension keyword and arguments")
+		AwkTestSupport.awkTest("whitespace between extension keyword and arguments")
 				.script("BEGIN { print typeof (1), strtonum (\"0x10\") }")
 				.expectLines("number 16")
 				.runAndAssert();
@@ -1382,12 +1093,9 @@ public class GawkExtensionTest {
 
 	@Test
 	public void gettextFunctionsReturnUntranslatedText() throws Exception {
-		AwkTestSupport
-				.awkTest("dcgettext and dcngettext behave like gawk without catalogs")
+		AwkTestSupport.awkTest("dcgettext and dcngettext behave like gawk without catalogs")
 				.script(
-						"BEGIN { "
-								+ "print dcgettext(\"hello\"); "
-								+ "print dcgettext(\"hello\", \"dom\", \"LC_MESSAGES\"); "
+						"BEGIN { " + "print dcgettext(\"hello\"); " + "print dcgettext(\"hello\", \"dom\", \"LC_MESSAGES\"); "
 								+ "print dcngettext(\"one\", \"many\", 1), dcngettext(\"one\", \"many\", 2), dcngettext(\"one\", \"many\", 0) "
 								+ "}")
 				.expectLines("hello", "hello", "one many many")
@@ -1396,17 +1104,12 @@ public class GawkExtensionTest {
 
 	@Test
 	public void bindtextdomainTracksDirectoryBindings() throws Exception {
-		AwkTestSupport
-				.awkTest("bindtextdomain records and reports per-domain directories")
+		AwkTestSupport.awkTest("bindtextdomain records and reports per-domain directories")
 				.script(
-						"BEGIN { "
-								+ "print bindtextdomain(\"/opt/locale\", \"mydom\"); "
-								+ "print bindtextdomain(\"\", \"mydom\"); "
-								+ "print bindtextdomain(\"\"); "
-								+ "TEXTDOMAIN = \"mydom\"; "
-								+ "print bindtextdomain(\"\"); "
-								+ "print \"<\" bindtextdomain(\"/elsewhere\", \"\") \">\"; "
-								+ "print bindtextdomain(\"\", \"mydom\") "
+						"BEGIN { " + "print bindtextdomain(\"/opt/locale\", \"mydom\"); "
+								+ "print bindtextdomain(\"\", \"mydom\"); " + "print bindtextdomain(\"\"); "
+								+ "TEXTDOMAIN = \"mydom\"; " + "print bindtextdomain(\"\"); "
+								+ "print \"<\" bindtextdomain(\"/elsewhere\", \"\") \">\"; " + "print bindtextdomain(\"\", \"mydom\") "
 								+ "}")
 				.expectLines(
 						"/opt/locale",
@@ -1422,20 +1125,14 @@ public class GawkExtensionTest {
 
 	@Test
 	public void functabListsBuiltinAndExtensionFunctions() throws Exception {
-		AwkTestSupport
-				.awkTest("FUNCTAB lists standard built-ins and gawk extension functions")
+		AwkTestSupport.awkTest("FUNCTAB lists standard built-ins and gawk extension functions")
 				.script(
-						"BEGIN { "
-								+ "n = asorti(FUNCTAB, sorted); "
-								+ "line = \"\"; "
-								+ "for (i = 1; i <= n; i++) line = line (i > 1 ? \" \" : \"\") sorted[i]; "
-								+ "print line "
-								+ "}")
+						"BEGIN { " + "n = asorti(FUNCTAB, sorted); " + "line = \"\"; "
+								+ "for (i = 1; i <= n; i++) line = line (i > 1 ? \" \" : \"\") sorted[i]; " + "print line " + "}")
 				.expectLines(
 						"asort asorti atan2 bindtextdomain close cos dcgettext dcngettext exp gensub"
 								+ " gsub index int isarray length log match mkbool mktime patsplit rand sin"
-								+ " split sprintf sqrt srand strftime strtonum sub substr system systime"
-								+ " tolower toupper typeof")
+								+ " split sprintf sqrt srand strftime strtonum sub substr system systime" + " tolower toupper typeof")
 				.runAndAssert();
 	}
 
@@ -1443,14 +1140,10 @@ public class GawkExtensionTest {
 	public void asortiWritesIndicesAsStrings() throws Exception {
 		// gawk: the destination values of asorti() are strings even when the
 		// source index looks numeric
-		AwkTestSupport
-				.awkTest("asorti destination values are string-typed")
+		AwkTestSupport.awkTest("asorti destination values are string-typed")
 				.script(
-						"BEGIN { "
-								+ "a[1] = \"x\"; a[\"b\"] = \"y\"; "
-								+ "n = asorti(a, d); "
-								+ "for (i = 1; i <= n; i++) print d[i], typeof(d[i]) "
-								+ "}")
+						"BEGIN { " + "a[1] = \"x\"; a[\"b\"] = \"y\"; " + "n = asorti(a, d); "
+								+ "for (i = 1; i <= n; i++) print d[i], typeof(d[i]) " + "}")
 				.expectLines("1 string", "b string")
 				.runAndAssert();
 	}

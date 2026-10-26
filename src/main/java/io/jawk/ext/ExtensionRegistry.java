@@ -62,9 +62,7 @@ public final class ExtensionRegistry {
 	private static final ConcurrentMap<String, Registration> REGISTERED = new ConcurrentHashMap<String, Registration>();
 
 	static {
-		registerBuiltin(
-				GawkExtension::new,
-				"GNU Awk Compatibility");
+		registerBuiltin(GawkExtension::new, "GNU Awk Compatibility");
 	}
 
 	private ExtensionRegistry() {}

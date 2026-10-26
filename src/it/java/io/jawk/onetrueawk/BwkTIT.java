@@ -82,8 +82,7 @@ public class BwkTIT {
 			throw new IOException("Couldn't list files in " + scriptsDirectory);
 		}
 
-		return Arrays
-				.stream(scriptFiles)
+		return Arrays.stream(scriptFiles)
 				.filter(scriptFile -> scriptFile.getName().startsWith("t."))
 				.map(File::getName)
 				.sorted()
@@ -113,14 +112,12 @@ public class BwkTIT {
 		}
 
 		if ("t.in2".equals(awkName) || "t.intest2".equals(awkName)) {
-			String expectedResult = Files
-					.readAllLines(okPath, StandardCharsets.UTF_8)
+			String expectedResult = Files.readAllLines(okPath, StandardCharsets.UTF_8)
 					.stream()
 					.sorted()
 					.collect(Collectors.joining("\n"));
 
-			AwkTestSupport
-					.awkTest("BWK.t " + awkName)
+			AwkTestSupport.awkTest("BWK.t " + awkName)
 					.script(awkPath)
 					.operand(inputPath.toString())
 					.postProcessWith(output -> Arrays.stream(output.split("\\R")).sorted().collect(Collectors.joining("\n")))
@@ -129,8 +126,7 @@ public class BwkTIT {
 					.build()
 					.runAndAssert();
 		} else {
-			AwkTestSupport
-					.awkTest("BWK.t " + awkName)
+			AwkTestSupport.awkTest("BWK.t " + awkName)
 					.script(awkPath)
 					.operand(inputPath.toString())
 					.expectLines(okPath)

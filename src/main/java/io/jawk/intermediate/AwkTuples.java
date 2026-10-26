@@ -1767,14 +1767,7 @@ public class AwkTuples implements Serializable {
 			int numActualParams,
 			String sourceName,
 			int lineNumber) {
-		queue
-				.add(
-						new Tuple.IndirectCallTuple(
-								userFunctions,
-								extensionFunctions,
-								numActualParams,
-								sourceName,
-								lineNumber));
+		queue.add(new Tuple.IndirectCallTuple(userFunctions, extensionFunctions, numActualParams, sourceName, lineNumber));
 	}
 
 	/**
@@ -2344,9 +2337,7 @@ public class AwkTuples implements Serializable {
 						// opcode so $1, $2, etc. do not need a stack round trip for the
 						// field index.
 						long fieldIndex = JRT.toLong(literal);
-						Tuple replacement = createGetInputFieldConst(
-								fieldIndex,
-								tuple.getLineNumber());
+						Tuple replacement = createGetInputFieldConst(fieldIndex, tuple.getLineNumber());
 						optimizedQueue.add(replacement);
 						mapFoldedRange(indexMapping, oldIndex, 2, newIndex);
 						oldIndex += 2;
@@ -2355,9 +2346,7 @@ public class AwkTuples implements Serializable {
 						continue;
 					}
 				}
-				if ((oldIndex + 2) < originalSize
-						&& !isAddressTarget[oldIndex + 1]
-						&& !isAddressTarget[oldIndex + 2]) {
+				if ((oldIndex + 2) < originalSize && !isAddressTarget[oldIndex + 1] && !isAddressTarget[oldIndex + 2]) {
 					Tuple nextTuple = original.get(oldIndex + 1);
 					Tuple opTuple = original.get(oldIndex + 2);
 					Object secondLiteral = literalValue(nextTuple);
@@ -2501,7 +2490,8 @@ public class AwkTuples implements Serializable {
 				return null;
 			}
 			return JRT.compare2(left, right, opcode == Opcode.CMP_EQ ? 0 : opcode == Opcode.CMP_LT ? -1 : 1) ?
-					Long.valueOf(1L) : Long.valueOf(0L);
+					Long.valueOf(1L) :
+					Long.valueOf(0L);
 		case CONCAT:
 			if (left instanceof String && right instanceof String) {
 				return ((String) left) + ((String) right);
@@ -2608,11 +2598,7 @@ public class AwkTuples implements Serializable {
 		addressManager.remapIndexes(indexMapping);
 	}
 
-	private static void seedPropertyAddress(
-			Address address,
-			int size,
-			boolean[] reachable,
-			Deque<Integer> worklist) {
+	private static void seedPropertyAddress(Address address, int size, boolean[] reachable, Deque<Integer> worklist) {
 		if (address == null) {
 			return;
 		}
@@ -2674,11 +2660,7 @@ public class AwkTuples implements Serializable {
 			Tuple tuple = queue.get(i);
 			Address address = tuple.getAddress();
 			if (address != null) {
-				int resolvedTarget = resolveJumpEquivalentIndex(
-						address.index(),
-						size,
-						visitStamps,
-						nextVisitStamp++);
+				int resolvedTarget = resolveJumpEquivalentIndex(address.index(), size, visitStamps, nextVisitStamp++);
 				if (resolvedTarget >= 0 && resolvedTarget != address.index()) {
 					addressManager.reassignAddress(address, resolvedTarget);
 					modified = true;
@@ -2687,11 +2669,7 @@ public class AwkTuples implements Serializable {
 
 			switch (tuple.getOpcode()) {
 			case NOP: {
-				int redirectTarget = resolveJumpEquivalentIndex(
-						i + 1,
-						size,
-						visitStamps,
-						nextVisitStamp++);
+				int redirectTarget = resolveJumpEquivalentIndex(i + 1, size, visitStamps, nextVisitStamp++);
 				if (redirectTarget >= 0) {
 					remove[i] = true;
 					redirectTargets[i] = redirectTarget;
@@ -2700,16 +2678,8 @@ public class AwkTuples implements Serializable {
 				break;
 			}
 			case GOTO: {
-				int target = resolveJumpEquivalentIndex(
-						tuple.getAddress().index(),
-						size,
-						visitStamps,
-						nextVisitStamp++);
-				int fallthroughTarget = resolveJumpEquivalentIndex(
-						i + 1,
-						size,
-						visitStamps,
-						nextVisitStamp++);
+				int target = resolveJumpEquivalentIndex(tuple.getAddress().index(), size, visitStamps, nextVisitStamp++);
+				int fallthroughTarget = resolveJumpEquivalentIndex(i + 1, size, visitStamps, nextVisitStamp++);
 				if (target >= 0 && target == fallthroughTarget) {
 					remove[i] = true;
 					redirectTargets[i] = fallthroughTarget;

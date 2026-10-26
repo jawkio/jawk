@@ -40,8 +40,7 @@ public class SandboxedAVM extends AVM {
 	 * @param parameters Runtime settings to honor
 	 * @param extensionInstances Available extension implementations
 	 */
-	public SandboxedAVM(AwkSettings parameters,
-			Map<String, JawkExtension> extensionInstances) {
+	public SandboxedAVM(AwkSettings parameters, Map<String, JawkExtension> extensionInstances) {
 		this(parameters, extensionInstances, false);
 	}
 
@@ -53,10 +52,7 @@ public class SandboxedAVM extends AVM {
 	 * @param extensionInstances Available extension implementations
 	 * @param profilingEnabled Whether to collect profiling statistics
 	 */
-	public SandboxedAVM(
-			AwkSettings parameters,
-			Map<String, JawkExtension> extensionInstances,
-			boolean profilingEnabled) {
+	public SandboxedAVM(AwkSettings parameters, Map<String, JawkExtension> extensionInstances, boolean profilingEnabled) {
 		super(parameters, extensionInstances, profilingEnabled);
 	}
 

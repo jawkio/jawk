@@ -216,12 +216,8 @@ public class JRT {
 		private final Thread stdoutPump;
 		private final Thread stderrPump;
 
-		private ProcessOutputState(
-				Process processParam,
-				AwkSink sinkParam,
-				PrintStream processOutputParam,
-				Thread stdoutPumpParam,
-				Thread stderrPumpParam) {
+		private ProcessOutputState(Process processParam, AwkSink sinkParam, PrintStream processOutputParam,
+				Thread stdoutPumpParam, Thread stderrPumpParam) {
 			this.process = Objects.requireNonNull(processParam, "process");
 			this.sink = Objects.requireNonNull(sinkParam, "sink");
 			this.processOutput = Objects.requireNonNull(processOutputParam, "processOutput");
@@ -360,7 +356,8 @@ public class JRT {
 	 */
 	public void bindStandardInput(InputSource inputSource) {
 		this.standardInput = inputSource instanceof StreamInputSource ?
-				((StreamInputSource) inputSource).getDefaultInput() : System.in;
+				((StreamInputSource) inputSource).getDefaultInput() :
+				System.in;
 	}
 
 	/**
@@ -1054,8 +1051,7 @@ public class JRT {
 			return false;
 		}
 		int afterExponent = index + 1;
-		if (afterExponent < value.length()
-				&& (value.charAt(afterExponent) == '+' || value.charAt(afterExponent) == '-')) {
+		if (afterExponent < value.length() && (value.charAt(afterExponent) == '+' || value.charAt(afterExponent) == '-')) {
 			afterExponent++;
 		}
 		return afterExponent < value.length() && isAsciiDigit(value.charAt(afterExponent));
@@ -1072,9 +1068,7 @@ public class JRT {
 	public static long parseFieldNumber(Object obj) {
 		long num = toLong(obj);
 		if (num < 0) {
-			throw new AwkRuntimeException(
-					"Field $(" + obj.toString()
-							+ ") is incorrect.");
+			throw new AwkRuntimeException("Field $(" + obj.toString() + ") is incorrect.");
 		}
 		return num;
 	}
@@ -1139,13 +1133,7 @@ public class JRT {
 	 * @param locale the locale used to format numbers
 	 * @return a boolean
 	 */
-	private static boolean compare2(
-			Object o1,
-			Object o2,
-			int mode,
-			boolean ignoreCase,
-			String convfmt,
-			Locale locale) {
+	private static boolean compare2(Object o1, Object o2, int mode, boolean ignoreCase, String convfmt, Locale locale) {
 		if (o1 instanceof Number && o2 instanceof Number) {
 			if (isExactIntegral(o1) && isExactIntegral(o2)) {
 				// Compare exact 64-bit integers without the precision loss a
@@ -1383,8 +1371,7 @@ public class JRT {
 
 		if (index < length && (value.charAt(index) == 'e' || value.charAt(index) == 'E')) {
 			int afterExponent = index + 1;
-			if (afterExponent < length
-					&& (value.charAt(afterExponent) == '+' || value.charAt(afterExponent) == '-')) {
+			if (afterExponent < length && (value.charAt(afterExponent) == '+' || value.charAt(afterExponent) == '-')) {
 				afterExponent++;
 			}
 			int exponentDigits = afterExponent;
@@ -1972,9 +1959,7 @@ public class JRT {
 			caseInsensitivePatterns = new IdentityHashMap<Pattern, Pattern>();
 		}
 		return caseInsensitivePatterns
-				.computeIfAbsent(
-						pattern,
-						base -> Pattern.compile(base.pattern(), base.flags() | Pattern.CASE_INSENSITIVE));
+				.computeIfAbsent(pattern, base -> Pattern.compile(base.pattern(), base.flags() | Pattern.CASE_INSENSITIVE));
 	}
 
 	/**
@@ -2410,8 +2395,7 @@ public class JRT {
 	private void throwIfCurrentFileUnopened(StreamInputSource streamSource) {
 		String openError = streamSource.getCurrentFileOpenError();
 		if (openError != null) {
-			throw new AwkRuntimeException(
-					"cannot open file `" + toAwkString(getFILENAME()) + "' for reading: " + openError);
+			throw new AwkRuntimeException("cannot open file `" + toAwkString(getFILENAME()) + "' for reading: " + openError);
 		}
 	}
 
@@ -2451,8 +2435,7 @@ public class JRT {
 	 * @return {@code true} when the current input file could not be opened
 	 */
 	public boolean hasPendingInputFileError(InputSource source) {
-		return source instanceof StreamInputSource
-				&& ((StreamInputSource) source).getCurrentFileOpenError() != null;
+		return source instanceof StreamInputSource && ((StreamInputSource) source).getCurrentFileOpenError() != null;
 	}
 
 	/**
@@ -3072,8 +3055,7 @@ public class JRT {
 	 * @return {@code true} when the name designates the null device
 	 */
 	static boolean isNullDeviceName(String fileNameParam) {
-		return DEV_NULL.equals(fileNameParam)
-				|| (IS_WINDOWS && WINDOWS_NULL_DEVICE.equalsIgnoreCase(fileNameParam));
+		return DEV_NULL.equals(fileNameParam) || (IS_WINDOWS && WINDOWS_NULL_DEVICE.equalsIgnoreCase(fileNameParam));
 	}
 
 	/**
@@ -3227,8 +3209,7 @@ public class JRT {
 	 * @param values values supplied after the format string
 	 * @throws IOException if the sink cannot be written to
 	 */
-	public void printfToFile(String fileNameParam, boolean append, String format, Object[] values)
-			throws IOException {
+	public void printfToFile(String fileNameParam, boolean append, String format, Object[] values) throws IOException {
 		AwkSink sink = getFileAwkSink(fileNameParam, append);
 		sink.printf(ofs, ors, ofmt, convfmt, format, values);
 	}
@@ -3288,10 +3269,9 @@ public class JRT {
 		PartitioningReader pr = fileReaders.get(fileNameParam);
 		if (pr == null) {
 			InputStream inputStream = isStandardInputName(fileNameParam) ?
-					standardInput : new FileInputStream(toPlatformFileName(fileNameParam));
-			pr = new PartitioningReader(
-					new InputStreamReader(inputStream, StandardCharsets.UTF_8),
-					this.rs);
+					standardInput :
+					new FileInputStream(toPlatformFileName(fileNameParam));
+			pr = new PartitioningReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8), this.rs);
 			fileReaders.put(fileNameParam, pr);
 		}
 
@@ -3603,8 +3583,7 @@ public class JRT {
 		} catch (InterruptedException ie) {
 			Thread.currentThread().interrupt();
 			outputState.process.destroyForcibly();
-			throw new AwkRuntimeException(
-					"Caught exception while waiting for process exit: " + ie);
+			throw new AwkRuntimeException("Caught exception while waiting for process exit: " + ie);
 		} finally {
 			joinDataPump(outputState.stdoutPump);
 			joinDataPump(outputState.stderrPump);
@@ -3659,8 +3638,7 @@ public class JRT {
 			} catch (InterruptedException ie) {
 				Thread.currentThread().interrupt();
 				commandInput.process.destroyForcibly();
-				throw new AwkRuntimeException(
-						"Caught exception while waiting for process exit: " + ie);
+				throw new AwkRuntimeException("Caught exception while waiting for process exit: " + ie);
 			}
 			return true;
 		} catch (IOException ioe) {

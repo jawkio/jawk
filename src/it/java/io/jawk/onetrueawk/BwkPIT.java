@@ -80,8 +80,7 @@ public class BwkPIT {
 			throw new IOException("Couldn't list files in " + scriptsDirectory);
 		}
 
-		return Arrays
-				.stream(scriptFiles)
+		return Arrays.stream(scriptFiles)
 				.filter(scriptFile -> scriptFile.getName().startsWith("p."))
 				.map(File::getName)
 				.sorted()
@@ -103,8 +102,7 @@ public class BwkPIT {
 		Path okFilePath = bwkPDirectory.resolve("results/" + awkName + ".ok");
 		Path inputFilePath = bwkPDirectory.resolve("inputs/test.countries");
 
-		AwkTestSupport
-				.cliTest("BWK.p " + awkName)
+		AwkTestSupport.cliTest("BWK.p " + awkName)
 				.argument("-f", awkScriptPath.toString())
 				.operand(inputFilePath.toString())
 				.postProcessWith(output -> output.replace(inputFilePath.toString(), inputFilePath.getFileName().toString()))

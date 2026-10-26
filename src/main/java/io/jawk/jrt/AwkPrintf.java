@@ -309,8 +309,8 @@ public final class AwkPrintf {
 		 */
 		private final String parseError;
 
-		Segment(String literal, int argPosition, Flags flags, int widthKind, int width, int precisionKind,
-				int precision, char conversion, String parseError) {
+		Segment(String literal, int argPosition, Flags flags, int widthKind, int width, int precisionKind, int precision,
+				char conversion, String parseError) {
 			this.literal = literal;
 			this.argPosition = argPosition;
 			this.flags = flags;
@@ -420,12 +420,7 @@ public final class AwkPrintf {
 		if (digitsEnd > i && digitsEnd < length && format.charAt(digitsEnd) == '$') {
 			argPosition = parseInt(format, i, digitsEnd);
 			if (argPosition <= 0) {
-				emitError(
-						segments,
-						literal,
-						OPERAND_NONE,
-						0,
-						"argument index with `$' must be > 0 in `" + format + "'");
+				emitError(segments, literal, OPERAND_NONE, 0, "argument index with `$' must be > 0 in `" + format + "'");
 				return -1;
 			}
 			i = digitsEnd + 1;
@@ -559,16 +554,7 @@ public final class AwkPrintf {
 			emitVerbatim(
 					segments,
 					literal,
-					new Segment(
-							"%",
-							argPosition,
-							NO_FLAGS,
-							widthKind,
-							width,
-							precisionKind,
-							precision,
-							(char) 0,
-							null));
+					new Segment("%", argPosition, NO_FLAGS, widthKind, width, precisionKind, precision, (char) 0, null));
 			return i + 1;
 		}
 
@@ -599,18 +585,17 @@ public final class AwkPrintf {
 		i++;
 
 		flushLiteral(segments, literal);
-		segments
-				.add(
-						new Segment(
-								null,
-								argPosition,
-								new Flags(leftJustify, plusSign, spaceSign, zeroPad, alternate, grouping),
-								widthKind,
-								width,
-								precisionKind,
-								precision,
-								conversion,
-								null));
+		segments.add(
+				new Segment(
+						null,
+						argPosition,
+						new Flags(leftJustify, plusSign, spaceSign, zeroPad, alternate, grouping),
+						widthKind,
+						width,
+						precisionKind,
+						precision,
+						conversion,
+						null));
 		return i;
 	}
 
@@ -652,18 +637,7 @@ public final class AwkPrintf {
 	/** Emits the pending literal text run as a segment, if any. */
 	private static void flushLiteral(List<Segment> segments, StringBuilder literal) {
 		if (literal.length() > 0) {
-			segments
-					.add(
-							new Segment(
-									literal.toString(),
-									0,
-									NO_FLAGS,
-									OPERAND_NONE,
-									-1,
-									OPERAND_NONE,
-									-1,
-									(char) 0,
-									null));
+			segments.add(new Segment(literal.toString(), 0, NO_FLAGS, OPERAND_NONE, -1, OPERAND_NONE, -1, (char) 0, null));
 			literal.setLength(0);
 		}
 	}
@@ -817,8 +791,7 @@ public final class AwkPrintf {
 			}
 			if (position > args.length) {
 				throw new AwkRuntimeException(
-						"argument index " + position + " greater than total number of supplied arguments in `"
-								+ format + "'");
+						"argument index " + position + " greater than total number of supplied arguments in `" + format + "'");
 			}
 		}
 

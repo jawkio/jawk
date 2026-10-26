@@ -29,8 +29,7 @@ public class DynamicFieldTest {
 
 	@Test
 	public void testEmptyStringFieldIndex() throws Exception {
-		AwkTestSupport
-				.awkTest("DynamicFieldTest empty string field index")
+		AwkTestSupport.awkTest("DynamicFieldTest empty string field index")
 				.script("BEGIN{idx=\"\"}{print $(idx)}")
 				.stdin("a b c")
 				.expectLines("a b c")
@@ -39,8 +38,7 @@ public class DynamicFieldTest {
 
 	@Test
 	public void testNonNumericFieldIndex() throws Exception {
-		AwkTestSupport
-				.awkTest("DynamicFieldTest non numeric field index")
+		AwkTestSupport.awkTest("DynamicFieldTest non numeric field index")
 				.script("BEGIN{idx=\"foo\"}{print $(idx)}")
 				.stdin("a b")
 				.expectLines("a b")
@@ -49,8 +47,7 @@ public class DynamicFieldTest {
 
 	@Test
 	public void testUninitializedVariableFieldIndex() throws Exception {
-		AwkTestSupport
-				.awkTest("DynamicFieldTest uninitialized variable field index")
+		AwkTestSupport.awkTest("DynamicFieldTest uninitialized variable field index")
 				.script("{print $(idx)}")
 				.stdin("a b")
 				.expectLines("a b")
@@ -59,8 +56,7 @@ public class DynamicFieldTest {
 
 	@Test
 	public void testNumericStringFieldIndex() throws Exception {
-		AwkTestSupport
-				.awkTest("DynamicFieldTest numeric string field index")
+		AwkTestSupport.awkTest("DynamicFieldTest numeric string field index")
 				.script("BEGIN{idx=\"2\"}{print $(idx)}")
 				.stdin("a b c")
 				.expectLines("b")
@@ -69,8 +65,7 @@ public class DynamicFieldTest {
 
 	@Test
 	public void testFloatStringFieldIndex() throws Exception {
-		AwkTestSupport
-				.awkTest("DynamicFieldTest float string field index")
+		AwkTestSupport.awkTest("DynamicFieldTest float string field index")
 				.script("BEGIN{idx=\"2.7\"}{print $(idx)}")
 				.stdin("a b c")
 				.expectLines("b")
@@ -79,8 +74,7 @@ public class DynamicFieldTest {
 
 	@Test
 	public void testFloatVariableFieldIndex() throws Exception {
-		AwkTestSupport
-				.awkTest("DynamicFieldTest float variable field index")
+		AwkTestSupport.awkTest("DynamicFieldTest float variable field index")
 				.script("BEGIN{idx=2.3}{print $(idx)}")
 				.stdin("a b c")
 				.expectLines("b")
@@ -89,8 +83,7 @@ public class DynamicFieldTest {
 
 	@Test
 	public void testExponentStringFieldIndex() throws Exception {
-		AwkTestSupport
-				.awkTest("DynamicFieldTest exponent string field index")
+		AwkTestSupport.awkTest("DynamicFieldTest exponent string field index")
 				.script("BEGIN{idx=\"3e0\"}{print $(idx)}")
 				.stdin("1 2 3 4")
 				.expectLines("3")
@@ -99,8 +92,7 @@ public class DynamicFieldTest {
 
 	@Test
 	public void testNegativeFieldIndex() throws Exception {
-		AwkTestSupport
-				.awkTest("DynamicFieldTest negative field index")
+		AwkTestSupport.awkTest("DynamicFieldTest negative field index")
 				.script("BEGIN{idx=-1}{print $(idx)}")
 				.stdin("a b")
 				.expectThrow(AwkRuntimeException.class)

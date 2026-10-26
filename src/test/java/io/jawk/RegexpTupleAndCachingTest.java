@@ -46,28 +46,18 @@ public class RegexpTupleAndCachingTest {
 	public void literalRegexpEmitsPrecompiledPattern() throws Exception {
 		String script = "BEGIN { print (\"abc\" ~ /a.c/) }\n";
 
-		AwkTestSupport
-				.awkTest("literal regex matches and is precompiled")
-				.script(script)
-				.expect("1\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("literal regex matches and is precompiled").script(script).expect("1\n").runAndAssert();
 
 		AwkProgram program = new Awk().compile(script);
 		String dump = dumpTuples(program);
-		assertTrue(
-				"Tuple dump should include precompiled pattern",
-				dump.contains("REGEXP, \"a.c\", /a.c/"));
+		assertTrue("Tuple dump should include precompiled pattern", dump.contains("REGEXP, \"a.c\", /a.c/"));
 	}
 
 	@Test
 	public void variableRegexpCompilesAtRuntime() throws Exception {
 		String script = "BEGIN { r = \"a.c\"; print (\"abc\" ~ r) }\n";
 
-		AwkTestSupport
-				.awkTest("variable regex compiles dynamically")
-				.script(script)
-				.expect("1\n")
-				.runAndAssert();
+		AwkTestSupport.awkTest("variable regex compiles dynamically").script(script).expect("1\n").runAndAssert();
 
 		AwkProgram program = new Awk().compile(script);
 		String dump = dumpTuples(program);
@@ -76,8 +66,7 @@ public class RegexpTupleAndCachingTest {
 
 	@Test
 	public void standardRegexpConstantExpressionMatchesCurrentRecord() throws Exception {
-		AwkTestSupport
-				.awkTest("standard regexp expression evaluates as $0 match")
+		AwkTestSupport.awkTest("standard regexp expression evaluates as $0 match")
 				.script("{ assigned = /to/; print assigned; if (/zz/ || /to/) print \"logic\"; else print \"miss\" }")
 				.stdin("toto\nmimi\n")
 				.expectLines("1", "logic", "0", "miss")
@@ -86,8 +75,7 @@ public class RegexpTupleAndCachingTest {
 
 	@Test
 	public void regexpRightHandSideOfMatchOperatorRemainsRegexp() throws Exception {
-		AwkTestSupport
-				.awkTest("regexp is raw on RHS of match operators")
+		AwkTestSupport.awkTest("regexp is raw on RHS of match operators")
 				.script("{ print ($1 ~ /to/); print (/to/ ~ \"1\"); print (/xx/ ~ \"0\") }")
 				.stdin("toto\n")
 				.expectLines("1", "1", "1")
@@ -96,22 +84,17 @@ public class RegexpTupleAndCachingTest {
 
 	@Test
 	public void builtinRegexpArgumentsRemainRegexpConstants() throws Exception {
-		AwkTestSupport
-				.awkTest("regexp constants stay raw in builtin regex parameters")
+		AwkTestSupport.awkTest("regexp constants stay raw in builtin regex parameters")
 				.script(
-						"BEGIN { "
-								+ "print match(\"toto\", /to/); "
-								+ "s = \"toto\"; print sub(/to/, \"XX\", s), s; "
-								+ "print split(\"a:b:c\", a, /:/), a[2] "
-								+ "}")
+						"BEGIN { " + "print match(\"toto\", /to/); " + "s = \"toto\"; print sub(/to/, \"XX\", s), s; "
+								+ "print split(\"a:b:c\", a, /:/), a[2] " + "}")
 				.expectLines("1", "1 XXto", "3 b")
 				.runAndAssert();
 	}
 
 	@Test
 	public void gensubRegexpArgumentRemainsRegexpConstant() throws Exception {
-		AwkTestSupport
-				.awkTest("gensub first argument keeps regexp literal")
+		AwkTestSupport.awkTest("gensub first argument keeps regexp literal")
 				.script("BEGIN { print gensub(/to/, \"XX\", 1, \"toto\") }")
 				.expectLines("XXto")
 				.runAndAssert();
@@ -119,8 +102,7 @@ public class RegexpTupleAndCachingTest {
 
 	@Test
 	public void threeArgumentGensubUsesCurrentRecordAsTarget() throws Exception {
-		AwkTestSupport
-				.awkTest("three argument gensub uses current record")
+		AwkTestSupport.awkTest("three argument gensub uses current record")
 				.script("{ print gensub(/to/, \"XX\", 1) }")
 				.stdin("toto\n")
 				.expectLines("XXto")
@@ -129,8 +111,7 @@ public class RegexpTupleAndCachingTest {
 
 	@Test
 	public void userFunctionRegexpArgumentReceivesBooleanMatchValue() throws Exception {
-		AwkTestSupport
-				.awkTest("user function regexp argument receives boolean match value")
+		AwkTestSupport.awkTest("user function regexp argument receives boolean match value")
 				.script("function f(x) { print x } { f(/to/) }")
 				.stdin("toto\nmimi\n")
 				.expectLines("1", "0")
@@ -152,8 +133,7 @@ public class RegexpTupleAndCachingTest {
 		settings.setDefaultRS("\n");
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 
-		new Awk(settings)
-				.script(cli.getPrecompiledProgram())
+		new Awk(settings).script(cli.getPrecompiledProgram())
 				.variable("ORS", "\n")
 				.input(new ByteArrayInputStream(new byte[0]))
 				.execute(out);

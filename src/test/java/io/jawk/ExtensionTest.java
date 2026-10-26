@@ -47,8 +47,7 @@ public class ExtensionTest {
 	 */
 	@Test
 	public void testExtension() throws Exception {
-		AwkTestSupport
-				.awkTest("extension invocation")
+		AwkTestSupport.awkTest("extension invocation")
 				.script("BEGIN { ab[1] = \"a\"; ab[2] = \"b\"; printf myExtensionFunction(3, ab) }")
 				.withExtensions(new TestExtension())
 				.expect("ababab")
@@ -57,11 +56,9 @@ public class ExtensionTest {
 
 	@Test
 	public void testIndirectExtension() throws Exception {
-		AwkTestSupport
-				.awkTest("indirect extension invocation")
+		AwkTestSupport.awkTest("indirect extension invocation")
 				.script(
-						"BEGIN { ab[1] = \"a\"; ab[2] = \"b\"; "
-								+ "callback = \"myExtensionFunction\"; print @callback(2, ab) }")
+						"BEGIN { ab[1] = \"a\"; ab[2] = \"b\"; " + "callback = \"myExtensionFunction\"; print @callback(2, ab) }")
 				.withExtensions(new TestExtension())
 				.expectLines("abab")
 				.runAndAssert();
@@ -69,8 +66,7 @@ public class ExtensionTest {
 
 	@Test
 	public void testAnnotatedExtensionArgumentValidation() throws Exception {
-		AwkTestSupport
-				.awkTest("annotated extension argument validation")
+		AwkTestSupport.awkTest("annotated extension argument validation")
 				.script("BEGIN { myExtensionFunction() }")
 				.withExtensions(new TestExtension())
 				.expectThrow(IllegalAwkArgumentException.class)
@@ -79,8 +75,7 @@ public class ExtensionTest {
 
 	@Test
 	public void testVarArgAssocArrayInvocation() throws Exception {
-		AwkTestSupport
-				.awkTest("var arg assoc array invocation")
+		AwkTestSupport.awkTest("var arg assoc array invocation")
 				.script("BEGIN { first[1] = 1; second[1] = 2; print varArgAssoc(first, second) }")
 				.withExtensions(new TestExtension())
 				.expectLines("2")
@@ -89,8 +84,7 @@ public class ExtensionTest {
 
 	@Test
 	public void testVarArgAssocArraySemanticValidation() throws Exception {
-		TestResult result = AwkTestSupport
-				.awkTest("var arg assoc array semantic validation")
+		TestResult result = AwkTestSupport.awkTest("var arg assoc array semantic validation")
 				.script("BEGIN { array[1] = 1; scalar = 1; print varArgAssoc(array, scalar) }")
 				.withExtensions(new TestExtension())
 				.expectThrow(RuntimeException.class)
@@ -101,8 +95,7 @@ public class ExtensionTest {
 
 	@Test
 	public void testVarArgAssocArrayRuntimeValidation() throws Exception {
-		TestResult result = AwkTestSupport
-				.awkTest("var arg assoc array runtime validation")
+		TestResult result = AwkTestSupport.awkTest("var arg assoc array runtime validation")
 				.script("BEGIN { array[1] = 1; print varArgAssoc(array, 1) }")
 				.withExtensions(new TestExtension())
 				.expectThrow(RuntimeException.class)

@@ -97,7 +97,8 @@ public final class ExtensionFunction implements Serializable {
 		this.assocArrayParameters = inspectParameters(methodParam, methodParam.getParameters());
 		int optionalCount = scanOptionalParameterCount(methodParam, methodParam.getParameters());
 		this.mandatoryParameterCount = varArgs ?
-				assocArrayParameters.length - 1 : assocArrayParameters.length - optionalCount;
+				assocArrayParameters.length - 1 :
+				assocArrayParameters.length - optionalCount;
 		this.varArgAssocArray = varArgs && assocArrayParameters[assocArrayParameters.length - 1];
 		computeAnnotationMetadata(methodParam);
 	}
@@ -130,14 +131,14 @@ public final class ExtensionFunction implements Serializable {
 			if (parameter.isAnnotationPresent(JawkOptional.class)) {
 				if (methodParam.isVarArgs()) {
 					throw new IllegalStateException(
-							"@" + JawkOptional.class.getSimpleName()
-									+ " cannot be combined with varargs: " + methodParam.toGenericString());
+							"@" + JawkOptional.class.getSimpleName() + " cannot be combined with varargs: "
+									+ methodParam.toGenericString());
 				}
 				optionalCount++;
 			} else if (optionalCount > 0) {
 				throw new IllegalStateException(
-						"@" + JawkOptional.class.getSimpleName()
-								+ " parameters must be trailing: " + methodParam.toGenericString());
+						"@" + JawkOptional.class.getSimpleName() + " parameters must be trailing: "
+								+ methodParam.toGenericString());
 			}
 		}
 		return optionalCount;
@@ -147,8 +148,7 @@ public final class ExtensionFunction implements Serializable {
 		Objects.requireNonNull(method, "method");
 		if (keyword == null || keyword.trim().isEmpty()) {
 			throw new IllegalStateException(
-					"@" + JawkFunction.class.getSimpleName()
-							+ " on " + method + " must declare a non-empty name");
+					"@" + JawkFunction.class.getSimpleName() + " on " + method + " must declare a non-empty name");
 		}
 		return keyword;
 	}
@@ -157,9 +157,8 @@ public final class ExtensionFunction implements Serializable {
 		Class<?> declaringClass = method.getDeclaringClass();
 		if (!AbstractExtension.class.isAssignableFrom(declaringClass)) {
 			throw new IllegalStateException(
-					"@" + JawkFunction.class.getSimpleName()
-							+ " must be declared on a subclass of " + AbstractExtension.class.getName()
-							+ ": " + method);
+					"@" + JawkFunction.class.getSimpleName() + " must be declared on a subclass of "
+							+ AbstractExtension.class.getName() + ": " + method);
 		}
 		@SuppressWarnings("unchecked")
 		Class<? extends AbstractExtension> type = (Class<? extends AbstractExtension>) declaringClass;
@@ -169,8 +168,7 @@ public final class ExtensionFunction implements Serializable {
 	private static Method prepareMethod(Method method) {
 		if (java.lang.reflect.Modifier.isStatic(method.getModifiers())) {
 			throw new IllegalStateException(
-					"@" + JawkFunction.class.getSimpleName()
-							+ " does not support static methods: " + method.toGenericString());
+					"@" + JawkFunction.class.getSimpleName() + " does not support static methods: " + method.toGenericString());
 		}
 		method.setAccessible(true);
 		return method;
@@ -194,8 +192,7 @@ public final class ExtensionFunction implements Serializable {
 			}
 			if (parameter.isVarArgs() || parameter.getType() != Object.class) {
 				throw new IllegalStateException(
-						"Parameter " + idx + " of " + methodParam
-								+ " annotated with @" + annotationType.getSimpleName()
+						"Parameter " + idx + " of " + methodParam + " annotated with @" + annotationType.getSimpleName()
 								+ " must be a non-vararg " + Object.class.getName());
 			}
 			indexes[count++] = idx;
@@ -242,13 +239,10 @@ public final class ExtensionFunction implements Serializable {
 				if (parameter.isVarArgs()) {
 					parameterType = parameterType.getComponentType();
 				}
-				if (!Map.class.isAssignableFrom(parameterType)
-						|| !parameterType.isAssignableFrom(AssocArray.class)) {
+				if (!Map.class.isAssignableFrom(parameterType) || !parameterType.isAssignableFrom(AssocArray.class)) {
 					throw new IllegalStateException(
-							"Parameter " + idx + " of " + methodParam
-									+ " annotated with @" + JawkAssocArray.class.getSimpleName()
-									+ " must accept " + AssocArray.class.getName()
-									+ " instances via " + Map.class.getName());
+							"Parameter " + idx + " of " + methodParam + " annotated with @" + JawkAssocArray.class.getSimpleName()
+									+ " must accept " + AssocArray.class.getName() + " instances via " + Map.class.getName());
 				}
 				assoc[idx] = true;
 			}
@@ -271,8 +265,7 @@ public final class ExtensionFunction implements Serializable {
 			computeAnnotationMetadata(resolved);
 		} catch (NoSuchMethodException ex) {
 			throw new IllegalStateException(
-					"Unable to rehydrate extension method '" + methodName
-							+ "' on type " + declaringType.getName(),
+					"Unable to rehydrate extension method '" + methodName + "' on type " + declaringType.getName(),
 					ex);
 		}
 	}
@@ -399,8 +392,7 @@ public final class ExtensionFunction implements Serializable {
 		Objects.requireNonNull(target, "target");
 		if (!declaringType.isInstance(target)) {
 			throw new IllegalArgumentException(
-					"Extension instance " + target.getClass().getName()
-							+ " is not compatible with " + declaringType.getName());
+					"Extension instance " + target.getClass().getName() + " is not compatible with " + declaringType.getName());
 		}
 		int argCount = args == null ? 0 : args.length;
 		verifyArgCount(argCount);
@@ -409,9 +401,7 @@ public final class ExtensionFunction implements Serializable {
 		try {
 			return method.invoke(target, invocationArgs);
 		} catch (IllegalAccessException ex) {
-			throw new IllegalStateException(
-					"Unable to access extension function method for keyword '" + keyword + "'",
-					ex);
+			throw new IllegalStateException("Unable to access extension function method for keyword '" + keyword + "'", ex);
 		} catch (InvocationTargetException ex) {
 			Throwable cause = ex.getCause();
 			if (cause instanceof RuntimeException) {
@@ -420,9 +410,7 @@ public final class ExtensionFunction implements Serializable {
 			if (cause instanceof Error) {
 				throw (Error) cause;
 			}
-			throw new IllegalStateException(
-					"Invocation of extension function '" + keyword + "' failed",
-					cause);
+			throw new IllegalStateException("Invocation of extension function '" + keyword + "' failed", cause);
 		}
 	}
 
@@ -465,17 +453,16 @@ public final class ExtensionFunction implements Serializable {
 			int maxCount = parameterTypes.length;
 			if (argCount < mandatoryParameterCount || argCount > maxCount) {
 				String expected = mandatoryParameterCount == maxCount ?
-						String.valueOf(maxCount) : mandatoryParameterCount + " to " + maxCount;
+						String.valueOf(maxCount) :
+						mandatoryParameterCount + " to " + maxCount;
 				throw new IllegalAwkArgumentException(
-						"Extension function '" + keyword + "' expects " + expected
-								+ " argument(s), not " + argCount);
+						"Extension function '" + keyword + "' expects " + expected + " argument(s), not " + argCount);
 			}
 			return;
 		}
 		if (argCount < mandatoryParameterCount) {
 			throw new IllegalAwkArgumentException(
-					"Extension function '" + keyword + "' expects " + getArity()
-							+ " argument(s), not " + argCount);
+					"Extension function '" + keyword + "' expects " + getArity() + " argument(s), not " + argCount);
 		}
 	}
 
@@ -500,8 +487,7 @@ public final class ExtensionFunction implements Serializable {
 	private void requireAssocArray(int idx, Object arg) {
 		if (!(arg instanceof Map)) {
 			throw new IllegalAwkArgumentException(
-					"Argument " + idx + " passed to extension function '" + keyword
-							+ "' must be an associative array");
+					"Argument " + idx + " passed to extension function '" + keyword + "' must be an associative array");
 		}
 	}
 }

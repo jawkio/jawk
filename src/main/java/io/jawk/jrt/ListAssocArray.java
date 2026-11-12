@@ -24,9 +24,11 @@ package io.jawk.jrt;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 
 /**
  * An AWK associative array materialized from a Java {@link List}.
@@ -40,7 +42,8 @@ import java.util.Set;
  * This class also owns normalization of nested Java containers supplied from
  * embedding APIs. Java {@link Map} instances remain map-backed for performance,
  * while nested {@link List} instances are replaced by materialized
- * {@link AssocArray} instances. Recursive object graphs are guarded with an
+ * {@link AssocArray} instances and String leaves can be converted to input
+ * scalars (numeric strings). Recursive object graphs are guarded with an
  * identity-based recursion stack so self-referencing maps or lists do not cause
  * infinite conversion.
  * </p>
@@ -57,7 +60,7 @@ public final class ListAssocArray extends HashAssocArray {
 	 * @param values list values to expose as an AWK array
 	 */
 	public ListAssocArray(List<?> values) {
-		populateFromList(this, values, false, newActiveContainers());
+		populateFromList(this, values, false, UnaryOperator.identity(), newActiveContainers());
 	}
 
 	/**
@@ -76,9 +79,7 @@ public final class ListAssocArray extends HashAssocArray {
 	 *         {@link Long} keys
 	 */
 	static AssocArray createFromList(List<?> values, boolean sortedArrayKeys) {
-		AssocArray array = sortedArrayKeys ? AssocArray.createSorted() : new ListAssocArray();
-		populateFromList(array, values, sortedArrayKeys, newActiveContainers());
-		return array;
+		return createFromList(values, sortedArrayKeys, UnaryOperator.identity(), newActiveContainers());
 	}
 
 	/**
@@ -86,16 +87,19 @@ public final class ListAssocArray extends HashAssocArray {
 	 * <p>
 	 * Lists are materialized as AWK arrays. Maps are kept as the original map
 	 * instance for the existing no-copy fast path, but their values are scanned so
-	 * nested lists can be materialized too.
+	 * nested lists can be materialized and String leaves converted too. A map
+	 * that rejects these updates (read-only or type-checked) is copied instead.
 	 * </p>
 	 *
 	 * @param value value to normalize
 	 * @param sortedArrayKeys {@code true} when materialized lists should use
 	 *        sorted AWK array keys
+	 * @param stringConverter conversion applied to every {@link String} found
+	 *        inside a list or map, at any depth
 	 * @return the normalized value
 	 */
-	static Object normalizeValue(Object value, boolean sortedArrayKeys) {
-		return normalizeValue(value, sortedArrayKeys, newActiveContainers());
+	static Object normalizeValue(Object value, boolean sortedArrayKeys, UnaryOperator<Object> stringConverter) {
+		return normalizeValue(value, sortedArrayKeys, stringConverter, newActiveContainers());
 	}
 
 	/**
@@ -104,16 +108,26 @@ public final class ListAssocArray extends HashAssocArray {
 	 * @param value value to normalize
 	 * @param sortedArrayKeys {@code true} when materialized lists should use
 	 *        sorted AWK array keys
+	 * @param stringConverter conversion applied to {@link String} values
 	 * @param activeContainers identity-based set of maps/lists currently being
 	 *        traversed; used only as a recursion stack to break cycles
 	 * @return the normalized value
 	 */
-	private static Object normalizeValue(Object value, boolean sortedArrayKeys, Set<Object> activeContainers) {
+	private static Object normalizeValue(
+			Object value,
+			boolean sortedArrayKeys,
+			UnaryOperator<Object> stringConverter,
+			Set<Object> activeContainers) {
 		if (value instanceof List) {
-			return createFromList((List<?>) value, sortedArrayKeys, activeContainers);
+			return createFromList((List<?>) value, sortedArrayKeys, stringConverter, activeContainers);
 		}
 		if (value instanceof Map) {
-			normalizeMapValues(value, sortedArrayKeys, activeContainers);
+			@SuppressWarnings("unchecked")
+			Map<Object, Object> map = (Map<Object, Object>) value;
+			return normalizeMapValues(map, sortedArrayKeys, stringConverter, activeContainers);
+		}
+		if (value instanceof String) {
+			return stringConverter.apply(value);
 		}
 		return value;
 	}
@@ -124,14 +138,19 @@ public final class ListAssocArray extends HashAssocArray {
 	 *
 	 * @param values list values to expose as an AWK array
 	 * @param sortedArrayKeys {@code true} to use sorted AWK array keys
+	 * @param stringConverter conversion applied to {@link String} values
 	 * @param activeContainers identity-based set of maps/lists currently being
 	 *        traversed
 	 * @return an AWK associative array containing the list values, or an empty
 	 *         array when a recursive reference to the same list is detected
 	 */
-	private static AssocArray createFromList(List<?> values, boolean sortedArrayKeys, Set<Object> activeContainers) {
+	private static AssocArray createFromList(
+			List<?> values,
+			boolean sortedArrayKeys,
+			UnaryOperator<Object> stringConverter,
+			Set<Object> activeContainers) {
 		AssocArray array = sortedArrayKeys ? AssocArray.createSorted() : new ListAssocArray();
-		populateFromList(array, values, sortedArrayKeys, activeContainers);
+		populateFromList(array, values, sortedArrayKeys, stringConverter, activeContainers);
 		return array;
 	}
 
@@ -149,12 +168,14 @@ public final class ListAssocArray extends HashAssocArray {
 	 * @param values list values to copy; {@code null} leaves {@code target} empty
 	 * @param sortedArrayKeys {@code true} when nested lists should use sorted AWK
 	 *        array keys
+	 * @param stringConverter conversion applied to {@link String} values
 	 * @param activeContainers identity-based recursion stack for maps/lists
 	 */
 	private static void populateFromList(
 			AssocArray target,
 			List<?> values,
 			boolean sortedArrayKeys,
+			UnaryOperator<Object> stringConverter,
 			Set<Object> activeContainers) {
 		if (values == null || !activeContainers.add(values)) {
 			return;
@@ -162,7 +183,7 @@ public final class ListAssocArray extends HashAssocArray {
 		try {
 			long index = 0L;
 			for (Object listValue : values) {
-				target.put(Long.valueOf(index), normalizeValue(listValue, sortedArrayKeys, activeContainers));
+				target.put(Long.valueOf(index), normalizeValue(listValue, sortedArrayKeys, stringConverter, activeContainers));
 				index++;
 			}
 		} finally {
@@ -171,42 +192,49 @@ public final class ListAssocArray extends HashAssocArray {
 	}
 
 	/**
-	 * Converts nested lists inside a Java map while preserving the map instance
-	 * itself.
+	 * Converts nested lists and String values inside a Java map while preserving
+	 * the map instance itself when possible.
 	 * <p>
 	 * Preserving the map keeps direct map insertion and retrieval fast in the AVM.
-	 * Only map values that actually change, normally nested lists, are written
-	 * back. The map is removed from {@code activeContainers} in {@code finally}
-	 * so another branch can still normalize the same shared map later.
+	 * Only map values that actually change, nested lists and converted Strings,
+	 * are written back. A map that rejects the write (read-only or type-checked)
+	 * is copied into a {@link LinkedHashMap}, which is normalized and returned
+	 * instead, leaving the caller's map untouched. The map is removed from
+	 * {@code activeContainers} in {@code finally} so another branch can still
+	 * normalize the same shared map later.
 	 * </p>
 	 *
-	 * @param value map value to normalize in place
+	 * @param map map value to normalize in place
 	 * @param sortedArrayKeys {@code true} when materialized lists should use
 	 *        sorted AWK array keys
+	 * @param stringConverter conversion applied to {@link String} values
 	 * @param activeContainers identity-based recursion stack for maps/lists
+	 * @return {@code map} itself, or its normalized copy when {@code map}
+	 *         rejected an update
 	 */
-	private static void normalizeMapValues(Object value, boolean sortedArrayKeys, Set<Object> activeContainers) {
-		if (!activeContainers.add(value)) {
-			return;
+	private static Map<Object, Object> normalizeMapValues(
+			Map<Object, Object> map,
+			boolean sortedArrayKeys,
+			UnaryOperator<Object> stringConverter,
+			Set<Object> activeContainers) {
+		if (!activeContainers.add(map)) {
+			return map;
 		}
-		@SuppressWarnings("unchecked")
-		Map<Object, Object> map = (Map<Object, Object>) value;
 		try {
 			for (Map.Entry<Object, Object> entry : map.entrySet()) {
 				Object originalValue = entry.getValue();
-				Object normalizedValue = normalizeValue(originalValue, sortedArrayKeys, activeContainers);
+				Object normalizedValue = normalizeValue(originalValue, sortedArrayKeys, stringConverter, activeContainers);
 				if (normalizedValue != originalValue) {
 					try {
 						entry.setValue(normalizedValue);
 					} catch (UnsupportedOperationException | ClassCastException ex) {
-						throw new IllegalArgumentException(
-								"Injected maps must be mutable when nested List values need to be materialized as AWK arrays.",
-								ex);
+						return normalizeMapValues(new LinkedHashMap<>(map), sortedArrayKeys, stringConverter, activeContainers);
 					}
 				}
 			}
+			return map;
 		} finally {
-			activeContainers.remove(value);
+			activeContainers.remove(map);
 		}
 	}
 

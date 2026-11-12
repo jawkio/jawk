@@ -29,11 +29,13 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.junit.Test;
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.jrt.AssocArray;
 import io.jawk.jrt.AwkRuntimeException;
+import io.jawk.util.AwkSettings;
 
 public class AssocArrayTest {
 
@@ -197,20 +199,64 @@ public class AssocArrayTest {
 	}
 
 	@Test
-	public void testInjectImmutableMapOfListVariableThrowsClearException() throws Exception {
+	public void testInjectImmutableMapVariableIsCopied() throws Exception {
 		Map<Object, Object> mutableData = new LinkedHashMap<>();
-		mutableData.put("items", Arrays.asList("aaa", "bbb", "ccc"));
+		mutableData.put("items", Arrays.asList("aaa", "10"));
+		mutableData.put("count", "10");
 		Map<Object, Object> data = Collections.unmodifiableMap(mutableData);
 
-		AwkTestSupport.TestResult result = AwkTestSupport.awkTest("inject immutable Map containing List should throw")
-				.script("BEGIN{ print payload[\"items\"][0] }")
+		AwkTestSupport.awkTest("inject immutable Map containing List and String")
+				.script("BEGIN{ print payload[\"items\"][0], (payload[\"items\"][1] > 9), (payload[\"count\"] > 9) }")
 				.preassign("payload", data)
-				.expectThrow(AwkRuntimeException.class)
-				.run();
-		result.assertExpected();
+				.expectLines("aaa 1 1")
+				.runAndAssert();
 
-		assertTrue(result.thrownException().getMessage().contains("Injected maps must be mutable"));
 		assertTrue(mutableData.get("items") instanceof List);
+		assertEquals("10", mutableData.get("count"));
+	}
+
+	@Test
+	public void testInjectedNestedStringsAreNumericStrings() throws Exception {
+		Map<Object, Object> map = new LinkedHashMap<>();
+		map.put("a", "10");
+		map.put("list", Arrays.asList("10"));
+
+		AwkTestSupport.awkTest("strings nested in injected List and Map compare as numbers")
+				.script(
+						"BEGIN{ print (v > 9), (l[0] > 9), (m[\"a\"] > 9), (m[\"list\"][0] > 9), (t[0][0] > 9), (t[0][1] > 9) }")
+				.preassign("v", "10")
+				.preassign("l", Arrays.asList("10"))
+				.preassign("m", map)
+				.preassign("t", Arrays.asList(Arrays.asList("10", "abc")))
+				.expectLines("1 1 1 1 1 1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testInjectedNestedStringsTypeofStrnum() throws Exception {
+		Map<Object, Object> map = new LinkedHashMap<>();
+		map.put("a", "10");
+
+		AwkTestSupport.awkTest("typeof of strings nested in injected List and Map")
+				.script("BEGIN{ print typeof(l[0]), typeof(l[1]), typeof(m[\"a\"]), typeof(t[0][0]) }")
+				.preassign("l", Arrays.asList("10", "abc"))
+				.preassign("m", map)
+				.preassign("t", Arrays.asList(Arrays.asList("10")))
+				.expectLines("strnum string strnum strnum")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testInjectedNestedStringsUseRuntimeLocale() throws Exception {
+		AwkSettings settings = new AwkSettings();
+		settings.setLocale(Locale.FRANCE);
+
+		AwkTestSupport.awkTest("strings nested in injected List use the runtime decimal separator")
+				.withAwk(new Awk(settings))
+				.script("BEGIN{ print (l[0] < 10), (l[0] > 3) }")
+				.preassign("l", Arrays.asList("3,14"))
+				.expectLines("1 1")
+				.runAndAssert();
 	}
 
 	@Test

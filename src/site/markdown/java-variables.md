@@ -55,7 +55,7 @@ Object result = awk.eval("threshold");
 
 Values may be scalars such as `Long`, `Double`, and `String`, or associative-array-style values such as mutable `Map` instances, `List` instances, and `AssocArray`.
 
-When you pass a plain Java `Map`, Jawk exposes it directly to the script. The runtime may mutate that map, so do not pass immutable map implementations. Numeric AWK array indexes are represented as `Long` keys (e.g. `0L`, `1L`, `2L`).
+When you pass a plain Java `Map`, Jawk exposes it directly to the script. The runtime may mutate that map: it replaces nested `List` and `String` values with their AWK forms (see below), and the script may write to it. Pass a mutable map; a read-only or type-checked map whose values need converting is copied first, so the script's writes never reach your instance. Numeric AWK array indexes are represented as `Long` keys (e.g. `0L`, `1L`, `2L`).
 
 When you pass a Java `List`, Jawk materializes it as an AWK associative array with zero-based `Long` indexes. This matches JSON array indexing in common Java JSON parsers while preserving normal AWK array behavior for writes, deletes, sparse indexes, and string keys:
 
@@ -68,6 +68,8 @@ String result = awk.script("BEGIN { print values[0] }")
 ```
 
 Nested `Map` and `List` values are supported, so JSON-like object trees can be traversed with array syntax such as `payload["items"][0]["name"]`.
+
+Every `String` inside an injected `Map` or `List`, at any depth, becomes a numeric string (strnum), like an input field or a top-level `String` variable: `"10"` compares as the number 10 (with the run's decimal separator), `"abc"` compares as text, and `typeof()` reports `strnum` or `string` accordingly. With `values = ["10"]`, `values[0] > 9` is true.
 
 ## Per-Call Variable Overrides
 

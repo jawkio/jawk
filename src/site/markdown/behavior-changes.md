@@ -20,7 +20,14 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
-_No user-visible behavior changes recorded yet._
+- Strings nested in a `List` or `Map` injected as a variable (for example the cells of an injected
+  table, `t[0][1]`) are now numeric strings (strnum), like input fields and top-level injected
+  strings: they compare as numbers when they look like numbers, using the run's decimal
+  separator, and `typeof()` reports `strnum`. They used to be plain strings that compared as
+  text, so `l[0] > 9` with `l = ["10"]` printed `0` and now prints `1`. A mutable injected `Map`
+  receives the converted values in place, as it already did for nested lists. A read-only or
+  type-checked `Map` that needs a change is now copied instead of failing with "Injected maps must
+  be mutable" ([#638](https://github.com/jawkio/jawk/issues/638)).
 
 ## [v7.2.00](https://github.com/jawkio/jawk/releases/tag/v7.2.00) (2026-11-12)
 

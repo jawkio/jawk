@@ -20,7 +20,10 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
-_No user-visible behavior changes recorded yet._
+- New `AwkSink.printRecord(ofs, ors, ofmt, fields, record)` for Java embedders: a `print` without
+  arguments to the default output, and a rule without an action, now pass the current fields `$1`
+  to `$NF` to the sink. The default implementation prints `$0` as before, so existing sinks write
+  the same output ([#635](https://github.com/jawkio/jawk/issues/635)).
 
 ## [v7.1.02](https://github.com/jawkio/jawk/releases/tag/v7.1.02) (2026-10-08)
 

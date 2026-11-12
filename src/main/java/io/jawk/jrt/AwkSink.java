@@ -98,8 +98,10 @@ public abstract class AwkSink {
 	 * copy it to keep it.
 	 * </p>
 	 * <p>
+	 * A rule without an action (a pattern alone) prints through this method too.
 	 * {@code print $0}, {@code print} with arguments, and a redirected
-	 * {@code print} call {@link #print(String, String, String, Object...)}.
+	 * {@code print} (including {@code > "/dev/stdout"}) call
+	 * {@link #print(String, String, String, Object...)}.
 	 * </p>
 	 *
 	 * @param ofs output field separator

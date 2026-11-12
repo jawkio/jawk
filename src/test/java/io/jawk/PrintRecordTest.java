@@ -98,6 +98,19 @@ public class PrintRecordTest {
 	}
 
 	@Test
+	public void patternWithoutActionPassesTheFields() throws Exception {
+		fieldsTest("pattern without action").script("NF > 1").stdin("a b\nc\n").expect("<a|b>a b\n").runAndAssert();
+	}
+
+	@Test
+	public void barePrintToDevStdoutPrintsTheRecord() throws Exception {
+		fieldsTest("bare print > \"/dev/stdout\" prints $0").script("{ print > \"/dev/stdout\" }")
+				.stdin("a b\n")
+				.expect("a b\n")
+				.runAndAssert();
+	}
+
+	@Test
 	public void barePrintPassesAnAssignedField() throws Exception {
 		fieldsTest("bare print after $3 = \"x\"").script("{ $3 = \"x\"; print }")
 				.stdin("a b c d\n")

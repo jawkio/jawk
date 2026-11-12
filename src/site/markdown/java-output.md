@@ -106,8 +106,8 @@ public final class CollectingSink extends AwkSink {
 
 ### Bare `print` and printRecord
 
-A `print` without arguments to the default output calls
-`printRecord(ofs, ors, ofmt, fields, record)`. Its default implementation calls
+A `print` without arguments to the default output, and a rule without an action (a pattern
+alone), call `printRecord(ofs, ors, ofmt, fields, record)`. Its default implementation calls
 `print(ofs, ors, ofmt, record)`, so a sink that does not override it receives `$0` as before.
 Override it to receive the current fields `$1` to `$NF` as the script left them (assigned fields
 and a changed `NF` included), for instance to turn each record into one row of values:
@@ -125,7 +125,7 @@ public void printRecord(String ofs, String ors, String ofmt, List<Object> fields
 
 `fields` is a read-only view of the current record, valid only during the call; the record is split
 into fields only when the sink reads it. `print $0`, `print` with arguments, and a redirected
-`print` (`> file`, `| cmd`) still call `print(...)`.
+`print` (`> file`, `| cmd`, and `> "/dev/stdout"`) still call `print(...)`.
 
 ### getPrintStream
 
@@ -140,7 +140,7 @@ internally.
 
 The gawk [special filenames](compatibility.html#special-filenames) are routed to the streams the run is configured with rather than to files of those names:
 
-- `print > "/dev/stdout"` (and `/dev/fd/1`) writes to the sink, exactly like an unredirected `print`, so a script that writes there is captured by the host like any other output.
+- `print > "/dev/stdout"` (and `/dev/fd/1`) writes to the sink like an unredirected `print`, so a script that writes there is captured by the host like any other output. A bare `print > "/dev/stdout"` calls `print(...)` with `$0`, not [`printRecord`](#bare-print-and-printrecord).
 - `print > "/dev/stderr"` (and `/dev/fd/2`) writes to the stream passed to `errorStream(PrintStream)`, which defaults to `System.err`.
 - `getline < "/dev/stdin"` (and `/dev/fd/0`) reads the stream passed to `input(...)` — not the JVM's standard input, unless that is what the host supplied. When the run is fed with a structured `InputSource` instead of a stream, `/dev/stdin` falls back to `System.in`.
 

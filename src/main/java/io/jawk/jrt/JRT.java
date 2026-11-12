@@ -31,6 +31,7 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormatSymbols;
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Enumeration;
@@ -161,6 +162,26 @@ public class JRT {
 	// The currently active InputSource (set during consumeInput calls).
 	private InputSource activeSource;
 	private static final UninitializedObject BLANK = new UninitializedObject();
+	/**
+	 * Read-only live view of {@code $1..$NF} handed to
+	 * {@link AwkSink#printRecord(String, String, String, List, Object)}: it splits
+	 * the record only when a sink reads it, so a plain-text bare {@code print}
+	 * costs nothing more.
+	 */
+	private final List<Object> recordFieldsView = new AbstractList<Object>() {
+		@Override
+		public Object get(int index) {
+			if (index < 0 || index >= size()) {
+				throw new IndexOutOfBoundsException("Field index " + index + ", NF " + size());
+			}
+			return jrtGetInputField(index + 1L);
+		}
+
+		@Override
+		public int size() {
+			return getNF().intValue();
+		}
+	};
 
 	private static final Integer ONE = Integer.valueOf(1);
 	private static final Integer ZERO = Integer.valueOf(0);
@@ -3149,6 +3170,17 @@ public class JRT {
 	 */
 	public void printDefault(Object[] values) throws IOException {
 		awkSink.print(ofs, ors, ofmt, values);
+	}
+
+	/**
+	 * Writes an AWK {@code print} statement without arguments to the default
+	 * output, through
+	 * {@link AwkSink#printRecord(String, String, String, List, Object)}.
+	 *
+	 * @throws IOException if the sink cannot be written to
+	 */
+	public void printRecordDefault() throws IOException {
+		awkSink.printRecord(ofs, ors, ofmt, recordFieldsView, jrtGetInputField(0));
 	}
 
 	/**

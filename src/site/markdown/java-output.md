@@ -104,6 +104,29 @@ public final class CollectingSink extends AwkSink {
 >   | `format` | — | The AWK format string |
 >   | `values` | — | The AWK values to be formatted |
 
+### Bare `print` and printRecord
+
+A `print` without arguments to the default output calls
+`printRecord(ofs, ors, ofmt, fields, record)`. Its default implementation calls
+`print(ofs, ors, ofmt, record)`, so a sink that does not override it receives `$0` as before.
+Override it to receive the current fields `$1` to `$NF` as the script left them (assigned fields
+and a changed `NF` included), for instance to turn each record into one row of values:
+
+```java
+@Override
+public void printRecord(String ofs, String ors, String ofmt, List<Object> fields, Object record) {
+    List<String> row = new ArrayList<String>();
+    for (Object field : fields) {
+        row.add(formatPrintArgument(field, ofmt)); // the text "print $i" would write
+    }
+    rows.add(row);
+}
+```
+
+`fields` is a read-only view of the current record, valid only during the call; the record is split
+into fields only when the sink reads it. `print $0`, `print` with arguments, and a redirected
+`print` (`> file`, `| cmd`) still call `print(...)`.
+
 ### getPrintStream
 
 `getPrintStream()` provides the `PrintStream` that receives the stdout of the processes a script

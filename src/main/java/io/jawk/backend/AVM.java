@@ -2809,7 +2809,11 @@ public class AVM implements VariableManager, Closeable {
 
 	private void execPrint(CountTuple tuple) throws IOException {
 		long numArgs = tuple.getCount();
-		jrt.printDefault(numArgs == 0 ? new Object[] { jrt.jrtGetInputField(0) } : popArguments(numArgs));
+		if (numArgs == 0) {
+			jrt.printRecordDefault();
+		} else {
+			jrt.printDefault(popArguments(numArgs));
+		}
 	}
 
 	private void execPrintToFile(CountAndAppendTuple tuple) throws IOException {

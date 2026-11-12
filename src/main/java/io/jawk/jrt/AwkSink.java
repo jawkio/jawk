@@ -25,6 +25,7 @@ package io.jawk.jrt;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.util.List;
 import java.util.Locale;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
@@ -76,6 +77,44 @@ public abstract class AwkSink {
 	 * @throws IOException if the sink cannot write the output
 	 */
 	public abstract void print(String ofs, String ors, String ofmt, Object... values) throws IOException;
+
+	/**
+	 * Writes one AWK {@code print} statement without arguments to the default
+	 * output, which prints the current record.
+	 * <p>
+	 * The default implementation calls
+	 * {@link #print(String, String, String, Object...)} with {@code record}, so
+	 * a sink that does not override this method writes exactly what
+	 * {@code print $0} writes. Override it to receive the record's fields
+	 * instead, for instance to collect one value per field.
+	 * </p>
+	 * <p>
+	 * {@code fields} holds {@code $1} to {@code $NF} as the script left them,
+	 * including assigned fields and an {@code NF} the script changed. Each element
+	 * is the value {@code $i} returns (an unassigned field renders as the empty
+	 * string); {@link #formatPrintArgument(Object, String)} renders it as
+	 * {@code print $i} would. The list is a read-only view of the current record,
+	 * valid only during this call, that splits the record only when it is read:
+	 * copy it to keep it.
+	 * </p>
+	 * <p>
+	 * A rule without an action (a pattern alone) prints through this method too.
+	 * {@code print $0}, {@code print} with arguments, and a redirected
+	 * {@code print} (including {@code > "/dev/stdout"}) call
+	 * {@link #print(String, String, String, Object...)}.
+	 * </p>
+	 *
+	 * @param ofs output field separator
+	 * @param ors output record separator
+	 * @param ofmt numeric output format used by plain {@code print}
+	 * @param fields read-only view of the current fields {@code $1} to
+	 *        {@code $NF}
+	 * @param record the current record {@code $0}
+	 * @throws IOException if the sink cannot write the output
+	 */
+	public void printRecord(String ofs, String ors, String ofmt, List<Object> fields, Object record) throws IOException {
+		print(ofs, ors, ofmt, record);
+	}
 
 	/**
 	 * Writes one AWK {@code printf} operation.

@@ -411,6 +411,7 @@ public final class AwkTestSupport {
 		private Reader scriptReader;
 		private Path scriptPath;
 		private final List<String> sharedRuntimeInputs = new ArrayList<>();
+		private Function<Appendable, AwkSink> sinkFactory;
 
 		private AwkTestBuilder(String description) {
 			super(description);
@@ -558,6 +559,24 @@ public final class AwkTestSupport {
 		}
 
 		/**
+		 * Sends the script's output to a custom {@link AwkSink} instead of the
+		 * default text sink. The factory receives the buffer the test result reads,
+		 * so the sink writes there whatever the test expects.
+		 *
+		 * @param sinkFactoryParam creates the sink writing to the result buffer
+		 * @return this builder for method chaining
+		 * @throws IllegalArgumentException when {@code sinkFactoryParam} is
+		 *         {@code null}
+		 */
+		public AwkTestBuilder withSink(Function<Appendable, AwkSink> sinkFactoryParam) {
+			if (sinkFactoryParam == null) {
+				throw new IllegalArgumentException("sink factory must not be null");
+			}
+			this.sinkFactory = sinkFactoryParam;
+			return this;
+		}
+
+		/**
 		 * Runs the script several times on a single reused runtime, one execution
 		 * per supplied standard-input text, and captures the output of all of them
 		 * in order. This is how a test exercises the state a runtime carries — or
@@ -601,7 +620,8 @@ public final class AwkTestSupport {
 					inputSource,
 					scriptReader,
 					scriptPath,
-					sharedRuntimeInputs);
+					sharedRuntimeInputs,
+					sinkFactory);
 		}
 	}
 
@@ -1190,11 +1210,13 @@ public final class AwkTestSupport {
 		private final Reader scriptReader;
 		private final Path scriptPath;
 		private final List<String> sharedRuntimeInputs;
+		private final Function<Appendable, AwkSink> sinkFactory;
 
 		AwkTestCase(TestLayout layout, Map<String, String> fileContents, Map<String, String> symbolicLinks,
 				List<String> operandSpecs, List<String> pathPlaceholders, PlatformRequirement platformRequirement,
 				Map<String, Object> preAssignments, Awk customAwk, List<JawkExtension> extensions, InputSource inputSource,
-				Reader scriptReader, Path scriptPath, List<String> sharedRuntimeInputs) {
+				Reader scriptReader, Path scriptPath, List<String> sharedRuntimeInputs,
+				Function<Appendable, AwkSink> sinkFactory) {
 			super(layout, fileContents, symbolicLinks, operandSpecs, pathPlaceholders, platformRequirement);
 			this.preAssignments = new LinkedHashMap<>(preAssignments);
 			this.customAwk = customAwk;
@@ -1203,6 +1225,7 @@ public final class AwkTestSupport {
 			this.scriptReader = scriptReader;
 			this.scriptPath = scriptPath;
 			this.sharedRuntimeInputs = new ArrayList<>(sharedRuntimeInputs);
+			this.sinkFactory = sinkFactory;
 		}
 
 		@Override
@@ -1244,7 +1267,11 @@ public final class AwkTestSupport {
 			}
 			int exitCode = 0;
 			try {
-				builder.execute(out);
+				if (sinkFactory == null) {
+					builder.execute(out);
+				} else {
+					builder.execute(sinkFactory.apply(out));
+				}
 			} catch (ExitException ex) {
 				exitCode = ex.getCode();
 			}
@@ -1270,7 +1297,7 @@ public final class AwkTestSupport {
 				throws Exception {
 			int exitCode = 0;
 			try (AVM avm = awk.createAvm()) {
-				avm.setAwkSink(AwkSink.from(out));
+				avm.setAwkSink(sinkFactory == null ? AwkSink.from(out) : sinkFactory.apply(out));
 				// Every source is created before any of them runs, so that what a
 				// run observes depends on the source bound to it rather than on the
 				// order the sources were constructed in.

@@ -315,7 +315,7 @@
 			<!-- failsafe for compatibility tests -->
 			<plugin>
 				<artifactId>maven-failsafe-plugin</artifactId>
-				<version>3.6.0</version>
+				<version>3.6.1</version>
 				<configuration>
 					<includes>
 						<include>**/*IT.java</include>

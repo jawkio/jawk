@@ -631,6 +631,26 @@ public class CliOptionTest {
 	}
 
 	@Test
+	public void persistOptionPersistsInputDerivedStrnumValues() throws Exception {
+		File memory = new File(tempFolder.getRoot(), "strnum-memory.bin");
+
+		AwkTestSupport.cliTest("CLI persist saves fields and -v assignments")
+				.argument("--persist", memory.getAbsolutePath())
+				.argument("-v", "x=7")
+				.script("{ a[NR] = $1 } END { y = x }")
+				.stdin("5\n9\n")
+				.expect("")
+				.expectExit(0)
+				.runAndAssert();
+		AwkTestSupport.cliTest("CLI persist restores them as strnums")
+				.argument("--persist", memory.getAbsolutePath())
+				.script("BEGIN { print a[1] + 1, typeof(a[2]), a[2] < 10, typeof(y), y }")
+				.expectLines("6 strnum 1 strnum 7")
+				.expectExit(0)
+				.runAndAssert();
+	}
+
+	@Test
 	public void persistentMemoryEnvironmentVariablePersistsUserGlobalsAcrossCliRuns() throws Exception {
 		File memory = new File(tempFolder.getRoot(), "env-memory.bin");
 		Map<String, String> environment = Collections.singletonMap("JAWK_PERSISTENT_MEMORY", memory.getAbsolutePath());

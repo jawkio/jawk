@@ -33,6 +33,10 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
   of failing with "Injected maps must be mutable". Keys follow AWK rules in the copy (`"1"` and `1`
   are the same element), and `for (k in arr)` follows the AWK array's order instead of the map's
   ([#638](https://github.com/jawkio/jawk/issues/638)).
+- `--persist` (and `AVM.snapshotPersistentMemory()`) now saves globals holding input-derived values,
+  such as fields, `split()` pieces or `-v` assignments, and restores them as numeric strings. It used
+  to fail with `NotSerializableException: io.jawk.jrt.StrNum`
+  ([#640](https://github.com/jawkio/jawk/issues/640)).
 
 ## [v7.2.00](https://github.com/jawkio/jawk/releases/tag/v7.2.00) (2026-11-12)
 

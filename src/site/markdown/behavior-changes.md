@@ -20,6 +20,10 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
+_No user-visible behavior changes recorded yet._
+
+## [v7.3.00](https://github.com/jawkio/jawk/releases/tag/v7.3.00) (2026-11-12)
+
 - Strings nested in a `List` or `Map` injected as a variable (for example the cells of an injected
   table, `t[0][1]`) are now numeric strings (strnum), like input fields and top-level injected
   strings: they compare as numbers when they look like numbers, using the run's decimal

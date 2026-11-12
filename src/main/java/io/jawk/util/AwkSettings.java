@@ -61,17 +61,11 @@ public class AwkSettings {
 	 * The values may be of type <code>Integer</code>,
 	 * <code>Double</code>, <code>String</code>,
 	 * {@link io.jawk.jrt.AssocArray} (for array variables),
-	 * any {@link java.util.Map} that Jawk exposes directly to the script,
-	 * or any {@link java.util.List} that Jawk materializes as an array with
-	 * zero-based {@link java.lang.Long} keys.
-	 * <p>
-	 * When a {@link java.util.Map} is provided, the Jawk runtime may mutate it
-	 * during execution. Callers must therefore supply a mutable map
-	 * implementation. Numeric indices written by the runtime into such maps and
-	 * indices derived from {@link java.util.List} values use
-	 * {@link java.lang.Long} keys (for example, <code>0L</code>,
-	 * <code>1L</code>, ...).
-	 * </p>
+	 * or any {@link java.util.Map} or {@link java.util.List}. Maps and lists,
+	 * at any depth, are copied into new AWK arrays (list indexes become
+	 * zero-based {@link java.lang.Long} keys, and nested strings become numeric
+	 * strings): the caller's map or list is never modified, and the script's
+	 * writes stay in the copy.
 	 */
 	private final Map<String, Object> variables = new HashMap<String, Object>();
 
@@ -184,9 +178,11 @@ public class AwkSettings {
 	 * The values may be of type <code>Integer</code>,
 	 * <code>Double</code>, <code>String</code>,
 	 * {@link io.jawk.jrt.AssocArray} (for array variables),
-	 * any {@link java.util.Map} that Jawk exposes directly to the script,
-	 * or any {@link java.util.List} that Jawk materializes as an array with
-	 * zero-based {@link java.lang.Long} keys.
+	 * or any {@link java.util.Map} or {@link java.util.List}. Maps and lists,
+	 * at any depth, are copied into new AWK arrays (list indexes become
+	 * zero-based {@link java.lang.Long} keys, and nested strings become numeric
+	 * strings): the caller's map or list is never modified, and the script's
+	 * writes stay in the copy.
 	 *
 	 * @return the variables
 	 */
@@ -217,9 +213,11 @@ public class AwkSettings {
 	 * The values may be of type <code>Integer</code>,
 	 * <code>Double</code>, <code>String</code>,
 	 * {@link io.jawk.jrt.AssocArray} (for array variables),
-	 * any {@link java.util.Map} that Jawk exposes directly to the script,
-	 * or any {@link java.util.List} that Jawk materializes as an array with
-	 * zero-based {@link java.lang.Long} keys.
+	 * or any {@link java.util.Map} or {@link java.util.List}. Maps and lists,
+	 * at any depth, are copied into new AWK arrays (list indexes become
+	 * zero-based {@link java.lang.Long} keys, and nested strings become numeric
+	 * strings): the caller's map or list is never modified, and the script's
+	 * writes stay in the copy.
 	 *
 	 * @param variables the variables to set
 	 */

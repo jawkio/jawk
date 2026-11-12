@@ -281,6 +281,39 @@ public class AssocArrayTest {
 				.runAndAssert();
 	}
 
+	/** Extension that reads a variable by name before the script starts. */
+	private static final class VariableReadingExtension extends io.jawk.ext.AbstractExtension {
+		private Object value;
+
+		@Override
+		public String getExtensionName() {
+			return "VariableReadingExtension";
+		}
+
+		@Override
+		public void beforeStart(io.jawk.backend.AVM avm, io.jawk.jrt.JRT runtime) {
+			value = avm.getVariable("payload");
+		}
+	}
+
+	@Test
+	public void testUnreferencedInjectedMapIsCopiedForExtensions() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+		data.put("a", "10");
+		VariableReadingExtension probe = new VariableReadingExtension();
+
+		AwkTestSupport.awkTest("map injected for an extension only is copied with numeric strings")
+				.withExtensions(probe)
+				.script("BEGIN{ print \"ok\" }")
+				.preassign("payload", data)
+				.expectLines("ok")
+				.runAndAssert();
+
+		assertTrue(probe.value instanceof AssocArray);
+		assertTrue(((AssocArray) probe.value).get("a") instanceof io.jawk.jrt.StrNum);
+		assertEquals("10", data.get("a"));
+	}
+
 	@Test
 	public void testRejectedFunctionNameAssignmentDoesNotNormalizeMapValue() throws Exception {
 		Map<Object, Object> data = new LinkedHashMap<>();

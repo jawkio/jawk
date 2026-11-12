@@ -92,7 +92,9 @@ public final class ListAssocArray extends HashAssocArray {
 	 * @param sortedArrayKeys {@code true} when materialized lists should use
 	 *        sorted AWK array keys
 	 * @param stringConverter conversion applied to every {@link String} found
-	 *        inside a list or map, at any depth
+	 *        inside a list or map, at any depth, and to every {@link StrNum}
+	 *        (which an array from an earlier run may hold): it receives either
+	 *        type
 	 * @return the normalized value
 	 */
 	static Object normalizeValue(Object value, boolean sortedArrayKeys, UnaryOperator<Object> stringConverter) {

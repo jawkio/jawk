@@ -353,6 +353,8 @@ public interface AssocArray extends Map<Object, Object> {
 	 * @param sortedArrayKeys {@code true} when converted lists should use sorted
 	 *        array keys
 	 * @param stringConverter conversion applied to nested {@link String} values
+	 *        and to nested {@link StrNum} values (which an array from an earlier
+	 *        run may hold): it receives either type
 	 * @return the normalized value
 	 */
 	static Object normalizeValue(Object value, boolean sortedArrayKeys, UnaryOperator<Object> stringConverter) {

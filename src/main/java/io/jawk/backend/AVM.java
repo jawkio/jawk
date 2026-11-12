@@ -918,7 +918,12 @@ public class AVM implements VariableManager, Closeable {
 			executionSpecialVariables = baseSpecialVariables;
 		} else {
 			executionInitialVariables = new HashMap<>(baseInitialVariables);
-			executionInitialVariables.putAll(variableOverrides);
+			// Normalized here, like base variables in assignVariable(), so that a
+			// variable the script never references (read by an extension through
+			// getVariable()) is a copy with numeric strings too
+			for (Map.Entry<String, Object> entry : variableOverrides.entrySet()) {
+				executionInitialVariables.put(entry.getKey(), normalizeExternalVariableValue(entry.getValue()));
+			}
 
 			Map<String, Object> specialOverrides = JRT.copySpecialVariables(variableOverrides);
 			if (specialOverrides.isEmpty()) {

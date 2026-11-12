@@ -22,6 +22,7 @@ package io.jawk.jrt;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 
 /**
@@ -30,13 +31,18 @@ import java.math.BigDecimal;
  * results, {@code split()} pieces, and similar input-originated values are
  * represented as instances of this class so comparisons and gawk's
  * {@code typeof()} can distinguish them from plain string constants.
+ * <p>
+ * Instances are serializable so they can be retained in persistent memory.
  */
-public final class StrNum {
+public final class StrNum implements Serializable {
+
+	private static final long serialVersionUID = 1L;
 
 	private final String value;
 	private final char decimalSeparator;
-	private Boolean numeric;
-	private Double numericValue;
+	// Parse caches, recomputed on demand after deserialization
+	private transient Boolean numeric;
+	private transient Double numericValue;
 
 	StrNum(String value) {
 		this(value, '.');

@@ -918,7 +918,12 @@ public class AVM implements VariableManager, Closeable {
 			executionSpecialVariables = baseSpecialVariables;
 		} else {
 			executionInitialVariables = new HashMap<>(baseInitialVariables);
-			executionInitialVariables.putAll(variableOverrides);
+			// Normalized here, like base variables in assignVariable(), so that a
+			// variable the script never references (read by an extension through
+			// getVariable()) is a copy with numeric strings too
+			for (Map.Entry<String, Object> entry : variableOverrides.entrySet()) {
+				executionInitialVariables.put(entry.getKey(), normalizeExternalVariableValue(entry.getValue()));
+			}
 
 			Map<String, Object> specialOverrides = JRT.copySpecialVariables(variableOverrides);
 			if (specialOverrides.isEmpty()) {
@@ -4448,7 +4453,9 @@ public class AVM implements VariableManager, Closeable {
 		if (!(value instanceof Map) && !(value instanceof List)) {
 			return value;
 		}
-		return AssocArray.normalizeValue(value, sortedArrayKeys);
+		// toString() also rebinds a StrNum left by a previous run to this run's
+		// decimal separator
+		return AssocArray.normalizeValue(value, sortedArrayKeys, leaf -> jrt.toInputScalar(leaf.toString()));
 	}
 
 	private static final UninitializedObject BLANK = new UninitializedObject();

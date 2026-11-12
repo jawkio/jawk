@@ -24,6 +24,7 @@ package io.jawk.jrt;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.UnaryOperator;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.intermediate.UntypedObject;
@@ -325,9 +326,8 @@ public interface AssocArray extends Map<Object, Object> {
 	/**
 	 * Normalizes an externally supplied structured value before the AVM stores it.
 	 * <p>
-	 * {@link List} values are converted to {@link AssocArray} instances.
-	 * {@link Map} values are kept in place to preserve direct-map performance, but
-	 * their nested list values are recursively converted.
+	 * {@link List} and {@link Map} values, at any depth, are copied into new
+	 * {@link AssocArray} instances; the caller's containers are never modified.
 	 * </p>
 	 *
 	 * @param value value to normalize
@@ -336,7 +336,29 @@ public interface AssocArray extends Map<Object, Object> {
 	 * @return the normalized value
 	 */
 	static Object normalizeValue(Object value, boolean sortedArrayKeys) {
-		return ListAssocArray.normalizeValue(value, sortedArrayKeys);
+		return normalizeValue(value, sortedArrayKeys, UnaryOperator.identity());
+	}
+
+	/**
+	 * Normalizes an externally supplied structured value before the AVM stores it,
+	 * converting every {@link String} inside a {@link List} or {@link Map}, at any
+	 * depth, with {@code stringConverter}.
+	 * <p>
+	 * The AVM passes {@code JRT::toInputScalar} so that nested strings become
+	 * numeric strings, like input fields. Lists and maps are copied, never
+	 * modified.
+	 * </p>
+	 *
+	 * @param value value to normalize
+	 * @param sortedArrayKeys {@code true} when converted lists should use sorted
+	 *        array keys
+	 * @param stringConverter conversion applied to nested {@link String} values
+	 *        and to nested {@link StrNum} values (which an array from an earlier
+	 *        run may hold): it receives either type
+	 * @return the normalized value
+	 */
+	static Object normalizeValue(Object value, boolean sortedArrayKeys, UnaryOperator<Object> stringConverter) {
+		return ListAssocArray.normalizeValue(value, sortedArrayKeys, stringConverter);
 	}
 
 }

@@ -29,11 +29,13 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.junit.Test;
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.jrt.AssocArray;
 import io.jawk.jrt.AwkRuntimeException;
+import io.jawk.util.AwkSettings;
 
 public class AssocArrayTest {
 
@@ -125,15 +127,16 @@ public class AssocArrayTest {
 	}
 
 	@Test
-	public void testNormalizeMapValueKeepsMapAndConvertsNestedList() {
+	public void testNormalizeMapValueCopiesMapAndNestedList() {
 		Map<Object, Object> data = new LinkedHashMap<>();
 		data.put("items", Arrays.asList("aaa", "bbb", "ccc"));
 
 		Object normalized = AssocArray.normalizeValue(data, false);
 
-		assertSame(data, normalized);
-		assertTrue(data.get("items") instanceof AssocArray);
-		assertEquals("bbb", ((AssocArray) data.get("items")).get(1L));
+		assertTrue(normalized instanceof AssocArray);
+		assertTrue(((AssocArray) normalized).get("items") instanceof AssocArray);
+		assertEquals("bbb", ((AssocArray) ((AssocArray) normalized).get("items")).get(1L));
+		assertTrue(data.get("items") instanceof List);
 	}
 
 	@Test
@@ -197,20 +200,118 @@ public class AssocArrayTest {
 	}
 
 	@Test
-	public void testInjectImmutableMapOfListVariableThrowsClearException() throws Exception {
+	public void testInjectImmutableMapVariableIsCopied() throws Exception {
 		Map<Object, Object> mutableData = new LinkedHashMap<>();
-		mutableData.put("items", Arrays.asList("aaa", "bbb", "ccc"));
+		mutableData.put("items", Arrays.asList("aaa", "10"));
+		mutableData.put("count", "10");
 		Map<Object, Object> data = Collections.unmodifiableMap(mutableData);
 
-		AwkTestSupport.TestResult result = AwkTestSupport.awkTest("inject immutable Map containing List should throw")
-				.script("BEGIN{ print payload[\"items\"][0] }")
+		AwkTestSupport.awkTest("inject immutable Map containing List and String")
+				.script("BEGIN{ print payload[\"items\"][0], (payload[\"items\"][1] > 9), (payload[\"count\"] > 9) }")
 				.preassign("payload", data)
-				.expectThrow(AwkRuntimeException.class)
-				.run();
-		result.assertExpected();
+				.expectLines("aaa 1 1")
+				.runAndAssert();
 
-		assertTrue(result.thrownException().getMessage().contains("Injected maps must be mutable"));
 		assertTrue(mutableData.get("items") instanceof List);
+		assertEquals("10", mutableData.get("count"));
+	}
+
+	@Test
+	public void testInjectedNestedStringsAreNumericStrings() throws Exception {
+		Map<Object, Object> map = new LinkedHashMap<>();
+		map.put("a", "10");
+		map.put("list", Arrays.asList("10"));
+
+		AwkTestSupport.awkTest("strings nested in injected List and Map compare as numbers")
+				.script(
+						"BEGIN{ print (v > 9), (l[0] > 9), (m[\"a\"] > 9), (m[\"list\"][0] > 9), (t[0][0] > 9), (t[0][1] > 9) }")
+				.preassign("v", "10")
+				.preassign("l", Arrays.asList("10"))
+				.preassign("m", map)
+				.preassign("t", Arrays.asList(Arrays.asList("10", "abc")))
+				.expectLines("1 1 1 1 1 1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testInjectedNestedStringsTypeofStrnum() throws Exception {
+		Map<Object, Object> map = new LinkedHashMap<>();
+		map.put("a", "10");
+
+		AwkTestSupport.awkTest("typeof of strings nested in injected List and Map")
+				.script("BEGIN{ print typeof(l[0]), typeof(l[1]), typeof(m[\"a\"]), typeof(t[0][0]) }")
+				.preassign("l", Arrays.asList("10", "abc"))
+				.preassign("m", map)
+				.preassign("t", Arrays.asList(Arrays.asList("10")))
+				.expectLines("strnum string strnum strnum")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testInjectedNestedStringsUseRuntimeLocale() throws Exception {
+		AwkSettings settings = new AwkSettings();
+		settings.setLocale(Locale.FRANCE);
+
+		AwkTestSupport.awkTest("strings nested in injected List use the runtime decimal separator")
+				.withAwk(new Awk(settings))
+				.script("BEGIN{ print (l[0] < 10), (l[0] > 3) }")
+				.preassign("l", Arrays.asList("3,14"))
+				.expectLines("1 1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testReusedInjectedMapFollowsEachRunLocale() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+		data.put("pi", "3,14");
+
+		AwkTestSupport.awkTest("reused injected Map under the default locale")
+				.script("BEGIN{ print typeof(m[\"pi\"]) }")
+				.preassign("m", data)
+				.expectLines("string")
+				.runAndAssert();
+
+		AwkSettings settings = new AwkSettings();
+		settings.setLocale(Locale.FRANCE);
+		AwkTestSupport.awkTest("same injected Map under a comma decimal separator")
+				.withAwk(new Awk(settings))
+				.script("BEGIN{ print typeof(m[\"pi\"]) }")
+				.preassign("m", data)
+				.expectLines("strnum")
+				.runAndAssert();
+	}
+
+	/** Extension that reads a variable by name before the script starts. */
+	private static final class VariableReadingExtension extends io.jawk.ext.AbstractExtension {
+		private Object value;
+
+		@Override
+		public String getExtensionName() {
+			return "VariableReadingExtension";
+		}
+
+		@Override
+		public void beforeStart(io.jawk.backend.AVM avm, io.jawk.jrt.JRT runtime) {
+			value = avm.getVariable("payload");
+		}
+	}
+
+	@Test
+	public void testUnreferencedInjectedMapIsCopiedForExtensions() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+		data.put("a", "10");
+		VariableReadingExtension probe = new VariableReadingExtension();
+
+		AwkTestSupport.awkTest("map injected for an extension only is copied with numeric strings")
+				.withExtensions(probe)
+				.script("BEGIN{ print \"ok\" }")
+				.preassign("payload", data)
+				.expectLines("ok")
+				.runAndAssert();
+
+		assertTrue(probe.value instanceof AssocArray);
+		assertTrue(((AssocArray) probe.value).get("a") instanceof io.jawk.jrt.StrNum);
+		assertEquals("10", data.get("a"));
 	}
 
 	@Test
@@ -259,49 +360,44 @@ public class AssocArrayTest {
 	}
 
 	@Test
-	public void testInjectMapVariableMutatesOriginalMap() throws Exception {
+	public void testInjectMapVariableIsCopied() throws Exception {
 		Map<Object, Object> data = new LinkedHashMap<>();
 		data.put("a", "alpha");
 
-		AwkTestSupport.awkTest("inject Map into array variable without copying")
+		AwkTestSupport.awkTest("inject Map into array variable as a copy")
 				.script("BEGIN{ arr[\"b\"] = \"beta\"; delete arr[\"a\"]; print arr[\"b\"], (\"a\" in arr) }")
 				.preassign("arr", data)
 				.expectLines("beta 0")
 				.runAndAssert();
 
-		assertFalse(data.containsKey("a"));
-		assertEquals("beta", data.get("b"));
+		assertEquals(Collections.singletonMap("a", "alpha"), data);
 	}
 
 	@Test
-	public void testInjectMapVariableDoesNotNormalizeKeys() throws Exception {
+	public void testInjectMapVariableNormalizesKeys() throws Exception {
 		Map<Object, Object> data = new LinkedHashMap<>();
 		data.put("1", "one");
 		data.put("2", "two");
 
-		AwkTestSupport.awkTest("inject Map with numeric string keys without key normalization")
+		AwkTestSupport.awkTest("inject Map with numeric string keys as AWK keys")
 				.script("BEGIN{ print (1 in arr) \" \" (\"1\" in arr) }")
 				.preassign("arr", data)
-				.expectLines("0 1")
+				.expectLines("1 1")
 				.runAndAssert();
 	}
 
 	@Test
-	public void testSplitMutatesInjectedMapDirectly() throws Exception {
+	public void testSplitIntoInjectedMapLeavesOriginal() throws Exception {
 		Map<Object, Object> data = new LinkedHashMap<>();
 		data.put("old", "value");
 
-		AwkTestSupport.awkTest("split rewrites injected Map directly")
-				.script("BEGIN{ print split(\"alpha beta\", arr), arr[1], arr[2] }")
+		AwkTestSupport.awkTest("split rewrites the copy of an injected Map")
+				.script("BEGIN{ print split(\"alpha beta\", arr), arr[1], arr[2], (\"old\" in arr) }")
 				.preassign("arr", data)
-				.expectLines("2 alpha beta")
+				.expectLines("2 alpha beta 0")
 				.runAndAssert();
 
-		assertFalse(data.containsKey("old"));
-		assertFalse(data.containsKey(1));
-		assertFalse(data.containsKey(2));
-		assertEquals("alpha", data.get(1L).toString());
-		assertEquals("beta", data.get(2L).toString());
+		assertEquals(Collections.singletonMap("old", "value"), data);
 	}
 
 	@Test
@@ -341,18 +437,18 @@ public class AssocArrayTest {
 	}
 
 	@Test
-	public void testDeleteArrayClearsInjectedMap() throws Exception {
+	public void testDeleteArrayLeavesInjectedMap() throws Exception {
 		Map<Object, Object> data = new LinkedHashMap<>();
 		data.put("a", "alpha");
 		data.put("b", "beta");
 
-		AwkTestSupport.awkTest("delete array clears injected Map")
-				.script("BEGIN{ delete arr }")
+		AwkTestSupport.awkTest("delete array clears the copy of an injected Map")
+				.script("BEGIN{ delete arr; print length(arr) }")
 				.preassign("arr", data)
-				.expect("")
+				.expectLines("0")
 				.runAndAssert();
 
-		assertTrue(data.isEmpty());
+		assertEquals(2, data.size());
 	}
 
 	@Test
@@ -464,17 +560,28 @@ public class AssocArrayTest {
 	}
 
 	@Test
-	public void testDeleteArrayKeepsInjectedMapBoundForLaterWrites() throws Exception {
+	public void testDeleteArrayKeepsInjectedArrayBoundForLaterWrites() throws Exception {
 		Map<Object, Object> data = new LinkedHashMap<>();
 		data.put("a", "alpha");
 
-		AwkTestSupport.awkTest("delete array keeps injected Map bound")
-				.script("BEGIN{ delete arr; arr[1] = \"after\"; print arr[1] }")
+		AwkTestSupport.awkTest("delete array keeps the injected array bound")
+				.script("BEGIN{ delete arr; arr[1] = \"after\"; print arr[1], length(arr) }")
 				.preassign("arr", data)
-				.expectLines("after")
+				.expectLines("after 1")
 				.runAndAssert();
 
-		assertFalse(data.containsKey("a"));
-		assertEquals("after", data.get(1L));
+		assertEquals(Collections.singletonMap("a", "alpha"), data);
+	}
+
+	@Test
+	public void testNullValueInInjectedMapIsBlank() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+		data.put("a", null);
+
+		AwkTestSupport.awkTest("null value in an injected Map reads as blank")
+				.script("BEGIN{ print \"[\" arr[\"a\"] \"]\", (arr[\"a\"] ? 1 : 0) }")
+				.preassign("arr", data)
+				.expectLines("[] 0")
+				.runAndAssert();
 	}
 }

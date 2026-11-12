@@ -31,6 +31,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentSkipListMap;
 import org.junit.Test;
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.jrt.AssocArray;
@@ -257,6 +258,41 @@ public class AssocArrayTest {
 				.preassign("l", Arrays.asList("3,14"))
 				.expectLines("1 1")
 				.runAndAssert();
+	}
+
+	@Test
+	public void testReusedInjectedMapFollowsEachRunLocale() throws Exception {
+		Map<Object, Object> data = new LinkedHashMap<>();
+		data.put("pi", "3,14");
+
+		AwkTestSupport.awkTest("reused injected Map under the default locale")
+				.script("BEGIN{ print typeof(m[\"pi\"]) }")
+				.preassign("m", data)
+				.expectLines("string")
+				.runAndAssert();
+
+		AwkSettings settings = new AwkSettings();
+		settings.setLocale(Locale.FRANCE);
+		AwkTestSupport.awkTest("same injected Map under a comma decimal separator")
+				.withAwk(new Awk(settings))
+				.script("BEGIN{ print typeof(m[\"pi\"]) }")
+				.preassign("m", data)
+				.expectLines("strnum")
+				.runAndAssert();
+	}
+
+	@Test
+	public void testInjectedMapWithReadOnlyEntriesKeepsScriptWrites() throws Exception {
+		Map<Object, Object> data = new ConcurrentSkipListMap<>();
+		data.put("a", "10");
+
+		AwkTestSupport.awkTest("injected ConcurrentSkipListMap is converted in place")
+				.script("BEGIN{ print (m[\"a\"] > 9); m[\"b\"] = 1 }")
+				.preassign("m", data)
+				.expectLines("1")
+				.runAndAssert();
+
+		assertTrue(data.containsKey("b"));
 	}
 
 	@Test

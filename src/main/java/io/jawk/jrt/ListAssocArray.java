@@ -126,7 +126,9 @@ public final class ListAssocArray extends HashAssocArray {
 			Map<Object, Object> map = (Map<Object, Object>) value;
 			return normalizeMapValues(map, sortedArrayKeys, stringConverter, activeContainers);
 		}
-		if (value instanceof String) {
+		if (value instanceof String || value instanceof StrNum) {
+			// A StrNum comes from a previous run on the same map: the converter
+			// rebinds it to the current run's decimal separator
 			return stringConverter.apply(value);
 		}
 		return value;
@@ -224,17 +226,55 @@ public final class ListAssocArray extends HashAssocArray {
 			for (Map.Entry<Object, Object> entry : map.entrySet()) {
 				Object originalValue = entry.getValue();
 				Object normalizedValue = normalizeValue(originalValue, sortedArrayKeys, stringConverter, activeContainers);
-				if (normalizedValue != originalValue) {
-					try {
-						entry.setValue(normalizedValue);
-					} catch (UnsupportedOperationException | ClassCastException ex) {
-						return normalizeMapValues(new LinkedHashMap<>(map), sortedArrayKeys, stringConverter, activeContainers);
-					}
+				if (normalizedValue != originalValue && !replaceValue(map, entry, normalizedValue)) {
+					return normalizeMapValues(new LinkedHashMap<>(map), sortedArrayKeys, stringConverter, activeContainers);
 				}
 			}
 			return map;
 		} finally {
 			activeContainers.remove(map);
+		}
+	}
+
+	/**
+	 * Writes a normalized value back into a map, through the entry when it
+	 * supports {@link Map.Entry#setValue(Object)}, otherwise through
+	 * {@link Map#put(Object, Object)}: some mutable maps, such as
+	 * {@link java.util.concurrent.ConcurrentSkipListMap}, return read-only entry
+	 * snapshots.
+	 *
+	 * @param map map being normalized
+	 * @param entry entry of {@code map} to update
+	 * @param value normalized value
+	 * @return {@code false} when {@code map} is read-only or rejects the value's
+	 *         type
+	 */
+	private static boolean replaceValue(Map<Object, Object> map, Map.Entry<Object, Object> entry, Object value) {
+		try {
+			entry.setValue(value);
+			return true;
+		} catch (UnsupportedOperationException ex) {
+			return putValue(map, entry.getKey(), value);
+		} catch (ClassCastException ex) {
+			return false;
+		}
+	}
+
+	/**
+	 * Writes a normalized value back into a map whose entries are read-only.
+	 *
+	 * @param map map being normalized
+	 * @param key key to update
+	 * @param value normalized value
+	 * @return {@code false} when {@code map} is read-only or rejects the value's
+	 *         type
+	 */
+	private static boolean putValue(Map<Object, Object> map, Object key, Object value) {
+		try {
+			map.put(key, value);
+			return true;
+		} catch (UnsupportedOperationException | ClassCastException ex) {
+			return false;
 		}
 	}
 

@@ -4448,7 +4448,9 @@ public class AVM implements VariableManager, Closeable {
 		if (!(value instanceof Map) && !(value instanceof List)) {
 			return value;
 		}
-		return AssocArray.normalizeValue(value, sortedArrayKeys, jrt::toInputScalar);
+		// toString() also rebinds a StrNum left by a previous run to this run's
+		// decimal separator
+		return AssocArray.normalizeValue(value, sortedArrayKeys, leaf -> jrt.toInputScalar(leaf.toString()));
 	}
 
 	private static final UninitializedObject BLANK = new UninitializedObject();

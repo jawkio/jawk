@@ -55,7 +55,7 @@ Object result = awk.eval("threshold");
 
 Values may be scalars such as `Long`, `Double`, and `String`, or associative-array-style values such as mutable `Map` instances, `List` instances, and `AssocArray`.
 
-When you pass a plain Java `Map`, Jawk exposes it directly to the script. The runtime may mutate that map: it replaces nested `List` and `String` values with their AWK forms (see below), and the script may write to it. Pass a mutable map; a read-only or type-checked map whose values need converting is copied first, so the script's writes never reach your instance. Numeric AWK array indexes are represented as `Long` keys (e.g. `0L`, `1L`, `2L`).
+When you pass a plain Java `Map`, Jawk exposes it directly to the script. The runtime may mutate that map: it replaces nested `List` and `String` values with their AWK forms (see below), and the script may write to it. Pass a mutable map, and always when the script writes to it. A read-only or type-checked map is copied only when one of its own values needs converting, and the script's writes then go to the copy. A read-only map whose own values need no change (numbers, or nested maps only) is used as is and rejects the script's writes. Numeric AWK array indexes are represented as `Long` keys (e.g. `0L`, `1L`, `2L`).
 
 When you pass a Java `List`, Jawk materializes it as an AWK associative array with zero-based `Long` indexes. This matches JSON array indexing in common Java JSON parsers while preserving normal AWK array behavior for writes, deletes, sparse indexes, and string keys:
 

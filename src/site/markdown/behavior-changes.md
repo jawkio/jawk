@@ -24,10 +24,15 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
   table, `t[0][1]`) are now numeric strings (strnum), like input fields and top-level injected
   strings: they compare as numbers when they look like numbers, using the run's decimal
   separator, and `typeof()` reports `strnum`. They used to be plain strings that compared as
-  text, so `l[0] > 9` with `l = ["10"]` printed `0` and now prints `1`. A mutable injected `Map`
-  receives the converted values in place, as it already did for nested lists. A read-only or
-  type-checked `Map` that needs a change is now copied instead of failing with "Injected maps must
-  be mutable" ([#638](https://github.com/jawkio/jawk/issues/638)).
+  text, so `l[0] > 9` with `l = ["10"]` printed `0` and now prints `1`
+  ([#638](https://github.com/jawkio/jawk/issues/638)).
+- Breaking change for Java embedders: a `Map` (or `AssocArray`) injected as a variable is now copied
+  into a new AWK array, as a `List` already was. The script's writes, deletes and `split()` calls no
+  longer reach the caller's map, and the caller's map is never modified (nested lists used to be
+  replaced in it). Read-only maps such as `Map.of(...)` now work even when they hold lists, instead
+  of failing with "Injected maps must be mutable". Keys follow AWK rules in the copy (`"1"` and `1`
+  are the same element), and `for (k in arr)` follows the AWK array's order instead of the map's
+  ([#638](https://github.com/jawkio/jawk/issues/638)).
 
 ## [v7.2.00](https://github.com/jawkio/jawk/releases/tag/v7.2.00) (2026-11-12)
 

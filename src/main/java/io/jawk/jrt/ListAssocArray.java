@@ -24,7 +24,6 @@ package io.jawk.jrt;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,10 +39,10 @@ import java.util.function.UnaryOperator;
  * </p>
  * <p>
  * This class also owns normalization of nested Java containers supplied from
- * embedding APIs. Java {@link Map} instances remain map-backed for performance,
- * while nested {@link List} instances are replaced by materialized
- * {@link AssocArray} instances and String leaves can be converted to input
- * scalars (numeric strings). Recursive object graphs are guarded with an
+ * embedding APIs. Java {@link Map} and {@link List} instances, at any depth, are
+ * copied into new {@link AssocArray} instances, never modified, and String
+ * leaves can be converted to input scalars (numeric strings). Recursive object
+ * graphs are guarded with an
  * identity-based recursion stack so self-referencing maps or lists do not cause
  * infinite conversion.
  * </p>
@@ -85,10 +84,8 @@ public final class ListAssocArray extends HashAssocArray {
 	/**
 	 * Normalizes a value supplied from Java before it is stored in the AVM.
 	 * <p>
-	 * Lists are materialized as AWK arrays. Maps are kept as the original map
-	 * instance for the existing no-copy fast path, but their values are scanned so
-	 * nested lists can be materialized and String leaves converted too. A map
-	 * that rejects these updates (read-only or type-checked) is copied instead.
+	 * Lists and maps, at any depth, are copied into new AWK arrays; the caller's
+	 * containers are never modified.
 	 * </p>
 	 *
 	 * @param value value to normalize
@@ -122,13 +119,11 @@ public final class ListAssocArray extends HashAssocArray {
 			return createFromList((List<?>) value, sortedArrayKeys, stringConverter, activeContainers);
 		}
 		if (value instanceof Map) {
-			@SuppressWarnings("unchecked")
-			Map<Object, Object> map = (Map<Object, Object>) value;
-			return normalizeMapValues(map, sortedArrayKeys, stringConverter, activeContainers);
+			return createFromMap((Map<?, ?>) value, sortedArrayKeys, stringConverter, activeContainers);
 		}
 		if (value instanceof String || value instanceof StrNum) {
-			// A StrNum comes from a previous run on the same map: the converter
-			// rebinds it to the current run's decimal separator
+			// A StrNum comes from an array of a previous run: the converter rebinds it
+			// to the current run's decimal separator
 			return stringConverter.apply(value);
 		}
 		return value;
@@ -194,88 +189,38 @@ public final class ListAssocArray extends HashAssocArray {
 	}
 
 	/**
-	 * Converts nested lists and String values inside a Java map while preserving
-	 * the map instance itself when possible.
+	 * Copies a Java map into a new AWK associative array, normalizing every value.
 	 * <p>
-	 * Preserving the map keeps direct map insertion and retrieval fast in the AVM.
-	 * Only map values that actually change, nested lists and converted Strings,
-	 * are written back. A map that rejects the write (read-only or type-checked)
-	 * is copied into a {@link LinkedHashMap}, which is normalized and returned
-	 * instead, leaving the caller's map untouched. The map is removed from
-	 * {@code activeContainers} in {@code finally} so another branch can still
-	 * normalize the same shared map later.
+	 * The caller's map is never modified, so read-only, type-checked or
+	 * concurrent maps behave like any other, and the script's writes stay in the
+	 * copy. Keys are stored with AWK key semantics, and iteration follows the AWK
+	 * array's order, not the source map's. A map that contains itself is copied
+	 * as an empty array at the point of recursion, as lists are.
 	 * </p>
 	 *
-	 * @param map map value to normalize in place
-	 * @param sortedArrayKeys {@code true} when materialized lists should use
-	 *        sorted AWK array keys
+	 * @param values map to copy
+	 * @param sortedArrayKeys {@code true} to use sorted AWK array keys
 	 * @param stringConverter conversion applied to {@link String} values
 	 * @param activeContainers identity-based recursion stack for maps/lists
-	 * @return {@code map} itself, or its normalized copy when {@code map}
-	 *         rejected an update
+	 * @return an AWK associative array holding the normalized entries
 	 */
-	private static Map<Object, Object> normalizeMapValues(
-			Map<Object, Object> map,
+	private static AssocArray createFromMap(
+			Map<?, ?> values,
 			boolean sortedArrayKeys,
 			UnaryOperator<Object> stringConverter,
 			Set<Object> activeContainers) {
-		if (!activeContainers.add(map)) {
-			return map;
+		AssocArray array = AssocArray.create(sortedArrayKeys);
+		if (!activeContainers.add(values)) {
+			return array;
 		}
 		try {
-			for (Map.Entry<Object, Object> entry : map.entrySet()) {
-				Object originalValue = entry.getValue();
-				Object normalizedValue = normalizeValue(originalValue, sortedArrayKeys, stringConverter, activeContainers);
-				if (normalizedValue != originalValue && !replaceValue(map, entry, normalizedValue)) {
-					return normalizeMapValues(new LinkedHashMap<>(map), sortedArrayKeys, stringConverter, activeContainers);
-				}
+			for (Map.Entry<?, ?> entry : values.entrySet()) {
+				array.put(entry.getKey(), normalizeValue(entry.getValue(), sortedArrayKeys, stringConverter, activeContainers));
 			}
-			return map;
 		} finally {
-			activeContainers.remove(map);
+			activeContainers.remove(values);
 		}
-	}
-
-	/**
-	 * Writes a normalized value back into a map, through the entry when it
-	 * supports {@link Map.Entry#setValue(Object)}, otherwise through
-	 * {@link Map#put(Object, Object)}: some mutable maps, such as
-	 * {@link java.util.concurrent.ConcurrentSkipListMap}, return read-only entry
-	 * snapshots.
-	 *
-	 * @param map map being normalized
-	 * @param entry entry of {@code map} to update
-	 * @param value normalized value
-	 * @return {@code false} when {@code map} is read-only or rejects the value's
-	 *         type
-	 */
-	private static boolean replaceValue(Map<Object, Object> map, Map.Entry<Object, Object> entry, Object value) {
-		try {
-			entry.setValue(value);
-			return true;
-		} catch (UnsupportedOperationException ex) {
-			return putValue(map, entry.getKey(), value);
-		} catch (ClassCastException ex) {
-			return false;
-		}
-	}
-
-	/**
-	 * Writes a normalized value back into a map whose entries are read-only.
-	 *
-	 * @param map map being normalized
-	 * @param key key to update
-	 * @param value normalized value
-	 * @return {@code false} when {@code map} is read-only or rejects the value's
-	 *         type
-	 */
-	private static boolean putValue(Map<Object, Object> map, Object key, Object value) {
-		try {
-			map.put(key, value);
-			return true;
-		} catch (UnsupportedOperationException | ClassCastException ex) {
-			return false;
-		}
+		return array;
 	}
 
 	/**

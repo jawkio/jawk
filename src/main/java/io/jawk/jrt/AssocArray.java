@@ -326,9 +326,8 @@ public interface AssocArray extends Map<Object, Object> {
 	/**
 	 * Normalizes an externally supplied structured value before the AVM stores it.
 	 * <p>
-	 * {@link List} values are converted to {@link AssocArray} instances.
-	 * {@link Map} values are kept in place to preserve direct-map performance, but
-	 * their nested list values are recursively converted.
+	 * {@link List} and {@link Map} values, at any depth, are copied into new
+	 * {@link AssocArray} instances; the caller's containers are never modified.
 	 * </p>
 	 *
 	 * @param value value to normalize
@@ -346,8 +345,8 @@ public interface AssocArray extends Map<Object, Object> {
 	 * depth, with {@code stringConverter}.
 	 * <p>
 	 * The AVM passes {@code JRT::toInputScalar} so that nested strings become
-	 * numeric strings, like input fields. Mutable maps are updated in place; a
-	 * read-only or type-checked map that needs a change is copied instead.
+	 * numeric strings, like input fields. Lists and maps are copied, never
+	 * modified.
 	 * </p>
 	 *
 	 * @param value value to normalize

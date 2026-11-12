@@ -53,11 +53,11 @@ Awk awk = new Awk(settings);
 Object result = awk.eval("threshold");
 ```
 
-Values may be scalars such as `Long`, `Double`, and `String`, or associative-array-style values such as mutable `Map` instances, `List` instances, and `AssocArray`.
+Values may be scalars such as `Long`, `Double`, and `String`, or associative-array-style values such as `Map` instances (including `AssocArray`) and `List` instances.
 
-When you pass a plain Java `Map`, Jawk exposes it directly to the script. The runtime may mutate that map: it replaces nested `List` and `String` values with their AWK forms (see below), and the script may write to it. Pass a mutable map, and always when the script writes to it. A read-only or type-checked map is copied only when one of its own values needs converting, and the script's writes then go to the copy. A read-only map whose own values need no change (numbers, or nested maps only) is used as is and rejects the script's writes. Numeric AWK array indexes are represented as `Long` keys (e.g. `0L`, `1L`, `2L`).
+When you pass a Java `Map`, Jawk copies it into a new AWK associative array before the script runs. Your map is never modified, so read-only maps such as `Map.of(...)` work, and the script's writes, deletes and `split()` calls change only the copy: read results back with `eval()` or the script's output, not from the map you passed. Keys follow AWK rules in the copy, so the keys `"1"` and `1L` are the same element, and `for (k in arr)` follows the AWK array's order (see `useSortedArrayKeys`), not your map's. Numeric AWK array indexes are represented as `Long` keys (e.g. `0L`, `1L`, `2L`).
 
-When you pass a Java `List`, Jawk materializes it as an AWK associative array with zero-based `Long` indexes. This matches JSON array indexing in common Java JSON parsers while preserving normal AWK array behavior for writes, deletes, sparse indexes, and string keys:
+When you pass a Java `List`, Jawk copies it into an AWK associative array with zero-based `Long` indexes. This matches JSON array indexing in common Java JSON parsers while preserving normal AWK array behavior for writes, deletes, sparse indexes, and string keys:
 
 ```java
 List<String> values = Arrays.asList("aaa", "bbb", "ccc");
@@ -67,7 +67,7 @@ String result = awk.script("BEGIN { print values[0] }")
         .execute();
 ```
 
-Nested `Map` and `List` values are supported, so JSON-like object trees can be traversed with array syntax such as `payload["items"][0]["name"]`.
+Nested `Map` and `List` values are supported and copied the same way, at any depth, so JSON-like object trees can be traversed with array syntax such as `payload["items"][0]["name"]`.
 
 Every `String` inside an injected `Map` or `List`, at any depth, becomes a numeric string (strnum), like an input field or a top-level `String` variable: `"10"` compares as the number 10 (with the run's decimal separator), `"abc"` compares as text, and `typeof()` reports `strnum` or `string` accordingly. With `values = ["10"]`, `values[0] > 9` is true.
 

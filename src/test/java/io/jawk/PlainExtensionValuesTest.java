@@ -27,6 +27,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -220,6 +221,28 @@ public class PlainExtensionValuesTest {
 		public int rawSize(@JawkAssocArray @JawkRawValue AssocArray array) {
 			return array.size();
 		}
+
+		/**
+		 * Removes elements 1 and 2 through the key and entry sets, using string keys.
+		 *
+		 * @param array array holding the numeric keys 1 and 2
+		 * @return containment and removal results
+		 */
+		@JawkFunction("removeViaSets")
+		public String removeViaSets(@JawkAssocArray Map<Object, Object> array) {
+			return array.keySet().contains("1") + "," + array.keySet().remove("1") + ","
+					+ array.entrySet().contains(new AbstractMap.SimpleEntry<Object, Object>("2", "two")) + ","
+					+ array.entrySet().remove(new AbstractMap.SimpleEntry<Object, Object>("2", "two"));
+		}
+	}
+
+	@Test
+	public void keyAndEntrySetsMatchAwkKeys() throws Exception {
+		AwkTestSupport.awkTest("key and entry sets match keys like the AWK in operator")
+				.script("BEGIN { a[1] = \"one\"; a[2] = \"two\"; a[3] = \"x\"; print removeViaSets(a), length(a) }")
+				.withExtensions(new ValuesExtension())
+				.expectLines("true,true,true,true 1")
+				.runAndAssert();
 	}
 
 	@Test

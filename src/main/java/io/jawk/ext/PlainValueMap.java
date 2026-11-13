@@ -137,6 +137,64 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 		array.clear();
 	}
 
+	/**
+	 * Returns a live key set whose {@code contains} and {@code remove} match
+	 * keys like {@link #containsKey(Object)} and {@link #remove(Object)}.
+	 */
+	@Override
+	public Set<Object> keySet() {
+		return new AbstractSet<Object>() {
+			@Override
+			public int size() {
+				return array.size();
+			}
+
+			@Override
+			public void clear() {
+				array.clear();
+			}
+
+			@Override
+			public boolean contains(Object key) {
+				return containsKey(key);
+			}
+
+			@Override
+			public boolean remove(Object key) {
+				if (!containsKey(key)) {
+					return false;
+				}
+				PlainValueMap.this.remove(key);
+				return true;
+			}
+
+			@Override
+			public Iterator<Object> iterator() {
+				Iterator<Map.Entry<Object, Object>> entries = entrySet().iterator();
+				return new Iterator<Object>() {
+					@Override
+					public boolean hasNext() {
+						return entries.hasNext();
+					}
+
+					@Override
+					public Object next() {
+						return entries.next().getKey();
+					}
+
+					@Override
+					public void remove() {
+						entries.remove();
+					}
+				};
+			}
+		};
+	}
+
+	/**
+	 * Returns a live entry set whose {@code contains} and {@code remove} match
+	 * keys like {@link #containsKey(Object)} and compare plain values.
+	 */
 	@Override
 	public Set<Map.Entry<Object, Object>> entrySet() {
 		return new AbstractSet<Map.Entry<Object, Object>>() {
@@ -148,6 +206,24 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 			@Override
 			public void clear() {
 				array.clear();
+			}
+
+			@Override
+			public boolean contains(Object other) {
+				if (!(other instanceof Map.Entry)) {
+					return false;
+				}
+				Map.Entry<?, ?> entry = (Map.Entry<?, ?>) other;
+				return containsKey(entry.getKey()) && Objects.equals(get(entry.getKey()), entry.getValue());
+			}
+
+			@Override
+			public boolean remove(Object other) {
+				if (!contains(other)) {
+					return false;
+				}
+				PlainValueMap.this.remove(((Map.Entry<?, ?>) other).getKey());
+				return true;
 			}
 
 			@Override

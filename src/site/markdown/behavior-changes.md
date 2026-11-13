@@ -37,8 +37,8 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
   untyped values now reach extensions as `""` instead of internal objects
   ([#649](https://github.com/jawkio/jawk/issues/649)).
 - `strtonum()` of an untyped variable now makes it unassigned, as in gawk: `strtonum(u); print
-  typeof(u)` printed `untyped` and now prints `unassigned`
-  ([#649](https://github.com/jawkio/jawk/issues/649)).
+  typeof(u)` printed `untyped` and now prints `unassigned`. Programs compiled with `-K` by earlier
+  versions must be recompiled ([#649](https://github.com/jawkio/jawk/issues/649)).
 
 ## [v7.3.00](https://github.com/jawkio/jawk/releases/tag/v7.3.00) (2026-11-12)
 

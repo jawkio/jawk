@@ -158,6 +158,7 @@ Jawk's classes are designed for single-threaded use within each instance. The ke
 - **`AwkProgram` and `AwkExpression` are immutable.** Compiled artifacts can be safely shared across threads and reused by different `Awk` or `AVM` instances.
 - **`AwkSettings` should not be mutated during execution.** Configure settings before creating an `Awk` instance or before calling `script(...)`.
 - **`AwkSink` instances should not be shared** across concurrent executions unless the implementation is explicitly thread-safe.
+- **Extension instances can be shared** by several `Awk` instances and threads: an `AbstractExtension` resolves the runtime of the run that calls it (`getJrt()`, `getVm()`, `getSettings()`, `toAwkString()`), so each call uses the `CONVFMT`, variables and settings of its own run. State the extension keeps in its own fields is shared by all its callers, and must be thread-safe. See [Sharing an Extension Instance](extensions-writing.html#sharing-an-extension-instance).
 
 For concurrent AWK processing, create a separate `Awk` instance per thread:
 

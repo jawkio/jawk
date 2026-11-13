@@ -11,7 +11,7 @@ Modern Jawk extensions are small Java classes that expose AWK-callable functions
 
 [`AbstractExtension`](apidocs/io/jawk/ext/AbstractExtension.html) already handles common extension plumbing:
 
-- it stores the `VariableManager`, `JRT`, and `AwkSettings`
+- `getJrt()`, `getVm()`, `getSettings()`, and `toAwkString()` give the runtime, variables, and settings of the run that calls the extension
 - it scans the extension class for annotated functions
 - it builds the immutable keyword-to-function map returned to the parser and runtime
 
@@ -53,12 +53,15 @@ The extension receives a live view of the AWK array, not a copy:
 - Reads follow `Map` rules, not AWK rules: `get()` returns `null` for a missing key instead of creating the element, and `containsKey("1")` finds the element `1`, like `"1" in array`.
 - The same AWK array always reaches the call as the same view object, so `source == dest` still detects an array passed twice.
 - Writes (`put()`, `remove()`, `clear()`, `Map.Entry.setValue()`...) go straight to the AWK array, so the script sees them after the call.
+- Like an AWK array, a view has no string value: `toString()`, `toAwkString()`, `JRT.toDouble()` or `String.valueOf()` on a view (for example on a nested array read with `get()`) fail with "Attempting to use an array in a scalar context". Check `value instanceof Map` before converting an element that may be a subarray.
 
 To receive the `AssocArray` itself instead, add `@JawkRawValue` (see below).
 
 ## Plain Scalar Values
 
 Scalar arguments are plain Java values too: numbers and strings are passed as is, input-derived numeric strings (fields, `split()` pieces, `-v` values, strings nested in injected lists and maps) as their `String` text, and an unassigned variable as `""`, whatever the declared parameter type.
+
+Only `@JawkAssocArray` parameters receive arrays. An array passed to any other parameter (`Object`, `String`, `Object...`) fails with "Attempting to use an array in a scalar context", as when the script uses an array as a scalar, and the extension method is not called.
 
 Use `@JawkRawValue` to receive Jawk's own representation instead.
 
@@ -156,6 +159,16 @@ private Collection<Object> orderKeys(Map<Object, Object> array) {
     return sortIfNeeded(array);
 }
 ```
+
+## Sharing an Extension Instance
+
+An `AbstractExtension` does not store a runtime: `getJrt()`, `getVm()`, `getSettings()`, and `toAwkString()` return those of the run executing on the calling thread. One instance can therefore be registered in several `Awk` engines and called by concurrent runs on different threads: each call converts values with the `CONVFMT` of its own run and reads its own variables. When an extension function starts another run itself, the calling run is current again when that run returns.
+
+Keep the following in mind:
+
+- These methods are available while a run calls the extension (in an extension function, a `@JawkBeforeStart` method, or a hook such as `ForInKeyOrder`). Elsewhere, for example in a thread started by the extension, they throw `IllegalStateException`: read what you need before handing work to another thread.
+- Fields of the extension are shared by every run that uses the instance: keep them immutable or thread-safe.
+- `@JawkBeforeStart` methods run once per interpreter, so a shared instance runs them once for each engine that executes it.
 
 ## Making the Extension Available
 

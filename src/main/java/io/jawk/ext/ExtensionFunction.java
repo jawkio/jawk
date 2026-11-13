@@ -44,6 +44,7 @@ import io.jawk.ext.annotations.JawkOptional;
 import io.jawk.ext.annotations.JawkRawValue;
 import io.jawk.ext.annotations.JawkRegexp;
 import io.jawk.jrt.AssocArray;
+import io.jawk.jrt.AwkRuntimeException;
 import io.jawk.jrt.IllegalAwkArgumentException;
 
 /**
@@ -502,15 +503,20 @@ public final class ExtensionFunction implements Serializable {
 		return invocationArgs;
 	}
 
-	/** Converts an argument to a plain Java value unless its parameter opted in to raw values. */
+	/**
+	 * Converts an argument to a plain Java value unless its parameter opted in to
+	 * raw values. Only {@code @JawkAssocArray} parameters receive arrays: an
+	 * array reaching a plain scalar parameter is an array used in a scalar
+	 * context.
+	 */
 	private Object argumentValue(int parameterIndex, Object arg, Map<Map<Object, Object>, PlainValueMap> views) {
 		if (!plainValueParameters[parameterIndex]) {
 			return arg;
 		}
-		// views are only read for arrays, which scalar parameters never receive
-		return PlainValueMap.plain(
-				arg,
-				views == null && arg instanceof Map ? new IdentityHashMap<Map<Object, Object>, PlainValueMap>() : views);
+		if (arg instanceof Map && !assocArrayParameters[parameterIndex]) {
+			throw new AwkRuntimeException("Attempting to use an array in a scalar context.");
+		}
+		return PlainValueMap.plain(arg, views);
 	}
 
 	/**

@@ -20,6 +20,21 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
+- An AWK array passed to a scalar parameter of an extension function (any parameter without
+  `@JawkAssocArray`) fails again with "Attempting to use an array in a scalar context", as in
+  7.3.00, instead of reaching the extension as a `Map` that converts to text like `{1=x, 2=y}`.
+  The `Map` view an `@JawkAssocArray` parameter receives, and the nested arrays read through it,
+  now fail the same way when converted to a string or a number
+  ([#651](https://github.com/jawkio/jawk/issues/651)).
+- Breaking change for extension authors: an extension instance no longer stores the runtime of
+  the last engine that initialized it. `AbstractExtension.getJrt()`, `getVm()`, `getSettings()`,
+  and `toAwkString()` now return those of the run that calls the extension, so an instance shared
+  by several engines and threads no longer converts values with another run's `CONVFMT`. They
+  throw `IllegalStateException` when no run is executing on the calling thread.
+  `JawkExtension.init(VariableManager, JRT, AwkSettings)` is removed: use a `@JawkBeforeStart`
+  method (or override `beforeStart(AVM, JRT)`) for per-interpreter setup.
+  `AVM.current()` returns the interpreter executing on the calling thread, and
+  `AVM.getSettings()` is now public ([#652](https://github.com/jawkio/jawk/issues/652)).
 - A string array subscript is now the same element as an integer only when it is the integer's
   canonical text (`"7"`, `"-5"`, `"0"`), as in gawk and POSIX. `"007"`, `"0010"`, `"+3"` and `"-0"`
   were stored under the integers 7, 10, 3 and 0, so `h["007"]` and `h["7"]` were the same element,

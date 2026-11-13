@@ -42,7 +42,6 @@ import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jawk.backend.AVM;
 import io.jawk.ext.annotations.JawkAssocArray;
 import io.jawk.ext.annotations.JawkBeforeStart;
@@ -87,9 +86,6 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 			new HashSet<String>(
 					Arrays.asList("LC_ALL", "LC_COLLATE", "LC_CTYPE", "LC_MESSAGES", "LC_MONETARY", "LC_NUMERIC", "LC_TIME")));
 
-	/** Interpreter this per-engine extension instance is bound to. */
-	private AVM avm;
-
 	/** Comparison-function names already warned about; created on first use. */
 	private Set<String> warnedComparators;
 
@@ -98,14 +94,9 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 
 	/**
 	 * Creates the gawk compatibility extension.
-	 * <p>
-	 * The instance is bound to its interpreter by
-	 * {@link #initializeGawkVariables(AVM, JRT)}, which the runtime calls before
-	 * the script starts.
-	 * </p>
 	 */
 	public GawkExtension() {
-		// The interpreter is supplied by initializeGawkVariables(), not by construction.
+		// Per-engine state (warnings, textdomain bindings) is created on first use.
 	}
 
 	private static final class SortEntry {
@@ -126,17 +117,15 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 
 	/**
 	 * Installs the {@code PROCINFO["sorted_in"]} traversal order for
-	 * {@code for-in} loops and binds this per-engine extension instance to its
-	 * interpreter. SYMTAB and FUNCTAB are populated by the interpreter itself.
+	 * {@code for-in} loops. SYMTAB and FUNCTAB are populated by the interpreter
+	 * itself.
 	 *
 	 * @param avmParam interpreter about to execute
 	 * @param jrt runtime associated with {@code avmParam}
 	 */
 	@JawkBeforeStart
-	@SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "The extension is a per-engine instance deliberately bound to its interpreter")
 	public void initializeGawkVariables(AVM avmParam, JRT jrt) {
-		this.avm = avmParam;
-		avm.setForInKeyOrder(this::orderForInKeys);
+		avmParam.setForInKeyOrder(this::orderForInKeys);
 	}
 
 	/**
@@ -686,6 +675,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * being dispatched, e.g. {@code gawk: script.awk:4: warning: ...}.
 	 */
 	private void warnAtCurrentLine(String format, Object... args) {
+		AVM avm = AVM.current();
 		String source = avm == null ? null : avm.getSourceDescription();
 		String basename = source == null ? "" : new File(source).getName();
 		getJrt().printWarning(

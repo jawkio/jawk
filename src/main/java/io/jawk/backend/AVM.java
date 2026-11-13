@@ -146,6 +146,26 @@ public class AVM implements VariableManager, Closeable {
 
 	private static final int INITIAL_OPERAND_STACK_CAPACITY = 64;
 
+	/** Interpreter executing tuples on each thread (see {@link #current()}). */
+	private static final ThreadLocal<AVM> CURRENT = new ThreadLocal<AVM>();
+
+	/**
+	 * Returns the interpreter executing a program or an expression on the
+	 * calling thread.
+	 * <p>
+	 * Extensions resolve their runtime through it, so an extension instance
+	 * shared by several engines and threads always sees the run that calls it.
+	 * When an extension starts another run on the same thread, that run is
+	 * current until it returns.
+	 * </p>
+	 *
+	 * @return the executing interpreter, or {@code null} when no program or
+	 *         expression is executing on this thread
+	 */
+	public static AVM current() {
+		return CURRENT.get();
+	}
+
 	// stack methods
 	private Object pop() {
 		Object value = operandStack[--operandStackSize];
@@ -244,7 +264,6 @@ public class AVM implements VariableManager, Closeable {
 		executionSpecialVariables = baseSpecialVariables;
 
 		jrt = createJrt();
-		initExtensions();
 	}
 
 	/**
@@ -268,7 +287,8 @@ public class AVM implements VariableManager, Closeable {
 	 *
 	 * @return the settings, never {@code null}
 	 */
-	protected AwkSettings getSettings() {
+	@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "Extensions read the settings of the run that calls them")
+	public AwkSettings getSettings() {
 		return settings;
 	}
 
@@ -360,7 +380,7 @@ public class AVM implements VariableManager, Closeable {
 		jrt.setPosix(compiledExpression.isPosix());
 
 		try {
-			executeTuples(compiledExpression.top());
+			runTuples(compiledExpression.top());
 		} catch (ExitException e) {
 			// Expression tuples must never contain EXIT opcodes. If callers pass an
 			// invalid compiled expression, fail fast without poisoning later evals.
@@ -457,7 +477,7 @@ public class AVM implements VariableManager, Closeable {
 			jrt.applySpecialVariables(executionSpecialVariables);
 		}
 		rebindResolvedInputSource(resolvedSource);
-		executeTuples(compiledProgram.top());
+		runTuples(compiledProgram.top());
 	}
 
 	/**
@@ -530,7 +550,7 @@ public class AVM implements VariableManager, Closeable {
 			jrt.applySpecialVariables(executionSpecialVariables);
 		}
 		rebindResolvedInputSource(resolvedSource);
-		executeTuples(compiledProgram.top());
+		runTuples(compiledProgram.top());
 	}
 
 	/**
@@ -576,18 +596,6 @@ public class AVM implements VariableManager, Closeable {
 			applyGlobalsToStack(restoredGlobals);
 		}
 		mergedGlobalLayoutActive = false;
-	}
-
-	private void initExtensions() {
-		if (extensionInstances.isEmpty()) {
-			return;
-		}
-		Set<JawkExtension> initialized = new LinkedHashSet<JawkExtension>();
-		for (JawkExtension extension : extensionInstances.values()) {
-			if (initialized.add(extension)) {
-				extension.init(this, jrt, settings); // this = VariableManager
-			}
-		}
 	}
 
 	// Offsets for globals that remain runtime-managed by the tuple stream.
@@ -1104,6 +1112,26 @@ public class AVM implements VariableManager, Closeable {
 		Boolean arrayObj = globalVariableArrays.get(name);
 		if (Boolean.TRUE.equals(arrayObj) && !(value instanceof Map)) {
 			throw new IllegalArgumentException("Cannot assign a scalar to a non-scalar variable (" + name + ").");
+		}
+	}
+
+	/*
+	 * Binds this interpreter to the calling thread for the duration of the
+	 * execution (see current()). Kept out of executeTuples(), whose bytecode
+	 * size is at the JIT's HugeMethodLimit.
+	 */
+	private void runTuples(PositionTracker position) throws ExitException, IOException {
+		AVM previous = CURRENT.get();
+		CURRENT.set(this);
+		try {
+			executeTuples(position);
+		} finally {
+			if (previous == null) {
+				// do not keep the interpreter reachable from a pooled thread
+				CURRENT.remove();
+			} else {
+				CURRENT.set(previous);
+			}
 		}
 	}
 

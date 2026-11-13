@@ -20,8 +20,8 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
-- An AWK array passed to a scalar parameter of an extension function (any parameter without
-  `@JawkAssocArray`) fails again with "Attempting to use an array in a scalar context", as in
+- An AWK array passed to a plain scalar parameter of an extension function (without
+  `@JawkAssocArray`, `@JawkRawValue` or `@JawkIntrospect`) fails again with "Attempting to use an array in a scalar context", as in
   7.3.00, instead of reaching the extension as a `Map` that converts to text like `{1=x, 2=y}`.
   The `Map` view an `@JawkAssocArray` parameter receives, and the nested arrays read through it,
   now fail the same way when converted to a string or a number

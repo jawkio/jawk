@@ -61,7 +61,7 @@ To receive the `AssocArray` itself instead, add `@JawkRawValue` (see below).
 
 Scalar arguments are plain Java values too: numbers and strings are passed as is, input-derived numeric strings (fields, `split()` pieces, `-v` values, strings nested in injected lists and maps) as their `String` text, and an unassigned variable as `""`, whatever the declared parameter type.
 
-Only `@JawkAssocArray` parameters receive arrays. An array passed to any other parameter (`Object`, `String`, `Object...`) fails with "Attempting to use an array in a scalar context", as when the script uses an array as a scalar, and the extension method is not called.
+An array passed to a plain scalar parameter (`Object`, `String`, `Object...` without `@JawkRawValue` or `@JawkIntrospect`) fails with "Attempting to use an array in a scalar context", as when the script uses an array as a scalar, and the extension method is not called. Arrays reach `@JawkAssocArray` parameters, and reach `@JawkRawValue` and `@JawkIntrospect` scalars as is, so that functions such as `isarray()` can inspect them.
 
 Use `@JawkRawValue` to receive Jawk's own representation instead.
 

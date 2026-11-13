@@ -53,7 +53,9 @@ Awk awk = new Awk(settings);
 Object result = awk.eval("threshold");
 ```
 
-Values may be scalars such as `Long`, `Double`, and `String`, or associative-array-style values such as `Map` instances (including `AssocArray`) and `List` instances.
+Values may be scalars such as `Long`, `Double`, `String`, and `Boolean`, or associative-array-style values such as `Map` instances (including `AssocArray`) and `List` instances.
+
+AWK has no boolean type: a `Boolean`, as a variable or inside a `Map` or `List` at any depth, becomes the number 1 or 0, as gawk's `mkbool()` returns. It prints as `1` or `0`, works in conditions and arithmetic, and `typeof()` reports `number|bool`. A parsed JSON document can therefore be passed as is.
 
 When you pass a Java `Map`, Jawk copies it into a new AWK associative array before the script runs. Your map is never modified, so read-only maps such as `Map.of(...)` work, and the script's writes, deletes and `split()` calls change only the copy: read results back with `eval()` or the script's output, not from the map you passed. Use `String` or integral number keys: they follow AWK rules in the copy, so the keys `"1"` and `1L` are the same element. Other keys, such as `Double.valueOf(1.5)`, are copied as they are, and an AWK subscript cannot reach them. `for (k in arr)` follows the AWK array's order (see `useSortedArrayKeys`), not your map's. Numeric AWK array indexes are represented as `Long` keys (e.g. `0L`, `1L`, `2L`).
 

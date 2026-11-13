@@ -136,9 +136,11 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 		return containsKey(key) ? plain(array.get(unwrap(key))) : null;
 	}
 
+	/** Stores a {@link Boolean} as the boolean-typed number 1 or 0. */
 	@Override
 	public Object put(Object key, Object value) {
-		return plain(array.put(unwrap(key), unwrap(value)));
+		Object stored = value instanceof Boolean ? new GawkBool((Boolean) value) : unwrap(value);
+		return plain(array.put(unwrap(key), stored));
 	}
 
 	@Override

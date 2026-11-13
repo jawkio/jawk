@@ -584,4 +584,24 @@ public class AssocArrayTest {
 				.expectLines("[] 0")
 				.runAndAssert();
 	}
+
+	@Test
+	public void testNonCanonicalIntegerStringsAreDistinctSubscripts() throws Exception {
+		String script = "{ h[\"007\"] = 1; h[\"7\"] = 2; h[\"042\"] = 3; h[\"+3\"] = 4; h[\"-0\"] = 5; h[\"0010\"] = 6; "
+				+ "h[-5] = 7; h[\"-5\"] = 8; h[0] = 9; h[\"0\"] = 10; h[$1] = 11; h[$2] = 12; " + "n = 0; for (k in h) n++; "
+				+ "print n, (42 in h), (\"042\" in h), (7 in h), h[7], h[\"007\"], (3 in h), (0 in h), h[0], h[-5], h[9], h[\"09\"] }";
+		AwkTestSupport.awkTest("integer strings other than the canonical text are distinct subscripts")
+				.script(script)
+				.stdin("09 9\n")
+				.expectLines("10 0 1 1 2 1 0 1 10 8 12 11")
+				.runAndAssert();
+		AwkSettings settings = new AwkSettings();
+		settings.setUseSortedArrayKeys(true);
+		AwkTestSupport.awkTest("integer strings other than the canonical text are distinct sorted subscripts")
+				.script(script)
+				.withAwk(new Awk(settings))
+				.stdin("09 9\n")
+				.expectLines("10 0 1 1 2 1 0 1 10 8 12 11")
+				.runAndAssert();
+	}
 }

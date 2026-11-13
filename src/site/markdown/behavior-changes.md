@@ -20,6 +20,13 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
+- A string array subscript is now the same element as an integer only when it is the integer's
+  canonical text (`"7"`, `"-5"`, `"0"`), as in gawk and POSIX. `"007"`, `"0010"`, `"+3"` and `"-0"`
+  were stored under the integers 7, 10, 3 and 0, so `h["007"]` and `h["7"]` were the same element,
+  `for (k in h)` printed `42` for `h["042"]`, and `(42 in h)` was true. They are now distinct
+  string subscripts, also in the keys an extension reads through an `@JawkAssocArray` view
+  ([#653](https://github.com/jawkio/jawk/issues/653)).
+
 - Breaking change for extension authors: extension functions now receive plain Java values. An
   input-derived numeric string (a field, a `split()` piece, a `-v` value, a string nested in an
   injected `List` or `Map`...) used to reach the extension as an internal `io.jawk.jrt.StrNum`

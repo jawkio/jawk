@@ -32,6 +32,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -94,6 +95,9 @@ public final class ExtensionFunction implements Serializable {
 	 */
 	private transient boolean[] plainValueParameters;
 
+	/** Whether any parameter receives a plain-value array view. */
+	private transient boolean plainArrayViews;
+
 	ExtensionFunction(String keywordParam, Method methodParam) {
 		this.keyword = validateKeyword(keywordParam, methodParam);
 		this.declaringType = resolveDeclaringType(methodParam);
@@ -128,6 +132,10 @@ public final class ExtensionFunction implements Serializable {
 		// validation only: @JawkStrNum changes the passed value, not the evaluation
 		scanObjectParameterIndexes(methodParam, methodParam.getParameters(), JawkStrNum.class);
 		this.plainValueParameters = plainParameters(methodParam.getParameters());
+		this.plainArrayViews = false;
+		for (int idx = 0; idx < plainValueParameters.length; idx++) {
+			plainArrayViews |= plainValueParameters[idx] && assocArrayParameters[idx];
+		}
 	}
 
 	/*
@@ -449,11 +457,13 @@ public final class ExtensionFunction implements Serializable {
 
 	private Object[] prepareArguments(Object[] args) {
 		int argCount = args == null ? 0 : args.length;
+		// one view per AWK array for the whole call, so aliases stay detectable
+		Map<AssocArray, PlainValueMap> views = plainArrayViews ? new IdentityHashMap<AssocArray, PlainValueMap>() : null;
 		if (!varArgs) {
 			// Omitted optional trailing arguments are passed as null
 			Object[] invocationArgs = new Object[parameterTypes.length];
 			for (int idx = 0; idx < argCount; idx++) {
-				invocationArgs[idx] = argumentValue(idx, args[idx]);
+				invocationArgs[idx] = argumentValue(idx, args[idx], views);
 			}
 			return invocationArgs;
 		}
@@ -462,21 +472,27 @@ public final class ExtensionFunction implements Serializable {
 		}
 		Object[] invocationArgs = new Object[mandatoryParameterCount + 1];
 		for (int idx = 0; idx < mandatoryParameterCount; idx++) {
-			invocationArgs[idx] = argumentValue(idx, args[idx]);
+			invocationArgs[idx] = argumentValue(idx, args[idx], views);
 		}
 		int varArgCount = argCount - mandatoryParameterCount;
 		Class<?> componentType = parameterTypes[parameterTypes.length - 1].getComponentType();
 		Object varArgArray = Array.newInstance(componentType, varArgCount);
 		for (int idx = 0; idx < varArgCount; idx++) {
-			Array.set(varArgArray, idx, argumentValue(mandatoryParameterCount, args[mandatoryParameterCount + idx]));
+			Array.set(varArgArray, idx, argumentValue(mandatoryParameterCount, args[mandatoryParameterCount + idx], views));
 		}
 		invocationArgs[mandatoryParameterCount] = varArgArray;
 		return invocationArgs;
 	}
 
 	/** Converts an argument to a plain Java value unless its parameter opted in to raw values. */
-	private Object argumentValue(int parameterIndex, Object arg) {
-		return plainValueParameters[parameterIndex] ? PlainValueMap.plain(arg) : arg;
+	private Object argumentValue(int parameterIndex, Object arg, Map<AssocArray, PlainValueMap> views) {
+		if (!plainValueParameters[parameterIndex]) {
+			return arg;
+		}
+		// views are only read for arrays, which scalar parameters never receive
+		return PlainValueMap.plain(
+				arg,
+				views == null && arg instanceof AssocArray ? new IdentityHashMap<AssocArray, PlainValueMap>() : views);
 	}
 
 	/**

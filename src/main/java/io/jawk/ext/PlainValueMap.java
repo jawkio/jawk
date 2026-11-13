@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import io.jawk.jrt.AssocArray;
 import io.jawk.jrt.StrNum;
 
 /**
@@ -38,28 +39,41 @@ import io.jawk.jrt.StrNum;
  */
 final class PlainValueMap extends AbstractMap<Object, Object> {
 
-	private final Map<Object, Object> array;
+	private final AssocArray array;
 
-	PlainValueMap(Map<Object, Object> arrayParam) {
+	/**
+	 * Views created for one extension call, shared by all its arguments and
+	 * nested arrays, so the same AWK array always maps to the same view and
+	 * aliases ({@code source == dest}) stay detectable.
+	 */
+	private final Map<AssocArray, PlainValueMap> views;
+
+	private PlainValueMap(AssocArray arrayParam, Map<AssocArray, PlainValueMap> viewsParam) {
 		this.array = arrayParam;
+		this.views = viewsParam;
 	}
 
 	/**
 	 * Converts a runtime value into the plain Java value extensions receive.
 	 *
 	 * @param value runtime value
-	 * @return the {@code String} text of a {@link StrNum}, a view of an array,
-	 *         or the value itself
+	 * @param views views already created for the current extension call, keyed
+	 *        by identity
+	 * @return the {@code String} text of a {@link StrNum}, the view of an AWK
+	 *         array, or the value itself
 	 */
-	@SuppressWarnings("unchecked")
-	static Object plain(Object value) {
+	static Object plain(Object value, Map<AssocArray, PlainValueMap> views) {
 		if (value instanceof StrNum) {
 			return value.toString();
 		}
-		if (value instanceof Map && !(value instanceof PlainValueMap)) {
-			return new PlainValueMap((Map<Object, Object>) value);
+		if (value instanceof AssocArray) {
+			return views.computeIfAbsent((AssocArray) value, array -> new PlainValueMap(array, views));
 		}
 		return value;
+	}
+
+	private Object plain(Object value) {
+		return plain(value, views);
 	}
 
 	@Override
@@ -69,12 +83,17 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 
 	@Override
 	public boolean containsKey(Object key) {
-		return array.containsKey(key);
+		return array.isIn(key);
 	}
 
+	/**
+	 * Returns the plain value of an element, or {@code null} when the element
+	 * does not exist. Unlike an AWK array reference, reading a missing element
+	 * does not create it.
+	 */
 	@Override
 	public Object get(Object key) {
-		return plain(array.get(key));
+		return array.isIn(key) ? plain(array.get(key)) : null;
 	}
 
 	@Override
@@ -129,7 +148,7 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 	}
 
 	/** Entry whose value reads plain and writes through to the AWK array. */
-	private static final class PlainEntry implements Map.Entry<Object, Object> {
+	private final class PlainEntry implements Map.Entry<Object, Object> {
 
 		private final Map.Entry<Object, Object> entry;
 

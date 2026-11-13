@@ -125,6 +125,48 @@ public class PlainExtensionValuesTest {
 			}
 			return 1;
 		}
+
+		/**
+		 * Looks up missing and present keys through the plain view.
+		 *
+		 * @param array array
+		 * @return lookup results
+		 */
+		@JawkFunction("lookup")
+		public String lookup(@JawkAssocArray Map<Object, Object> array) {
+			return array.get("nope") + "," + array.getOrDefault("nope", "dflt") + "," + array.containsKey("1") + ","
+					+ array.get("1") + "," + array.computeIfAbsent("made", key -> "m");
+		}
+
+		/**
+		 * Reports whether views of the same AWK array are the same object.
+		 *
+		 * @param first first array
+		 * @param second second array
+		 * @return identity results for the arguments and a nested array
+		 */
+		@JawkFunction("same")
+		public String same(@JawkAssocArray Map<Object, Object> first, @JawkAssocArray Map<Object, Object> second) {
+			return (first == second) + "," + (first.get("sub") == second.get("sub"));
+		}
+	}
+
+	@Test
+	public void missingKeyReadsDoNotCreateElements() throws Exception {
+		AwkTestSupport.awkTest("reading a missing key through the plain view does not create it")
+				.script("BEGIN { a[1] = \"one\"; print lookup(a); print (\"nope\" in a), a[\"made\"], length(a) }")
+				.withExtensions(new ValuesExtension())
+				.expectLines("null,dflt,true,one,m", "0 m 2")
+				.runAndAssert();
+	}
+
+	@Test
+	public void sameArrayGetsSameView() throws Exception {
+		AwkTestSupport.awkTest("an array passed twice reaches the extension as one view")
+				.script("BEGIN { a[\"sub\"][1] = 1; b[\"sub\"][1] = 1; print same(a, a), same(a, b) }")
+				.withExtensions(new ValuesExtension())
+				.expectLines("true,true false,false")
+				.runAndAssert();
 	}
 
 	@Test

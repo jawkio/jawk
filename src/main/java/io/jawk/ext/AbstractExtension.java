@@ -57,8 +57,10 @@ import io.jawk.util.AwkSettings;
  */
 public abstract class AbstractExtension implements JawkExtension {
 
-	private Map<String, ExtensionFunction> annotatedFunctions;
-	private List<Method> beforeStartMethods;
+	// volatile: a shared instance may compute these on several threads, and
+	// each thread must see a fully built map or list
+	private volatile Map<String, ExtensionFunction> annotatedFunctions;
+	private volatile List<Method> beforeStartMethods;
 
 	/**
 	 * Creates an extension.

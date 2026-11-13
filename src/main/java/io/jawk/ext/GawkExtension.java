@@ -33,12 +33,12 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.GregorianCalendar;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -86,17 +86,22 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 			new HashSet<String>(
 					Arrays.asList("LC_ALL", "LC_COLLATE", "LC_CTYPE", "LC_MESSAGES", "LC_MONETARY", "LC_NUMERIC", "LC_TIME")));
 
-	/** Comparison-function names already warned about; created on first use. */
-	private Set<String> warnedComparators;
+	/*
+	 * Engine-wide state. Concurrent collections, because one instance may be
+	 * shared by engines running on several threads.
+	 */
 
-	/** Per-domain directory bindings established by {@code bindtextdomain()}; created on first use. */
-	private Map<String, String> textdomainBindings;
+	/** Comparison-function names already warned about. */
+	private final Set<String> warnedComparators = ConcurrentHashMap.newKeySet();
+
+	/** Per-domain directory bindings established by {@code bindtextdomain()}. */
+	private final Map<String, String> textdomainBindings = new ConcurrentHashMap<String, String>();
 
 	/**
 	 * Creates the gawk compatibility extension.
 	 */
 	public GawkExtension() {
-		// Per-engine state (warnings, textdomain bindings) is created on first use.
+		// No per-run state: the runtime is resolved per call.
 	}
 
 	private static final class SortEntry {
@@ -653,9 +658,6 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 			return "";
 		}
 		String directoryName = toAwkString(directory);
-		if (textdomainBindings == null) {
-			textdomainBindings = new HashMap<String, String>();
-		}
 		if (!directoryName.isEmpty()) {
 			textdomainBindings.put(domainName, directoryName);
 		}
@@ -727,9 +729,6 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	}
 
 	private void warnUnsupportedComparator(String name) {
-		if (warnedComparators == null) {
-			warnedComparators = new HashSet<String>();
-		}
 		if (warnedComparators.add(name)) {
 			warnAtCurrentLine("sort comparison function `%s' is not supported; using default ordering", name);
 		}

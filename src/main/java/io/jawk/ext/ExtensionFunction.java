@@ -458,7 +458,9 @@ public final class ExtensionFunction implements Serializable {
 	private Object[] prepareArguments(Object[] args) {
 		int argCount = args == null ? 0 : args.length;
 		// one view per AWK array for the whole call, so aliases stay detectable
-		Map<AssocArray, PlainValueMap> views = plainArrayViews ? new IdentityHashMap<AssocArray, PlainValueMap>() : null;
+		Map<Map<Object, Object>, PlainValueMap> views = plainArrayViews ?
+				new IdentityHashMap<Map<Object, Object>, PlainValueMap>() :
+				null;
 		if (!varArgs) {
 			// Omitted optional trailing arguments are passed as null
 			Object[] invocationArgs = new Object[parameterTypes.length];
@@ -485,14 +487,14 @@ public final class ExtensionFunction implements Serializable {
 	}
 
 	/** Converts an argument to a plain Java value unless its parameter opted in to raw values. */
-	private Object argumentValue(int parameterIndex, Object arg, Map<AssocArray, PlainValueMap> views) {
+	private Object argumentValue(int parameterIndex, Object arg, Map<Map<Object, Object>, PlainValueMap> views) {
 		if (!plainValueParameters[parameterIndex]) {
 			return arg;
 		}
 		// views are only read for arrays, which scalar parameters never receive
 		return PlainValueMap.plain(
 				arg,
-				views == null && arg instanceof AssocArray ? new IdentityHashMap<AssocArray, PlainValueMap>() : views);
+				views == null && arg instanceof Map ? new IdentityHashMap<Map<Object, Object>, PlainValueMap>() : views);
 	}
 
 	/**

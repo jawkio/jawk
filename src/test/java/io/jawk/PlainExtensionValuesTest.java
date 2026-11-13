@@ -22,6 +22,7 @@ package io.jawk;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -149,6 +150,47 @@ public class PlainExtensionValuesTest {
 		public String same(@JawkAssocArray Map<Object, Object> first, @JawkAssocArray Map<Object, Object> second) {
 			return (first == second) + "," + (first.get("sub") == second.get("sub"));
 		}
+
+		/**
+		 * Copies a nested array from one view to another, and sets every value
+		 * of the destination to {@code null} through its entries.
+		 *
+		 * @param source array holding {@code sub}
+		 * @param dest array receiving {@code sub}
+		 * @param cleared array whose values are set to {@code null}
+		 * @return 1
+		 */
+		@JawkFunction("copyAndClear")
+		public int copyAndClear(
+				@JawkAssocArray Map<Object, Object> source,
+				@JawkAssocArray Map<Object, Object> dest,
+				@JawkAssocArray Map<Object, Object> cleared) {
+			dest.put("sub", source.get("sub"));
+			cleared.replaceAll((key, value) -> null);
+			return 1;
+		}
+	}
+
+	@Test
+	public void writesStoreAwkValues() throws Exception {
+		AwkTestSupport.awkTest("views and nulls written through the plain view become AWK values")
+				.script(
+						"BEGIN { s[\"sub\"][1] = 1; c[\"x\"] = 1; copyAndClear(s, d, c); "
+								+ "print describeRaw(d), describeRaw(c), length(c) }")
+				.withExtensions(new ValuesExtension())
+				.expectLines("A{sub=A{1=Long}} A{x=UntypedObject} 1")
+				.runAndAssert();
+	}
+
+	@Test
+	public void plainViewWrapsAnyMap() {
+		ValuesExtension extension = new ValuesExtension();
+		Map<Object, Object> nested = new HashMap<Object, Object>();
+		nested.put("n", Long.valueOf(1L));
+		Map<Object, Object> map = new HashMap<Object, Object>();
+		map.put("sub", nested);
+		Object description = extension.getExtensionFunctions().get("describe").invoke(extension, new Object[] { map });
+		assertEquals("V{sub=V{n=Long}}", description);
 	}
 
 	@Test

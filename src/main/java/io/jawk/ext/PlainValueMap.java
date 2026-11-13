@@ -36,19 +36,24 @@ import io.jawk.jrt.StrNum;
  * Live view of an AWK array handed to extension functions by default: reads
  * return plain Java values (a {@link StrNum} as its {@code String} text, a
  * nested array as another view), writes go straight to the AWK array.
+ * <p>
+ * The backing array is usually an {@link AssocArray}, but any {@link Map} the
+ * runtime accepts as an array (such as a map returned by an extension) is
+ * viewed the same way.
+ * </p>
  */
 final class PlainValueMap extends AbstractMap<Object, Object> {
 
-	private final AssocArray array;
+	private final Map<Object, Object> array;
 
 	/**
 	 * Views created for one extension call, shared by all its arguments and
 	 * nested arrays, so the same AWK array always maps to the same view and
 	 * aliases ({@code source == dest}) stay detectable.
 	 */
-	private final Map<AssocArray, PlainValueMap> views;
+	private final Map<Map<Object, Object>, PlainValueMap> views;
 
-	private PlainValueMap(AssocArray arrayParam, Map<AssocArray, PlainValueMap> viewsParam) {
+	private PlainValueMap(Map<Object, Object> arrayParam, Map<Map<Object, Object>, PlainValueMap> viewsParam) {
 		this.array = arrayParam;
 		this.views = viewsParam;
 	}
@@ -62,12 +67,13 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 	 * @return the {@code String} text of a {@link StrNum}, the view of an AWK
 	 *         array, or the value itself
 	 */
-	static Object plain(Object value, Map<AssocArray, PlainValueMap> views) {
+	@SuppressWarnings("unchecked")
+	static Object plain(Object value, Map<Map<Object, Object>, PlainValueMap> views) {
 		if (value instanceof StrNum) {
 			return value.toString();
 		}
-		if (value instanceof AssocArray) {
-			return views.computeIfAbsent((AssocArray) value, array -> new PlainValueMap(array, views));
+		if (value instanceof Map && !(value instanceof PlainValueMap)) {
+			return views.computeIfAbsent((Map<Object, Object>) value, map -> new PlainValueMap(map, views));
 		}
 		return value;
 	}
@@ -76,14 +82,26 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 		return plain(value, views);
 	}
 
+	/**
+	 * Returns the value to store in the AWK array: the array behind a view,
+	 * so a nested array copied from one view to another stays an AWK array.
+	 */
+	private static Object unwrap(Object value) {
+		return value instanceof PlainValueMap ? ((PlainValueMap) value).array : value;
+	}
+
 	@Override
 	public int size() {
 		return array.size();
 	}
 
+	/**
+	 * Returns whether the element exists. Keys of an {@link AssocArray} follow
+	 * the AWK {@code in} operator, so {@code "1"} finds the element {@code 1}.
+	 */
 	@Override
 	public boolean containsKey(Object key) {
-		return array.isIn(key);
+		return array instanceof AssocArray ? ((AssocArray) array).isIn(key) : array.containsKey(key);
 	}
 
 	/**
@@ -93,12 +111,12 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 	 */
 	@Override
 	public Object get(Object key) {
-		return array.isIn(key) ? plain(array.get(key)) : null;
+		return containsKey(key) ? plain(array.get(key)) : null;
 	}
 
 	@Override
 	public Object put(Object key, Object value) {
-		return plain(array.put(key, value));
+		return plain(array.put(key, unwrap(value)));
 	}
 
 	@Override
@@ -166,9 +184,14 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 			return plain(entry.getValue());
 		}
 
+		/**
+		 * Stores the value through the array's {@code put}, which applies the
+		 * AWK rules (a {@code null} becomes the untyped marker). Replacing the
+		 * value of an existing key does not disturb the iteration.
+		 */
 		@Override
 		public Object setValue(Object value) {
-			return plain(entry.setValue(value));
+			return put(entry.getKey(), value);
 		}
 
 		@Override

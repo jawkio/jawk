@@ -342,7 +342,8 @@ public interface AssocArray extends Map<Object, Object> {
 	 * <p>
 	 * The AVM passes {@code JRT::toInputScalar} so that nested strings become
 	 * numeric strings, like input fields. Lists and maps are copied, never
-	 * modified.
+	 * modified. A {@link Boolean}, at any depth, becomes the boolean-typed
+	 * number 1 or 0, as gawk's {@code mkbool()} returns.
 	 * </p>
 	 *
 	 * @param value value to normalize

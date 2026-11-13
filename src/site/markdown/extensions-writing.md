@@ -52,7 +52,7 @@ The extension receives a live view of the AWK array, not a copy:
 - Reads (`get()`, `entrySet()`, `values()`, iteration...) return plain Java values: an input-derived numeric string as its `String` text, a blank or untyped element as `""`, numbers as is, and a nested array as another such view. The view can be handed to libraries such as Jackson as an ordinary `Map`.
 - Reads follow `Map` rules, not AWK rules: `get()` returns `null` for a missing key instead of creating the element, and `containsKey("1")` finds the element `1`, like `"1" in array`.
 - The same AWK array always reaches the call as the same view object, so `source == dest` still detects an array passed twice.
-- Writes (`put()`, `remove()`, `clear()`, `Map.Entry.setValue()`...) go straight to the AWK array, so the script sees them after the call.
+- Writes (`put()`, `remove()`, `clear()`, `Map.Entry.setValue()`...) go straight to the AWK array, so the script sees them after the call. A `Boolean` is stored as the number 1 or 0, as gawk's `mkbool()` returns (`typeof()` reports `number|bool`).
 - Like an AWK array, a view has no string value: `toString()`, `toAwkString()`, `JRT.toDouble()` or `String.valueOf()` on a view (for example on a nested array read with `get()`) fail with "Attempting to use an array in a scalar context". Check `value instanceof Map` before converting an element that may be a subarray.
 
 To receive the `AssocArray` itself instead, add `@JawkRawValue` (see below).
@@ -114,6 +114,10 @@ public long isArray(@JawkIntrospect Object value) {
 ```
 
 This is how the built-in gawk compatibility extension implements `typeof()` and `isarray()`.
+
+## Return Booleans
+
+An extension function may return a `Boolean` (or `boolean`): the script receives the number 1 or 0, as gawk's `mkbool()` returns, so `if (f())` works and `typeof(f())` reports `number|bool`. A `Boolean` inside a returned `Map`, or in a `Map` or `List` copied with `AssocArray.normalizeValue()`, is converted the same way.
 
 ## Return Arrays
 

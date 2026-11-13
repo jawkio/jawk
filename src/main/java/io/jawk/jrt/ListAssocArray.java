@@ -85,7 +85,8 @@ public final class ListAssocArray extends HashAssocArray {
 	 * Normalizes a value supplied from Java before it is stored in the AVM.
 	 * <p>
 	 * Lists and maps, at any depth, are copied into new AWK arrays; the caller's
-	 * containers are never modified.
+	 * containers are never modified. A {@link Boolean}, at any depth, becomes
+	 * the boolean-typed number 1 or 0.
 	 * </p>
 	 *
 	 * @param value value to normalize
@@ -127,6 +128,10 @@ public final class ListAssocArray extends HashAssocArray {
 			// A StrNum comes from an array of a previous run: the converter rebinds it
 			// to the current run's decimal separator
 			return stringConverter.apply(value);
+		}
+		if (value instanceof Boolean) {
+			// AWK has no boolean: 1 or 0, typed as gawk's mkbool() values are
+			return new GawkBool((Boolean) value);
 		}
 		return value;
 	}

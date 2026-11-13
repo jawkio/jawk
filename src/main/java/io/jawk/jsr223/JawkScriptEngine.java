@@ -143,6 +143,10 @@ public class JawkScriptEngine extends AbstractScriptEngine {
 	}
 
 	private static boolean isSupportedBindingValue(Object value) {
-		return value instanceof String || value instanceof Number || value instanceof Map || value instanceof List;
+		return value instanceof String
+				|| value instanceof Number
+				|| value instanceof Boolean
+				|| value instanceof Map
+				|| value instanceof List;
 	}
 }

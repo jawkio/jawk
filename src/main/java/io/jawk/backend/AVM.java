@@ -264,6 +264,10 @@ public class AVM implements VariableManager, Closeable {
 		executionSpecialVariables = baseSpecialVariables;
 
 		jrt = createJrt();
+		// Normalized like per-run overrides and assignVariable(), so that a
+		// settings variable the script never references (read through SYMTAB, or
+		// by an extension through getVariable()) is an AWK value too
+		baseInitialVariables.replaceAll((name, value) -> normalizeExternalVariableValue(value));
 	}
 
 	/**
@@ -3121,9 +3125,10 @@ public class AVM implements VariableManager, Closeable {
 		if (result == null) {
 			return "";
 		}
-		if (result instanceof Map && !(result instanceof AssocArray)) {
+		if (result instanceof Boolean || result instanceof Map && !(result instanceof AssocArray)) {
 			// a Java map becomes an AWK array, as an injected one does: AWK keys,
-			// and no Java toString() when the script uses it as a scalar
+			// and no Java toString() when the script uses it as a scalar; a
+			// Boolean becomes the boolean-typed number 1 or 0
 			return AssocArray.normalizeValue(result, sortedArrayKeys);
 		}
 		if (result instanceof Number || result instanceof String || result instanceof Map) {
@@ -4483,7 +4488,7 @@ public class AVM implements VariableManager, Closeable {
 		if (value instanceof String) {
 			return jrt.toInputScalar(value);
 		}
-		if (!(value instanceof Map) && !(value instanceof List)) {
+		if (!(value instanceof Map) && !(value instanceof List) && !(value instanceof Boolean)) {
 			return value;
 		}
 		// toString() also rebinds a StrNum left by a previous run to this run's

@@ -52,6 +52,7 @@ import io.jawk.ext.annotations.JawkRawValue;
 import io.jawk.ext.annotations.JawkRegexp;
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.intermediate.UntypedObject;
+import io.jawk.jrt.GawkBool;
 import io.jawk.jrt.IllegalAwkArgumentException;
 import io.jawk.jrt.JRT;
 import io.jawk.jrt.StrNum;

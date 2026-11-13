@@ -78,6 +78,22 @@ public class ScriptEngineTest {
 	}
 
 	@Test
+	public void testJawkScriptEngineAcceptsBooleanBinding() throws Exception {
+		ScriptEngine engine = new ScriptEngineManager().getEngineByName("jawk");
+		assertNotNull("Jawk ScriptEngine not found", engine);
+
+		Bindings bindings = engine.createBindings();
+		bindings.put("enabled", Boolean.TRUE);
+
+		StringWriter result = new StringWriter();
+		engine.getContext().setWriter(new PrintWriter(result));
+
+		engine.eval("BEGIN { print enabled, (enabled ? \"on\" : \"off\") }", bindings);
+
+		assertEquals("1 on\n", result.toString());
+	}
+
+	@Test
 	public void factoryReportsTheRunningJawkVersion() {
 		ScriptEngineFactory factory = factory();
 

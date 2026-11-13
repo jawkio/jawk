@@ -553,6 +553,11 @@ public class JRT {
 	 *         {@code false} when the assignment was not handled
 	 */
 	public boolean applySpecialVariable(String name, Object value) {
+		if (value instanceof Boolean) {
+			// special variables come straight from the settings and the per-run
+			// overrides: a Java Boolean is AWK's 1 or 0 here too
+			return applySpecialVariable(name, new GawkBool((Boolean) value));
+		}
 		switch (name) {
 		case "FS":
 			setFS(value);
@@ -1470,6 +1475,7 @@ public class JRT {
 	 *         <li><strong>Integer</strong> - o.intValue() != 0
 	 *         <li><strong>Long</strong> - o.longValue() != 0
 	 *         <li><strong>Double</strong> - o.doubleValue() != 0
+	 *         <li><strong>Number</strong> (any other) - o.doubleValue() != 0
 	 *         <li><strong>String</strong> - o.length() &gt; 0
 	 *         <li><strong>UninitializedObject</strong> - false
 	 *         <li><strong>Pattern</strong> - $0 ~ o
@@ -1498,6 +1504,9 @@ public class JRT {
 			String s = inputField instanceof UninitializedObject ? "" : inputField.toString();
 			Matcher matcher = pattern.matcher(s);
 			val = matcher.find();
+		} else if (o instanceof Number) {
+			// any other number, such as a boolean-typed number or a Float from Java
+			val = ((Number) o).doubleValue() != 0;
 		} else {
 			throw new Error("Unknown operand_stack type: " + o.getClass() + " for value " + o);
 		}

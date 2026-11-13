@@ -1,4 +1,4 @@
-package io.jawk.ext;
+package io.jawk.jrt;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -23,7 +23,9 @@ package io.jawk.ext;
  */
 
 /**
- * Numeric value carrying gawk's boolean type attribute.
+ * Numeric value carrying gawk's boolean type attribute: what gawk's
+ * {@code mkbool()} returns, and what a {@link Boolean} handed to a script by
+ * Java code becomes.
  */
 public final class GawkBool extends Number {
 

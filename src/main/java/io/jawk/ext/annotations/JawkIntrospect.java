@@ -28,18 +28,18 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marks an extension function scalar parameter that receives input-derived
- * numeric strings as {@link io.jawk.jrt.StrNum} instances instead of their
- * {@code String} text.
+ * Marks an extension function parameter used to inspect an AWK value: the
+ * parameter receives the value exactly as the runtime stores it, and an
+ * untyped variable or a missing array element is passed without being turned
+ * into an assigned scalar.
  * <p>
- * Without this marker, extension functions receive plain Java values. Use it
- * when the function must tell an input-derived {@code "0"} (a strnum, false
- * in a boolean context) from the string constant {@code "0"} (true), for
- * example through {@link io.jawk.jrt.JRT#toBoolean(Object)}. Unlike
- * {@link JawkRawValue}, the argument is evaluated like any scalar argument.
- * The annotated Java parameter must be declared as {@link Object}.
+ * Because the value can be an untyped placeholder, an uninitialized value, an
+ * associative array, a precompiled regexp, or one of Jawk's raw scalar values
+ * (see {@link JawkRawValue}), the annotated Java parameter must be declared as
+ * {@link Object}. Type-introspection functions such as gawk's
+ * {@code typeof()} and {@code isarray()} rely on this marker.
  * </p>
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.PARAMETER)
-public @interface JawkStrNum {}
+public @interface JawkIntrospect {}

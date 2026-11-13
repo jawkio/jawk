@@ -775,12 +775,12 @@ public class GawkExtensionTest {
 	}
 
 	@Test
-	public void mkboolKeepsUntypedArgumentEvaluation() throws Exception {
+	public void rawValueArgumentsKeepScalarEvaluation() throws Exception {
 		// gawk turns an untyped variable used as a scalar argument into an
 		// unassigned one
-		AwkTestSupport.awkTest("mkbool evaluates an untyped variable as a scalar")
-				.script("BEGIN { print mkbool(u), typeof(u) }")
-				.expectLines("0 unassigned")
+		AwkTestSupport.awkTest("mkbool and strtonum evaluate an untyped variable as a scalar")
+				.script("BEGIN { print mkbool(u), typeof(u); print strtonum(v), typeof(v) }")
+				.expectLines("0 unassigned", "0 unassigned")
 				.runAndAssert();
 	}
 

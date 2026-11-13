@@ -2954,27 +2954,27 @@ public class AVM implements VariableManager, Closeable {
 
 	private void resolveIndirectArguments(Object[] actualArgumentsParam, ExtensionFunction function) {
 		boolean[] arrayArguments = new boolean[actualArgumentsParam.length];
-		boolean[] rawValueArguments = new boolean[actualArgumentsParam.length];
+		boolean[] introspectArguments = new boolean[actualArgumentsParam.length];
 		for (int index : function.collectAssocArrayIndexes(actualArgumentsParam.length)) {
 			arrayArguments[index] = true;
 		}
-		for (int index : function.collectRawValueIndexes(actualArgumentsParam.length)) {
-			rawValueArguments[index] = true;
+		for (int index : function.collectIntrospectIndexes(actualArgumentsParam.length)) {
+			introspectArguments[index] = true;
 		}
 		for (int index = 0; index < actualArgumentsParam.length; index++) {
 			actualArgumentsParam[index] = resolveIndirectArgument(
 					actualArgumentsParam[index],
 					arrayArguments[index],
-					rawValueArguments[index]);
+					introspectArguments[index]);
 		}
 	}
 
-	private Object resolveIndirectArgument(Object argument, boolean arrayArgument, boolean rawValueArgument) {
+	private Object resolveIndirectArgument(Object argument, boolean arrayArgument, boolean introspectArgument) {
 		if (!(argument instanceof ArgumentReference)) {
 			return argument;
 		}
 		ArgumentReference reference = (ArgumentReference) argument;
-		if (rawValueArgument) {
+		if (introspectArgument) {
 			return resolveRawArgumentReference(reference);
 		}
 		return resolveArgumentReference(reference, arrayArgument);

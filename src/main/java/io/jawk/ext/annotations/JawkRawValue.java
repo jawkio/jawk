@@ -28,20 +28,26 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marks an extension function parameter that must receive the AWK value
- * exactly as the runtime stores it, without forcing an untyped variable or a
- * missing array element into an assigned scalar.
+ * Marks an extension function parameter that receives Jawk's raw runtime
+ * values instead of plain Java values.
  * <p>
- * Because the raw value can be an untyped placeholder, an uninitialized
- * value, an associative array, or a precompiled regexp, the annotated Java
- * parameter must be declared as {@link Object}. Type-introspection functions
- * such as gawk's {@code typeof()} and {@code isarray()} rely on this marker.
+ * By default, extension functions receive plain Java values: an
+ * input-derived numeric string is passed as its {@code String} text, and an
+ * array as a {@link java.util.Map} view whose reads return plain values. With
+ * this marker:
  * </p>
+ * <ul>
+ * <li>a scalar parameter, which must be declared as {@link Object}, receives
+ * input-derived numeric strings as {@link io.jawk.jrt.StrNum} instances, so
+ * that, for example, {@link io.jawk.jrt.JRT#toBoolean(Object)} can tell an
+ * input {@code "0"} (false) from the string constant {@code "0"} (true)</li>
+ * <li>a {@link JawkAssocArray} parameter receives the
+ * {@link io.jawk.jrt.AssocArray} itself, with its values exactly as stored,
+ * and may be declared as {@link io.jawk.jrt.AssocArray}</li>
+ * </ul>
  * <p>
- * Without this marker, extension functions receive plain Java values: an
- * input-derived numeric string ({@link io.jawk.jrt.StrNum}) is passed as its
- * {@code String} text. With it, the value is passed exactly as stored,
- * including {@link io.jawk.jrt.StrNum} instances.
+ * The argument is evaluated like any other argument. To inspect untyped
+ * variables without assigning them, use {@link JawkIntrospect}.
  * </p>
  */
 @Retention(RetentionPolicy.RUNTIME)

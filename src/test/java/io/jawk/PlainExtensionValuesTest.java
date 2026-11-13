@@ -23,6 +23,7 @@ package io.jawk;
  */
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -36,8 +37,8 @@ import org.junit.Test;
 import io.jawk.ext.AbstractExtension;
 import io.jawk.ext.annotations.JawkAssocArray;
 import io.jawk.ext.annotations.JawkFunction;
+import io.jawk.ext.annotations.JawkIntrospect;
 import io.jawk.ext.annotations.JawkRawValue;
-import io.jawk.ext.annotations.JawkStrNum;
 import io.jawk.jrt.AssocArray;
 
 /**
@@ -72,13 +73,13 @@ public class PlainExtensionValuesTest {
 		}
 
 		/**
-		 * Returns the class name of a strnum scalar argument.
+		 * Returns the class name of an introspected argument.
 		 *
 		 * @param value argument
 		 * @return simple class name
 		 */
-		@JawkFunction("strnumClass")
-		public String strnumClass(@JawkStrNum Object value) {
+		@JawkFunction("introspectClass")
+		public String introspectClass(@JawkIntrospect Object value) {
 			return value.getClass().getSimpleName();
 		}
 
@@ -100,7 +101,7 @@ public class PlainExtensionValuesTest {
 		 * @return sorted key=type pairs
 		 */
 		@JawkFunction("describeRaw")
-		public String describeRaw(@JawkAssocArray(plainValues = false) Map<Object, Object> array) {
+		public String describeRaw(@JawkAssocArray @JawkRawValue Map<Object, Object> array) {
 			return describeMap(array);
 		}
 
@@ -169,6 +170,25 @@ public class PlainExtensionValuesTest {
 			cleared.replaceAll((key, value) -> null);
 			return 1;
 		}
+
+		/**
+		 * Returns the array it receives.
+		 *
+		 * @param array array
+		 * @return the same array
+		 */
+		@JawkFunction("identity")
+		public Map<Object, Object> identity(@JawkAssocArray Map<Object, Object> array) {
+			return array;
+		}
+	}
+
+	@Test
+	public void returnedViewIsUnwrapped() {
+		ValuesExtension extension = new ValuesExtension();
+		AssocArray array = AssocArray.createHash();
+		Object result = extension.getExtensionFunctions().get("identity").invoke(extension, new Object[] { array });
+		assertSame(array, result);
 	}
 
 	@Test
@@ -222,9 +242,9 @@ public class PlainExtensionValuesTest {
 	}
 
 	@Test
-	public void rawValueAndStrNumOptInsReceiveStrNum() throws Exception {
-		AwkTestSupport.awkTest("@JawkRawValue and @JawkStrNum receive StrNum")
-				.script("{ print rawClass($1), strnumClass($1), strnumClass(\"s\") }")
+	public void rawValueAndIntrospectReceiveStrNum() throws Exception {
+		AwkTestSupport.awkTest("@JawkRawValue and @JawkIntrospect receive StrNum")
+				.script("{ print rawClass($1), introspectClass($1), introspectClass(\"s\") }")
 				.withExtensions(new ValuesExtension())
 				.stdin("7\n")
 				.expectLines("StrNum StrNum String")
@@ -243,7 +263,7 @@ public class PlainExtensionValuesTest {
 
 	@Test
 	public void rawArrayKeepsRuntimeValues() throws Exception {
-		AwkTestSupport.awkTest("@JawkAssocArray(plainValues = false) receives the AssocArray")
+		AwkTestSupport.awkTest("@JawkAssocArray @JawkRawValue receives the AssocArray")
 				.script("{ a[1] = $1; a[2] = \"lit\"; a[3] = 2.5; a[\"sub\"][\"k\"] = $2; print describeRaw(a) }")
 				.withExtensions(new ValuesExtension())
 				.stdin("7 8\n")
@@ -304,13 +324,13 @@ public class PlainExtensionValuesTest {
 		 * @return size
 		 */
 		@JawkFunction("size")
-		public int size(@JawkAssocArray(plainValues = false) AssocArray array) {
+		public int size(@JawkAssocArray @JawkRawValue AssocArray array) {
 			return array.size();
 		}
 	}
 
-	/** Declares a {@link JawkStrNum} parameter that is not an {@link Object}. */
-	public static class StringStrNumExtension extends AbstractExtension {
+	/** Declares a scalar {@link JawkRawValue} parameter that is not an {@link Object}. */
+	public static class StringRawValueExtension extends AbstractExtension {
 
 		/**
 		 * Returns the text.
@@ -319,7 +339,7 @@ public class PlainExtensionValuesTest {
 		 * @return the text
 		 */
 		@JawkFunction("text")
-		public String text(@JawkStrNum String text) {
+		public String text(@JawkRawValue String text) {
 			return text;
 		}
 	}
@@ -330,9 +350,9 @@ public class PlainExtensionValuesTest {
 			new AssocArrayTypedExtension().getExtensionFunctions();
 			fail("Expected IllegalStateException");
 		} catch (IllegalStateException ex) {
-			assertTrue(ex.getMessage(), ex.getMessage().contains("plainValues = false"));
+			assertTrue(ex.getMessage(), ex.getMessage().contains("@JawkRawValue"));
 		}
-		AwkTestSupport.awkTest("an AssocArray parameter works with plainValues = false")
+		AwkTestSupport.awkTest("an AssocArray parameter works with @JawkRawValue")
 				.script("BEGIN { a[1]; a[2]; print size(a) }")
 				.withExtensions(new RawAssocArrayTypedExtension())
 				.expectLines("2")
@@ -340,12 +360,12 @@ public class PlainExtensionValuesTest {
 	}
 
 	@Test
-	public void strNumParameterMustBeObject() {
+	public void rawScalarParameterMustBeObject() {
 		try {
-			new StringStrNumExtension().getExtensionFunctions();
+			new StringRawValueExtension().getExtensionFunctions();
 			fail("Expected IllegalStateException");
 		} catch (IllegalStateException ex) {
-			assertTrue(ex.getMessage(), ex.getMessage().contains("JawkStrNum"));
+			assertTrue(ex.getMessage(), ex.getMessage().contains("JawkRawValue"));
 		}
 	}
 

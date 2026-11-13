@@ -83,10 +83,13 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 	}
 
 	/**
-	 * Returns the value to store in the AWK array: the array behind a view,
-	 * so a nested array copied from one view to another stays an AWK array.
+	 * Returns the runtime value behind a view: the AWK array it shows, so a
+	 * view stored in an array or returned by an extension stays an AWK array.
+	 *
+	 * @param value value written or returned by an extension
+	 * @return the array behind a view, or the value itself
 	 */
-	private static Object unwrap(Object value) {
+	static Object unwrap(Object value) {
 		return value instanceof PlainValueMap ? ((PlainValueMap) value).array : value;
 	}
 

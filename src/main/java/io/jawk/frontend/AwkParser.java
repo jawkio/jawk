@@ -2581,7 +2581,7 @@ public class AwkParser {
 			AwkTuples tuples,
 			FunctionCallParamListAst params,
 			Set<Integer> arrayParameterIndexes,
-			Set<Integer> rawValueParameterIndexes,
+			Set<Integer> introspectParameterIndexes,
 			Set<Integer> literalRegexpIndexes,
 			int parameterIndex) {
 		if (params == null) {
@@ -2595,7 +2595,7 @@ public class AwkParser {
 					"Parameter position " + (parameterIndex + 1) + " must be an array or subarray.");
 		} else if (literalRegexpIndexes.contains(Integer.valueOf(parameterIndex))) {
 			populateRawRegexpParameterTuples(params.getAst1(), tuples);
-		} else if (rawValueParameterIndexes.contains(Integer.valueOf(parameterIndex))) {
+		} else if (introspectParameterIndexes.contains(Integer.valueOf(parameterIndex))) {
 			populateRawValueTuples(params.getAst1(), tuples);
 		} else {
 			params.getAst1().populateTuples(tuples);
@@ -2607,7 +2607,7 @@ public class AwkParser {
 				tuples,
 				(FunctionCallParamListAst) params.getAst2(),
 				arrayParameterIndexes,
-				rawValueParameterIndexes,
+				introspectParameterIndexes,
 				literalRegexpIndexes,
 				parameterIndex + 1);
 	}
@@ -5887,17 +5887,17 @@ public class AwkParser {
 			}
 
 			int[] reqArrayIdxs = function.collectAssocArrayIndexes(argCount);
-			int[] rawValueIdxs = function.collectRawValueIndexes(argCount);
+			int[] introspectIdxs = function.collectIntrospectIndexes(argCount);
 
 			int paramCount;
 			if (getAst1() == null) {
 				paramCount = 0;
 			} else {
 				Set<Integer> arrayIndexes = new HashSet<Integer>();
-				Set<Integer> rawValueIndexes = new HashSet<Integer>();
+				Set<Integer> introspectIndexes = new HashSet<Integer>();
 				Set<Integer> literalRegexpIndexes = new HashSet<Integer>();
-				for (int idx : rawValueIdxs) {
-					rawValueIndexes.add(Integer.valueOf(idx));
+				for (int idx : introspectIdxs) {
+					introspectIndexes.add(Integer.valueOf(idx));
 				}
 				for (int idx : reqArrayIdxs) {
 					AST paramAst = getParamAst((FunctionCallParamListAst) getAst1(), idx).getAst1();
@@ -5922,7 +5922,7 @@ public class AwkParser {
 						tuples,
 						(FunctionCallParamListAst) getAst1(),
 						arrayIndexes,
-						rawValueIndexes,
+						introspectIndexes,
 						literalRegexpIndexes,
 						0);
 			}

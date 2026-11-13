@@ -37,6 +37,12 @@ import java.lang.annotation.Target;
  * parameter must be declared as {@link Object}. Type-introspection functions
  * such as gawk's {@code typeof()} and {@code isarray()} rely on this marker.
  * </p>
+ * <p>
+ * Without this marker, extension functions receive plain Java values: an
+ * input-derived numeric string ({@link io.jawk.jrt.StrNum}) is passed as its
+ * {@code String} text. With it, the value is passed exactly as stored,
+ * including {@link io.jawk.jrt.StrNum} instances.
+ * </p>
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.PARAMETER)

@@ -50,6 +50,7 @@ import io.jawk.ext.annotations.JawkFunction;
 import io.jawk.ext.annotations.JawkOptional;
 import io.jawk.ext.annotations.JawkRawValue;
 import io.jawk.ext.annotations.JawkRegexp;
+import io.jawk.ext.annotations.JawkStrNum;
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.intermediate.UntypedObject;
 import io.jawk.jrt.IllegalAwkArgumentException;
@@ -148,8 +149,8 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 */
 	@JawkFunction("asort")
 	public Long asort(
-			@JawkAssocArray Map<Object, Object> source,
-			@JawkOptional @JawkAssocArray Map<Object, Object> dest,
+			@JawkAssocArray(plainValues = false) Map<Object, Object> source,
+			@JawkOptional @JawkAssocArray(plainValues = false) Map<Object, Object> dest,
 			@JawkOptional Object how) {
 		return sort(source, dest, how, false);
 	}
@@ -164,8 +165,8 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 */
 	@JawkFunction("asorti")
 	public Long asorti(
-			@JawkAssocArray Map<Object, Object> source,
-			@JawkOptional @JawkAssocArray Map<Object, Object> dest,
+			@JawkAssocArray(plainValues = false) Map<Object, Object> source,
+			@JawkOptional @JawkAssocArray(plainValues = false) Map<Object, Object> dest,
 			@JawkOptional Object how) {
 		return sort(source, dest, how, true);
 	}
@@ -178,7 +179,9 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * @return gawk type name
 	 */
 	@JawkFunction("typeof")
-	public String typeof(@JawkRawValue Object value, @JawkOptional @JawkAssocArray Map<Object, Object> meta) {
+	public String typeof(
+			@JawkRawValue Object value,
+			@JawkOptional @JawkAssocArray(plainValues = false) Map<Object, Object> meta) {
 		if (meta != null) {
 			meta.clear();
 			if (value instanceof Map) {
@@ -206,7 +209,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * @return boolean numeric value
 	 */
 	@JawkFunction("mkbool")
-	public GawkBool mkbool(Object value) {
+	public GawkBool mkbool(@JawkStrNum Object value) {
 		// gawk applies ordinary AWK truthiness: a non-empty non-numeric
 		// string like "abc" is true, not numeric-coerced to 0
 		return new GawkBool(getJrt().toBoolean(value));
@@ -284,7 +287,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * @return seconds since the epoch, or -1 when the specification is invalid
 	 */
 	@JawkFunction("mktime")
-	public Long mktime(Object datespec, @JawkOptional Object utcFlag) {
+	public Long mktime(Object datespec, @JawkOptional @JawkStrNum Object utcFlag) {
 		String[] fields = toAwkString(datespec).trim().split("\\s+");
 		if (fields.length < 6 || fields.length > 7) {
 			return Long.valueOf(-1L);
@@ -323,7 +326,10 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * @return formatted timestamp
 	 */
 	@JawkFunction("strftime")
-	public String strftime(@JawkOptional Object format, @JawkOptional Object timestamp, @JawkOptional Object utcFlag) {
+	public String strftime(
+			@JawkOptional Object format,
+			@JawkOptional Object timestamp,
+			@JawkOptional @JawkStrNum Object utcFlag) {
 		String formatString = format == null ? defaultStrftimeFormat() : toAwkString(format);
 		long seconds = timestamp == null ? System.currentTimeMillis() / 1000L : (long) JRT.toDouble(timestamp);
 		boolean utc = utcFlag != null && getJrt().toBoolean(utcFlag);
@@ -479,9 +485,9 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	@JawkFunction("patsplit")
 	public Long patsplit(
 			Object source,
-			@JawkAssocArray Map<Object, Object> array,
+			@JawkAssocArray(plainValues = false) Map<Object, Object> array,
 			@JawkOptional @JawkRegexp Object fieldpat,
-			@JawkOptional @JawkAssocArray Map<Object, Object> seps) {
+			@JawkOptional @JawkAssocArray(plainValues = false) Map<Object, Object> seps) {
 		if (array == seps) {
 			throw new IllegalAwkArgumentException("patsplit: cannot use the same array for second and fourth args");
 		}

@@ -41,6 +41,7 @@ import io.jawk.ext.annotations.JawkFunction;
 import io.jawk.ext.annotations.JawkOptional;
 import io.jawk.ext.annotations.JawkRawValue;
 import io.jawk.ext.annotations.JawkRegexp;
+import io.jawk.ext.annotations.JawkStrNum;
 import io.jawk.jrt.AssocArray;
 import io.jawk.jrt.IllegalAwkArgumentException;
 
@@ -87,6 +88,12 @@ public final class ExtensionFunction implements Serializable {
 	/** AWK argument positions where regexp literals keep their precompiled pattern. */
 	private transient int[] regexpParameterIndexes;
 
+	/**
+	 * Flags of the declared parameters that receive plain Java values (see
+	 * {@link #plainParameters(Parameter[])}).
+	 */
+	private transient boolean[] plainValueParameters;
+
 	ExtensionFunction(String keywordParam, Method methodParam) {
 		this.keyword = validateKeyword(keywordParam, methodParam);
 		this.declaringType = resolveDeclaringType(methodParam);
@@ -118,6 +125,25 @@ public final class ExtensionFunction implements Serializable {
 				methodParam,
 				methodParam.getParameters(),
 				JawkRegexp.class);
+		// validation only: @JawkStrNum changes the passed value, not the evaluation
+		scanObjectParameterIndexes(methodParam, methodParam.getParameters(), JawkStrNum.class);
+		this.plainValueParameters = plainParameters(methodParam.getParameters());
+	}
+
+	/*
+	 * Extensions receive plain Java values unless they opt in to the raw
+	 * runtime values with @JawkRawValue, @JawkStrNum or
+	 * @JawkAssocArray(plainValues = false).
+	 */
+	private static boolean[] plainParameters(Parameter[] parameters) {
+		boolean[] plain = new boolean[parameters.length];
+		for (int idx = 0; idx < parameters.length; idx++) {
+			JawkAssocArray assocArray = parameters[idx].getAnnotation(JawkAssocArray.class);
+			plain[idx] = !parameters[idx].isAnnotationPresent(JawkRawValue.class)
+					&& !parameters[idx].isAnnotationPresent(JawkStrNum.class)
+					&& (assocArray == null || assocArray.plainValues());
+		}
+		return plain;
 	}
 
 	/*
@@ -178,6 +204,7 @@ public final class ExtensionFunction implements Serializable {
 	 * Raw-value and regexp markers change how the compiler evaluates the matching
 	 * AWK argument, so the annotated Java parameter must be able to receive any
 	 * runtime value (Pattern, Map, untyped placeholders, ...): plain Object.
+	 * A strnum parameter receives a StrNum, a String or a Number: Object too.
 	 */
 	private static int[] scanObjectParameterIndexes(
 			Method methodParam,
@@ -205,44 +232,50 @@ public final class ExtensionFunction implements Serializable {
 	 * with {@link JawkAssocArray}.
 	 * <p>
 	 * The validation is intentionally stricter than checking
-	 * {@code Map.class.isAssignableFrom(parameterType)} alone. Jawk passes runtime
-	 * associative arrays as {@link AssocArray} instances, so the declared parameter
-	 * type must satisfy two constraints:
+	 * {@code Map.class.isAssignableFrom(parameterType)} alone. The declared
+	 * parameter type must satisfy two constraints:
 	 * </p>
 	 * <ul>
 	 * <li>it must be a {@link Map} type, because {@code @JawkAssocArray} is a
 	 * map-shaped contract for extension authors</li>
-	 * <li>it must also be able to receive an {@link AssocArray} instance at
-	 * invocation time</li>
+	 * <li>it must also be able to receive the value Jawk passes at invocation
+	 * time: a plain-value {@link Map} view by default, or the {@link AssocArray}
+	 * itself with {@link JawkAssocArray#plainValues()} set to {@code false}</li>
 	 * </ul>
 	 * <p>
 	 * That second constraint rejects concrete map implementations such as
-	 * {@link java.util.HashMap}. A declaration like
+	 * {@link java.util.HashMap}, and {@link AssocArray} itself unless the raw
+	 * array is requested. A declaration like
 	 * {@code @JawkAssocArray HashMap<Object, Object>} is map-shaped, but it is not
-	 * compatible with the {@link AssocArray} values that Jawk actually passes, so
-	 * letting it register here would only defer the failure until reflective
-	 * invocation.
+	 * compatible with the values that Jawk actually passes, so letting it
+	 * register here would only defer the failure until reflective invocation.
 	 * </p>
 	 *
 	 * @param methodParam method whose parameters are being inspected
 	 * @param parameters declared parameters of {@code methodParam}
 	 * @return flags indicating which parameter positions require associative arrays
 	 * @throws IllegalStateException when an annotated parameter cannot receive the
-	 *         runtime {@link AssocArray} values provided by Jawk
+	 *         runtime values provided by Jawk
 	 */
 	private boolean[] inspectParameters(Method methodParam, Parameter[] parameters) {
 		boolean[] assoc = new boolean[parameters.length];
 		for (int idx = 0; idx < parameters.length; idx++) {
 			Parameter parameter = parameters[idx];
-			if (parameter.isAnnotationPresent(JawkAssocArray.class)) {
+			JawkAssocArray annotation = parameter.getAnnotation(JawkAssocArray.class);
+			if (annotation != null) {
 				Class<?> parameterType = parameter.getType();
 				if (parameter.isVarArgs()) {
 					parameterType = parameterType.getComponentType();
 				}
-				if (!Map.class.isAssignableFrom(parameterType) || !parameterType.isAssignableFrom(AssocArray.class)) {
+				Class<?> passedType = annotation.plainValues() ? PlainValueMap.class : AssocArray.class;
+				if (!Map.class.isAssignableFrom(parameterType) || !parameterType.isAssignableFrom(passedType)) {
 					throw new IllegalStateException(
 							"Parameter " + idx + " of " + methodParam + " annotated with @" + JawkAssocArray.class.getSimpleName()
-									+ " must accept " + AssocArray.class.getName() + " instances via " + Map.class.getName());
+									+ (annotation.plainValues() ?
+											" must be declared as " + Map.class.getName() + " (or use plainValues = false to receive "
+													+ AssocArray.class.getName() + ")" :
+											"(plainValues = false) must accept " + AssocArray.class.getName() + " instances via "
+													+ Map.class.getName()));
 				}
 				assoc[idx] = true;
 			}
@@ -419,8 +452,8 @@ public final class ExtensionFunction implements Serializable {
 		if (!varArgs) {
 			// Omitted optional trailing arguments are passed as null
 			Object[] invocationArgs = new Object[parameterTypes.length];
-			if (argCount > 0) {
-				System.arraycopy(args, 0, invocationArgs, 0, argCount);
+			for (int idx = 0; idx < argCount; idx++) {
+				invocationArgs[idx] = argumentValue(idx, args[idx]);
 			}
 			return invocationArgs;
 		}
@@ -429,16 +462,21 @@ public final class ExtensionFunction implements Serializable {
 		}
 		Object[] invocationArgs = new Object[mandatoryParameterCount + 1];
 		for (int idx = 0; idx < mandatoryParameterCount; idx++) {
-			invocationArgs[idx] = args[idx];
+			invocationArgs[idx] = argumentValue(idx, args[idx]);
 		}
 		int varArgCount = argCount - mandatoryParameterCount;
 		Class<?> componentType = parameterTypes[parameterTypes.length - 1].getComponentType();
 		Object varArgArray = Array.newInstance(componentType, varArgCount);
 		for (int idx = 0; idx < varArgCount; idx++) {
-			Array.set(varArgArray, idx, args[mandatoryParameterCount + idx]);
+			Array.set(varArgArray, idx, argumentValue(mandatoryParameterCount, args[mandatoryParameterCount + idx]));
 		}
 		invocationArgs[mandatoryParameterCount] = varArgArray;
 		return invocationArgs;
+	}
+
+	/** Converts an argument to a plain Java value unless its parameter opted in to raw values. */
+	private Object argumentValue(int parameterIndex, Object arg) {
+		return plainValueParameters[parameterIndex] ? PlainValueMap.plain(arg) : arg;
 	}
 
 	/**

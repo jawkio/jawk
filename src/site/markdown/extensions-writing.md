@@ -36,7 +36,7 @@ The annotation value is the AWK function name seen by the script.
 
 ## Mark Assoc Array Parameters with @JawkAssocArray
 
-Use `@JawkAssocArray` on parameters that must receive an associative array. Annotated parameters should be declared as `Map`, which keeps the extension API decoupled from the concrete `AssocArray` implementation Jawk provides at runtime. Do not use concrete map classes such as `HashMap` or `TreeMap`, because Jawk passes `AssocArray` instances:
+Use `@JawkAssocArray` on parameters that must receive an associative array. Annotated parameters must be declared as `Map`. Do not use concrete map classes such as `HashMap` or `TreeMap`, because Jawk passes its own `Map` implementation:
 
 ```java
 @JawkFunction("AssocSize")
@@ -46,6 +46,19 @@ public int assocSize(@JawkAssocArray Map<Object, Object> array) {
 ```
 
 That metadata lets Jawk validate array-vs-scalar usage more accurately.
+
+The extension receives a live view of the AWK array, not a copy:
+
+- Reads (`get()`, `entrySet()`, `values()`, iteration...) return plain Java values: an input-derived numeric string as its `String` text, numbers as is, and a nested array as another such view. The view can be handed to libraries such as Jackson as an ordinary `Map`.
+- Writes (`put()`, `remove()`, `clear()`, `Map.Entry.setValue()`...) go straight to the AWK array, so the script sees them after the call.
+
+To receive the `AssocArray` itself, with values exactly as the runtime stores them (including the internal `StrNum` numeric strings), opt in with `@JawkAssocArray(plainValues = false)`. The parameter may then also be declared as `AssocArray`. The built-in gawk extension does this for `asort()`, `asorti()`, `patsplit()` and `typeof()`, which need AWK value types.
+
+## Plain Scalar Values
+
+Scalar arguments are plain Java values too: numbers and strings are passed as is, and input-derived numeric strings (fields, `split()` pieces, `-v` values, strings nested in injected lists and maps) as their `String` text, whatever the declared parameter type.
+
+Annotate a scalar `Object` parameter with `@JawkStrNum` when the function must tell an input-derived numeric string from a string constant, for example to apply AWK truthiness (an input `"0"` is false, the constant `"0"` is true). The parameter then receives the internal `io.jawk.jrt.StrNum` value, which `JRT` methods such as `toBoolean()` understand. The argument is evaluated like any other scalar. The gawk extension uses it for `mkbool()` and the UTC flag of `mktime()` and `strftime()`.
 
 ## Declare Optional Arguments with @JawkOptional
 
@@ -65,7 +78,7 @@ This is how the built-in gawk compatibility extension declares `asort(source [, 
 
 ## Receive Raw Values with @JawkRawValue
 
-By default, Jawk resolves every scalar argument to an assigned value before calling the extension. Type-introspection functions sometimes need to distinguish untyped variables, uninitialized values, or regexp constants from plain strings. Annotate those parameters with `@JawkRawValue` to receive the runtime object as-is. The parameter must be declared as `Object`, because the raw value can be an array, a pattern, or an internal placeholder:
+By default, Jawk resolves every scalar argument to an assigned value before calling the extension. Type-introspection functions sometimes need to distinguish untyped variables, uninitialized values, or regexp constants from plain strings. Annotate those parameters with `@JawkRawValue` to receive the runtime object as-is, including numeric strings as `StrNum`. The parameter must be declared as `Object`, because the raw value can be an array, a pattern, or an internal placeholder:
 
 ```java
 @JawkFunction("IsArray")
@@ -74,7 +87,7 @@ public long isArray(@JawkRawValue Object value) {
 }
 ```
 
-This is how the built-in gawk compatibility extension implements `typeof()` and `isarray()`.
+This is how the built-in gawk compatibility extension implements `typeof()`, `isarray()` and `strtonum()`.
 
 ## Keep Regexp Literals with @JawkRegexp
 

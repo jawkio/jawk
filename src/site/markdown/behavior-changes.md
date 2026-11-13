@@ -20,7 +20,15 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
-_No user-visible behavior changes recorded yet._
+- Breaking change for extension authors: extension functions now receive plain Java values. An
+  input-derived numeric string (a field, a `split()` piece, a `-v` value, a string nested in an
+  injected `List` or `Map`...) used to reach the extension as an internal `io.jawk.jrt.StrNum`
+  object and is now passed as its `String` text. A `@JawkAssocArray` parameter now receives a live
+  `Map` view of the AWK array: reads return plain values (nested arrays as views too), writes still
+  go to the AWK array. A `@JawkAssocArray` parameter declared as `AssocArray` must now opt in with
+  `@JawkAssocArray(plainValues = false)`, which passes the `AssocArray` and its raw values as before.
+  `@JawkRawValue` and the new `@JawkStrNum` keep passing scalars as stored. Functions of the gawk
+  extension behave as before ([#649](https://github.com/jawkio/jawk/issues/649)).
 
 ## [v7.3.00](https://github.com/jawkio/jawk/releases/tag/v7.3.00) (2026-11-12)
 

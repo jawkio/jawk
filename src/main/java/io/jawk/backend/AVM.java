@@ -264,6 +264,10 @@ public class AVM implements VariableManager, Closeable {
 		executionSpecialVariables = baseSpecialVariables;
 
 		jrt = createJrt();
+		// Normalized like per-run overrides and assignVariable(), so that a
+		// settings variable the script never references (read through SYMTAB, or
+		// by an extension through getVariable()) is an AWK value too
+		baseInitialVariables.replaceAll((name, value) -> normalizeExternalVariableValue(value));
 	}
 
 	/**

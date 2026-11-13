@@ -182,4 +182,16 @@ public class JavaBooleanValuesTest {
 				.expectLines("10x")
 				.runAndAssert();
 	}
+
+	@Test
+	public void booleanSettingsVariableReadThroughSymtabIsBooleanNumber() throws Exception {
+		AwkSettings settings = new AwkSettings();
+		settings.putVariable("enabled", Boolean.TRUE);
+		settings.putVariable("doc", Collections.<String, Object>singletonMap("enabled", Boolean.FALSE));
+		AwkTestSupport.awkTest("A settings variable the script reads only through SYMTAB is normalized")
+				.script("BEGIN { v = SYMTAB[\"enabled\"]; " + USE + "; v = SYMTAB[\"doc\"][\"enabled\"]; " + USE + " }")
+				.withAwk(new Awk(settings))
+				.expectLines("1 1 on 0 number|bool", "0 0 off 1 number|bool")
+				.runAndAssert();
+	}
 }

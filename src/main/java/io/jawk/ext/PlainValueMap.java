@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import io.jawk.intermediate.UninitializedObject;
 import io.jawk.jrt.AssocArray;
 import io.jawk.jrt.StrNum;
 
@@ -64,12 +65,14 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 	 * @param value runtime value
 	 * @param views views already created for the current extension call, keyed
 	 *        by identity
-	 * @return the {@code String} text of a {@link StrNum}, the view of an AWK
-	 *         array, or the value itself
+	 * @return the {@code String} text of a {@link StrNum}, {@code ""} for a
+	 *         blank or untyped value, the view of an AWK array, or the value
+	 *         itself
 	 */
 	@SuppressWarnings("unchecked")
 	static Object plain(Object value, Map<Map<Object, Object>, PlainValueMap> views) {
-		if (value instanceof StrNum) {
+		if (value instanceof StrNum || value instanceof UninitializedObject) {
+			// an unassigned or untyped value reads as AWK's empty string
 			return value.toString();
 		}
 		if (value instanceof Map && !(value instanceof PlainValueMap)) {
@@ -84,7 +87,8 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 
 	/**
 	 * Returns the runtime value behind a view: the AWK array it shows, so a
-	 * view stored in an array or returned by an extension stays an AWK array.
+	 * view stored in an array (as a value or a key) or returned by an extension
+	 * stays an AWK array.
 	 *
 	 * @param value value written or returned by an extension
 	 * @return the array behind a view, or the value itself
@@ -104,7 +108,8 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 	 */
 	@Override
 	public boolean containsKey(Object key) {
-		return array instanceof AssocArray ? ((AssocArray) array).isIn(key) : array.containsKey(key);
+		Object arrayKey = unwrap(key);
+		return array instanceof AssocArray ? ((AssocArray) array).isIn(arrayKey) : array.containsKey(arrayKey);
 	}
 
 	/**
@@ -114,17 +119,17 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 	 */
 	@Override
 	public Object get(Object key) {
-		return containsKey(key) ? plain(array.get(key)) : null;
+		return containsKey(key) ? plain(array.get(unwrap(key))) : null;
 	}
 
 	@Override
 	public Object put(Object key, Object value) {
-		return plain(array.put(key, unwrap(value)));
+		return plain(array.put(unwrap(key), unwrap(value)));
 	}
 
 	@Override
 	public Object remove(Object key) {
-		return plain(array.remove(key));
+		return plain(array.remove(unwrap(key)));
 	}
 
 	@Override

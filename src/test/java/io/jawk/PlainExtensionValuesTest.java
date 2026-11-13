@@ -40,6 +40,7 @@ import io.jawk.ext.annotations.JawkFunction;
 import io.jawk.ext.annotations.JawkIntrospect;
 import io.jawk.ext.annotations.JawkRawValue;
 import io.jawk.jrt.AssocArray;
+import io.jawk.jrt.AwkRuntimeException;
 
 /**
  * Tests that extension functions receive plain Java values by default, and
@@ -181,6 +182,79 @@ public class PlainExtensionValuesTest {
 		public Map<Object, Object> identity(@JawkAssocArray Map<Object, Object> array) {
 			return array;
 		}
+
+		/**
+		 * Stores a value under the nested array {@code source["sub"]} used as a key.
+		 *
+		 * @param source array holding {@code sub}
+		 * @param dest array receiving the entry
+		 * @return whether the key is found again
+		 */
+		@JawkFunction("keyBySub")
+		public boolean keyBySub(@JawkAssocArray Map<Object, Object> source, @JawkAssocArray Map<Object, Object> dest) {
+			dest.put(source.get("sub"), "v");
+			return dest.containsKey(source.get("sub")) && "v".equals(dest.get(source.get("sub")));
+		}
+
+		/**
+		 * Returns a Java map holding {@code "1" -> "one"}.
+		 *
+		 * @return a new Java map
+		 */
+		@JawkFunction("javaMap")
+		public Map<Object, Object> javaMap() {
+			Map<Object, Object> map = new HashMap<Object, Object>();
+			map.put("1", "one");
+			return map;
+		}
+
+		/**
+		 * Returns the size of a raw array.
+		 *
+		 * @param array array
+		 * @return size
+		 */
+		@JawkFunction("rawSize")
+		public int rawSize(@JawkAssocArray @JawkRawValue AssocArray array) {
+			return array.size();
+		}
+	}
+
+	@Test
+	public void blankValuesReadAsEmptyStrings() throws Exception {
+		AwkTestSupport.awkTest("blank and untyped values reach extensions as empty strings")
+				.script("BEGIN { x = a[1]; a[2] = \"\"; print describe(a), plainClass(u) }")
+				.withExtensions(new ValuesExtension())
+				.expectLines("V{1=String,2=String} String")
+				.runAndAssert();
+	}
+
+	@Test
+	public void viewKeysAreUnwrapped() {
+		ValuesExtension extension = new ValuesExtension();
+		AssocArray sub = AssocArray.createHash();
+		AssocArray source = AssocArray.createHash();
+		source.put("sub", sub);
+		AssocArray dest = AssocArray.createHash();
+		Object found = extension.getExtensionFunctions().get("keyBySub").invoke(extension, new Object[] { source, dest });
+		assertEquals(Boolean.TRUE, found);
+		assertSame(sub, dest.keySet().iterator().next());
+	}
+
+	@Test
+	public void returnedJavaMapBecomesAwkArray() throws Exception {
+		AwkTestSupport.awkTest("a Java map returned by an extension is an AWK array")
+				.script(
+						"function first(arr) { return arr[1] } function size(arr) { return rawSize(arr) } "
+								+ "BEGIN { print first(javaMap()), size(javaMap()) }")
+				.withExtensions(new ValuesExtension())
+				.expectLines("one 1")
+				.runAndAssert();
+		AwkTestSupport.awkTest("a returned Java map cannot be printed as a scalar")
+				.script("BEGIN { print javaMap() }")
+				.withExtensions(new ValuesExtension())
+				.expectThrow(AwkRuntimeException.class)
+				.runAndAssert();
 	}
 
 	@Test

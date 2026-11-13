@@ -35,7 +35,8 @@ import java.util.Map;
  * <p>
  * The parameter must be declared as {@link Map} and receives a live view of
  * the AWK array: reads return plain Java values (an input-derived numeric
- * string as its {@code String} text, numbers as is, a nested array as another
+ * string as its {@code String} text, a blank or untyped element as
+ * {@code ""}, numbers as is, a nested array as another
  * such view), while writes ({@code put}, {@code remove}, {@code clear}, ...)
  * go straight to the AWK array, so the script sees them after the call.
  * Combine with {@link JawkRawValue} to receive the

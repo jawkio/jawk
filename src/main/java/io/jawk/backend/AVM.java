@@ -3093,6 +3093,11 @@ public class AVM implements VariableManager, Closeable {
 		if (result == null) {
 			return "";
 		}
+		if (result instanceof Map && !(result instanceof AssocArray)) {
+			// a Java map becomes an AWK array, as an injected one does: AWK keys,
+			// and no Java toString() when the script uses it as a scalar
+			return AssocArray.normalizeValue(result, sortedArrayKeys);
+		}
 		if (result instanceof Number || result instanceof String || result instanceof Map) {
 			return result;
 		}

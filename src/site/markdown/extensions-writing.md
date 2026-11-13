@@ -49,7 +49,7 @@ That metadata lets Jawk validate array-vs-scalar usage more accurately.
 
 The extension receives a live view of the AWK array, not a copy:
 
-- Reads (`get()`, `entrySet()`, `values()`, iteration...) return plain Java values: an input-derived numeric string as its `String` text, numbers as is, and a nested array as another such view. The view can be handed to libraries such as Jackson as an ordinary `Map`.
+- Reads (`get()`, `entrySet()`, `values()`, iteration...) return plain Java values: an input-derived numeric string as its `String` text, a blank or untyped element as `""`, numbers as is, and a nested array as another such view. The view can be handed to libraries such as Jackson as an ordinary `Map`.
 - Reads follow `Map` rules, not AWK rules: `get()` returns `null` for a missing key instead of creating the element, and `containsKey("1")` finds the element `1`, like `"1" in array`.
 - The same AWK array always reaches the call as the same view object, so `source == dest` still detects an array passed twice.
 - Writes (`put()`, `remove()`, `clear()`, `Map.Entry.setValue()`...) go straight to the AWK array, so the script sees them after the call.
@@ -58,7 +58,7 @@ To receive the `AssocArray` itself instead, add `@JawkRawValue` (see below).
 
 ## Plain Scalar Values
 
-Scalar arguments are plain Java values too: numbers and strings are passed as is, and input-derived numeric strings (fields, `split()` pieces, `-v` values, strings nested in injected lists and maps) as their `String` text, whatever the declared parameter type.
+Scalar arguments are plain Java values too: numbers and strings are passed as is, input-derived numeric strings (fields, `split()` pieces, `-v` values, strings nested in injected lists and maps) as their `String` text, and an unassigned variable as `""`, whatever the declared parameter type.
 
 Use `@JawkRawValue` to receive Jawk's own representation instead.
 
@@ -111,6 +111,10 @@ public long isArray(@JawkIntrospect Object value) {
 ```
 
 This is how the built-in gawk compatibility extension implements `typeof()` and `isarray()`.
+
+## Return Arrays
+
+An extension function may return a `Map`: Jawk copies it into a new AWK array, as it does for a `Map` injected as a variable, so its keys follow AWK rules. As in AWK, the result cannot be assigned to a variable, but it can be passed to a function that takes an array. To fill an array of the script instead, take it as an `@JawkAssocArray` parameter and write to it, as `split()` does.
 
 ## Keep Regexp Literals with @JawkRegexp
 

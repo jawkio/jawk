@@ -31,6 +31,11 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
   variable without assigning it, moves to the new `@JawkIntrospect`: extensions that implement
   `typeof()`-like functions with `@JawkRawValue` must switch to `@JawkIntrospect`
   ([#649](https://github.com/jawkio/jawk/issues/649)).
+- A Java `Map` returned by an extension function is now copied into an AWK array, as an injected
+  map is: its keys follow AWK rules (`"1"` and `1` are the same element), and using the result as a
+  scalar (`print f()`) now fails like any array instead of printing the map's Java text. Blank and
+  untyped values now reach extensions as `""` instead of internal objects
+  ([#649](https://github.com/jawkio/jawk/issues/649)).
 - `strtonum()` of an untyped variable now makes it unassigned, as in gawk: `strtonum(u); print
   typeof(u)` printed `untyped` and now prints `unassigned`
   ([#649](https://github.com/jawkio/jawk/issues/649)).

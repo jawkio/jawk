@@ -32,6 +32,7 @@ import java.util.Set;
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.jrt.AssocArray;
 import io.jawk.jrt.AwkRuntimeException;
+import io.jawk.jrt.GawkBool;
 import io.jawk.jrt.StrNum;
 
 /**

@@ -26,7 +26,9 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
   view, or returned by an extension function. It used to print as `true` or `false` (an extension
   result was that string, so `false` was true in a condition), and otherwise stopped the script
   with "Unknown operand_stack type" in a condition or in arithmetic. A `mkbool()` value itself
-  failed the same way in a condition (`if (mkbool(1))`) and now works
+  failed the same way in a condition (`if (mkbool(1))`) and now works.
+  Breaking change for extension authors: the class of these values, `io.jawk.ext.GawkBool`, moves
+  to `io.jawk.jrt.GawkBool`, with the other runtime value types
   ([#654](https://github.com/jawkio/jawk/issues/654)).
 - An AWK array passed to a plain scalar parameter of an extension function (without
   `@JawkAssocArray`, `@JawkRawValue` or `@JawkIntrospect`) fails again with "Attempting to use an array in a scalar context", as in

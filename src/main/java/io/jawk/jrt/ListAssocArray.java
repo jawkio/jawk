@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.UnaryOperator;
-import io.jawk.ext.GawkBool;
 
 /**
  * An AWK associative array materialized from a Java {@link List}.

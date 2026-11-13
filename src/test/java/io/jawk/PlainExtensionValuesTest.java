@@ -86,6 +86,44 @@ public class PlainExtensionValuesTest {
 		}
 
 		/**
+		 * Converts a scalar argument with {@code CONVFMT}.
+		 *
+		 * @param value argument
+		 * @return AWK string value
+		 */
+		@JawkFunction("text")
+		public String text(Object value) {
+			return toAwkString(value);
+		}
+
+		/**
+		 * Joins scalar arguments.
+		 *
+		 * @param parts arguments
+		 * @return the AWK string values, separated by commas
+		 */
+		@JawkFunction("joinAll")
+		public String joinAll(Object... parts) {
+			StringBuilder result = new StringBuilder();
+			for (Object part : parts) {
+				result.append(toAwkString(part)).append(',');
+			}
+			return result.toString();
+		}
+
+		/**
+		 * Converts the element {@code sub} of an array to a string, the way an
+		 * extension reading a nested value as a scalar would.
+		 *
+		 * @param array array
+		 * @return the string value of {@code array["sub"]}
+		 */
+		@JawkFunction("subText")
+		public String subText(@JawkAssocArray Map<Object, Object> array) {
+			return String.valueOf(array.get("sub"));
+		}
+
+		/**
 		 * Describes an array read through the plain view.
 		 *
 		 * @param array array
@@ -234,6 +272,26 @@ public class PlainExtensionValuesTest {
 					+ array.entrySet().contains(new AbstractMap.SimpleEntry<Object, Object>("2", "two")) + ","
 					+ array.entrySet().remove(new AbstractMap.SimpleEntry<Object, Object>("2", "two"));
 		}
+	}
+
+	@Test
+	public void arraysInScalarParametersFail() throws Exception {
+		for (String call : new String[] { "text(a)", "joinAll(\"x\", a)", "plainClass(a)", "subText(b)" }) {
+			AwkTestSupport.awkTest("an array used as a scalar by an extension fails: " + call)
+					.script("BEGIN { a[1] = \"x\"; b[\"sub\"][1] = \"y\"; print " + call + " }")
+					.withExtensions(new ValuesExtension())
+					.expectThrow(AwkRuntimeException.class)
+					.runAndAssert();
+		}
+	}
+
+	@Test
+	public void rawAndIntrospectScalarsReceiveArrays() throws Exception {
+		AwkTestSupport.awkTest("@JawkRawValue and @JawkIntrospect scalars receive arrays as is")
+				.script("BEGIN { a[1] = \"x\"; print rawClass(a), introspectClass(a), joinAll(\"x\", a[1]) }")
+				.withExtensions(new ValuesExtension())
+				.expectLines("HashAssocArray HashAssocArray x,x,")
+				.runAndAssert();
 	}
 
 	@Test

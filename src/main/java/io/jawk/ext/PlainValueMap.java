@@ -31,6 +31,7 @@ import java.util.Set;
 
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.jrt.AssocArray;
+import io.jawk.jrt.AwkRuntimeException;
 import io.jawk.jrt.StrNum;
 
 /**
@@ -95,6 +96,19 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 	 */
 	static Object unwrap(Object value) {
 		return value instanceof PlainValueMap ? ((PlainValueMap) value).array : value;
+	}
+
+	/**
+	 * A view is an AWK array: like {@link AssocArray#toString()}, it has no
+	 * string value, so converting it ({@code toAwkString()},
+	 * {@code JRT.toDouble()}, {@code String.valueOf()}) fails instead of
+	 * producing {@code {key=value}}.
+	 *
+	 * @throws AwkRuntimeException always
+	 */
+	@Override
+	public String toString() {
+		throw new AwkRuntimeException("Attempting to use an array in a scalar context.");
 	}
 
 	@Override

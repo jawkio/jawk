@@ -36,12 +36,7 @@ public class AssocArrayToLongKeyTest {
 	public void testAcceptsIntegerForms() {
 		assertEquals(Long.valueOf(0L), AssocArray.toLongKey("0"));
 		assertEquals(Long.valueOf(42L), AssocArray.toLongKey("42"));
-		assertEquals(Long.valueOf(42L), AssocArray.toLongKey("+42"));
 		assertEquals(Long.valueOf(-42L), AssocArray.toLongKey("-42"));
-		assertEquals(Long.valueOf(0L), AssocArray.toLongKey("-0"));
-		assertEquals(Long.valueOf(0L), AssocArray.toLongKey("+0"));
-		assertEquals(Long.valueOf(7L), AssocArray.toLongKey("007"));
-		assertEquals(Long.valueOf(42L), AssocArray.toLongKey("0000000000000000000042"));
 		assertEquals(Long.valueOf(Long.MAX_VALUE), AssocArray.toLongKey("9223372036854775807"));
 		assertEquals(Long.valueOf(Long.MIN_VALUE), AssocArray.toLongKey("-9223372036854775808"));
 	}
@@ -50,6 +45,22 @@ public class AssocArrayToLongKeyTest {
 	public void testAcceptsNonStringKeys() {
 		assertEquals(Long.valueOf(42L), AssocArray.toLongKey(Long.valueOf(42L)));
 		assertEquals(Long.valueOf(-7L), AssocArray.toLongKey(Integer.valueOf(-7)));
+	}
+
+	@Test
+	public void testRejectsNonCanonicalIntegerText() {
+		// distinct string subscripts in AWK: only the canonical text is the integer
+		assertNull(AssocArray.toLongKey("+42"));
+		assertNull(AssocArray.toLongKey("-0"));
+		assertNull(AssocArray.toLongKey("+0"));
+		assertNull(AssocArray.toLongKey("00"));
+		assertNull(AssocArray.toLongKey("007"));
+		assertNull(AssocArray.toLongKey("-007"));
+		assertNull(AssocArray.toLongKey("0010"));
+		assertNull(AssocArray.toLongKey("0000000000000000000042"));
+		// non-ASCII digits
+		assertNull(AssocArray.toLongKey("١٢٣"));
+		assertNull(AssocArray.toLongKey("１２"));
 	}
 
 	@Test
@@ -104,12 +115,13 @@ public class AssocArrayToLongKeyTest {
 	}
 
 	/**
-	 * Exhaustive parity check with the reference implementation: for every
-	 * sample, {@code toLongKey} must accept/reject exactly what
-	 * {@link Long#parseLong(String)} accepts/rejects, and produce the same value.
+	 * Parity check with the reference definition: for every sample,
+	 * {@code toLongKey} accepts exactly the strings that
+	 * {@link Long#parseLong(String)} accepts and {@link Long#toString(long)}
+	 * gives back unchanged, and produces the same value.
 	 */
 	@Test
-	public void testMatchesLongParseLongExactly() {
+	public void testMatchesCanonicalLongText() {
 		String[] samples = {
 				"0",
 				"1",
@@ -154,7 +166,7 @@ public class AssocArrayToLongKeyTest {
 				"abc42",
 				"1" + SUBSEP + "2",
 				"a" + SUBSEP + "b",
-				// non-ASCII digits: Long.parseLong accepts these via Character.digit
+				// non-ASCII digits: Long.parseLong accepts these, but they are not canonical
 				"١٢٣", // Arabic-Indic "123"
 				"１２", // fullwidth "12"
 				"-١",
@@ -164,6 +176,9 @@ public class AssocArrayToLongKeyTest {
 			Long expected;
 			try {
 				expected = Long.parseLong(sample);
+				if (!expected.toString().equals(sample)) {
+					expected = null;
+				}
 			} catch (NumberFormatException e) {
 				expected = null;
 			}

@@ -25,8 +25,6 @@ package io.jawk.ext;
 import java.util.Map;
 import io.jawk.backend.AVM;
 import io.jawk.jrt.JRT;
-import io.jawk.jrt.VariableManager;
-import io.jawk.util.AwkSettings;
 
 /**
  * A Jawk Extension.
@@ -52,19 +50,6 @@ import io.jawk.util.AwkSettings;
  * @author Danny Daglas
  */
 public interface JawkExtension {
-	/**
-	 * Called after the creation and before normal processing of the
-	 * extension, pass in the Jawk Runtime Manager
-	 * and the Variable Manager once.
-	 * <p>
-	 * It is guaranteed init() is called before invoke() is called.
-	 *
-	 * @param vm Reference to the Variable Manager
-	 * @param jrt Reference to the Runtime
-	 * @param settings Reference to the settings
-	 */
-	void init(VariableManager vm, JRT jrt, AwkSettings settings);
-
 	/**
 	 * Called after the runtime global variable slots have been allocated and before
 	 * the first executable tuple runs.

@@ -287,10 +287,8 @@ public class Awk {
 				Collections.<String, JawkExtension>emptyMap());
 
 		/*
-		 * Extensions keep per-engine runtime state (VariableManager, JRT), so the
-		 * default set must be a fresh instance per Awk engine, never a shared
-		 * singleton: two engines sharing one GawkExtension would clobber each
-		 * other's runtime bindings.
+		 * GawkExtension keeps per-engine state (textdomain bindings, warnings
+		 * already issued), so the default set is a fresh instance per Awk engine.
 		 */
 		private static ExtensionSetup createDefault() {
 			return createExtensionSetup(Collections.singletonList(new GawkExtension()));

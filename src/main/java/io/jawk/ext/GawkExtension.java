@@ -33,16 +33,15 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.GregorianCalendar;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jawk.backend.AVM;
 import io.jawk.ext.annotations.JawkAssocArray;
 import io.jawk.ext.annotations.JawkBeforeStart;
@@ -87,25 +86,22 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 			new HashSet<String>(
 					Arrays.asList("LC_ALL", "LC_COLLATE", "LC_CTYPE", "LC_MESSAGES", "LC_MONETARY", "LC_NUMERIC", "LC_TIME")));
 
-	/** Interpreter this per-engine extension instance is bound to. */
-	private AVM avm;
+	/*
+	 * Engine-wide state. Concurrent collections, because one instance may be
+	 * shared by engines running on several threads.
+	 */
 
-	/** Comparison-function names already warned about; created on first use. */
-	private Set<String> warnedComparators;
+	/** Comparison-function names already warned about. */
+	private final Set<String> warnedComparators = ConcurrentHashMap.newKeySet();
 
-	/** Per-domain directory bindings established by {@code bindtextdomain()}; created on first use. */
-	private Map<String, String> textdomainBindings;
+	/** Per-domain directory bindings established by {@code bindtextdomain()}. */
+	private final Map<String, String> textdomainBindings = new ConcurrentHashMap<String, String>();
 
 	/**
 	 * Creates the gawk compatibility extension.
-	 * <p>
-	 * The instance is bound to its interpreter by
-	 * {@link #initializeGawkVariables(AVM, JRT)}, which the runtime calls before
-	 * the script starts.
-	 * </p>
 	 */
 	public GawkExtension() {
-		// The interpreter is supplied by initializeGawkVariables(), not by construction.
+		// No per-run state: the runtime is resolved per call.
 	}
 
 	private static final class SortEntry {
@@ -126,17 +122,15 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 
 	/**
 	 * Installs the {@code PROCINFO["sorted_in"]} traversal order for
-	 * {@code for-in} loops and binds this per-engine extension instance to its
-	 * interpreter. SYMTAB and FUNCTAB are populated by the interpreter itself.
+	 * {@code for-in} loops. SYMTAB and FUNCTAB are populated by the interpreter
+	 * itself.
 	 *
 	 * @param avmParam interpreter about to execute
 	 * @param jrt runtime associated with {@code avmParam}
 	 */
 	@JawkBeforeStart
-	@SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "The extension is a per-engine instance deliberately bound to its interpreter")
 	public void initializeGawkVariables(AVM avmParam, JRT jrt) {
-		this.avm = avmParam;
-		avm.setForInKeyOrder(this::orderForInKeys);
+		avmParam.setForInKeyOrder(this::orderForInKeys);
 	}
 
 	/**
@@ -664,9 +658,6 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 			return "";
 		}
 		String directoryName = toAwkString(directory);
-		if (textdomainBindings == null) {
-			textdomainBindings = new HashMap<String, String>();
-		}
 		if (!directoryName.isEmpty()) {
 			textdomainBindings.put(domainName, directoryName);
 		}
@@ -686,6 +677,7 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	 * being dispatched, e.g. {@code gawk: script.awk:4: warning: ...}.
 	 */
 	private void warnAtCurrentLine(String format, Object... args) {
+		AVM avm = AVM.current();
 		String source = avm == null ? null : avm.getSourceDescription();
 		String basename = source == null ? "" : new File(source).getName();
 		getJrt().printWarning(
@@ -737,9 +729,6 @@ public class GawkExtension extends AbstractExtension implements JawkExtension {
 	}
 
 	private void warnUnsupportedComparator(String name) {
-		if (warnedComparators == null) {
-			warnedComparators = new HashSet<String>();
-		}
 		if (warnedComparators.add(name)) {
 			warnAtCurrentLine("sort comparison function `%s' is not supported; using default ordering", name);
 		}

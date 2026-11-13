@@ -29,7 +29,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jawk.backend.AVM;
 import io.jawk.ext.annotations.JawkBeforeStart;
 import io.jawk.ext.annotations.JawkFunction;
@@ -58,39 +57,29 @@ import io.jawk.util.AwkSettings;
  */
 public abstract class AbstractExtension implements JawkExtension {
 
-	private JRT jrt;
-	private VariableManager vm;
-	private AwkSettings settings;
-	private Map<String, ExtensionFunction> annotatedFunctions;
-	private List<Method> beforeStartMethods;
+	// volatile: a shared instance may compute these on several threads, and
+	// each thread must see a fully built map or list
+	private volatile Map<String, ExtensionFunction> annotatedFunctions;
+	private volatile List<Method> beforeStartMethods;
 
 	/**
-	 * Creates an extension that is not bound to a runtime yet.
+	 * Creates an extension.
 	 * <p>
-	 * {@link ExtensionRegistry} instantiates a subclass through its no-arg
-	 * constructor, then the runtime calls
-	 * {@link #init(VariableManager, JRT, AwkSettings)} to supply the variable
-	 * manager, the runtime, and the settings, before any of the extension's Awk
-	 * functions can be called.
+	 * An extension holds no runtime: {@link #getJrt()}, {@link #getVm()},
+	 * {@link #getSettings()} and {@link #toAwkString(Object)} resolve the run
+	 * executing on the calling thread ({@link AVM#current()}). The same
+	 * instance can therefore be registered in several engines and called by
+	 * concurrent runs.
 	 * </p>
 	 */
 	protected AbstractExtension() {
-		// The runtime handles are supplied by init(), not by construction.
+		// No per-run state: the runtime is resolved per call.
 	}
 
 	/** {@inheritDoc} */
 	@Override
 	public String getExtensionName() {
 		return getClass().getSimpleName();
-	}
-
-	/** {@inheritDoc} */
-	@Override
-	@SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "Extension needs direct access to runtime, VM and settings")
-	public void init(VariableManager vmParam, JRT runtime, final AwkSettings conf) {
-		this.vm = vmParam;
-		this.jrt = runtime;
-		this.settings = conf;
 	}
 
 	/**
@@ -102,7 +91,7 @@ public abstract class AbstractExtension implements JawkExtension {
 	 *         has been applied.
 	 */
 	protected final String toAwkString(Object obj) {
-		return jrt.toAwkString(obj);
+		return getJrt().toAwkString(obj);
 	}
 
 	/**
@@ -125,36 +114,49 @@ public abstract class AbstractExtension implements JawkExtension {
 	}
 
 	/**
-	 * <p>
-	 * Getter for the field <code>jrt</code>.
-	 * </p>
+	 * Returns the runtime of the run calling this extension.
 	 *
-	 * @return the Runtime
+	 * @return the runtime of the run executing on the calling thread
+	 * @throws IllegalStateException when no run is executing on the calling
+	 *         thread
 	 */
 	protected JRT getJrt() {
-		return jrt;
+		return currentAvm().getJrt();
 	}
 
 	/**
-	 * <p>
-	 * Getter for the field <code>vm</code>.
-	 * </p>
+	 * Returns the variable manager of the run calling this extension.
 	 *
-	 * @return the Variable Manager
+	 * @return the variable manager of the run executing on the calling thread
+	 * @throws IllegalStateException when no run is executing on the calling
+	 *         thread
 	 */
 	protected VariableManager getVm() {
-		return vm;
+		return currentAvm();
 	}
 
 	/**
-	 * <p>
-	 * Getter for the field <code>settings</code>.
-	 * </p>
+	 * Returns the settings of the run calling this extension.
 	 *
-	 * @return the Settings
+	 * @return the settings of the run executing on the calling thread
+	 * @throws IllegalStateException when no run is executing on the calling
+	 *         thread
 	 */
 	protected AwkSettings getSettings() {
-		return settings;
+		return currentAvm().getSettings();
+	}
+
+	/*
+	 * The interpreter calling this extension. Fails when no run is executing on
+	 * the calling thread (e.g. in a thread started by the extension).
+	 */
+	private static AVM currentAvm() {
+		AVM avm = AVM.current();
+		if (avm == null) {
+			throw new IllegalStateException(
+					"No AWK program is executing on this thread: the runtime of an extension is only available while a run calls it");
+		}
+		return avm;
 	}
 
 	private Map<String, ExtensionFunction> getAnnotatedFunctions() {

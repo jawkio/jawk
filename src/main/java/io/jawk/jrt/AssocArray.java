@@ -34,7 +34,8 @@ import io.jawk.intermediate.UntypedObject;
  * <p>
  * This interface extends {@link Map} and provides AWK-specific behaviour:
  * automatic key normalization (null and uninitialized values map to {@code ""}),
- * numeric key coercion ({@code "1"} and {@code 1L} address the same slot), and
+ * numeric key coercion ({@code "1"} and {@code 1L} address the same slot, but
+ * {@code "01"} is a different string subscript), and
  * auto-creation of blank entries on first access.
  * </p>
  * <p>
@@ -117,19 +118,25 @@ public interface AssocArray extends Map<Object, Object> {
 	}
 
 	/**
-	 * Attempts to parse the key as a {@code Long}.
+	 * Returns the {@code Long} key of a key that is the canonical text of a
+	 * {@code long}: {@code "0"}, or an optional {@code -} followed by ASCII digits
+	 * without a leading zero, within the {@code long} range.
 	 * <p>
-	 * This accepts and rejects exactly the same inputs as
-	 * {@link Long#parseLong(String)} (radix 10), but scans the string without
-	 * ever constructing an exception: most keys are not integer strings (every
-	 * multidimensional {@code arr[x,y]} key, for instance), and paying the cost
-	 * of a {@link NumberFormatException} stack-trace fill on every array access
-	 * is prohibitive.
+	 * AWK subscripts are strings: only such a key is the same subscript as the
+	 * integer it spells, so {@code "7"} and {@code 7} address one element, while
+	 * {@code "007"}, {@code "+7"}, {@code "-0"} or {@code " 7"} stay distinct
+	 * string subscripts, as in gawk.
+	 * </p>
+	 * <p>
+	 * The string is scanned without ever constructing an exception: most keys are
+	 * not integer strings (every multidimensional {@code arr[x,y]} key, for
+	 * instance), and paying the cost of a {@link NumberFormatException}
+	 * stack-trace fill on every array access is prohibitive.
 	 * </p>
 	 *
 	 * @param key the key to parse (must not be {@code null})
-	 * @return the {@code Long} value, or {@code null} if the key cannot be parsed
-	 *         as a long integer
+	 * @return the {@code Long} value, or {@code null} if the key is not the
+	 *         canonical text of a long integer
 	 */
 	@SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE", justification = "Defensive check against contract-violating toString() implementations returning null")
 	static Long toLongKey(Object key) {
@@ -145,8 +152,7 @@ public interface AssocArray extends Map<Object, Object> {
 				return null;
 			}
 			if (str == null) {
-				// a contract-violating toString(): treat the key as non-numeric,
-				// like the former Long.parseLong(null) NumberFormatException path
+				// a contract-violating toString(): treat the key as non-numeric
 				return null;
 			}
 		}
@@ -154,30 +160,20 @@ public interface AssocArray extends Map<Object, Object> {
 		if (len == 0) {
 			return null;
 		}
-		int i = 0;
-		boolean negative = false;
-		long limit = -Long.MAX_VALUE;
-		final char firstChar = str.charAt(0);
-		if (firstChar < '0') { // possible leading "+" or "-"
-			if (firstChar == '-') {
-				negative = true;
-				limit = Long.MIN_VALUE;
-			} else if (firstChar != '+') {
-				return null;
-			}
-			if (len == 1) { // lone "+" or "-"
-				return null;
-			}
-			i = 1;
+		final boolean negative = str.charAt(0) == '-';
+		int i = negative ? 1 : 0;
+		// "0" is the only canonical text starting with 0 ("-0", "007" are not)
+		if (i == len || str.charAt(i) == '0' && (negative || len > 1)) {
+			return null;
 		}
 		// Accumulate negatively, exactly like Long.parseLong, so that
 		// Long.MIN_VALUE (whose magnitude exceeds Long.MAX_VALUE) parses too
+		final long limit = negative ? Long.MIN_VALUE : -Long.MAX_VALUE;
 		final long multmin = limit / 10;
 		long result = 0;
 		while (i < len) {
-			// Character.digit keeps parity with Long.parseLong on non-ASCII digits
-			final int digit = Character.digit(str.charAt(i++), 10);
-			if (digit < 0 || result < multmin) {
+			final int digit = str.charAt(i++) - '0';
+			if (digit < 0 || digit > 9 || result < multmin) {
 				return null;
 			}
 			result *= 10;

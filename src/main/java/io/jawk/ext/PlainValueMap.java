@@ -184,7 +184,8 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 
 		@Override
 		public Object getKey() {
-			return entry.getKey();
+			// an array used as a key reads as its view, like an array value
+			return plain(entry.getKey());
 		}
 
 		@Override

@@ -188,12 +188,14 @@ public class PlainExtensionValuesTest {
 		 *
 		 * @param source array holding {@code sub}
 		 * @param dest array receiving the entry
-		 * @return whether the key is found again
+		 * @return whether the key is found again, and iterates as the same view
 		 */
 		@JawkFunction("keyBySub")
 		public boolean keyBySub(@JawkAssocArray Map<Object, Object> source, @JawkAssocArray Map<Object, Object> dest) {
 			dest.put(source.get("sub"), "v");
-			return dest.containsKey(source.get("sub")) && "v".equals(dest.get(source.get("sub")));
+			return dest.containsKey(source.get("sub"))
+					&& "v".equals(dest.get(source.get("sub")))
+					&& dest.keySet().iterator().next() == source.get("sub");
 		}
 
 		/**

@@ -553,6 +553,11 @@ public class JRT {
 	 *         {@code false} when the assignment was not handled
 	 */
 	public boolean applySpecialVariable(String name, Object value) {
+		if (value instanceof Boolean) {
+			// special variables come straight from the settings and the per-run
+			// overrides: a Java Boolean is AWK's 1 or 0 here too
+			return applySpecialVariable(name, new GawkBool((Boolean) value));
+		}
 		switch (name) {
 		case "FS":
 			setFS(value);

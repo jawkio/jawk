@@ -32,6 +32,7 @@ import io.jawk.ext.GawkExtension;
 import io.jawk.ext.annotations.JawkAssocArray;
 import io.jawk.ext.annotations.JawkFunction;
 import io.jawk.jrt.AssocArray;
+import io.jawk.util.AwkSettings;
 
 /**
  * Tests that a {@link Boolean} handed to a script by Java code is the AWK
@@ -162,6 +163,23 @@ public class JavaBooleanValuesTest {
 		AwkTestSupport.awkTest("mkbool() values work in conditions")
 				.script("BEGIN { v = mkbool(1); " + USE + "; if (!mkbool(0)) print \"ok\" }")
 				.expectLines("1 1 on 0 number|bool", "ok")
+				.runAndAssert();
+	}
+
+	@Test
+	public void booleanSpecialVariablesAreBooleanNumbers() throws Exception {
+		AwkSettings settings = new AwkSettings();
+		settings.putVariable("IGNORECASE", Boolean.TRUE);
+		AwkTestSupport.awkTest("Boolean special variables set in the settings are 1 and 0")
+				.script("BEGIN { v = IGNORECASE; " + USE + "; print \"ABC\" ~ /abc/ }")
+				.withAwk(new Awk(settings))
+				.expectLines("1 1 on 0 number|bool", "1")
+				.runAndAssert();
+		AwkTestSupport.awkTest("Boolean special variables set for one run are 1 and 0")
+				.script("BEGIN { print \"ABC\" ~ /abc/, \"x\" }")
+				.preassign("IGNORECASE", Boolean.TRUE)
+				.preassign("OFS", Boolean.FALSE)
+				.expectLines("10x")
 				.runAndAssert();
 	}
 }

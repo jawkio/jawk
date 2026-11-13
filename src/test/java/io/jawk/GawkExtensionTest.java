@@ -775,6 +775,29 @@ public class GawkExtensionTest {
 	}
 
 	@Test
+	public void rawValueArgumentsKeepScalarEvaluation() throws Exception {
+		// gawk turns an untyped variable used as a scalar argument into an
+		// unassigned one
+		AwkTestSupport.awkTest("mkbool and strtonum evaluate an untyped variable as a scalar")
+				.script("BEGIN { print mkbool(u), typeof(u); print strtonum(v), typeof(v) }")
+				.expectLines("0 unassigned", "0 unassigned")
+				.runAndAssert();
+	}
+
+	@Test
+	public void utcFlagUsesAwkTruthiness() throws Exception {
+		// an input "0" is a false strnum, the string constant "0" is true
+		AwkTestSupport.awkTest("strftime and mktime utc flags follow AWK truthiness")
+				.script(
+						"BEGIN { ENVIRON[\"TZ\"] = \"Asia/Tokyo\" } "
+								+ "{ print strftime(\"%H\", 0, $1), strftime(\"%H\", 0, \"0\"), "
+								+ "mktime(\"1970 01 01 09 00 00\", $1), mktime(\"1970 01 01 09 00 00\", \"0\") }")
+				.stdin("0\n")
+				.expectLines("09 00 0 32400")
+				.runAndAssert();
+	}
+
+	@Test
 	public void systimeReturnsCurrentEpochSeconds() throws Exception {
 		long before = System.currentTimeMillis() / 1000L;
 		AwkTestSupport.TestResult result = AwkTestSupport.awkTest("systime reports the current epoch time")

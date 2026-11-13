@@ -53,7 +53,10 @@ public class AwkTuples implements Serializable {
 	// Bumped to 6 when the getline opcodes gained a no-record jump address:
 	// older tuple streams emit them without one and must be recompiled.
 	// (5 = exact 64-bit integral arithmetic.)
-	private static final long serialVersionUID = 8L;
+	// 9 = @JawkRawValue extension arguments are evaluated like other scalars
+	// (issue #649): older streams peek at them without assigning untyped
+	// variables, which is now @JawkIntrospect only.
+	private static final long serialVersionUID = 9L;
 
 	/** Address manager */
 	private final AddressManager addressManager = new AddressManager();

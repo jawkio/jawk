@@ -44,6 +44,15 @@ import io.jawk.util.AwkSettings;
  * Provides functionality common to most extensions,
  * such as VM and JRT variable management, and convenience
  * methods such as checkNumArgs() and toAwkString().
+ * <p>
+ * Methods annotated with {@link JawkFunction} receive plain Java values: an
+ * input-derived numeric string is passed as its {@code String} text, and an
+ * {@link io.jawk.ext.annotations.JawkAssocArray} parameter receives a live
+ * {@link Map} view of the AWK array whose reads return plain values. Use
+ * {@link io.jawk.ext.annotations.JawkRawValue} to receive the values exactly
+ * as the runtime stores them, and
+ * {@link io.jawk.ext.annotations.JawkIntrospect} to inspect a value without
+ * assigning an untyped variable.
  *
  * @author Danny Daglas
  */

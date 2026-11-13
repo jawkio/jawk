@@ -20,7 +20,25 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
-_No user-visible behavior changes recorded yet._
+- Breaking change for extension authors: extension functions now receive plain Java values. An
+  input-derived numeric string (a field, a `split()` piece, a `-v` value, a string nested in an
+  injected `List` or `Map`...) used to reach the extension as an internal `io.jawk.jrt.StrNum`
+  object and is now passed as its `String` text. A `@JawkAssocArray` parameter now receives a live
+  `Map` view of the AWK array: reads return plain values (nested arrays as views too), writes still
+  go to the AWK array. `@JawkRawValue` now means "receive raw values": on a scalar it passes the
+  `StrNum`, and next to `@JawkAssocArray` it passes the `AssocArray` and its raw values as before (a
+  parameter declared as `AssocArray` now requires it). Its former role, inspecting an untyped
+  variable without assigning it, moves to the new `@JawkIntrospect`: extensions that implement
+  `typeof()`-like functions with `@JawkRawValue` must switch to `@JawkIntrospect`
+  ([#649](https://github.com/jawkio/jawk/issues/649)).
+- A Java `Map` returned by an extension function is now copied into an AWK array, as an injected
+  map is: its keys follow AWK rules (`"1"` and `1` are the same element), and using the result as a
+  scalar (`print f()`) now fails like any array instead of printing the map's Java text. Blank and
+  untyped values now reach extensions as `""` instead of internal objects
+  ([#649](https://github.com/jawkio/jawk/issues/649)).
+- `strtonum()` of an untyped variable now makes it unassigned, as in gawk: `strtonum(u); print
+  typeof(u)` printed `untyped` and now prints `unassigned`. Programs compiled with `-K` by earlier
+  versions must be recompiled ([#649](https://github.com/jawkio/jawk/issues/649)).
 
 ## [v7.3.00](https://github.com/jawkio/jawk/releases/tag/v7.3.00) (2026-11-12)
 

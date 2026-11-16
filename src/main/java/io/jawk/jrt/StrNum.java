@@ -40,6 +40,9 @@ public final class StrNum implements Serializable {
 
 	private final String value;
 	private final char decimalSeparator;
+	// Whether Java wrote the text, for a number: its decimal separator is the
+	// period in every run, whatever the locale
+	private final boolean javaNumber;
 	// Parse caches, recomputed on demand after deserialization
 	private transient Boolean numeric;
 	private transient Double numericValue;
@@ -49,8 +52,35 @@ public final class StrNum implements Serializable {
 	}
 
 	StrNum(String value, char decimalSeparator) {
+		this(value, decimalSeparator, false);
+	}
+
+	private StrNum(String value, char decimalSeparator, boolean javaNumber) {
 		this.value = value == null ? "" : value;
 		this.decimalSeparator = decimalSeparator;
+		this.javaNumber = javaNumber;
+	}
+
+	/**
+	 * Creates the numeric string of a Java number a double cannot hold, such as
+	 * a {@link BigDecimal}: its text, which keeps its digits.
+	 *
+	 * @param number number to represent
+	 * @return the numeric string
+	 */
+	static StrNum ofJavaNumber(Number number) {
+		return new StrNum(number.toString(), '.', true);
+	}
+
+	/**
+	 * Returns whether this scalar is the text of a Java number, which reads
+	 * with a period as its decimal separator whatever the locale of the run: it
+	 * must not be converted again for another locale.
+	 *
+	 * @return {@code true} when created with {@link #ofJavaNumber(Number)}
+	 */
+	boolean isJavaNumber() {
+		return javaNumber;
 	}
 
 	/**

@@ -22,6 +22,8 @@ package io.jawk.jrt;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -86,7 +88,8 @@ public final class ListAssocArray extends HashAssocArray {
 	 * <p>
 	 * Lists and maps, at any depth, are copied into new AWK arrays; the caller's
 	 * containers are never modified. A {@link Boolean}, at any depth, becomes
-	 * the boolean-typed number 1 or 0.
+	 * the boolean-typed number 1 or 0, and a {@link BigDecimal} or a
+	 * {@link BigInteger} a numeric string that keeps its digits.
 	 * </p>
 	 *
 	 * @param value value to normalize
@@ -124,6 +127,11 @@ public final class ListAssocArray extends HashAssocArray {
 		if (value instanceof Map) {
 			return createFromMap((Map<?, ?>) value, sortedArrayKeys, stringConverter, activeContainers);
 		}
+		if (value instanceof StrNum && ((StrNum) value).isJavaNumber()) {
+			// Already normalized, and not for a locale: the converter would read
+			// its period with the decimal separator of this run
+			return value;
+		}
 		if (value instanceof String || value instanceof StrNum) {
 			// A StrNum comes from an array of a previous run: the converter rebinds it
 			// to the current run's decimal separator
@@ -132,6 +140,11 @@ public final class ListAssocArray extends HashAssocArray {
 		if (value instanceof Boolean) {
 			// AWK has no boolean: 1 or 0, typed as gawk's mkbool() values are
 			return new GawkBool((Boolean) value);
+		}
+		if (value instanceof BigDecimal || value instanceof BigInteger) {
+			// A double cannot hold these: the text, as a numeric string, keeps the
+			// digits. Java writes it with a period, whatever the locale of the run
+			return StrNum.ofJavaNumber((Number) value);
 		}
 		return value;
 	}

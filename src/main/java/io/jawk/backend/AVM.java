@@ -25,6 +25,8 @@ package io.jawk.backend;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.AbstractSet;
 import java.util.Iterator;
 import java.util.Arrays;
@@ -3125,10 +3127,11 @@ public class AVM implements VariableManager, Closeable {
 		if (result == null) {
 			return "";
 		}
-		if (result instanceof Boolean || result instanceof Map && !(result instanceof AssocArray)) {
+		if (isHostScalar(result) || result instanceof Map && !(result instanceof AssocArray)) {
 			// a Java map becomes an AWK array, as an injected one does: AWK keys,
 			// and no Java toString() when the script uses it as a scalar; a
-			// Boolean becomes the boolean-typed number 1 or 0
+			// Boolean becomes the boolean-typed number 1 or 0, a BigDecimal or
+			// a BigInteger a numeric string
 			return AssocArray.normalizeValue(result, sortedArrayKeys);
 		}
 		if (result instanceof Number || result instanceof String || result instanceof Map) {
@@ -4484,11 +4487,22 @@ public class AVM implements VariableManager, Closeable {
 		return nested;
 	}
 
+	/**
+	 * Returns whether a scalar handed over by Java code is not an AWK value yet,
+	 * and becomes one in {@link AssocArray#normalizeValue(Object, boolean)}.
+	 *
+	 * @param value value to check
+	 * @return {@code true} for a Boolean, a BigDecimal or a BigInteger
+	 */
+	private static boolean isHostScalar(Object value) {
+		return value instanceof Boolean || value instanceof BigDecimal || value instanceof BigInteger;
+	}
+
 	private Object normalizeExternalVariableValue(Object value) {
 		if (value instanceof String) {
 			return jrt.toInputScalar(value);
 		}
-		if (!(value instanceof Map) && !(value instanceof List) && !(value instanceof Boolean)) {
+		if (!(value instanceof Map) && !(value instanceof List) && !isHostScalar(value)) {
 			return value;
 		}
 		// toString() also rebinds a StrNum left by a previous run to this run's

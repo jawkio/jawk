@@ -127,6 +127,11 @@ public final class ListAssocArray extends HashAssocArray {
 		if (value instanceof Map) {
 			return createFromMap((Map<?, ?>) value, sortedArrayKeys, stringConverter, activeContainers);
 		}
+		if (value instanceof StrNum && ((StrNum) value).isJavaNumber()) {
+			// Already normalized, and not for a locale: the converter would read
+			// its period with the decimal separator of this run
+			return value;
+		}
 		if (value instanceof String || value instanceof StrNum) {
 			// A StrNum comes from an array of a previous run: the converter rebinds it
 			// to the current run's decimal separator
@@ -139,7 +144,7 @@ public final class ListAssocArray extends HashAssocArray {
 		if (value instanceof BigDecimal || value instanceof BigInteger) {
 			// A double cannot hold these: the text, as a numeric string, keeps the
 			// digits. Java writes it with a period, whatever the locale of the run
-			return new StrNum(value.toString(), '.');
+			return StrNum.ofJavaNumber((Number) value);
 		}
 		return value;
 	}

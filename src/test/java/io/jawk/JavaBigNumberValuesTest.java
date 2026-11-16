@@ -51,6 +51,12 @@ public class JavaBigNumberValuesTest {
 	/** The value as it prints, computed with, converted to a string, compared as a number, and its type. */
 	private static final String USE = "print v, v + 0, v \"\", (v > 1000000), typeof(v)";
 
+	/**
+	 * The value as it prints, compared as a number (as a string, it would be smaller) and computed with: its decimals
+	 * count only when the period is read as its decimal separator.
+	 */
+	private static final String LOCALE_USE = "print v, (v > 999999), v * 1000";
+
 	private static final String DECIMAL_USED = "1234567.891 1.23457e+06 1234567.891 1 strnum";
 
 	private static final String INTEGER_USED = "12345678901234567890 12345678901234567168 12345678901234567890 1 strnum";
@@ -184,11 +190,11 @@ public class JavaBigNumberValuesTest {
 		AwkSettings settings = new AwkSettings();
 		settings.setLocale(Locale.FRANCE);
 		AwkTestSupport.awkTest("A BigDecimal is written with a period, also where the decimal separator is a comma")
-				.script("BEGIN { print d, (d > 1000000), doc[\"size\"], (doc[\"size\"] > 1000000) }")
+				.script("BEGIN { v = d; " + LOCALE_USE + "; v = doc[\"size\"]; " + LOCALE_USE + " }")
 				.withAwk(new Awk(settings))
 				.preassign("d", DECIMAL)
 				.preassign("doc", document())
-				.expectLines("1234567.891 1 1234567.891 1")
+				.expectLines("1234567.891 1 1234567891", "1234567.891 1 1234567891")
 				.runAndAssert();
 	}
 }

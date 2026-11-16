@@ -22,6 +22,8 @@ package io.jawk.ext;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
 import java.util.Iterator;
@@ -32,7 +34,6 @@ import java.util.Set;
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.jrt.AssocArray;
 import io.jawk.jrt.AwkRuntimeException;
-import io.jawk.jrt.GawkBool;
 import io.jawk.jrt.StrNum;
 
 /**
@@ -137,10 +138,14 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 		return containsKey(key) ? plain(array.get(unwrap(key))) : null;
 	}
 
-	/** Stores a {@link Boolean} as the boolean-typed number 1 or 0. */
+	/**
+	 * Stores a {@link Boolean} as the boolean-typed number 1 or 0, and a
+	 * {@link BigDecimal} or a {@link BigInteger} as a numeric string.
+	 */
 	@Override
 	public Object put(Object key, Object value) {
-		Object stored = value instanceof Boolean ? new GawkBool((Boolean) value) : unwrap(value);
+		boolean hostValue = value instanceof Boolean || value instanceof BigDecimal || value instanceof BigInteger;
+		Object stored = hostValue ? AssocArray.normalizeValue(value, false) : unwrap(value);
 		return plain(array.put(unwrap(key), stored));
 	}
 

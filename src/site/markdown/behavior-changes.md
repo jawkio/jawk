@@ -20,6 +20,15 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
+- A `java.math.BigDecimal` or a `java.math.BigInteger` handed to a script by Java code is now a
+  numeric string, like a field read from the input (`typeof()` reports `strnum`): it computes and
+  compares as a number, and prints with the digits it has, with a period as decimal separator
+  whatever the locale. It applies as a variable, inside an injected `Map` or `List`, in a value
+  copied with `AssocArray.normalizeValue()`, written to an `@JawkAssocArray` view, or returned by
+  an extension function. It used to be a double as soon as the script used it, so
+  `new BigDecimal("1234567.891")` printed as `1.23457e+06`, `new BigDecimal("12.50")` as `12.5`, and
+  `new BigInteger("12345678901234567890")` as `12345678901234567168`
+  ([#658](https://github.com/jawkio/jawk/issues/658)).
 - A `java.lang.Boolean` handed to a script by Java code is now the number 1 or 0, as gawk's
   `mkbool()` returns (`typeof()` reports `number|bool`): as a variable (special variables such as
   `IGNORECASE` included), as a JSR 223 binding, which used to be ignored, inside an injected `Map` or

@@ -20,6 +20,13 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
+- A Java `Map` or `List` an extension writes through an `@JawkAssocArray` view (`put()`,
+  `putAll()`, `Map.Entry.setValue()`) is now copied into a new AWK array, at any depth, as a `Map`
+  returned by an extension function is. It used to be stored as it is: a `Map` followed Java key
+  rules (`"1" in array` and `1 in array` did not find the same element), a `List` was a scalar
+  printing as `[a, b]`, and a `Boolean` inside stopped the script with "Unknown operand_stack
+  type". A `String` inside stays a string, and an `AssocArray` or another view stays the same
+  array ([#657](https://github.com/jawkio/jawk/issues/657)).
 - A `java.math.BigDecimal` or a `java.math.BigInteger` handed to a script by Java code is now a
   numeric string, like a field read from the input (`typeof()` reports `strnum`): it computes and
   compares as a number, and prints with the digits it has, with a period as decimal separator

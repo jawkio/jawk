@@ -27,21 +27,26 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.math.BigDecimal;
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.Test;
 import io.jawk.ext.AbstractExtension;
+import io.jawk.ext.GawkExtension;
 import io.jawk.ext.annotations.JawkAssocArray;
 import io.jawk.ext.annotations.JawkFunction;
 import io.jawk.ext.annotations.JawkIntrospect;
 import io.jawk.ext.annotations.JawkRawValue;
 import io.jawk.jrt.AssocArray;
 import io.jawk.jrt.AwkRuntimeException;
+import io.jawk.util.AwkSettings;
 
 /**
  * Tests that extension functions receive plain Java values by default, and
@@ -166,6 +171,34 @@ public class PlainExtensionValuesTest {
 				}
 			}
 			return 1;
+		}
+
+		/**
+		 * Writes Java maps and lists through the plain view, with {@code put()},
+		 * {@code putAll()} and {@code Map.Entry.setValue()}, as in issue #657.
+		 *
+		 * @param dest array to fill
+		 */
+		@JawkFunction("fillContainers")
+		public void fillContainers(@JawkAssocArray Map<Object, Object> dest) {
+			Map<Object, Object> nested = new LinkedHashMap<Object, Object>();
+			nested.put("1", "x");
+			nested.put("enabled", Boolean.FALSE);
+			nested.put(
+					"deep",
+					Collections.<Object, Object>singletonMap("list", Arrays.<Object>asList("10", new BigDecimal("1.50"))));
+			dest.put("nested", nested);
+			// a copy: what the Java map receives later does not reach the script
+			nested.put("late", "x");
+			dest.putAll(Collections.<Object, Object>singletonMap("list", Arrays.asList("a", "b")));
+			dest.put("entry", "scalar");
+			for (Map.Entry<Object, Object> entry : dest.entrySet()) {
+				if ("entry".equals(entry.getKey())) {
+					entry.setValue(Collections.singletonList("c"));
+				}
+			}
+			// an AWK array is not copied: both elements are the same array
+			dest.put("alias", dest.get("nested"));
 		}
 
 		/**
@@ -453,6 +486,32 @@ public class PlainExtensionValuesTest {
 								+ "a[\"sub\"][\"x\"], a[\"sub\"][\"y\"] }")
 				.withExtensions(new ValuesExtension())
 				.expectLines("4 v 0 0 changed 4 42 5")
+				.runAndAssert();
+	}
+
+	@Test
+	public void javaContainersWrittenToAnArrayViewAreAwkArrays() throws Exception {
+		AwkTestSupport.awkTest("a Java Map or List written through the plain view is copied into an AWK array")
+				.script(
+						"BEGIN { fillContainers(r); n = \"nested\"; "
+								+ "print (\"1\" in r[n]), (1 in r[n]), (\"late\" in r[n]), (r[n][\"enabled\"] ? \"on\" : \"off\"); "
+								+ "print typeof(r[\"list\"]), r[\"list\"][0], r[\"list\"][1], r[\"entry\"][0]; "
+								+ "print typeof(r[n][\"deep\"][\"list\"][0]), r[n][\"deep\"][\"list\"][1]; "
+								+ "r[\"alias\"][\"new\"] = 1; print (\"new\" in r[n]), rawClass(r[n]), rawClass(r[\"list\"]) }")
+				.withExtensions(new GawkExtension(), new ValuesExtension())
+				.expectLines("1 1 0 off", "array a b c", "string 1.50", "1 HashAssocArray ListAssocArray")
+				.runAndAssert();
+	}
+
+	@Test
+	public void javaContainersWrittenToASortedArrayViewAreSortedArrays() throws Exception {
+		AwkSettings settings = new AwkSettings();
+		settings.setUseSortedArrayKeys(true);
+		AwkTestSupport.awkTest("a Java Map or List written through the plain view follows the sorted keys setting")
+				.script(
+						"BEGIN { fillContainers(r); print rawClass(r[\"nested\"]), rawClass(r[\"nested\"][\"deep\"]), rawClass(r[\"list\"]) }")
+				.withAwk(new Awk(Collections.singletonList(new ValuesExtension()), settings))
+				.expectLines("SortedAssocArray SortedAssocArray SortedAssocArray")
 				.runAndAssert();
 	}
 

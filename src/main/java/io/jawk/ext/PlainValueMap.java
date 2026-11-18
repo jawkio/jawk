@@ -27,6 +27,7 @@ import java.math.BigInteger;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -34,6 +35,7 @@ import java.util.Set;
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.jrt.AssocArray;
 import io.jawk.jrt.AwkRuntimeException;
+import io.jawk.jrt.SortedAssocArray;
 import io.jawk.jrt.StrNum;
 
 /**
@@ -139,13 +141,18 @@ final class PlainValueMap extends AbstractMap<Object, Object> {
 	}
 
 	/**
-	 * Stores a {@link Boolean} as the boolean-typed number 1 or 0, and a
-	 * {@link BigDecimal} or a {@link BigInteger} as a numeric string.
+	 * Stores a {@link Boolean} as the boolean-typed number 1 or 0, a
+	 * {@link BigDecimal} or a {@link BigInteger} as a numeric string, and a
+	 * Java {@link Map} or {@link List} as a new AWK array holding a copy of it,
+	 * at any depth. An {@link AssocArray} or a view stays the same array, so
+	 * aliases keep working.
 	 */
 	@Override
 	public Object put(Object key, Object value) {
-		boolean hostValue = value instanceof Boolean || value instanceof BigDecimal || value instanceof BigInteger;
-		Object stored = hostValue ? AssocArray.normalizeValue(value, false) : unwrap(value);
+		Object stored = value instanceof PlainValueMap || value instanceof AssocArray ?
+				unwrap(value) :
+				// the copy is an array of the kind the script uses, as its parent is
+				AssocArray.normalizeValue(value, array instanceof SortedAssocArray);
 		return plain(array.put(unwrap(key), stored));
 	}
 

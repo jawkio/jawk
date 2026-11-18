@@ -20,6 +20,10 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
+- New `AwkExpression.isConstant()`, `getConstantValue()` and `getFieldIndex()` for Java embedders:
+  a compiled expression tells whether it is a constant (`"a"`, `42`, `2 * 3`) or a single field
+  of constant index (`$3`), so that a host can skip its evaluation. The host used to read the
+  compiled tuples to find out ([#661](https://github.com/jawkio/jawk/issues/661)).
 - A Java `Map` or `List` an extension writes through an `@JawkAssocArray` view (`put()`,
   `putAll()`, `Map.Entry.setValue()`) is now copied into a new AWK array, at any depth, as a `Map`
   returned by an extension function is. It used to be stored as it is: a `Map` followed Java key

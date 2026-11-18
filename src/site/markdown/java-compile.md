@@ -51,6 +51,30 @@ Object first = awk.eval(expression, "alpha,beta");
 Object second = awk.eval(expression, "left,right");
 ```
 
+### Skip the Evaluation of Trivial Expressions
+
+A host that evaluates many small expressions on every record can ask a compiled expression, once, whether it needs the runtime at all:
+
+```java
+AwkExpression constant = awk.compileExpression("\"enclosure\"");
+constant.isConstant();       // true
+constant.getConstantValue(); // "enclosure", as eval() returns it
+
+AwkExpression field = awk.compileExpression("$3");
+field.getFieldIndex();       // 3: the host can read the third field itself
+```
+
+| Method | Result |
+| --- | --- |
+| `isConstant()` | `true` when the value depends neither on the input nor on the variables: a string or number literal, or what constant folding reduces to one (`2 * 3`, `"a" "b"`) |
+| `getConstantValue()` | The value `eval()` returns for a constant expression (`String`, `Long` or `Double`). Throws `IllegalStateException` when the expression is not constant |
+| `getFieldIndex()` | `n` when the expression is exactly `$n` with a constant `n` (`0` for `$0`), `-1` otherwise |
+
+- The constant value is the evaluated one, not the source text: `0.10` is `0.1`, `010` is `10`, and `1e3` is `1000`.
+- An expression that reads a field or a variable, or calls a function, is never constant: `NF`, `length`, `x`, `toupper("a")`.
+- `$NF`, `$(i)` and `$1 $2` have no field index.
+- The answers come from the optimized code. When the optimizer does not reduce an expression to one value or one field (or when the expression is compiled with optimization disabled), it is reported as neither, and evaluating it remains correct.
+
 ## Compile a Full Program
 
 For full AWK programs, compile to `AwkProgram` and then run that compiled program with the input and output you want:

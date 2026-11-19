@@ -37,7 +37,8 @@ public class SandboxedJRT extends JRT {
 	 * Creates a sandboxed runtime facade with explicit default output settings.
 	 *
 	 * @param vm Variable manager used by the sandboxed runtime
-	 * @param locale locale to use for runtime formatting
+	 * @param locale locale to use for number formatting and for
+	 *        {@code tolower()} and {@code toupper()}
 	 * @param awkSink default output sink
 	 * @param error error stream for spawned-process stderr
 	 */

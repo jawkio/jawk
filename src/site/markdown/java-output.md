@@ -186,7 +186,7 @@ The first two are also reachable through the `AwkSink.from(...)` factories, whic
 
 ## Numeric Locale
 
-The locale controls how AWK formats numbers in `print` and `printf` output (e.g. decimal separator). The default is `Locale.US`.
+The locale controls how AWK formats numbers in `print` and `printf` output (e.g. decimal separator). The locale of the `AwkSettings` also drives the case conversion of `tolower()` and `toupper()`, whatever the default locale of the JVM. The default is `Locale.US`.
 
 ### With the Builder
 
@@ -204,7 +204,7 @@ String result = awk.script("BEGIN { print 3.14 }").execute();
 
 ### With a Custom AwkSink
 
-When you pass an `AwkSink` to `execute(AwkSink)`, the sink carries its own locale — `AwkSettings` is not involved.
+When you pass an `AwkSink` to `execute(AwkSink)`, the sink carries its own locale for number formatting in `print` and `printf` output. `tolower()` and `toupper()` still use the locale of the `AwkSettings`.
 Specify the locale when constructing the sink:
 
 ```java

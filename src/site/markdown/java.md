@@ -33,7 +33,7 @@ Awk awk = new Awk(settings);
 | Setter | Default | Description |
 | --- | --- | --- |
 | `setFieldSeparator(String)` | `null` (default AWK FS) | The initial value of `FS`, the field separator |
-| `setLocale(Locale)` | `Locale.US` | Locale for numeric output formatting |
+| `setLocale(Locale)` | `Locale.US` | Locale for numeric output formatting and for `tolower()` / `toupper()` |
 | `setDefaultRS(String)` | `"\n"` | Default value for `RS`, the record separator  |
 | `setUseSortedArrayKeys(boolean)` | `false` | Whether to keep associative array keys in sorted order |
 | `setPosix(boolean)` | `false` | Enforce POSIX compile-time behavior, rejecting gawk syntax such as `a[i][j]`, `split(..., a[i])`, all `@` forms, and the `BEGINFILE` / `ENDFILE` special patterns |

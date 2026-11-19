@@ -204,7 +204,7 @@ public class JRT {
 	private String convfmt; // number-to-string format
 	private String ofmt; // number-to-string for output
 	private String subsep; // subscript separator
-	private final Locale locale; // locale for number formatting
+	private final Locale locale; // locale for number formatting and case conversion
 	private final char decimalSeparator; // locale decimal separator for strnum recognition
 
 	private static final class FileOutputState {
@@ -291,7 +291,8 @@ public class JRT {
 	 * Create a JRT with explicit default output and error streams.
 	 *
 	 * @param vm The VariableManager to use with this JRT.
-	 * @param locale The Locale to use for number formatting.
+	 * @param locale The Locale to use for number formatting and for
+	 *        {@code tolower()} and {@code toupper()}.
 	 * @param awkSink default output sink used by plain AWK print operations
 	 * @param error default error stream used for process stderr
 	 */
@@ -402,7 +403,8 @@ public class JRT {
 	}
 
 	/**
-	 * Returns the locale used for number formatting in this runtime.
+	 * Returns the locale used for number formatting and for the case
+	 * conversion of {@code tolower()} and {@code toupper()} in this runtime.
 	 *
 	 * @return the runtime locale
 	 */

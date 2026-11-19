@@ -89,7 +89,8 @@ public class AwkSettings {
 	private volatile boolean posix;
 
 	/**
-	 * Locale for the output of numbers
+	 * Locale for the output of numbers and the case conversion of
+	 * {@code tolower()} and {@code toupper()},
 	 * <code>US-English</code> by default.
 	 */
 	private volatile Locale locale = Locale.US;
@@ -318,14 +319,16 @@ public class AwkSettings {
 	 * Getter for the field <code>locale</code>.
 	 * </p>
 	 *
-	 * @return the Locale that will be used for outputting numbers
+	 * @return the Locale that will be used for outputting numbers and for
+	 *         {@code tolower()} and {@code toupper()}
 	 */
 	public Locale getLocale() {
 		return locale;
 	}
 
 	/**
-	 * Sets the Locale for outputting numbers.
+	 * Sets the Locale for outputting numbers and for the case conversion of
+	 * {@code tolower()} and {@code toupper()}.
 	 *
 	 * @param pLocale The locale to be used (e.g.: <code>Locale.US</code>)
 	 */

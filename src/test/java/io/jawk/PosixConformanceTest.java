@@ -912,6 +912,22 @@ public class PosixConformanceTest {
 	}
 
 	@Test
+	public void caseConversionIgnoresDefaultLocale() throws Exception {
+		Locale previous = Locale.getDefault();
+		try {
+			Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+			AwkTestSupport.awkTest("tolower and toupper ignore the Turkish default locale")
+					.script(
+							"BEGIN { lo = \"tolower\"; up = \"toupper\"; "
+									+ "print tolower(\"FILTER\"), toupper(\"device\"), @lo(\"FILTER\"), @up(\"device\") }")
+					.expectLines("filter DEVICE filter DEVICE")
+					.runAndAssert();
+		} finally {
+			Locale.setDefault(previous);
+		}
+	}
+
+	@Test
 	public void posix142LocaleNumericInput() throws Exception {
 		Assume.assumeTrue("Locale-aware numeric parsing is not available", false);
 		Locale previous = Locale.getDefault();

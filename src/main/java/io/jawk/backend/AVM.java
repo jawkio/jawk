@@ -1770,13 +1770,13 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case TOLOWER: {
 					// stack[0] = string
-					push(jrt.toAwkString(pop()).toLowerCase());
+					push(jrt.toAwkString(pop()).toLowerCase(jrt.getLocale()));
 					position.next();
 					break;
 				}
 				case TOUPPER: {
 					// stack[0] = string
-					push(jrt.toAwkString(pop()).toUpperCase());
+					push(jrt.toAwkString(pop()).toUpperCase(jrt.getLocale()));
 					position.next();
 					break;
 				}
@@ -3076,10 +3076,10 @@ public class AVM implements VariableManager, Closeable {
 			return jrt.jrtSystem(jrt.toAwkString(args[0]));
 		case TOLOWER:
 			requireIndirectArgumentCount(builtin, args, 1, 1, lineNumber);
-			return jrt.toAwkString(args[0]).toLowerCase();
+			return jrt.toAwkString(args[0]).toLowerCase(jrt.getLocale());
 		case TOUPPER:
 			requireIndirectArgumentCount(builtin, args, 1, 1, lineNumber);
-			return jrt.toAwkString(args[0]).toUpperCase();
+			return jrt.toAwkString(args[0]).toUpperCase(jrt.getLocale());
 		default:
 			throw new AwkRuntimeException(
 					lineNumber,

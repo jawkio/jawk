@@ -20,6 +20,11 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
+- `tolower()` and `toupper()` now convert case with the locale of the `AwkSettings` (`--locale`,
+  `Locale.US` by default) instead of the default locale of the JVM. With a Turkish or Azeri
+  default locale, `tolower("FILTER")` used to return `fılter` (dotless i) and
+  `toupper("device")` `DEVİCE` (dotted capital I), so the same script gave different
+  results depending on the machine ([#663](https://github.com/jawkio/jawk/issues/663)).
 - New `AwkExpression.isConstant()`, `getConstantValue()` and `getFieldIndex()` for Java embedders:
   a compiled expression tells whether it is a constant (`"a"`, `42`, `2 * 3`) or a single field
   of constant index (`$3`), so that a host can skip its evaluation. The host used to read the

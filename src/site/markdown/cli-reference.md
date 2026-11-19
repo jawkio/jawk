@@ -53,7 +53,7 @@ jawk --version
 >
 >   - `-v <name=value>` assigns a variable before execution begins.
 >   - `-F <fs>` sets the initial field separator.
->   - `--locale <locale>` sets the locale used to format numbers, through `Locale.forLanguageTag(...)`.
+>   - `--locale <locale>` sets the locale used to format numbers and to convert case in `tolower()` and `toupper()`, through `Locale.forLanguageTag(...)`.
 >   - `-t` keeps associative array keys sorted.
 >   - `--posix` enforces POSIX-oriented compile-time behavior such as disabling gawk-style nested arrays, all gawk `@` forms, and the `BEGINFILE` / `ENDFILE` special patterns, and makes `sub()` / `gsub()` follow the POSIX backslash rules in their replacement text (see [Where Jawk follows gawk](compatibility.html#where-jawk-follows-gawk)).
 >

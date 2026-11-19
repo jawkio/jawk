@@ -204,7 +204,7 @@ String result = awk.script("BEGIN { print 3.14 }").execute();
 
 ### With a Custom AwkSink
 
-When you pass an `AwkSink` to `execute(AwkSink)`, the sink carries its own locale — `AwkSettings` is not involved.
+When you pass an `AwkSink` to `execute(AwkSink)`, the sink carries its own locale for number formatting in `print` and `printf` output. `tolower()` and `toupper()` still use the locale of the `AwkSettings`.
 Specify the locale when constructing the sink:
 
 ```java

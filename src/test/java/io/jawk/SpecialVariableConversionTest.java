@@ -67,4 +67,27 @@ public class SpecialVariableConversionTest {
 				.expectLines("2 3")
 				.runAndAssert();
 	}
+
+	@Test
+	public void assignedNumberKeepsItsNumericValue() throws Exception {
+		AwkTestSupport.awkTest("FS and OFS keep the number assigned, and their text from the CONVFMT at that time")
+				.script(
+						"BEGIN { CONVFMT = \"%.0f\"; FS = 3.6; OFS = 0.1 + 0.2;"
+								+ " printf \"%.17g %.17g\\n\", FS + 0, OFS + 0; print OFS; CONVFMT = \"%.6g\" }"
+								+ " { print $2; print $1, $2 }")
+				.stdin("a4b\n")
+				.expectLines("3.6000000000000001 0.30000000000000004", "0.3", "b", "a0b")
+				.runAndAssert();
+	}
+
+	@Test
+	public void preassignedConvfmtConvertsPreassignedSeparators() throws Exception {
+		AwkTestSupport.awkTest("a preassigned CONVFMT converts the numbers preassigned to the other variables")
+				.script("{ print }")
+				.preassign("RS", Double.valueOf(1.0 / 3))
+				.preassign("CONVFMT", "%.2f")
+				.stdin("a0.33b")
+				.expectLines("a", "b")
+				.runAndAssert();
+	}
 }

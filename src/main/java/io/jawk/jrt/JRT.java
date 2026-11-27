@@ -204,6 +204,14 @@ public class JRT {
 	private String convfmt; // number-to-string format
 	private String ofmt; // number-to-string for output
 	private String subsep; // subscript separator
+	// the values assigned to the variables above, numbers kept as numbers
+	private Object fsVar;
+	private Object rsVar;
+	private Object ofsVar;
+	private Object orsVar;
+	private Object convfmtVar;
+	private Object ofmtVar;
+	private Object subsepVar;
 	private final Locale locale; // locale for number formatting and case conversion
 	private final char decimalSeparator; // locale decimal separator for strnum recognition
 
@@ -624,10 +632,16 @@ public class JRT {
 		if (variableMap == null || variableMap.isEmpty()) {
 			return;
 		}
+		// CONVFMT first: it converts the numbers assigned to the others
+		if (variableMap.containsKey("CONVFMT")) {
+			applySpecialVariable("CONVFMT", variableMap.get("CONVFMT"));
+		}
 		for (Map.Entry<String, Object> var : variableMap.entrySet()) {
 			// Non-special variables are skipped; they are assigned later
 			// via the tuple instruction stream
-			applySpecialVariable(var.getKey(), var.getValue());
+			if (!"CONVFMT".equals(var.getKey())) {
+				applySpecialVariable(var.getKey(), var.getValue());
+			}
 		}
 	}
 
@@ -1712,7 +1726,7 @@ public class JRT {
 	 * @return FS value
 	 */
 	public Object getFSVar() {
-		return fs;
+		return fsVar;
 	}
 
 	/**
@@ -1730,6 +1744,7 @@ public class JRT {
 	 * @param value new FS value
 	 */
 	public void setFS(Object value) {
+		this.fsVar = value == null ? "" : value;
 		this.fs = toAwkString(value);
 	}
 
@@ -2088,7 +2103,7 @@ public class JRT {
 	 * @return RS value
 	 */
 	public Object getRSVar() {
-		return rs;
+		return rsVar;
 	}
 
 	/**
@@ -2106,6 +2121,7 @@ public class JRT {
 	 * @param value new RS value
 	 */
 	public void setRS(Object value) {
+		this.rsVar = value == null ? "" : value;
 		this.rs = toAwkString(value);
 		applyRS(this.rs);
 	}
@@ -2116,7 +2132,7 @@ public class JRT {
 	 * @return OFS value
 	 */
 	public Object getOFSVar() {
-		return ofs;
+		return ofsVar;
 	}
 
 	/**
@@ -2134,6 +2150,7 @@ public class JRT {
 	 * @param value new OFS value
 	 */
 	public void setOFS(Object value) {
+		this.ofsVar = value == null ? "" : value;
 		this.ofs = toAwkString(value);
 	}
 
@@ -2143,7 +2160,7 @@ public class JRT {
 	 * @return ORS value
 	 */
 	public Object getORSVar() {
-		return ors;
+		return orsVar;
 	}
 
 	/**
@@ -2161,6 +2178,7 @@ public class JRT {
 	 * @param value new ORS value
 	 */
 	public void setORS(Object value) {
+		this.orsVar = value == null ? "" : value;
 		this.ors = toAwkString(value);
 	}
 
@@ -2260,7 +2278,7 @@ public class JRT {
 	 * @return SUBSEP value
 	 */
 	public Object getSUBSEPVar() {
-		return subsep;
+		return subsepVar;
 	}
 
 	/**
@@ -2278,6 +2296,7 @@ public class JRT {
 	 * @param value new SUBSEP value
 	 */
 	public void setSUBSEP(Object value) {
+		this.subsepVar = value == null ? "" : value;
 		this.subsep = toAwkString(value);
 	}
 
@@ -2287,7 +2306,7 @@ public class JRT {
 	 * @return CONVFMT value
 	 */
 	public Object getCONVFMTVar() {
-		return convfmt;
+		return convfmtVar;
 	}
 
 	/**
@@ -2305,6 +2324,7 @@ public class JRT {
 	 * @param value new CONVFMT value
 	 */
 	public void setCONVFMT(Object value) {
+		this.convfmtVar = value == null ? "" : value;
 		this.convfmt = toAwkString(value);
 	}
 
@@ -2318,11 +2338,21 @@ public class JRT {
 	}
 
 	/**
+	 * Get the value assigned to OFMT, a number kept as a number.
+	 *
+	 * @return OFMT value
+	 */
+	public Object getOFMTVar() {
+		return ofmtVar;
+	}
+
+	/**
 	 * Set OFMT via the VariableManager.
 	 *
 	 * @param value new OFMT value
 	 */
 	public void setOFMT(Object value) {
+		this.ofmtVar = value == null ? "" : value;
 		this.ofmt = toAwkString(value);
 	}
 

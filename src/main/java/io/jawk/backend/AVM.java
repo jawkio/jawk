@@ -2095,7 +2095,7 @@ public class AVM implements VariableManager, Closeable {
 					break;
 				}
 				case APPLY_RS: {
-					jrt.applyRS(jrt.getRSVar());
+					jrt.applyRS(jrt.getRSString());
 					position.next();
 					break;
 				}
@@ -2554,7 +2554,7 @@ public class AVM implements VariableManager, Closeable {
 					break;
 				}
 				case PUSH_OFMT: {
-					push(getOFMT());
+					push(jrt.getOFMTVar());
 					position.next();
 					break;
 				}
@@ -3078,7 +3078,7 @@ public class AVM implements VariableManager, Closeable {
 			return Math.sin(JRT.toDouble(number(args[0])));
 		case SPLIT:
 			requireIndirectArgumentCount(builtin, args, 2, 3, lineNumber);
-			return splitIntoArray(args[0], args[1], args.length == 3 ? args[2] : jrt.getFSVar(), lineNumber);
+			return splitIntoArray(args[0], args[1], args.length == 3 ? args[2] : jrt.getFSString(), lineNumber);
 		case SPRINTF:
 			requireIndirectArgumentCount(builtin, args, 1, Integer.MAX_VALUE, lineNumber);
 			return jrt.sprintf(jrt.toAwkString(args[0]), Arrays.copyOfRange(args, 1, args.length));
@@ -3225,7 +3225,7 @@ public class AVM implements VariableManager, Closeable {
 		long numArgs = tuple.getCount();
 		Object fs;
 		if (numArgs == 2) {
-			fs = jrt.getFSVar();
+			fs = jrt.getFSString();
 		} else if (numArgs == 3) {
 			// a regexp literal arrives precompiled and stays that way, so the
 			// tokenizer can honor IGNORECASE through the pattern-twin cache
@@ -3712,7 +3712,7 @@ public class AVM implements VariableManager, Closeable {
 		Object value = pop();
 		checkScalar(value);
 		sb.append(jrt.toAwkString(value));
-		String subsep = jrt.toAwkString(jrt.getSUBSEPVar());
+		String subsep = jrt.getSUBSEPString();
 		for (int i = 1; i < count; i++) {
 			sb.insert(0, subsep);
 			value = pop();
@@ -4074,7 +4074,7 @@ public class AVM implements VariableManager, Closeable {
 		case "CONVFMT":
 			return getCONVFMT();
 		case "OFMT":
-			return jrt.getOFMTString();
+			return jrt.getOFMTVar();
 		case "NF":
 			return jrt.getNF();
 		case "NR":
@@ -4309,7 +4309,7 @@ public class AVM implements VariableManager, Closeable {
 	/** {@inheritDoc} */
 	@Override
 	public Object getCONVFMT() {
-		return jrt.getCONVFMTString();
+		return jrt.getCONVFMTVar();
 	}
 
 	/** {@inheritDoc} */
@@ -4362,10 +4362,6 @@ public class AVM implements VariableManager, Closeable {
 			return Long.valueOf(arguments.size() + 1);
 		}
 		return runtimeStack.getVariable(argcOffset, true);
-	}
-
-	private String getOFMT() {
-		return jrt.getOFMTString();
 	}
 
 	private Map<Object, Object> newAwkArray() {

@@ -1730,7 +1730,7 @@ public class JRT {
 	 * @param value new FS value
 	 */
 	public void setFS(Object value) {
-		this.fs = value == null ? "" : value.toString();
+		this.fs = toAwkString(value);
 	}
 
 	/**
@@ -2106,7 +2106,7 @@ public class JRT {
 	 * @param value new RS value
 	 */
 	public void setRS(Object value) {
-		this.rs = value == null ? "" : value.toString();
+		this.rs = toAwkString(value);
 		applyRS(this.rs);
 	}
 
@@ -2134,7 +2134,7 @@ public class JRT {
 	 * @param value new OFS value
 	 */
 	public void setOFS(Object value) {
-		this.ofs = value == null ? "" : value.toString();
+		this.ofs = toAwkString(value);
 	}
 
 	/**
@@ -2161,7 +2161,7 @@ public class JRT {
 	 * @param value new ORS value
 	 */
 	public void setORS(Object value) {
-		this.ors = value == null ? "" : value.toString();
+		this.ors = toAwkString(value);
 	}
 
 	/**
@@ -2278,7 +2278,7 @@ public class JRT {
 	 * @param value new SUBSEP value
 	 */
 	public void setSUBSEP(Object value) {
-		this.subsep = value == null ? "" : value.toString();
+		this.subsep = toAwkString(value);
 	}
 
 	/**
@@ -2305,7 +2305,7 @@ public class JRT {
 	 * @param value new CONVFMT value
 	 */
 	public void setCONVFMT(Object value) {
-		this.convfmt = value == null ? "" : value.toString();
+		this.convfmt = toAwkString(value);
 	}
 
 	/**
@@ -2323,7 +2323,7 @@ public class JRT {
 	 * @param value new OFMT value
 	 */
 	public void setOFMT(Object value) {
-		this.ofmt = value == null ? "" : value.toString();
+		this.ofmt = toAwkString(value);
 	}
 
 	/**

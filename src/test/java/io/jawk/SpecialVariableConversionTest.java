@@ -1,0 +1,70 @@
+package io.jawk;
+
+/*-
+ * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
+ * Jawk
+ * ჻჻჻჻჻჻
+ * Copyright (C) 2006 - 2026 MetricsHub
+ * ჻჻჻჻჻჻
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Lesser Public License for more details.
+ *
+ * You should have received a copy of the GNU General Lesser Public
+ * License along with this program.  If not, see
+ * <http://www.gnu.org/licenses/lgpl-3.0.html>.
+ * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
+ */
+
+import org.junit.Test;
+
+/**
+ * Tests that a number assigned to a special variable stored as text
+ * ({@code FS}, {@code RS}, {@code OFS}, {@code ORS}, {@code SUBSEP},
+ * {@code CONVFMT} and {@code OFMT}) is converted with {@code CONVFMT}, an
+ * integral value as an integer (#672). Expected outputs are gawk's.
+ */
+public class SpecialVariableConversionTest {
+
+	@Test
+	public void ofsAndSubsepUseConvfmt() throws Exception {
+		AwkTestSupport.awkTest("a number assigned to OFS or SUBSEP is converted with CONVFMT (#672)")
+				.script(
+						"BEGIN { OFS = 0.1 + 0.2; print \"a\", \"b\"; OFS = 3; OFS++; print \"a\", \"b\";"
+								+ " SUBSEP = 2 / 2.0; SUBSEP += 0; a[1, 2]; for (k in a) print k }")
+				.expectLines("a0.3b", "a4b", "112")
+				.runAndAssert();
+	}
+
+	@Test
+	public void fsIncrementedFromTextIsAnInteger() throws Exception {
+		AwkTestSupport.awkTest("FS += 1 and FS++ on a text leave an integer in FS (#672)")
+				.script("BEGIN { FS = \"3x\"; FS += 1; print FS; FS = \"3x\"; FS++; print FS } { print $2 }")
+				.stdin("a4b\n")
+				.expectLines("4", "4", "b")
+				.runAndAssert();
+	}
+
+	@Test
+	public void rsAndOrsUseConvfmt() throws Exception {
+		AwkTestSupport.awkTest("a number assigned to RS or ORS is converted with CONVFMT (#672)")
+				.script("BEGIN { RS = 6 / 2; ORS = 4 / 2 } { print } END { ORS = \"\\n\"; print \"\" }")
+				.stdin("a3b")
+				.expectLines("a2b2")
+				.runAndAssert();
+	}
+
+	@Test
+	public void convfmtAndOfmtUseConvfmt() throws Exception {
+		AwkTestSupport.awkTest("a number assigned to CONVFMT or OFMT is converted with CONVFMT (#672)")
+				.script("BEGIN { CONVFMT = 4 / 2; OFMT = 6 / 2; print CONVFMT, OFMT }")
+				.expectLines("2 3")
+				.runAndAssert();
+	}
+}

@@ -23,6 +23,8 @@ package io.jawk.jrt;
  */
 
 import java.io.File;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.io.FileOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -1745,13 +1747,31 @@ public class JRT {
 	}
 
 	/**
+	 * Normalizes a value assigned to a special variable stored as text: a
+	 * {@link BigDecimal} or a {@link BigInteger} becomes a numeric string that
+	 * keeps its digits, as the AVM does for any variable from the host.
+	 *
+	 * @param value assigned value
+	 * @return the value the variable holds
+	 */
+	private Object normalizeSpecialValue(Object value) {
+		if (value == null) {
+			return "";
+		}
+		if (value instanceof BigDecimal || value instanceof BigInteger) {
+			return toInputScalar(value.toString());
+		}
+		return value;
+	}
+
+	/**
 	 * Set FS via the VariableManager.
 	 *
 	 * @param value new FS value
 	 */
 	public void setFS(Object value) {
-		this.fsVar = value == null ? "" : value;
-		this.fs = toAwkString(value);
+		this.fsVar = normalizeSpecialValue(value);
+		this.fs = toAwkString(this.fsVar);
 	}
 
 	/**
@@ -2127,8 +2147,8 @@ public class JRT {
 	 * @param value new RS value
 	 */
 	public void setRS(Object value) {
-		this.rsVar = value == null ? "" : value;
-		this.rs = toAwkString(value);
+		this.rsVar = normalizeSpecialValue(value);
+		this.rs = toAwkString(this.rsVar);
 		applyRS(this.rs);
 	}
 
@@ -2156,8 +2176,8 @@ public class JRT {
 	 * @param value new OFS value
 	 */
 	public void setOFS(Object value) {
-		this.ofsVar = value == null ? "" : value;
-		this.ofs = toAwkString(value);
+		this.ofsVar = normalizeSpecialValue(value);
+		this.ofs = toAwkString(this.ofsVar);
 	}
 
 	/**
@@ -2184,8 +2204,8 @@ public class JRT {
 	 * @param value new ORS value
 	 */
 	public void setORS(Object value) {
-		this.orsVar = value == null ? "" : value;
-		this.ors = toAwkString(value);
+		this.orsVar = normalizeSpecialValue(value);
+		this.ors = toAwkString(this.orsVar);
 	}
 
 	/**
@@ -2302,8 +2322,8 @@ public class JRT {
 	 * @param value new SUBSEP value
 	 */
 	public void setSUBSEP(Object value) {
-		this.subsepVar = value == null ? "" : value;
-		this.subsep = toAwkString(value);
+		this.subsepVar = normalizeSpecialValue(value);
+		this.subsep = toAwkString(this.subsepVar);
 	}
 
 	/**
@@ -2330,8 +2350,8 @@ public class JRT {
 	 * @param value new CONVFMT value
 	 */
 	public void setCONVFMT(Object value) {
-		this.convfmtVar = value == null ? "" : value;
-		this.convfmt = toAwkString(value);
+		this.convfmtVar = normalizeSpecialValue(value);
+		this.convfmt = toAwkString(this.convfmtVar);
 	}
 
 	/**
@@ -2358,8 +2378,8 @@ public class JRT {
 	 * @param value new OFMT value
 	 */
 	public void setOFMT(Object value) {
-		this.ofmtVar = value == null ? "" : value;
-		this.ofmt = toAwkString(value);
+		this.ofmtVar = normalizeSpecialValue(value);
+		this.ofmt = toAwkString(this.ofmtVar);
 	}
 
 	/**

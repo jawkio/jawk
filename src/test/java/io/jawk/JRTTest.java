@@ -24,6 +24,8 @@ package io.jawk;
 
 import static org.junit.Assert.*;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -393,6 +395,16 @@ public class JRTTest {
 		jrt.assignInitialVariables(variables);
 		assertEquals("0.33", jrt.getOFSString());
 		assertEquals(Double.valueOf(1.0 / 3), jrt.getOFSVar());
+	}
+
+	@Test
+	public void testSpecialVariableSettersKeepTheDigitsOfBigNumbers() {
+		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
+		jrt.setFS(new BigDecimal("12.50"));
+		jrt.setSUBSEP(new BigInteger("123456789012345678901234567890"));
+		assertEquals("12.50", jrt.getFSString());
+		assertEquals("123456789012345678901234567890", jrt.getSUBSEPString());
+		assertEquals(12.5, JRT.toDouble(jrt.getFSVar()), 0);
 	}
 
 	@Test

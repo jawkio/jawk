@@ -794,6 +794,62 @@ public class JRT {
 	}
 
 	/**
+	 * Returns whether a value is a number for strict numbers
+	 * ({@link io.jawk.util.AwkSettings#setStrictNumbers(boolean)}): a Java
+	 * number, or a text that {@link #toDouble(Object)} reads in full once its
+	 * blanks are trimmed ({@code "007"}, {@code " 7 "}, {@code "1e3"},
+	 * {@code "+inf"}). A text with a mere numeric prefix ({@code "12 W"}), a
+	 * text without any number ({@code ""}, {@code "N/A"}, {@code "0x1A"}) and a
+	 * value that was never assigned are not numbers, although {@code toDouble}
+	 * converts them to their prefix or to zero. An input field that its runtime
+	 * recognized as a number, in its locale, is a number too.
+	 * <p>
+	 * An extension function calls it to tell a number from a text, with the
+	 * grammar of the arithmetic operators.
+	 * </p>
+	 *
+	 * @param value scalar to examine, {@code null} for a value never assigned
+	 * @return {@code true} when nothing of {@code value} is ignored or made up
+	 *         by its conversion to a number
+	 */
+	public static boolean isNumber(Object value) {
+		if (value instanceof Number || value instanceof Character) {
+			return true;
+		}
+		if (value == null || value instanceof UninitializedObject) {
+			return false;
+		}
+		if (value instanceof StrNum && ((StrNum) value).isNumber()) {
+			return true;
+		}
+		String s = value.toString();
+		if (isParseableNumber(s, '.')) {
+			return true;
+		}
+		// "+inf", "-nan": complete signed tokens, in any letter case
+		String token = trimWhitespace(s);
+		return token.length() == 4
+				&& (token.charAt(0) == '+' || token.charAt(0) == '-')
+				&& (token.regionMatches(true, 1, "inf", 0, 3) || token.regionMatches(true, 1, "nan", 0, 3));
+	}
+
+	/**
+	 * Fails for a value that is not a number, as the arithmetic operators do
+	 * under strict numbers. An extension function calls it on an argument it
+	 * is about to convert with {@link #toDouble(Object)} or
+	 * {@link #toLong(Object)}, which never fail.
+	 *
+	 * @param value scalar to examine, {@code null} for a value never assigned
+	 * @throws AwkNumberFormatException when {@link #isNumber(Object)} is false
+	 */
+	public static void requireNumber(Object value) {
+		if (!isNumber(value)) {
+			throw new AwkNumberFormatException(
+					value == null || value instanceof UninitializedObject ? null : value.toString());
+		}
+	}
+
+	/**
 	 * Determines whether a double value actually represents a long integer
 	 * within the limits of floating point precision.
 	 *

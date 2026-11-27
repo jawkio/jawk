@@ -82,6 +82,7 @@ import io.jawk.intermediate.Tuple.VariableTuple;
 import io.jawk.intermediate.UninitializedObject;
 import io.jawk.intermediate.UntypedObject;
 import io.jawk.jrt.AssocArray;
+import io.jawk.jrt.AwkNumberFormatException;
 import io.jawk.jrt.AwkRuntimeException;
 import io.jawk.jrt.AwkSink;
 import io.jawk.jrt.ConditionPair;
@@ -175,6 +176,19 @@ public class AVM implements VariableManager, Closeable {
 		return value;
 	}
 
+	/** Pops an operand of an arithmetic operator or of a numeric function. */
+	private Object popNumber() {
+		return number(pop());
+	}
+
+	/** Refuses a value that is not a number when strict numbers are enabled. */
+	private Object number(Object o) {
+		if (strictNumbers) {
+			JRT.requireNumber(o);
+		}
+		return o;
+	}
+
 	private void push(Object o) {
 		if (operandStackSize == operandStack.length) {
 			operandStack = Arrays.copyOf(operandStack, operandStack.length * 2);
@@ -188,6 +202,7 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	private final AwkSettings settings;
+	private final boolean strictNumbers;
 	private final boolean profiling;
 	private final Map<Opcode, ProfilingReport.Accumulator> tupleProfilingStats;
 	private final Map<String, ProfilingReport.Accumulator> functionProfilingStats;
@@ -260,6 +275,7 @@ public class AVM implements VariableManager, Closeable {
 
 		arguments = Collections.emptyList();
 		sortedArrayKeys = this.settings.isUseSortedArrayKeys();
+		strictNumbers = this.settings.isStrictNumbers();
 		baseInitialVariables = new HashMap<String, Object>(this.settings.getVariables());
 		baseSpecialVariables = JRT.copySpecialVariables(baseInitialVariables);
 		executionInitialVariables = baseInitialVariables;
@@ -1297,7 +1313,7 @@ public class AVM implements VariableManager, Closeable {
 				case NEGATE: {
 					// stack[0] = item to numerically negate
 
-					push(JRT.negate(pop()));
+					push(JRT.negate(popNumber()));
 					position.next();
 					break;
 				}
@@ -1305,7 +1321,13 @@ public class AVM implements VariableManager, Closeable {
 					// stack[0] = item to convert to a number
 					// A numeric scalar is already a number: pushing it back
 					// unchanged avoids both re-boxing and precision loss.
-					push(numericValueOf(pop()));
+					push(numericValueOf(popNumber()));
+					position.next();
+					break;
+				}
+				case POSTFIX_OPERAND: {
+					// stack[0] = array element about to be incremented or decremented
+					push(postfixOperand(pop()));
 					position.next();
 					break;
 				}
@@ -1504,7 +1526,7 @@ public class AVM implements VariableManager, Closeable {
 					Object key = pop();
 					checkScalar(key);
 					Object o = aa.get(key);
-					aa.put(key, JRT.inc(blankToZero(o)));
+					aa.put(key, JRT.inc(numberOrZero(o)));
 					position.next();
 					break;
 				}
@@ -1518,7 +1540,7 @@ public class AVM implements VariableManager, Closeable {
 					Object key = pop();
 					checkScalar(key);
 					Object o = aa.get(key);
-					aa.put(key, JRT.dec(blankToZero(o)));
+					aa.put(key, JRT.dec(numberOrZero(o)));
 					position.next();
 					break;
 				}
@@ -1529,7 +1551,7 @@ public class AVM implements VariableManager, Closeable {
 					checkScalar(key);
 					Map<Object, Object> aa = toMap(pop());
 					Object o = aa.get(key);
-					aa.put(key, JRT.inc(blankToZero(o)));
+					aa.put(key, JRT.inc(numberOrZero(o)));
 					position.next();
 					break;
 				}
@@ -1540,7 +1562,7 @@ public class AVM implements VariableManager, Closeable {
 					checkScalar(key);
 					Map<Object, Object> aa = toMap(pop());
 					Object o = aa.get(key);
-					aa.put(key, JRT.dec(blankToZero(o)));
+					aa.put(key, JRT.dec(numberOrZero(o)));
 					position.next();
 					break;
 				}
@@ -1548,7 +1570,7 @@ public class AVM implements VariableManager, Closeable {
 					// stack[0] = dollar index (field number)
 					long fieldnum = JRT.parseFieldNumber(pop());
 
-					Object numObj = blankToZero(jrt.jrtGetInputField(fieldnum));
+					Object numObj = numberOrZero(jrt.jrtGetInputField(fieldnum));
 					Object original = numericValueOf(numObj);
 					setNumOnJRT(fieldnum, JRT.inc(original));
 
@@ -1562,7 +1584,7 @@ public class AVM implements VariableManager, Closeable {
 					// same code as GET_INPUT_FIELD:
 					long fieldnum = JRT.parseFieldNumber(pop());
 
-					Object numObj = blankToZero(jrt.jrtGetInputField(fieldnum));
+					Object numObj = numberOrZero(jrt.jrtGetInputField(fieldnum));
 					Object original = numericValueOf(numObj);
 					setNumOnJRT(fieldnum, JRT.dec(original));
 
@@ -1661,7 +1683,7 @@ public class AVM implements VariableManager, Closeable {
 						// use the time of day for the seed
 						seed = JRT.timeSeed();
 					} else {
-						seed = (int) JRT.toDouble(pop());
+						seed = (int) JRT.toDouble(popNumber());
 					}
 					int previousSeed = randomNumberGenerator.getSeed();
 					randomNumberGenerator.setSeed(seed);
@@ -1676,45 +1698,45 @@ public class AVM implements VariableManager, Closeable {
 				}
 				case INTFUNC: {
 					// stack[0] = arg to int() function
-					push(JRT.truncateToScalar(JRT.toDouble(pop())));
+					push(JRT.truncateToScalar(JRT.toDouble(popNumber())));
 					position.next();
 					break;
 				}
 				case SQRT: {
 					// stack[0] = arg to sqrt() function
-					push(Math.sqrt(JRT.toDouble(pop())));
+					push(Math.sqrt(JRT.toDouble(popNumber())));
 					position.next();
 					break;
 				}
 				case LOG: {
 					// stack[0] = arg to log() function
-					push(Math.log(JRT.toDouble(pop())));
+					push(Math.log(JRT.toDouble(popNumber())));
 					position.next();
 					break;
 				}
 				case EXP: {
 					// stack[0] = arg to exp() function
-					push(Math.exp(JRT.toDouble(pop())));
+					push(Math.exp(JRT.toDouble(popNumber())));
 					position.next();
 					break;
 				}
 				case SIN: {
 					// stack[0] = arg to sin() function
-					push(Math.sin(JRT.toDouble(pop())));
+					push(Math.sin(JRT.toDouble(popNumber())));
 					position.next();
 					break;
 				}
 				case COS: {
 					// stack[0] = arg to cos() function
-					push(Math.cos(JRT.toDouble(pop())));
+					push(Math.cos(JRT.toDouble(popNumber())));
 					position.next();
 					break;
 				}
 				case ATAN2: {
 					// stack[0] = 2nd arg to atan2() function
 					// stack[1] = 1st arg to atan2() function
-					double d2 = JRT.toDouble(pop());
-					double d1 = JRT.toDouble(pop());
+					double d2 = JRT.toDouble(popNumber());
+					double d1 = JRT.toDouble(popNumber());
 					push(Math.atan2(d1, d2));
 					position.next();
 					break;
@@ -1838,8 +1860,8 @@ public class AVM implements VariableManager, Closeable {
 				case ADD: {
 					// stack[0] = item2
 					// stack[1] = item1
-					Object o2 = pop();
-					Object o1 = pop();
+					Object o2 = popNumber();
+					Object o1 = popNumber();
 					push(JRT.add(o1, o2));
 					position.next();
 					break;
@@ -1847,8 +1869,8 @@ public class AVM implements VariableManager, Closeable {
 				case SUBTRACT: {
 					// stack[0] = item2
 					// stack[1] = item1
-					Object o2 = pop();
-					Object o1 = pop();
+					Object o2 = popNumber();
+					Object o1 = popNumber();
 					push(JRT.subtract(o1, o2));
 					position.next();
 					break;
@@ -1856,8 +1878,8 @@ public class AVM implements VariableManager, Closeable {
 				case MULTIPLY: {
 					// stack[0] = item2
 					// stack[1] = item1
-					Object o2 = pop();
-					Object o1 = pop();
+					Object o2 = popNumber();
+					Object o1 = popNumber();
 					push(JRT.multiply(o1, o2));
 					position.next();
 					break;
@@ -1865,8 +1887,8 @@ public class AVM implements VariableManager, Closeable {
 				case DIVIDE: {
 					// stack[0] = item2
 					// stack[1] = item1
-					Object o2 = pop();
-					Object o1 = pop();
+					Object o2 = popNumber();
+					Object o1 = popNumber();
 					push(JRT.divide(o1, o2));
 					position.next();
 					break;
@@ -1874,8 +1896,8 @@ public class AVM implements VariableManager, Closeable {
 				case MOD: {
 					// stack[0] = item2
 					// stack[1] = item1
-					Object o2 = pop();
-					Object o1 = pop();
+					Object o2 = popNumber();
+					Object o1 = popNumber();
 					push(JRT.mod(o1, o2));
 					position.next();
 					break;
@@ -1883,8 +1905,8 @@ public class AVM implements VariableManager, Closeable {
 				case POW: {
 					// stack[0] = item2
 					// stack[1] = item1
-					Object o2 = pop();
-					Object o1 = pop();
+					Object o2 = popNumber();
+					Object o1 = popNumber();
 					push(JRT.pow(o1, o2));
 					position.next();
 					break;
@@ -2594,7 +2616,7 @@ public class AVM implements VariableManager, Closeable {
 			if (re instanceof AwkSandboxException) {
 				throw re;
 			}
-			throw new AwkRuntimeException(position.lineNumber(), re.getMessage(), re);
+			throw atLine(position.lineNumber(), re);
 		} catch (AssertionError ae) {
 			resetCallState();
 			throw ae;
@@ -2630,6 +2652,22 @@ public class AVM implements VariableManager, Closeable {
 		return new ProfilingReport(tupleProfilingStats, functionProfilingStats);
 	}
 
+	/**
+	 * Ties a failure of the interpreter loop to its source line. A value
+	 * refused by strict numbers keeps its type, so that the caller of
+	 * {@code eval()} or {@code execute()} can catch it and read the value.
+	 */
+	private static AwkRuntimeException atLine(int lineNumber, RuntimeException re) {
+		if (re instanceof AwkNumberFormatException) {
+			AwkNumberFormatException located = new AwkNumberFormatException(
+					lineNumber,
+					((AwkNumberFormatException) re).getValue());
+			located.initCause(re);
+			return located;
+		}
+		return new AwkRuntimeException(lineNumber, re.getMessage(), re);
+	}
+
 	// The exec* helpers below are extracted from executeTuples on purpose:
 	// that method must stay well under HotSpot's HugeMethodLimit (8000
 	// bytecodes) or the JIT never compiles the interpreter loop (see #562).
@@ -2640,8 +2678,8 @@ public class AVM implements VariableManager, Closeable {
 		// stack[0] = value
 		long offset = variableTuple.getVariableOffset();
 		boolean isGlobal = variableTuple.isGlobal();
-		Object o1 = blankToZero(resolveVariable(offset, isGlobal, false));
-		Object o2 = pop();
+		Object o1 = numberOrZero(resolveVariable(offset, isGlobal, false));
+		Object o2 = popNumber();
 		Object ans;
 		switch (opcode) {
 		case PLUS_EQ:
@@ -2684,7 +2722,8 @@ public class AVM implements VariableManager, Closeable {
 
 		Map<Object, Object> array = ensureMapVariable(offset, isGlobal);
 		checkScalar(arrIdx);
-		Object o = blankToZero(array.get(arrIdx));
+		Object o = numberOrZero(array.get(arrIdx));
+		number(rhs);
 
 		Object newVal;
 
@@ -2726,7 +2765,8 @@ public class AVM implements VariableManager, Closeable {
 		}
 
 		checkScalar(arrIdx);
-		Object o = blankToZero(array.get(arrIdx));
+		Object o = numberOrZero(array.get(arrIdx));
+		number(rhs);
 		Object newVal;
 
 		switch (opcode) {
@@ -2764,7 +2804,8 @@ public class AVM implements VariableManager, Closeable {
 		Object incval = pop();
 
 		// except here, get the number, and add the incvalue
-		Object numObj = blankToZero(jrt.jrtGetInputField(fieldnum));
+		Object numObj = numberOrZero(jrt.jrtGetInputField(fieldnum));
+		number(incval);
 		Object num;
 		switch (opcode) {
 		case PLUS_EQ_INPUT_FIELD:
@@ -3018,16 +3059,16 @@ public class AVM implements VariableManager, Closeable {
 		switch (builtin) {
 		case ATAN2:
 			requireIndirectArgumentCount(builtin, args, 2, 2, lineNumber);
-			return Math.atan2(JRT.toDouble(args[0]), JRT.toDouble(args[1]));
+			return Math.atan2(JRT.toDouble(number(args[0])), JRT.toDouble(number(args[1])));
 		case CLOSE:
 			requireIndirectArgumentCount(builtin, args, 1, 1, lineNumber);
 			return jrt.jrtClose(jrt.toAwkString(args[0]));
 		case COS:
 			requireIndirectArgumentCount(builtin, args, 1, 1, lineNumber);
-			return Math.cos(JRT.toDouble(args[0]));
+			return Math.cos(JRT.toDouble(number(args[0])));
 		case EXP:
 			requireIndirectArgumentCount(builtin, args, 1, 1, lineNumber);
-			return Math.exp(JRT.toDouble(args[0]));
+			return Math.exp(JRT.toDouble(number(args[0])));
 		case GSUB:
 		case SUB:
 			requireIndirectArgumentCount(builtin, args, 2, 2, lineNumber);
@@ -3037,13 +3078,13 @@ public class AVM implements VariableManager, Closeable {
 			return jrt.index(jrt.toAwkString(args[0]), jrt.toAwkString(args[1]));
 		case INT:
 			requireIndirectArgumentCount(builtin, args, 1, 1, lineNumber);
-			return JRT.truncateToScalar(JRT.toDouble(args[0]));
+			return JRT.truncateToScalar(JRT.toDouble(number(args[0])));
 		case LENGTH:
 			requireIndirectArgumentCount(builtin, args, 0, 1, lineNumber);
 			return args.length == 0 ? Integer.valueOf(jrt.jrtGetInputField(0).toString().length()) : lengthOf(args[0]);
 		case LOG:
 			requireIndirectArgumentCount(builtin, args, 1, 1, lineNumber);
-			return Math.log(JRT.toDouble(args[0]));
+			return Math.log(JRT.toDouble(number(args[0])));
 		case MATCH:
 			requireIndirectArgumentCount(builtin, args, 2, 2, lineNumber);
 			return jrt.matchPosition(jrt.toAwkString(args[0]), jrt.toAwkString(args[1]));
@@ -3052,7 +3093,7 @@ public class AVM implements VariableManager, Closeable {
 			return randomNumberGenerator.nextDouble();
 		case SIN:
 			requireIndirectArgumentCount(builtin, args, 1, 1, lineNumber);
-			return Math.sin(JRT.toDouble(args[0]));
+			return Math.sin(JRT.toDouble(number(args[0])));
 		case SPLIT:
 			requireIndirectArgumentCount(builtin, args, 2, 3, lineNumber);
 			return splitIntoArray(args[0], args[1], args.length == 3 ? args[2] : jrt.getFSVar(), lineNumber);
@@ -3061,10 +3102,10 @@ public class AVM implements VariableManager, Closeable {
 			return jrt.sprintf(jrt.toAwkString(args[0]), Arrays.copyOfRange(args, 1, args.length));
 		case SQRT:
 			requireIndirectArgumentCount(builtin, args, 1, 1, lineNumber);
-			return Math.sqrt(JRT.toDouble(args[0]));
+			return Math.sqrt(JRT.toDouble(number(args[0])));
 		case SRAND:
 			requireIndirectArgumentCount(builtin, args, 0, 1, lineNumber);
-			int seed = args.length == 0 ? JRT.timeSeed() : (int) JRT.toDouble(args[0]);
+			int seed = args.length == 0 ? JRT.timeSeed() : (int) JRT.toDouble(number(args[0]));
 			int previousSeed = randomNumberGenerator.getSeed();
 			randomNumberGenerator.setSeed(seed);
 			return Integer.valueOf(previousSeed);
@@ -3887,6 +3928,21 @@ public class AVM implements VariableManager, Closeable {
 		return o == null || o instanceof UninitializedObject ? ZERO : o;
 	}
 
+	/** The target of {@code ++}, {@code --} or a compound assignment: zero when unassigned, a number otherwise. */
+	private Object numberOrZero(Object o) {
+		return number(blankToZero(o));
+	}
+
+	/**
+	 * The numeric value of the array element that a postfix {@code ++} or
+	 * {@code --} is about to change. An element that was never assigned
+	 * converts to zero as unary plus always converted it; any other value
+	 * must be a number under strict numbers.
+	 */
+	private Object postfixOperand(Object o) {
+		return numericValueOf(o == null || o instanceof UninitializedObject ? o : number(o));
+	}
+
 	/**
 	 * Coerces a scalar to its numeric value, keeping an already numeric
 	 * scalar unchanged so an exact integer is not rounded through a double.
@@ -3904,7 +3960,7 @@ public class AVM implements VariableManager, Closeable {
 			o = ZERO;
 			runtimeStack.setVariable(l, o, isGlobal);
 		}
-		Object updated = JRT.inc(o);
+		Object updated = JRT.inc(number(o));
 		runtimeStack.setVariable(l, updated, isGlobal);
 		return o;
 	}
@@ -3919,7 +3975,7 @@ public class AVM implements VariableManager, Closeable {
 			o = ZERO;
 			runtimeStack.setVariable(l, o, isGlobal);
 		}
-		Object updated = JRT.dec(o);
+		Object updated = JRT.dec(number(o));
 		runtimeStack.setVariable(l, updated, isGlobal);
 		return o;
 	}

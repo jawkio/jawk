@@ -1,5 +1,5 @@
-keywords: avm, sandbox, jsr223, scriptengine
-description: Advanced runtime control, reusable execution, sandboxing, and JSR 223 integration in Jawk.
+keywords: avm, strict numbers, sandbox, jsr223, scriptengine
+description: Advanced runtime control, reusable execution, strict numbers, sandboxing, and JSR 223 integration in Jawk.
 
 # Advanced Runtime
 
@@ -86,6 +86,46 @@ try (AVM avm = awk.prepareEval("alpha beta")) {
 ```
 
 That second evaluation can see `RSTART` and `RLENGTH` produced by the first one because both expressions run inside the same mutable runtime.
+
+## Strict Numbers
+
+AWK converts any operand to a number: `""`, `"N/A"`, a field beyond `NF` and a variable never assigned count as `0`, and `"12 W"` counts as `12`. A host that evaluates expressions on the cells of a table gets `0` or `96` for `$2 * 8` where the cell holds no number, and cannot tell that result from a real one. Enable strict numbers to make such arithmetic fail instead:
+
+```java
+AwkSettings settings = new AwkSettings();
+settings.setStrictNumbers(true);
+Awk awk = new Awk(settings);
+
+try {
+    awk.eval("$2 * 8", "eth0 N/A");
+} catch (AwkNumberFormatException e) {
+    e.getMessage(); // "N/A" is not a number
+    e.getValue();   // N/A, or null for a value that was never assigned
+}
+```
+
+The setting is off by default, and an `AVM` reads it when it is created. `eval()` and `execute()` throw the [`AwkNumberFormatException`](apidocs/io/jawk/jrt/AwkNumberFormatException.html) as it is (it is an `AwkRuntimeException`), and the `Awk` or the `AVM` that threw it remains usable.
+
+An operand that is not a number makes these operations fail: `+ - * / % ^`, unary `-` and `+`, the compound assignments (`+=`, `-=`, `*=`, `/=`, `%=`, `^=`), `++`, `--`, and `int()`, `sqrt()`, `exp()`, `log()`, `sin()`, `cos()`, `atan2()` and `srand()`, also when they are called indirectly (`@f(x)`).
+
+| Operand | With strict numbers |
+| --- | --- |
+| A numeric value, `nan` and `inf` included | A number, as usual |
+| A text that is entirely a number once its blanks are trimmed (`"007"`, `" 7 "`, `"1e3"`, `"+inf"`), as a field, a variable or a string constant | A number, as usual |
+| Any other text (`""`, `"N/A"`, `"12 W"`, `"0x1A"`) | `"12 W" is not a number` |
+| A value never assigned: a variable, an array element, a field beyond `NF` | `An unassigned value is not a number` |
+
+- The target of `++`, `--` and of a compound assignment still starts from zero when it was never assigned: `n++`, `sum += $1` and `count[$1]++` work as usual. A target that holds a text, the empty text included, fails.
+- A variable passed with `AwkSettings.putVariable()` or with the per-call overrides of `AVM.eval()` behaves like a field: `"50"` and `" 50 "` are numbers, `"N/A"` and `""` are not, and a variable that is not passed is unassigned.
+- A compiled `AwkProgram` or `AwkExpression` does not depend on the setting: the same compiled object runs with and without strict numbers.
+
+Everything else behaves as without the setting:
+
+- Comparisons, concatenation, boolean tests and string functions: `$2 > 5` on `N/A` remains a string comparison, and `$2 == "" ? 0 : $2 * 8` is how an expression accepts an empty cell.
+- `printf` and `sprintf()`: `%d` of `"N/A"` remains `0`. `sprintf("%d", $2 + 0)` fails, on the addition.
+- `strtonum()`, the explicit lenient conversion: `strtonum($2) * 8` is `0` for `N/A` and `96` for `12 W`.
+- Positions and counts (`substr()`, `$(i)`, `exit`), and division by zero.
+- The arguments of extension functions, which may [check them themselves](extensions-writing.html#refuse-arguments-that-are-not-numbers).
 
 ## Sandbox Mode in Java
 

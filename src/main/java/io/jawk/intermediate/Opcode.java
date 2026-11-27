@@ -1704,7 +1704,17 @@ public enum Opcode {
 	 * <p>
 	 * Stack after: (empty)
 	 */
-	EXEC_NEXT;
+	EXEC_NEXT,
+
+	/**
+	 * Converts the top stack element, the value of an array element that a
+	 * postfix {@code ++} or {@code --} is about to change, to a number: an
+	 * element that was never assigned is zero, whatever the settings.
+	 * <p>
+	 * Stack before: x ...<br/>
+	 * Stack after: x ... (as a number)
+	 */
+	POSTFIX_OPERAND;
 
 	private static final Opcode[] VALUES = values();
 

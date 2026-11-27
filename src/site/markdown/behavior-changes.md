@@ -20,6 +20,20 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
+- New `AwkSettings.setStrictNumbers(true)` for Java embedders, off by default: arithmetic on a
+  value that is not a number (`""`, `"N/A"`, `"12 W"`, a field beyond `NF`, a variable never
+  assigned) throws the new `AwkNumberFormatException` instead of counting the value as zero or as
+  its numeric prefix, so that `$2 * 8` is never `0` or `96` for a cell that holds no number. The
+  operators `+ - * / % ^`, unary `-` and `+`, the compound assignments, `++`, `--`, and `int()`,
+  `sqrt()`, `exp()`, `log()`, `sin()`, `cos()`, `atan2()` and `srand()` are checked; comparisons,
+  concatenation, `printf` and `strtonum()` are not. New `JRT.isNumber()` and
+  `JRT.requireNumber()` give the same check to extension functions. Nothing changes while the
+  setting is off ([#666](https://github.com/jawkio/jawk/issues/666)).
+- Arithmetic on a string constant that is not a number (`"abc" * 2`, `-"abc"`) is no longer
+  computed at compile time, so that a compiled program does not depend on the strict numbers
+  setting. The result is the same, but `AwkExpression.isConstant()` is now `false` for such an
+  expression. Programs compiled with `-K` by earlier versions must be recompiled
+  ([#666](https://github.com/jawkio/jawk/issues/666)).
 - `tolower()` and `toupper()` now convert case with the locale of the `AwkSettings` (`--locale`,
   `Locale.US` by default) instead of the default locale of the JVM. With a Turkish or Azeri
   default locale, `tolower("FILTER")` used to return `fılter` (dotless i) and

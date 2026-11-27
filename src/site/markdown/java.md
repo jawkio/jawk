@@ -37,6 +37,7 @@ Awk awk = new Awk(settings);
 | `setDefaultRS(String)` | `"\n"` | Default value for `RS`, the record separator  |
 | `setUseSortedArrayKeys(boolean)` | `false` | Whether to keep associative array keys in sorted order |
 | `setPosix(boolean)` | `false` | Enforce POSIX compile-time behavior, rejecting gawk syntax such as `a[i][j]`, `split(..., a[i])`, all `@` forms, and the `BEGINFILE` / `ENDFILE` special patterns |
+| `setStrictNumbers(boolean)` | `false` | Make arithmetic fail with an `AwkNumberFormatException` on a value that is not a number (`""`, `"N/A"`, `"12 W"`, a field beyond `NF`, a variable never assigned) instead of counting it as zero or as its numeric prefix. See [Strict Numbers](java-advanced.html#strict-numbers) |
 | `putVariable(String, Object)` | Empty map | Pre-set variables available before `BEGIN` |
 
 The output destination is not a setting: it is chosen per call, when you execute the script. See

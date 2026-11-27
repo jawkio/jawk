@@ -89,6 +89,12 @@ public class AwkSettings {
 	private volatile boolean posix;
 
 	/**
+	 * Whether a value that is not a number fails arithmetic instead of counting
+	 * as zero or as its numeric prefix; <code>false</code> by default.
+	 */
+	private volatile boolean strictNumbers;
+
+	/**
 	 * Locale for the output of numbers and the case conversion of
 	 * {@code tolower()} and {@code toupper()},
 	 * <code>US-English</code> by default.
@@ -137,6 +143,7 @@ public class AwkSettings {
 		desc.append("fieldSeparator = ").append(getFieldSeparator()).append(newLine);
 		desc.append("useSortedArrayKeys = ").append(isUseSortedArrayKeys()).append(newLine);
 		desc.append("posix = ").append(isPosix()).append(newLine);
+		desc.append("strictNumbers = ").append(isStrictNumbers()).append(newLine);
 		return desc.toString();
 	}
 
@@ -315,6 +322,42 @@ public class AwkSettings {
 	}
 
 	/**
+	 * Returns whether arithmetic refuses a value that is not a number.
+	 *
+	 * @return {@code true} when strict numbers are enabled
+	 * @see #setStrictNumbers(boolean)
+	 */
+	public boolean isStrictNumbers() {
+		return strictNumbers;
+	}
+
+	/**
+	 * Enables or disables strict numbers. When enabled, the arithmetic
+	 * operators ({@code + - * / % ^}, unary {@code -} and {@code +}, the
+	 * compound assignments, {@code ++} and {@code --}) and the numeric
+	 * functions ({@code int}, {@code sqrt}, {@code exp}, {@code log},
+	 * {@code sin}, {@code cos}, {@code atan2}, {@code srand}) throw an
+	 * {@link io.jawk.jrt.AwkNumberFormatException} for an operand that is not a
+	 * number: a text that is not entirely a number once its blanks are trimmed
+	 * ({@code ""}, {@code "N/A"}, {@code "12 W"}), a field beyond {@code NF},
+	 * or a variable or array element that was never assigned. The target of
+	 * {@code ++}, {@code --} and of a compound assignment still starts from
+	 * zero when it was never assigned, so {@code n++} and {@code sum += $1}
+	 * keep working. Comparisons, concatenation, boolean tests, string
+	 * functions, {@code printf} and {@code strtonum()} are not affected.
+	 * <p>
+	 * An AVM reads this setting when it is created.
+	 * </p>
+	 *
+	 * @param strictNumbers {@code true} to refuse arithmetic on a value that
+	 *        is not a number
+	 */
+	public void setStrictNumbers(boolean strictNumbers) {
+		this.strictNumbers = strictNumbers;
+		markModified();
+	}
+
+	/**
 	 * <p>
 	 * Getter for the field <code>locale</code>.
 	 * </p>
@@ -399,6 +442,11 @@ public class AwkSettings {
 
 		@Override
 		public void setPosix(boolean posix) {
+			throw unsupported();
+		}
+
+		@Override
+		public void setStrictNumbers(boolean strictNumbers) {
 			throw unsupported();
 		}
 

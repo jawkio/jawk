@@ -874,14 +874,16 @@ public enum Opcode {
 	 */
 	DEC_ARRAY_REF,
 	/**
-	 * Increases the stack-provided array element reference by one.
+	 * Increases the stack-provided array element reference by one and pushes
+	 * the new value, for {@code ++a[k]}.
 	 * <p>
 	 * Stack before: array-idx associative-array ...<br/>
 	 * Stack after: x+1 ...
 	 */
 	INC_MAP_REF,
 	/**
-	 * Decreases the stack-provided array element reference by one.
+	 * Decreases the stack-provided array element reference by one and pushes
+	 * the new value, for {@code --a[k]}.
 	 * <p>
 	 * Stack before: array-idx associative-array ...<br/>
 	 * Stack after: x-1 ...
@@ -1707,14 +1709,24 @@ public enum Opcode {
 	EXEC_NEXT,
 
 	/**
-	 * Converts the top stack element, the value of an array element that a
-	 * postfix {@code ++} or {@code --} is about to change, to a number: an
-	 * element that was never assigned is zero, whatever the settings.
+	 * Increases the stack-provided array element reference by one and pushes
+	 * its numeric value before the increment, for {@code a[k]++}. An element
+	 * that was never assigned counts as zero.
 	 * <p>
-	 * Stack before: x ...<br/>
-	 * Stack after: x ... (as a number)
+	 * Stack before: array-idx associative-array ...<br/>
+	 * Stack after: x ...
 	 */
-	POSTFIX_OPERAND;
+	POSTINC_MAP_REF,
+
+	/**
+	 * Decreases the stack-provided array element reference by one and pushes
+	 * its numeric value before the decrement, for {@code a[k]--}. An element
+	 * that was never assigned counts as zero.
+	 * <p>
+	 * Stack before: array-idx associative-array ...<br/>
+	 * Stack after: x ...
+	 */
+	POSTDEC_MAP_REF;
 
 	private static final Opcode[] VALUES = values();
 

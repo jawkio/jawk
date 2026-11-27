@@ -20,6 +20,17 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
+- `++$n` and `--$n` now evaluate to the updated field. They used to evaluate to the field whose
+  number was the old value: `++$2` on a `$2` holding `3` was `$3`, and `$0` when `$2` was empty
+  ([#667](https://github.com/jawkio/jawk/issues/667)).
+- `x++` and `x--` now evaluate to the numeric value of `x` before the change, as POSIX requires,
+  also on a special variable like `NR` or `FS`. When `x` held a text, they used to evaluate to
+  that text: `x = "3x"; y = x++` set `y` to `3x` instead of `3`
+  ([#668](https://github.com/jawkio/jawk/issues/668)).
+- `++` and `--` on an array element now evaluate its subscript once, and `$(expr)--` its field
+  number once. `a[i++]++` used to increment `i` twice, read `a[1]` and increment `a[2]`, and
+  `b[f()]++` called `f()` twice. Programs compiled with `-K` by earlier versions must be
+  recompiled ([#669](https://github.com/jawkio/jawk/issues/669)).
 - New `AwkSettings.setStrictNumbers(true)` for Java embedders, off by default: arithmetic on a
   value that is not a number (`""`, `"N/A"`, `"12 W"`, a field beyond `NF`, a variable never
   assigned) throws the new `AwkNumberFormatException` instead of counting the value as zero or as

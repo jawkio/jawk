@@ -1848,17 +1848,10 @@ public class AwkParser {
 			throw parserException("Cannot do pre inc/dec Token.AND post inc/dec.");
 		}
 
-		if (preInc) {
-			return new PreIncAst(factorAst);
-		} else if (preDec) {
-			return new PreDecAst(factorAst);
-		} else if (postInc) {
-			return new PostIncAst(factorAst);
-		} else if (postDec) {
-			return new PostDecAst(factorAst);
-		} else {
-			return factorAst;
+		if (preInc || preDec || postInc || postDec) {
+			return new IncDecAst(factorAst, preInc || postInc, postInc || postDec);
 		}
+		return factorAst;
 	}
 
 	// FACTOR : '(' ASSIGNMENT_EXPRESSION ')' | Token.INTEGER | Token.DOUBLE | Token.STRING | GETLINE
@@ -5435,195 +5428,86 @@ public class AwkParser {
 		}
 	}
 
-	private final class PreIncAst extends ScalarExpressionAst {
+	/**
+	 * {@code ++} or {@code --}, prefix or postfix, on a variable, an array
+	 * element or a field. The array and its subscript, or the field number, are
+	 * evaluated once. A prefix form evaluates to the new value, a postfix form to
+	 * the numeric value before the change.
+	 */
+	private final class IncDecAst extends ScalarExpressionAst {
 
-		private PreIncAst(AST symbolAst) {
+		private final boolean increment;
+		private final boolean postfix;
+
+		private IncDecAst(AST symbolAst, boolean incrementParam, boolean postfixParam) {
 			super(symbolAst);
+			increment = incrementParam;
+			postfix = postfixParam;
 		}
 
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (getAst1() instanceof IDAst && isJrtManagedSpecialName(((IDAst) getAst1()).id)) {
-				// the sequence already leaves the new value on the stack
-				populateSpecialIncDec(tuples, ((IDAst) getAst1()).id, true, false);
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (getAst1() instanceof IDAst) {
-				IDAst idAst = (IDAst) getAst1();
-				tuples.inc(idAst.offset, idAst.isGlobal);
-			} else if (getAst1() instanceof ArrayReferenceAst) {
-				ArrayReferenceAst arrAst = (ArrayReferenceAst) getAst1();
-				if (arrAst.getAst1() instanceof IDAst) {
-					IDAst idAst = (IDAst) arrAst.getAst1();
-					if (idAst.isScalar()) {
-						throw new SemanticException("Cannot use " + idAst + " as an array.");
+			AST target = getAst1();
+			if (target instanceof IDAst && isJrtManagedSpecialName(((IDAst) target).id)) {
+				populateSpecialIncDec(tuples, ((IDAst) target).id, increment, postfix);
+			} else if (target instanceof IDAst) {
+				IDAst idAst = (IDAst) target;
+				if (postfix) {
+					// POSTINC and POSTDEC replace the value with the old numeric value
+					idAst.populateTuples(tuples);
+					if (increment) {
+						tuples.postInc(idAst.offset, idAst.isGlobal);
+					} else {
+						tuples.postDec(idAst.offset, idAst.isGlobal);
 					}
-					idAst.setArray(true);
-				}
-				arrAst.populateTargetReferenceTuples(tuples);
-				tuples.incMapRef();
-			} else if (getAst1() instanceof DollarExpressionAst) {
-				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
-				dollarExpr.getAst1().populateTuples(tuples); // OPTIMIATION: duplicate the x in $x here
-				// so that it is not evaluated again
-				tuples.dup();
-				// stack contains eval of dollar arg
-				// tuples.assignAsInputField();
-				tuples.incDollarRef();
-				// OPTIMIATION continued: now evaluate
-				// the dollar expression with x (for $x)
-				// instead of evaluating the expression again
-				tuples.getInputField();
-				popSourceLineNumber(tuples);
-				return 1; // NOTE, short-circuit return here!
-			} else {
-				throw new NotImplementedError("unhandled preinc for " + getAst1());
-			}
-			// else
-			// assert false : "cannot refer for preInc to "+getAst1();
-			getAst1().populateTuples(tuples);
-			popSourceLineNumber(tuples);
-			return 1;
-		}
-	}
-
-	private final class PreDecAst extends ScalarExpressionAst {
-
-		private PreDecAst(AST symbolAst) {
-			super(symbolAst);
-		}
-
-		@Override
-		public int populateTuples(AwkTuples tuples) {
-			pushSourceLineNumber(tuples);
-			if (getAst1() instanceof IDAst && isJrtManagedSpecialName(((IDAst) getAst1()).id)) {
-				// the sequence already leaves the new value on the stack
-				populateSpecialIncDec(tuples, ((IDAst) getAst1()).id, false, false);
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (getAst1() instanceof IDAst) {
-				IDAst idAst = (IDAst) getAst1();
-				tuples.dec(idAst.offset, idAst.isGlobal);
-			} else if (getAst1() instanceof ArrayReferenceAst) {
-				ArrayReferenceAst arrAst = (ArrayReferenceAst) getAst1();
-				if (arrAst.getAst1() instanceof IDAst) {
-					IDAst idAst = (IDAst) arrAst.getAst1();
-					if (idAst.isScalar()) {
-						throw new SemanticException("Cannot use " + idAst + " as an array.");
-					}
-					idAst.setArray(true);
-				}
-				arrAst.populateTargetReferenceTuples(tuples);
-				tuples.decMapRef();
-			} else if (getAst1() instanceof DollarExpressionAst) {
-				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
-				dollarExpr.getAst1().populateTuples(tuples); // OPTIMIATION: duplicate the x in $x here
-				// so that it is not evaluated again
-				tuples.dup();
-				// stack contains eval of dollar arg
-				// tuples.assignAsInputField();
-				tuples.decDollarRef();
-				// OPTIMIATION continued: now evaluate
-				// the dollar expression with x (for $x)
-				// instead of evaluating the expression again
-				tuples.getInputField();
-				popSourceLineNumber(tuples);
-				return 1; // NOTE, short-circuit return here!
-			} else {
-				throw new NotImplementedError("unhandled predec for " + getAst1());
-			}
-			getAst1().populateTuples(tuples);
-			popSourceLineNumber(tuples);
-			return 1;
-		}
-	}
-
-	private final class PostIncAst extends ScalarExpressionAst {
-
-		private PostIncAst(AST symbolAst) {
-			super(symbolAst);
-		}
-
-		@Override
-		public int populateTuples(AwkTuples tuples) {
-			pushSourceLineNumber(tuples);
-			if (getAst1() instanceof DollarExpressionAst) {
-				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
-				dollarExpr.getAst1().populateTuples(tuples);
-				tuples.incDollarRef();
-			} else if (getAst1() instanceof IDAst && isJrtManagedSpecialName(((IDAst) getAst1()).id)) {
-				populateSpecialIncDec(tuples, ((IDAst) getAst1()).id, true, true);
-			} else {
-				if (getAst1() instanceof ArrayReferenceAst) {
-					((ArrayReferenceAst) getAst1()).populateTargetValueTuples(tuples);
-					tuples.postfixOperand();
 				} else {
-					getAst1().populateTuples(tuples);
-				}
-				if (getAst1() instanceof IDAst) {
-					IDAst idAst = (IDAst) getAst1();
-					tuples.postInc(idAst.offset, idAst.isGlobal);
-				} else if (getAst1() instanceof ArrayReferenceAst) {
-					ArrayReferenceAst arrAst = (ArrayReferenceAst) getAst1();
-					if (arrAst.getAst1() instanceof IDAst) {
-						IDAst idAst = (IDAst) arrAst.getAst1();
-						if (idAst.isScalar()) {
-							throw new SemanticException("Cannot use " + idAst + " as an array.");
-						}
-						idAst.setArray(true);
+					if (increment) {
+						tuples.inc(idAst.offset, idAst.isGlobal);
+					} else {
+						tuples.dec(idAst.offset, idAst.isGlobal);
 					}
-					arrAst.populateTargetReferenceTuples(tuples);
+					idAst.populateTuples(tuples);
+				}
+			} else if (target instanceof ArrayReferenceAst) {
+				ArrayReferenceAst arrAst = (ArrayReferenceAst) target;
+				if (arrAst.getAst1() instanceof IDAst) {
+					IDAst idAst = (IDAst) arrAst.getAst1();
+					if (idAst.isScalar()) {
+						throw new SemanticException("Cannot use " + idAst + " as an array.");
+					}
+					idAst.setArray(true);
+				}
+				arrAst.populateTargetReferenceTuples(tuples);
+				if (postfix) {
+					if (increment) {
+						tuples.postIncMapRef();
+					} else {
+						tuples.postDecMapRef();
+					}
+				} else if (increment) {
 					tuples.incMapRef();
 				} else {
-					throw new NotImplementedError("unhandled postinc for " + getAst1());
+					tuples.decMapRef();
 				}
-			}
-			popSourceLineNumber(tuples);
-			return 1;
-		}
-	}
-
-	private final class PostDecAst extends ScalarExpressionAst {
-
-		private PostDecAst(AST symbolAst) {
-			super(symbolAst);
-		}
-
-		@Override
-		public int populateTuples(AwkTuples tuples) {
-			pushSourceLineNumber(tuples);
-			if (getAst1() instanceof IDAst && isJrtManagedSpecialName(((IDAst) getAst1()).id)) {
-				populateSpecialIncDec(tuples, ((IDAst) getAst1()).id, false, true);
-				popSourceLineNumber(tuples);
-				return 1;
-			}
-			if (getAst1() instanceof ArrayReferenceAst) {
-				((ArrayReferenceAst) getAst1()).populateTargetValueTuples(tuples);
-				tuples.postfixOperand();
-			} else {
-				getAst1().populateTuples(tuples);
-			}
-			if (getAst1() instanceof IDAst) {
-				IDAst idAst = (IDAst) getAst1();
-				tuples.postDec(idAst.offset, idAst.isGlobal);
-			} else if (getAst1() instanceof ArrayReferenceAst) {
-				ArrayReferenceAst arrAst = (ArrayReferenceAst) getAst1();
-				if (arrAst.getAst1() instanceof IDAst) {
-					IDAst idAst = (IDAst) arrAst.getAst1();
-					if (idAst.isScalar()) {
-						throw new SemanticException("Cannot use " + idAst + " as an array.");
-					}
-					idAst.setArray(true);
+			} else if (target instanceof DollarExpressionAst) {
+				((DollarExpressionAst) target).getAst1().populateTuples(tuples);
+				if (!postfix) {
+					// keep the field number to read the updated field
+					tuples.dup();
 				}
-				arrAst.populateTargetReferenceTuples(tuples);
-				tuples.decMapRef();
-			} else if (getAst1() instanceof DollarExpressionAst) {
-				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
-				dollarExpr.getAst1().populateTuples(tuples);
-				tuples.decDollarRef();
+				// pushes the old numeric value of the field
+				if (increment) {
+					tuples.incDollarRef();
+				} else {
+					tuples.decDollarRef();
+				}
+				if (!postfix) {
+					tuples.pop();
+					tuples.getInputField();
+				}
 			} else {
-				throw new NotImplementedError("unhandled postinc for " + getAst1());
+				throw new NotImplementedError("unhandled inc/dec for " + target);
 			}
 			popSourceLineNumber(tuples);
 			return 1;
@@ -5840,6 +5724,8 @@ public class AwkParser {
 	private void populateSpecialIncDec(AwkTuples tuples, String id, boolean increment, boolean postfix) {
 		pushSpecialVariable(tuples, id);
 		if (postfix) {
+			// the expression evaluates to the old numeric value
+			tuples.unaryPlus();
 			tuples.dup();
 		}
 		tuples.push(Long.valueOf(1L));

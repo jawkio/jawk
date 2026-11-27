@@ -20,6 +20,10 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
+- A number assigned to `FS`, `RS`, `OFS`, `ORS`, `SUBSEP`, `CONVFMT` or `OFMT` is now converted
+  to text with `CONVFMT`, an integral value as an integer, as in gawk. It used to get Java's
+  formatting: `OFS = 3; OFS++` set `OFS` to `4.0` and `OFS = 0.1 + 0.2` to
+  `0.30000000000000004` ([#672](https://github.com/jawkio/jawk/issues/672)).
 - `++$n` and `--$n` now evaluate to the updated field. They used to evaluate to the field whose
   number was the old value: `++$2` on a `$2` holding `3` was `$3`, and `$0` when `$2` was empty
   ([#667](https://github.com/jawkio/jawk/issues/667)).

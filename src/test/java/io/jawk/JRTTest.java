@@ -24,6 +24,8 @@ package io.jawk;
 
 import static org.junit.Assert.*;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -370,6 +372,55 @@ public class JRTTest {
 				.script("BEGIN { printf \"%c\\n\", 17379 }")
 				.expectLines("\u43e3")
 				.runAndAssert();
+	}
+
+	@Test
+	public void testSpecialVariablesHoldTheirDefaultsBeforeExecution() {
+		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
+		assertEquals(Awk.DEFAULT_FS, jrt.getFSVar());
+		assertEquals(Awk.DEFAULT_RS, jrt.getRSVar());
+		assertEquals(Awk.DEFAULT_OFS, jrt.getOFSVar());
+		assertEquals(Awk.DEFAULT_ORS, jrt.getORSVar());
+		assertEquals(Awk.DEFAULT_CONVFMT, jrt.getCONVFMTVar());
+		assertEquals(Awk.DEFAULT_OFMT, jrt.getOFMTVar());
+		assertEquals(Awk.DEFAULT_SUBSEP, jrt.getSUBSEPVar());
+	}
+
+	@Test
+	public void testAssignInitialVariablesAppliesConvfmtFirst() {
+		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
+		Map<String, Object> variables = new LinkedHashMap<>();
+		variables.put("OFS", Double.valueOf(1.0 / 3));
+		variables.put("CONVFMT", "%.2f");
+		jrt.assignInitialVariables(variables);
+		assertEquals("0.33", jrt.getOFSString());
+		assertEquals(Double.valueOf(1.0 / 3), jrt.getOFSVar());
+	}
+
+	@Test
+	public void testSpecialVariableSettersKeepTheDigitsOfBigNumbers() {
+		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
+		jrt.setFS(new BigDecimal("12.50"));
+		jrt.setSUBSEP(new BigInteger("123456789012345678901234567890"));
+		assertEquals("12.50", jrt.getFSString());
+		assertEquals("123456789012345678901234567890", jrt.getSUBSEPString());
+		assertEquals(12.5, JRT.toDouble(jrt.getFSVar()), 0);
+
+		JRT french = new JRT(null, Locale.FRANCE, AwkSink.from(System.out, Locale.FRANCE), System.err);
+		french.setOFS(new BigDecimal("12.50"));
+		assertEquals("12.50", french.getOFSString());
+		assertEquals(12.5, JRT.toDouble(french.getOFSVar()), 0);
+	}
+
+	@Test
+	public void testSpecialVariableSettersTurnBooleansIntoNumbers() {
+		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
+		jrt.setFS(Boolean.TRUE);
+		jrt.setOFS(Boolean.FALSE);
+		assertEquals("1", jrt.getFSString());
+		assertEquals("0", jrt.getOFSString());
+		assertTrue(jrt.toBoolean(jrt.getFSVar()));
+		assertFalse(jrt.toBoolean(jrt.getOFSVar()));
 	}
 
 	@Test

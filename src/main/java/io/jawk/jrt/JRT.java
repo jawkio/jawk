@@ -23,6 +23,8 @@ package io.jawk.jrt;
  */
 
 import java.io.File;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.io.FileOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -204,6 +206,14 @@ public class JRT {
 	private String convfmt; // number-to-string format
 	private String ofmt; // number-to-string for output
 	private String subsep; // subscript separator
+	// the values assigned to the variables above, numbers kept as numbers
+	private Object fsVar;
+	private Object rsVar;
+	private Object ofsVar;
+	private Object orsVar;
+	private Object convfmtVar;
+	private Object ofmtVar;
+	private Object subsepVar;
 	private final Locale locale; // locale for number formatting and case conversion
 	private final char decimalSeparator; // locale decimal separator for strnum recognition
 
@@ -318,6 +328,13 @@ public class JRT {
 		this.convfmt = Awk.DEFAULT_CONVFMT;
 		this.ofmt = Awk.DEFAULT_OFMT;
 		this.subsep = Awk.DEFAULT_SUBSEP;
+		this.fsVar = this.fs;
+		this.rsVar = this.rs;
+		this.ofsVar = this.ofs;
+		this.orsVar = this.ors;
+		this.convfmtVar = this.convfmt;
+		this.ofmtVar = this.ofmt;
+		this.subsepVar = this.subsep;
 	}
 
 	/**
@@ -537,11 +554,10 @@ public class JRT {
 	 *        names and their values.
 	 */
 	public final void assignInitialVariables(Map<String, Object> initialVarMap) {
+		applySpecialVariables(initialVarMap);
 		for (Map.Entry<String, Object> var : initialVarMap.entrySet()) {
-			String name = var.getKey();
-			Object value = var.getValue();
-			if (!applySpecialVariable(name, value)) {
-				vm.assignVariable(name, value);
+			if (!isJrtManagedSpecialVariable(var.getKey())) {
+				vm.assignVariable(var.getKey(), var.getValue());
 			}
 		}
 	}
@@ -624,10 +640,16 @@ public class JRT {
 		if (variableMap == null || variableMap.isEmpty()) {
 			return;
 		}
+		// CONVFMT first: it converts the numbers assigned to the others
+		if (variableMap.containsKey("CONVFMT")) {
+			applySpecialVariable("CONVFMT", variableMap.get("CONVFMT"));
+		}
 		for (Map.Entry<String, Object> var : variableMap.entrySet()) {
 			// Non-special variables are skipped; they are assigned later
 			// via the tuple instruction stream
-			applySpecialVariable(var.getKey(), var.getValue());
+			if (!"CONVFMT".equals(var.getKey())) {
+				applySpecialVariable(var.getKey(), var.getValue());
+			}
 		}
 	}
 
@@ -1712,7 +1734,7 @@ public class JRT {
 	 * @return FS value
 	 */
 	public Object getFSVar() {
-		return fs;
+		return fsVar;
 	}
 
 	/**
@@ -1725,12 +1747,35 @@ public class JRT {
 	}
 
 	/**
+	 * Normalizes a value assigned to a special variable stored as text, as the
+	 * AVM does for any variable from the host: a {@link Boolean} becomes AWK's
+	 * 1 or 0, and a {@link BigDecimal} or a {@link BigInteger} a numeric string
+	 * that keeps its digits, whatever the locale.
+	 *
+	 * @param value assigned value
+	 * @return the value the variable holds
+	 */
+	private static Object normalizeSpecialValue(Object value) {
+		if (value == null) {
+			return "";
+		}
+		if (value instanceof Boolean) {
+			return new GawkBool((Boolean) value);
+		}
+		if (value instanceof BigDecimal || value instanceof BigInteger) {
+			return StrNum.ofJavaNumber((Number) value);
+		}
+		return value;
+	}
+
+	/**
 	 * Set FS via the VariableManager.
 	 *
 	 * @param value new FS value
 	 */
 	public void setFS(Object value) {
-		this.fs = value == null ? "" : value.toString();
+		this.fsVar = normalizeSpecialValue(value);
+		this.fs = toAwkString(this.fsVar);
 	}
 
 	/**
@@ -2088,7 +2133,7 @@ public class JRT {
 	 * @return RS value
 	 */
 	public Object getRSVar() {
-		return rs;
+		return rsVar;
 	}
 
 	/**
@@ -2106,7 +2151,8 @@ public class JRT {
 	 * @param value new RS value
 	 */
 	public void setRS(Object value) {
-		this.rs = value == null ? "" : value.toString();
+		this.rsVar = normalizeSpecialValue(value);
+		this.rs = toAwkString(this.rsVar);
 		applyRS(this.rs);
 	}
 
@@ -2116,7 +2162,7 @@ public class JRT {
 	 * @return OFS value
 	 */
 	public Object getOFSVar() {
-		return ofs;
+		return ofsVar;
 	}
 
 	/**
@@ -2134,7 +2180,8 @@ public class JRT {
 	 * @param value new OFS value
 	 */
 	public void setOFS(Object value) {
-		this.ofs = value == null ? "" : value.toString();
+		this.ofsVar = normalizeSpecialValue(value);
+		this.ofs = toAwkString(this.ofsVar);
 	}
 
 	/**
@@ -2143,7 +2190,7 @@ public class JRT {
 	 * @return ORS value
 	 */
 	public Object getORSVar() {
-		return ors;
+		return orsVar;
 	}
 
 	/**
@@ -2161,7 +2208,8 @@ public class JRT {
 	 * @param value new ORS value
 	 */
 	public void setORS(Object value) {
-		this.ors = value == null ? "" : value.toString();
+		this.orsVar = normalizeSpecialValue(value);
+		this.ors = toAwkString(this.orsVar);
 	}
 
 	/**
@@ -2260,7 +2308,7 @@ public class JRT {
 	 * @return SUBSEP value
 	 */
 	public Object getSUBSEPVar() {
-		return subsep;
+		return subsepVar;
 	}
 
 	/**
@@ -2278,7 +2326,8 @@ public class JRT {
 	 * @param value new SUBSEP value
 	 */
 	public void setSUBSEP(Object value) {
-		this.subsep = value == null ? "" : value.toString();
+		this.subsepVar = normalizeSpecialValue(value);
+		this.subsep = toAwkString(this.subsepVar);
 	}
 
 	/**
@@ -2287,7 +2336,7 @@ public class JRT {
 	 * @return CONVFMT value
 	 */
 	public Object getCONVFMTVar() {
-		return convfmt;
+		return convfmtVar;
 	}
 
 	/**
@@ -2305,7 +2354,8 @@ public class JRT {
 	 * @param value new CONVFMT value
 	 */
 	public void setCONVFMT(Object value) {
-		this.convfmt = value == null ? "" : value.toString();
+		this.convfmtVar = normalizeSpecialValue(value);
+		this.convfmt = toAwkString(this.convfmtVar);
 	}
 
 	/**
@@ -2318,12 +2368,22 @@ public class JRT {
 	}
 
 	/**
+	 * Get the value assigned to OFMT, a number kept as a number.
+	 *
+	 * @return OFMT value
+	 */
+	public Object getOFMTVar() {
+		return ofmtVar;
+	}
+
+	/**
 	 * Set OFMT via the VariableManager.
 	 *
 	 * @param value new OFMT value
 	 */
 	public void setOFMT(Object value) {
-		this.ofmt = value == null ? "" : value.toString();
+		this.ofmtVar = normalizeSpecialValue(value);
+		this.ofmt = toAwkString(this.ofmtVar);
 	}
 
 	/**

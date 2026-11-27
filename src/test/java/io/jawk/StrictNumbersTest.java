@@ -170,6 +170,24 @@ public class StrictNumbersTest {
 		};
 	}
 
+	/** An engine that runs what an engine with the other setting compiled and serialized. */
+	private static Awk awkRunningWhatTheOtherSettingCompiled(boolean strict) {
+		final Awk compiler = awk(!strict, true);
+		AwkSettings settings = new AwkSettings();
+		settings.setFieldSeparator(";");
+		settings.setStrictNumbers(strict);
+		return new Awk(Arrays.asList(new GawkExtension(), new NumberExtension()), settings) {
+			@Override
+			public AwkProgram compile(String script) throws IOException {
+				try {
+					return serialized(compiler.compile(script));
+				} catch (ClassNotFoundException e) {
+					throw new IOException(e);
+				}
+			}
+		};
+	}
+
 	private static String mode(boolean strict, boolean optimize) {
 		return (strict ? " (strict" : " (lenient") + (optimize ? ", optimized)" : ", not optimized)");
 	}
@@ -626,12 +644,18 @@ public class StrictNumbersTest {
 			assertEquals(42L, avm.eval(doubled));
 		}
 		// One Awk goes on too, for scripts and for expressions
-		try {
-			awk.script("{ print $1 * 2 }").input("x\n").execute();
-			fail("A text must be refused");
-		} catch (AwkNumberFormatException e) {
-			assertEquals("x", e.getValue());
-		}
+		AwkTestSupport.awkTest("A script fails on a text")
+				.script("{ print $1 * 2 }")
+				.withAwk(awk)
+				.stdin("x\n")
+				.expectThrow(AwkNumberFormatException.class)
+				.runAndAssert();
+		AwkTestSupport.awkTest("The same engine then runs a script")
+				.script("{ print $1 * 2 }")
+				.withAwk(awk)
+				.stdin(RECORD + "\n")
+				.expectLines("16")
+				.runAndAssert();
 		assertEquals(16L, awk.eval(doubled, RECORD));
 	}
 
@@ -710,15 +734,27 @@ public class StrictNumbersTest {
 
 		// A program compiled by one engine and serialized runs on the other
 		String script = "{ count[$1]++; total += $1; old = seen[$1]--; print count[$1], total, old, \"abc\" * 1 }";
-		assertEquals("1 8 0 0\n", lenient.script(serialized(strict.compile(script))).input(RECORD + "\n").execute());
-		try {
-			strict.script(serialized(lenient.compile(script))).input(RECORD + "\n").execute();
-			fail("\"abc\" * 1 compiled without strict numbers must fail with them");
-		} catch (AwkNumberFormatException e) {
-			assertEquals("abc", e.getValue());
-		}
-		String accumulators = "{ count[$1]++; total += $1; old = seen[$1]--; print count[$1], total, old }";
-		assertEquals("1 8 0\n", strict.script(serialized(lenient.compile(accumulators))).input(RECORD + "\n").execute());
+		AwkTestSupport.awkTest("A program compiled with strict numbers runs without them")
+				.script(script)
+				.withAwk(awkRunningWhatTheOtherSettingCompiled(false))
+				.stdin(RECORD + "\n")
+				.expectLines("1 8 0 0")
+				.runAndAssert();
+		AwkTestSupport.TestResult result = AwkTestSupport
+				.awkTest("A program compiled without strict numbers fails with them")
+				.script(script)
+				.withAwk(awkRunningWhatTheOtherSettingCompiled(true))
+				.stdin(RECORD + "\n")
+				.expectThrow(AwkNumberFormatException.class)
+				.run();
+		result.assertExpected();
+		assertEquals("abc", ((AwkNumberFormatException) result.thrownException()).getValue());
+		AwkTestSupport.awkTest("The accumulators of a program compiled without strict numbers work with them")
+				.script("{ count[$1]++; total += $1; old = seen[$1]--; print count[$1], total, old }")
+				.withAwk(awkRunningWhatTheOtherSettingCompiled(true))
+				.stdin(RECORD + "\n")
+				.expectLines("1 8 0")
+				.runAndAssert();
 	}
 
 	@Test
@@ -828,7 +864,7 @@ public class StrictNumbersTest {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static <T> T serialized(T tuples) throws Exception {
+	private static <T> T serialized(T tuples) throws IOException, ClassNotFoundException {
 		ByteArrayOutputStream bytes = new ByteArrayOutputStream();
 		try (ObjectOutputStream out = new ObjectOutputStream(bytes)) {
 			out.writeObject(tuples);

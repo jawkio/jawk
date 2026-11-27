@@ -830,47 +830,43 @@ public enum Opcode {
 	POW,
 
 	/**
-	 * Increases the variable reference by one; pushes the result
-	 * onto the stack.
+	 * Increases the variable reference by one; pushes nothing.
 	 * <p>
 	 * Argument 1: offset of the particular variable into the variable manager<br/>
 	 * Argument 2: whether the variable is global or local
 	 * <p>
 	 * Stack before: ...<br/>
-	 * Stack after: x+1 ...
+	 * Stack after: ...
 	 */
 	INC,
 	/**
-	 * Decreases the variable reference by one; pushes the result
-	 * onto the stack.
+	 * Decreases the variable reference by one; pushes nothing.
 	 * <p>
 	 * Argument 1: offset of the particular variable into the variable manager<br/>
 	 * Argument 2: whether the variable is global or local
 	 * <p>
 	 * Stack before: ...<br/>
-	 * Stack after: x-1 ...
+	 * Stack after: ...
 	 */
 	DEC,
 	/**
-	 * Increases the array element reference by one; pushes the result
-	 * onto the stack.
+	 * Increases the array element reference by one; pushes nothing.
 	 * <p>
 	 * Argument 1: offset of the associative array into the variable manager<br/>
 	 * Argument 2: whether the associative array is global or local
 	 * <p>
 	 * Stack before: array-idx ...<br/>
-	 * Stack after: x+1 ...
+	 * Stack after: ...
 	 */
 	INC_ARRAY_REF,
 	/**
-	 * Decreases the array element reference by one; pushes the result
-	 * onto the stack.
+	 * Decreases the array element reference by one; pushes nothing.
 	 * <p>
 	 * Argument 1: offset of the associative array into the variable manager<br/>
 	 * Argument 2: whether the associative array is global or local
 	 * <p>
 	 * Stack before: array-idx ...<br/>
-	 * Stack after: x-1 ...
+	 * Stack after: ...
 	 */
 	DEC_ARRAY_REF,
 	/**
@@ -890,19 +886,19 @@ public enum Opcode {
 	 */
 	DEC_MAP_REF,
 	/**
-	 * Increases the input field variable by one; pushes the result
-	 * onto the stack.
+	 * Increases the input field variable by one; pushes its numeric value
+	 * before the change, for {@code $n++}.
 	 * <p>
 	 * Stack before: field-idx ...<br/>
-	 * Stack after: x+1
+	 * Stack after: x ...
 	 */
 	INC_DOLLAR_REF,
 	/**
-	 * Decreases the input field variable by one; pushes the result
-	 * onto the stack.
+	 * Decreases the input field variable by one; pushes its numeric value
+	 * before the change, for {@code $n--}.
 	 * <p>
 	 * Stack before: field-idx ...<br/>
-	 * Stack after: x-1
+	 * Stack after: x ...
 	 */
 	DEC_DOLLAR_REF,
 
@@ -1473,26 +1469,28 @@ public enum Opcode {
 	ORS_OFFSET,
 
 	/**
-	 * Increases the variable reference by one; pushes the original value
-	 * onto the stack.
+	 * Increases the variable reference by one; replaces the value on top of
+	 * the stack with the numeric value of the variable before the increment
+	 * (0 if uninitialized).
 	 * <p>
 	 * Argument 1: offset of the particular variable into the variable manager<br/>
 	 * Argument 2: whether the variable is global or local
 	 * <p>
-	 * Stack before: ...<br/>
-	 * Stack after: x ... or 0 if uninitialized
+	 * Stack before: x ...<br/>
+	 * Stack after: x ... (as a number)
 	 */
 	POSTINC,
 
 	/**
-	 * Decreases the variable reference by one; pushes the original value
-	 * onto the stack.
+	 * Decreases the variable reference by one; replaces the value on top of
+	 * the stack with the numeric value of the variable before the decrement
+	 * (0 if uninitialized).
 	 * <p>
 	 * Argument 1: offset of the particular variable into the variable manager<br/>
 	 * Argument 2: whether the variable is global or local
 	 * <p>
-	 * Stack before: ...<br/>
-	 * Stack after: x ... or 0 if uninitialized
+	 * Stack before: x ...<br/>
+	 * Stack after: x ... (as a number)
 	 */
 	POSTDEC,
 

@@ -1081,7 +1081,8 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
-	 * Increments a stack-provided associative-array element reference.
+	 * Increments a stack-provided associative-array element reference and
+	 * pushes its new value.
 	 */
 	public void incMapRef() {
 		queue.add(new Tuple.NoOperandTuple(Opcode.INC_MAP_REF));
@@ -1100,7 +1101,8 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
-	 * Decrements a stack-provided associative-array element reference.
+	 * Decrements a stack-provided associative-array element reference and
+	 * pushes its new value.
 	 */
 	public void decMapRef() {
 		queue.add(new Tuple.NoOperandTuple(Opcode.DEC_MAP_REF));

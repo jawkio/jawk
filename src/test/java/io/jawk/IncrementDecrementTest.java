@@ -54,6 +54,26 @@ public class IncrementDecrementTest {
 	}
 
 	@Test
+	public void prefixAndPostfixOnEmptyFields() throws Exception {
+		AwkTestSupport.awkTest("++ and -- on an empty field and beyond NF, in expressions and statements (#667)")
+				.script(
+						"BEGIN { FS = \":\" } { print ++$2, $2, --$3, $3; print $4++, $4, $5--, $5, NF;"
+								+ " $2++; $9--; print; print NF }")
+				.stdin("a::c\n")
+				.expectLines("1 1 -1 -1", "0 1 0 -1 5", "a 2 -1 1 -1    -1", "9")
+				.runAndAssert();
+	}
+
+	@Test
+	public void postfixDecrementOnFieldKeepsTheOperandsAround() throws Exception {
+		AwkTestSupport.awkTest("$n-- leaves no extra value next to it")
+				.script("{ print \"A\", $1--, \"B\" }")
+				.stdin(RECORD)
+				.expectLines("A 8 B")
+				.runAndAssert();
+	}
+
+	@Test
 	public void prefixOnFieldInStatement() throws Exception {
 		AwkTestSupport.awkTest("++$n and --$n as statements update the record (#667)")
 				.script("{ ++$2; --$1; print }")

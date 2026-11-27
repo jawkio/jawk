@@ -343,6 +343,10 @@ public class AwkParser {
 	private LineNumberReader reader;
 	private int c;
 	private Token token;
+	/** Line of the lookahead {@link #token}, counted in its own source. */
+	private int tokenLine;
+	/** Line of the last consumed token, counted in its own source. */
+	private int lastTokenLine;
 	private String pendingIndirectIdentifier;
 	private boolean pendingColon;
 	private String currentNamespace = "awk";
@@ -451,6 +455,8 @@ public class AwkParser {
 			} else {
 				return;
 			}
+			// a line counted in the source left behind means nothing in this one
+			tokenLine = 1;
 		}
 	}
 
@@ -491,6 +497,7 @@ public class AwkParser {
 		resetIncludedSourcePaths();
 		pendingIndirectIdentifier = null;
 		pendingColon = false;
+		tokenLine = 1;
 		read();
 		lexer();
 		return SCRIPT();
@@ -522,6 +529,7 @@ public class AwkParser {
 		pendingColon = false;
 
 		// Initialize the lexer
+		tokenLine = 1;
 		read();
 		lexer();
 
@@ -547,13 +555,15 @@ public class AwkParser {
 	}
 
 	/**
-	 * Returns the current 1-based source line number to stamp onto AST nodes that
-	 * will later emit tuple line markers for runtime error reporting.
+	 * Returns the 1-based line of the last consumed token, to stamp onto AST
+	 * nodes that will later emit tuple line markers for runtime error reporting.
+	 * A node built once its last token is consumed takes the line where it ends,
+	 * even though the lexer has already read the next token.
 	 *
-	 * @return current source line number using 1-based counting
+	 * @return line of the last consumed token, counted in its own source
 	 */
 	private int currentSourceLineNumber() {
-		return reader.getLineNumber() + 1;
+		return lastTokenLine;
 	}
 
 	/**
@@ -733,6 +743,7 @@ public class AwkParser {
 	}
 
 	private Token lexer() throws IOException {
+		lastTokenLine = tokenLine;
 		// clear whitespace
 		while (true) {
 			advancePastEndOfSource();
@@ -768,9 +779,12 @@ public class AwkParser {
 			return token;
 		}
 		if (c < 0) {
+			// the end of the source is on its last line, after any blank lines
+			tokenLine = Math.max(tokenLine, reader.getLineNumber());
 			token = Token.EOF;
 			return token;
 		}
+		tokenLine = c == '\n' ? reader.getLineNumber() : reader.getLineNumber() + 1;
 		if (c == ',') {
 			read();
 			skipWhitespaces();
@@ -1539,9 +1553,9 @@ public class AwkParser {
 	 *        – false ⇒ disallow “in”
 	 */
 	AST EXPRESSION_LIST(boolean allowComparisons, boolean allowInKeyword) throws IOException {
-		// Captured before parsing: the list node's line is where its first
-		// expression starts, so a parenthesized group rebuilt into a
-		// multi-dimensional subscript reports errors there.
+		// Captured before parsing: the list node's line is the line of the token
+		// that opens it, so a parenthesized group rebuilt into a
+		// multi-dimensional subscript reports errors where it starts.
 		int lineNo = currentSourceLineNumber();
 
 		// 1) Parse exactly one assignment expression.
@@ -1570,7 +1584,7 @@ public class AwkParser {
 			throws IOException {
 		// Captured before parsing: if the expression turns out to be the first
 		// component of a multi-dimensional subscript group, the group's line is
-		// where this component starts.
+		// where the group starts.
 		int startLineNo = currentSourceLineNumber();
 		AST ternaryExpression = TERNARY_EXPRESSION(left, allowComparison, allowInKeyword, allowMultidimIndices);
 		AST result = ternaryExpression;
@@ -1848,17 +1862,10 @@ public class AwkParser {
 			throw parserException("Cannot do pre inc/dec Token.AND post inc/dec.");
 		}
 
-		if (preInc) {
-			return new PreIncAst(factorAst);
-		} else if (preDec) {
-			return new PreDecAst(factorAst);
-		} else if (postInc) {
-			return new PostIncAst(factorAst);
-		} else if (postDec) {
-			return new PostDecAst(factorAst);
-		} else {
-			return factorAst;
+		if (preInc || preDec || postInc || postDec) {
+			return new IncDecAst(factorAst, preInc || postInc, postInc || postDec);
 		}
+		return factorAst;
 	}
 
 	// FACTOR : '(' ASSIGNMENT_EXPRESSION ')' | Token.INTEGER | Token.DOUBLE | Token.STRING | GETLINE
@@ -1929,10 +1936,11 @@ public class AwkParser {
 		}
 		AST functionNameAst = symbolTable.getID(text.toString());
 		lexer();
+		int nameLineNo = currentSourceLineNumber();
 		lexer(Token.OPEN_PAREN);
 		AST params = token == Token.CLOSE_PAREN ? null : EXPRESSION_LIST(true, allowInKeyword);
 		lexer(Token.CLOSE_PAREN);
-		return new IndirectFunctionCallAst(functionNameAst, params);
+		return new IndirectFunctionCallAst(nameLineNo, functionNameAst, params);
 	}
 
 	// SYMBOL : Token.ID [ '(' params ')' | '[' ASSIGNMENT_EXPRESSION ']' ]
@@ -1943,6 +1951,7 @@ public class AwkParser {
 		Token idToken = token;
 		String id = text.toString();
 		lexer();
+		int nameLineNo = currentSourceLineNumber();
 
 		if (idToken == Token.EXTENSION) {
 			String extensionKeyword = id;
@@ -1997,7 +2006,7 @@ public class AwkParser {
 				params = null;
 			}
 
-			return new ExtensionAst(function, params, extensionCallLineNumber(params));
+			return new ExtensionAst(function, params, nameLineNo);
 		} else if (idToken == Token.FUNC_ID || idToken == Token.BUILTIN_FUNC_NAME) {
 			AST params;
 			// length can take on the special form of no parens
@@ -2023,26 +2032,24 @@ public class AwkParser {
 				lexer(Token.CLOSE_PAREN);
 			}
 			if (idToken == Token.BUILTIN_FUNC_NAME) {
-				return new BuiltinFunctionCallAst(id, params);
+				return new BuiltinFunctionCallAst(nameLineNo, id, params);
 			} else {
-				return symbolTable.addFunctionCall(id, params);
+				return symbolTable.addFunctionCall(id, params, nameLineNo);
 			}
 		}
 		if (token == Token.OPEN_BRACKET) {
-			int arrayReferenceLineNo = currentSourceLineNumber();
 			lexer();
 			AST idxAst = ARRAY_INDEX(true, allowInKeyword);
 			lexer(Token.CLOSE_BRACKET);
-			AST arrayReference = symbolTable.addArrayReference(id, idxAst, arrayReferenceLineNo);
+			AST arrayReference = symbolTable.addArrayReference(id, idxAst);
 			if (posix && token == Token.OPEN_BRACKET) {
 				throw parserException("Use [a,b,c,...] instead of [a][b][c]... for multi-dimensional arrays.");
 			}
 			while (!posix && token == Token.OPEN_BRACKET) {
-				int nestedArrayReferenceLineNo = currentSourceLineNumber();
 				lexer();
 				idxAst = ARRAY_INDEX(true, allowInKeyword);
 				lexer(Token.CLOSE_BRACKET);
-				arrayReference = new ArrayReferenceAst(nestedArrayReferenceLineNo, arrayReference, idxAst);
+				arrayReference = new ArrayReferenceAst(arrayReference, idxAst);
 			}
 			return arrayReference;
 		}
@@ -2052,8 +2059,7 @@ public class AwkParser {
 	// ARRAY_INDEX : ASSIGNMENT_EXPRESSION [, ARRAY_INDEX]
 	AST ARRAY_INDEX(boolean allowComparison, boolean allowInKeyword) throws IOException {
 		// Capture the line before parsing the expression: the expression AST can
-		// be a shared identifier node carrying its first occurrence's line, and
-		// by the end of the expression the lexer may have read past the line.
+		// be a shared identifier node carrying its first occurrence's line.
 		int lineNo = currentSourceLineNumber();
 		AST exprAst = ASSIGNMENT_EXPRESSION(null, allowComparison, allowInKeyword, false);
 		if (token == Token.COMMA) {
@@ -2135,6 +2141,7 @@ public class AwkParser {
 		// multidim
 		// indices expressions
 		lexer(Token.CLOSE_PAREN);
+		int headerLineNo = currentSourceLineNumber();
 
 		//// Was:
 		//// AST b1 = BLOCK_OR_STMT();
@@ -2167,9 +2174,9 @@ public class AwkParser {
 			lexer();
 			optNewline();
 			AST b2 = BLOCK_OR_STMT();
-			return new IfStatementAst(expr, b1, b2);
+			return new IfStatementAst(headerLineNo, expr, b1, b2);
 		} else {
-			AST ifAst = new IfStatementAst(expr, b1, null);
+			AST ifAst = new IfStatementAst(headerLineNo, expr, b1, null);
 			return ifAst;
 		}
 	}
@@ -2213,8 +2220,9 @@ public class AwkParser {
 		// multidim
 		// indices expressions
 		lexer(Token.CLOSE_PAREN);
+		int headerLineNo = currentSourceLineNumber();
 		AST block = BLOCK_OR_STMT();
-		return new WhileStatementAst(expr, block);
+		return new WhileStatementAst(headerLineNo, expr, block);
 	}
 
 	AST FOR_STATEMENT() throws IOException {
@@ -2243,8 +2251,9 @@ public class AwkParser {
 			AST arrayAst = SYMBOL(true, true);
 			// close paren ...
 			lexer(Token.CLOSE_PAREN);
+			int headerLineNo = currentSourceLineNumber();
 			AST block = BLOCK_OR_STMT();
-			return new ForInStatementAst(expr1, arrayAst, block);
+			return new ForInStatementAst(headerLineNo, expr1, arrayAst, block);
 		}
 
 		if (token == Token.SEMICOLON) {
@@ -2253,10 +2262,12 @@ public class AwkParser {
 		} else {
 			throw parserException("Expecting ;. Got " + token.name() + ": " + text);
 		}
+		int conditionLineNo = 0;
 		if (token != Token.SEMICOLON) {
 			expr2 = ASSIGNMENT_EXPRESSION(null, true, true, false); // allow comparators, allow IN keyword, do Token.NOT allow
 			// multidim
 			// indices expressions
+			conditionLineNo = currentSourceLineNumber();
 		}
 		if (token == Token.SEMICOLON) {
 			lexer();
@@ -2268,8 +2279,11 @@ public class AwkParser {
 			expr3 = OPT_SIMPLE_STATEMENT(true); // true = "allow the in keyword"
 		}
 		lexer(Token.CLOSE_PAREN);
+		if (expr2 == null) {
+			conditionLineNo = currentSourceLineNumber();
+		}
 		AST block = BLOCK_OR_STMT();
-		return new ForStatementAst(expr1, expr2, expr3, block);
+		return new ForStatementAst(conditionLineNo, expr1, expr2, expr3, block);
 	}
 
 	AST OPT_SIMPLE_STATEMENT(boolean allowInKeyword) throws IOException {
@@ -2415,6 +2429,7 @@ public class AwkParser {
 
 	AST PRINT_STATEMENT() throws IOException {
 		expectKeyword("print");
+		int keywordLineNo = currentSourceLineNumber();
 		ParsedPrintStatement parsedPrintStatement = parsePrintStatement();
 
 		AST params = parsedPrintStatement.getFuncParams();
@@ -2431,6 +2446,7 @@ public class AwkParser {
 		}
 
 		return new PrintAst(
+				keywordLineNo,
 				params,
 				parsedPrintStatement.getOutputToken(),
 				parsedPrintStatement.getOutputExpr(),
@@ -2439,6 +2455,7 @@ public class AwkParser {
 
 	AST PRINTF_STATEMENT() throws IOException {
 		expectKeyword("printf");
+		int keywordLineNo = currentSourceLineNumber();
 		ParsedPrintStatement parsedPrintStatement = parsePrintStatement();
 
 		AST params = parsedPrintStatement.getFuncParams();
@@ -2454,7 +2471,11 @@ public class AwkParser {
 			params = new FunctionCallParamListAst(new TernaryExpressionAst(condExpr, trueBlock, falseBlock), null);
 		}
 
-		return new PrintfAst(params, parsedPrintStatement.getOutputToken(), parsedPrintStatement.getOutputExpr());
+		return new PrintfAst(
+				keywordLineNo,
+				params,
+				parsedPrintStatement.getOutputToken(),
+				parsedPrintStatement.getOutputExpr());
 	}
 
 	AST GETLINE_EXPRESSION(AST pipeExpr, boolean allowComparison, boolean allowInKeyword) throws IOException {
@@ -3661,8 +3682,8 @@ public class AwkParser {
 
 	private final class IfStatementAst extends AST {
 
-		private IfStatementAst(AST expr, AST b1, AST b2) {
-			super(expr, b1, b2);
+		private IfStatementAst(int lineNo, AST expr, AST b1, AST b2) {
+			super(lineNo, expr, b1, b2);
 		}
 
 		@Override
@@ -3722,8 +3743,8 @@ public class AwkParser {
 		private Address breakAddress;
 		private Address continueAddress;
 
-		private WhileStatementAst(AST expr, AST block) {
-			super(expr, block);
+		private WhileStatementAst(int lineNo, AST expr, AST block) {
+			super(lineNo, expr, block);
 			addFlag(AstFlag.BREAKABLE);
 			addFlag(AstFlag.CONTINUEABLE);
 		}
@@ -3825,8 +3846,8 @@ public class AwkParser {
 		private Address breakAddress;
 		private Address continueAddress;
 
-		private ForStatementAst(AST expr1, AST expr2, AST expr3, AST block) {
-			super(expr1, expr2, expr3, block);
+		private ForStatementAst(int lineNo, AST expr1, AST expr2, AST expr3, AST block) {
+			super(lineNo, expr1, expr2, expr3, block);
 			addFlag(AstFlag.BREAKABLE);
 			addFlag(AstFlag.CONTINUEABLE);
 		}
@@ -3896,8 +3917,8 @@ public class AwkParser {
 		private Address breakAddress;
 		private Address continueAddress;
 
-		private ForInStatementAst(AST keyIdAst, AST arrayIdAst, AST block) {
-			super(keyIdAst, arrayIdAst, block);
+		private ForInStatementAst(int lineNo, AST keyIdAst, AST arrayIdAst, AST block) {
+			super(lineNo, keyIdAst, arrayIdAst, block);
 			addFlag(AstFlag.BREAKABLE);
 			addFlag(AstFlag.CONTINUEABLE);
 		}
@@ -4564,8 +4585,8 @@ public class AwkParser {
 
 		private FunctionProxy functionProxy;
 
-		private FunctionCallAst(FunctionProxy functionProxy, AST params) {
-			super(params);
+		private FunctionCallAst(int lineNo, FunctionProxy functionProxy, AST params) {
+			super(lineNo, params);
 			this.functionProxy = functionProxy;
 		}
 
@@ -4632,26 +4653,15 @@ public class AwkParser {
 			return String.format(
 					"gawk: %s:%d: warning: function `%s' called with more arguments than declared",
 					sourceBasename(),
-					warningLineNo(),
+					getLineNo(),
 					functionProxy.getFunctionName());
 		}
-
-		private int warningLineNo() {
-			if (getAst1() instanceof FunctionCallParamListAst) {
-				AST firstParam = getAst1().getAst1();
-				if (firstParam != null) {
-					return firstParam.getLineNo();
-				}
-			}
-			return getLineNo();
-		}
-
 	}
 
 	private final class IndirectFunctionCallAst extends ScalarExpressionAst {
 
-		private IndirectFunctionCallAst(AST functionNameAst, AST params) {
-			super(functionNameAst, params);
+		private IndirectFunctionCallAst(int lineNo, AST functionNameAst, AST params) {
+			super(lineNo, functionNameAst, params);
 		}
 
 		@Override
@@ -4675,8 +4685,8 @@ public class AwkParser {
 		private final String id;
 		private final BuiltinFunction builtin;
 
-		private BuiltinFunctionCallAst(String id, AST params) {
-			super(params);
+		private BuiltinFunctionCallAst(int lineNo, String id, AST params) {
+			super(lineNo, params);
 			this.id = id;
 			this.builtin = BuiltinFunction.of(id);
 		}
@@ -5145,10 +5155,6 @@ public class AwkParser {
 			super(idAst, idxAst);
 		}
 
-		private ArrayReferenceAst(int lineNo, AST idAst, AST idxAst) {
-			super(lineNo, idAst, idxAst);
-		}
-
 		@Override
 		public String toString() {
 			return super.toString() + " (" + getAst1() + " [...])";
@@ -5435,195 +5441,86 @@ public class AwkParser {
 		}
 	}
 
-	private final class PreIncAst extends ScalarExpressionAst {
+	/**
+	 * {@code ++} or {@code --}, prefix or postfix, on a variable, an array
+	 * element or a field. The array and its subscript, or the field number, are
+	 * evaluated once. A prefix form evaluates to the new value, a postfix form to
+	 * the numeric value before the change.
+	 */
+	private final class IncDecAst extends ScalarExpressionAst {
 
-		private PreIncAst(AST symbolAst) {
+		private final boolean increment;
+		private final boolean postfix;
+
+		private IncDecAst(AST symbolAst, boolean incrementParam, boolean postfixParam) {
 			super(symbolAst);
+			increment = incrementParam;
+			postfix = postfixParam;
 		}
 
 		@Override
 		public int populateTuples(AwkTuples tuples) {
 			pushSourceLineNumber(tuples);
-			if (getAst1() instanceof IDAst && isJrtManagedSpecialName(((IDAst) getAst1()).id)) {
-				// the sequence already leaves the new value on the stack
-				populateSpecialIncDec(tuples, ((IDAst) getAst1()).id, true, false);
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (getAst1() instanceof IDAst) {
-				IDAst idAst = (IDAst) getAst1();
-				tuples.inc(idAst.offset, idAst.isGlobal);
-			} else if (getAst1() instanceof ArrayReferenceAst) {
-				ArrayReferenceAst arrAst = (ArrayReferenceAst) getAst1();
-				if (arrAst.getAst1() instanceof IDAst) {
-					IDAst idAst = (IDAst) arrAst.getAst1();
-					if (idAst.isScalar()) {
-						throw new SemanticException("Cannot use " + idAst + " as an array.");
+			AST target = getAst1();
+			if (target instanceof IDAst && isJrtManagedSpecialName(((IDAst) target).id)) {
+				populateSpecialIncDec(tuples, ((IDAst) target).id, increment, postfix);
+			} else if (target instanceof IDAst) {
+				IDAst idAst = (IDAst) target;
+				if (postfix) {
+					// POSTINC and POSTDEC replace the value with the old numeric value
+					idAst.populateTuples(tuples);
+					if (increment) {
+						tuples.postInc(idAst.offset, idAst.isGlobal);
+					} else {
+						tuples.postDec(idAst.offset, idAst.isGlobal);
 					}
-					idAst.setArray(true);
-				}
-				arrAst.populateTargetReferenceTuples(tuples);
-				tuples.incMapRef();
-			} else if (getAst1() instanceof DollarExpressionAst) {
-				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
-				dollarExpr.getAst1().populateTuples(tuples); // OPTIMIATION: duplicate the x in $x here
-				// so that it is not evaluated again
-				tuples.dup();
-				// stack contains eval of dollar arg
-				// tuples.assignAsInputField();
-				tuples.incDollarRef();
-				// OPTIMIATION continued: now evaluate
-				// the dollar expression with x (for $x)
-				// instead of evaluating the expression again
-				tuples.getInputField();
-				popSourceLineNumber(tuples);
-				return 1; // NOTE, short-circuit return here!
-			} else {
-				throw new NotImplementedError("unhandled preinc for " + getAst1());
-			}
-			// else
-			// assert false : "cannot refer for preInc to "+getAst1();
-			getAst1().populateTuples(tuples);
-			popSourceLineNumber(tuples);
-			return 1;
-		}
-	}
-
-	private final class PreDecAst extends ScalarExpressionAst {
-
-		private PreDecAst(AST symbolAst) {
-			super(symbolAst);
-		}
-
-		@Override
-		public int populateTuples(AwkTuples tuples) {
-			pushSourceLineNumber(tuples);
-			if (getAst1() instanceof IDAst && isJrtManagedSpecialName(((IDAst) getAst1()).id)) {
-				// the sequence already leaves the new value on the stack
-				populateSpecialIncDec(tuples, ((IDAst) getAst1()).id, false, false);
-				popSourceLineNumber(tuples);
-				return 1;
-			} else if (getAst1() instanceof IDAst) {
-				IDAst idAst = (IDAst) getAst1();
-				tuples.dec(idAst.offset, idAst.isGlobal);
-			} else if (getAst1() instanceof ArrayReferenceAst) {
-				ArrayReferenceAst arrAst = (ArrayReferenceAst) getAst1();
-				if (arrAst.getAst1() instanceof IDAst) {
-					IDAst idAst = (IDAst) arrAst.getAst1();
-					if (idAst.isScalar()) {
-						throw new SemanticException("Cannot use " + idAst + " as an array.");
-					}
-					idAst.setArray(true);
-				}
-				arrAst.populateTargetReferenceTuples(tuples);
-				tuples.decMapRef();
-			} else if (getAst1() instanceof DollarExpressionAst) {
-				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
-				dollarExpr.getAst1().populateTuples(tuples); // OPTIMIATION: duplicate the x in $x here
-				// so that it is not evaluated again
-				tuples.dup();
-				// stack contains eval of dollar arg
-				// tuples.assignAsInputField();
-				tuples.decDollarRef();
-				// OPTIMIATION continued: now evaluate
-				// the dollar expression with x (for $x)
-				// instead of evaluating the expression again
-				tuples.getInputField();
-				popSourceLineNumber(tuples);
-				return 1; // NOTE, short-circuit return here!
-			} else {
-				throw new NotImplementedError("unhandled predec for " + getAst1());
-			}
-			getAst1().populateTuples(tuples);
-			popSourceLineNumber(tuples);
-			return 1;
-		}
-	}
-
-	private final class PostIncAst extends ScalarExpressionAst {
-
-		private PostIncAst(AST symbolAst) {
-			super(symbolAst);
-		}
-
-		@Override
-		public int populateTuples(AwkTuples tuples) {
-			pushSourceLineNumber(tuples);
-			if (getAst1() instanceof DollarExpressionAst) {
-				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
-				dollarExpr.getAst1().populateTuples(tuples);
-				tuples.incDollarRef();
-			} else if (getAst1() instanceof IDAst && isJrtManagedSpecialName(((IDAst) getAst1()).id)) {
-				populateSpecialIncDec(tuples, ((IDAst) getAst1()).id, true, true);
-			} else {
-				if (getAst1() instanceof ArrayReferenceAst) {
-					((ArrayReferenceAst) getAst1()).populateTargetValueTuples(tuples);
-					tuples.postfixOperand();
 				} else {
-					getAst1().populateTuples(tuples);
-				}
-				if (getAst1() instanceof IDAst) {
-					IDAst idAst = (IDAst) getAst1();
-					tuples.postInc(idAst.offset, idAst.isGlobal);
-				} else if (getAst1() instanceof ArrayReferenceAst) {
-					ArrayReferenceAst arrAst = (ArrayReferenceAst) getAst1();
-					if (arrAst.getAst1() instanceof IDAst) {
-						IDAst idAst = (IDAst) arrAst.getAst1();
-						if (idAst.isScalar()) {
-							throw new SemanticException("Cannot use " + idAst + " as an array.");
-						}
-						idAst.setArray(true);
+					if (increment) {
+						tuples.inc(idAst.offset, idAst.isGlobal);
+					} else {
+						tuples.dec(idAst.offset, idAst.isGlobal);
 					}
-					arrAst.populateTargetReferenceTuples(tuples);
+					idAst.populateTuples(tuples);
+				}
+			} else if (target instanceof ArrayReferenceAst) {
+				ArrayReferenceAst arrAst = (ArrayReferenceAst) target;
+				if (arrAst.getAst1() instanceof IDAst) {
+					IDAst idAst = (IDAst) arrAst.getAst1();
+					if (idAst.isScalar()) {
+						throw new SemanticException("Cannot use " + idAst + " as an array.");
+					}
+					idAst.setArray(true);
+				}
+				arrAst.populateTargetReferenceTuples(tuples);
+				if (postfix) {
+					if (increment) {
+						tuples.postIncMapRef();
+					} else {
+						tuples.postDecMapRef();
+					}
+				} else if (increment) {
 					tuples.incMapRef();
 				} else {
-					throw new NotImplementedError("unhandled postinc for " + getAst1());
+					tuples.decMapRef();
 				}
-			}
-			popSourceLineNumber(tuples);
-			return 1;
-		}
-	}
-
-	private final class PostDecAst extends ScalarExpressionAst {
-
-		private PostDecAst(AST symbolAst) {
-			super(symbolAst);
-		}
-
-		@Override
-		public int populateTuples(AwkTuples tuples) {
-			pushSourceLineNumber(tuples);
-			if (getAst1() instanceof IDAst && isJrtManagedSpecialName(((IDAst) getAst1()).id)) {
-				populateSpecialIncDec(tuples, ((IDAst) getAst1()).id, false, true);
-				popSourceLineNumber(tuples);
-				return 1;
-			}
-			if (getAst1() instanceof ArrayReferenceAst) {
-				((ArrayReferenceAst) getAst1()).populateTargetValueTuples(tuples);
-				tuples.postfixOperand();
-			} else {
-				getAst1().populateTuples(tuples);
-			}
-			if (getAst1() instanceof IDAst) {
-				IDAst idAst = (IDAst) getAst1();
-				tuples.postDec(idAst.offset, idAst.isGlobal);
-			} else if (getAst1() instanceof ArrayReferenceAst) {
-				ArrayReferenceAst arrAst = (ArrayReferenceAst) getAst1();
-				if (arrAst.getAst1() instanceof IDAst) {
-					IDAst idAst = (IDAst) arrAst.getAst1();
-					if (idAst.isScalar()) {
-						throw new SemanticException("Cannot use " + idAst + " as an array.");
-					}
-					idAst.setArray(true);
+			} else if (target instanceof DollarExpressionAst) {
+				((DollarExpressionAst) target).getAst1().populateTuples(tuples);
+				if (!postfix) {
+					// keep the field number to read the updated field
+					tuples.dup();
 				}
-				arrAst.populateTargetReferenceTuples(tuples);
-				tuples.decMapRef();
-			} else if (getAst1() instanceof DollarExpressionAst) {
-				DollarExpressionAst dollarExpr = (DollarExpressionAst) getAst1();
-				dollarExpr.getAst1().populateTuples(tuples);
-				tuples.decDollarRef();
+				// pushes the old numeric value of the field
+				if (increment) {
+					tuples.incDollarRef();
+				} else {
+					tuples.decDollarRef();
+				}
+				if (!postfix) {
+					tuples.pop();
+					tuples.getInputField();
+				}
 			} else {
-				throw new NotImplementedError("unhandled postinc for " + getAst1());
+				throw new NotImplementedError("unhandled inc/dec for " + target);
 			}
 			popSourceLineNumber(tuples);
 			return 1;
@@ -5635,8 +5532,8 @@ public class AwkParser {
 		private Token outputToken;
 		private boolean parenthesized;
 
-		private PrintAst(AST exprList, Token outToken, AST outputExpr, boolean parenthesized) {
-			super(exprList, outputExpr);
+		private PrintAst(int lineNo, AST exprList, Token outToken, AST outputExpr, boolean parenthesized) {
+			super(lineNo, exprList, outputExpr);
 			this.outputToken = outToken;
 			this.parenthesized = parenthesized;
 		}
@@ -5840,6 +5737,8 @@ public class AwkParser {
 	private void populateSpecialIncDec(AwkTuples tuples, String id, boolean increment, boolean postfix) {
 		pushSpecialVariable(tuples, id);
 		if (postfix) {
+			// the expression evaluates to the old numeric value
+			tuples.unaryPlus();
 			tuples.dup();
 		}
 		tuples.push(Long.valueOf(1L));
@@ -5852,19 +5751,6 @@ public class AwkParser {
 		if (postfix) {
 			tuples.pop();
 		}
-	}
-
-	/*
-	 * A call-expression node is normally stamped when it is reduced, after the
-	 * lexer may already have consumed the line terminator; the first argument
-	 * carries the line of the call site itself, which is what gawk-style
-	 * diagnostics report.
-	 */
-	private int extensionCallLineNumber(AST params) {
-		if (params != null && params.getAst1() != null) {
-			return params.getAst1().getLineNo();
-		}
-		return currentSourceLineNumber();
 	}
 
 	private final class ExtensionAst extends AST {
@@ -5961,8 +5847,8 @@ public class AwkParser {
 
 		private Token outputToken;
 
-		private PrintfAst(AST exprList, Token outToken, AST outputExpr) {
-			super(exprList, outputExpr);
+		private PrintfAst(int lineNo, AST exprList, Token outToken, AST outputExpr) {
+			super(lineNo, exprList, outputExpr);
 			this.outputToken = outToken;
 		}
 
@@ -6511,14 +6397,14 @@ public class AwkParser {
 			return functionDef;
 		}
 
-		AST addFunctionCall(String id, AST paramList) {
+		AST addFunctionCall(String id, AST paramList, int lineNo) {
 			id = qualifyGlobalIdentifier(id);
 			FunctionProxy functionProxy = functionProxies.get(id);
 			if (functionProxy == null) {
 				functionProxy = new FunctionProxy(id);
 				functionProxies.put(id, functionProxy);
 			}
-			return new FunctionCallAst(functionProxy, paramList);
+			return new FunctionCallAst(lineNo, functionProxy, paramList);
 		}
 
 		Map<String, Tuple.IndirectFunctionTarget> indirectFunctionTargets() {
@@ -6541,8 +6427,8 @@ public class AwkParser {
 			return cachedIndirectFunctionTargets;
 		}
 
-		AST addArrayReference(String id, AST idxAst, int lineNo) throws ParserException {
-			return new ArrayReferenceAst(lineNo, addArrayID(id), idxAst);
+		AST addArrayReference(String id, AST idxAst) throws ParserException {
+			return new ArrayReferenceAst(addArrayID(id), idxAst);
 		}
 
 		// constants are no longer cached/hashed so that individual ASTs
@@ -6576,6 +6462,7 @@ public class AwkParser {
 	}
 
 	private ParserException parserException(String msg) {
-		return new ParserException(msg, currentScriptSource.getDescription(), reader.getLineNumber());
+		// the line of the lookahead token, where the parser stopped
+		return new ParserException(msg, currentScriptSource.getDescription(), tokenLine);
 	}
 }

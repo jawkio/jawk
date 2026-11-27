@@ -59,7 +59,10 @@ public class AwkTuples implements Serializable {
 	// 10 = POSTFIX_OPERAND replaces the UNARY_PLUS of a[k]++ and a[k]--, and
 	// arithmetic on a string literal that is not a number is no longer folded
 	// (issue #666): older streams would not follow strict numbers.
-	private static final long serialVersionUID = 10L;
+	// 11 = POSTINC_MAP_REF and POSTDEC_MAP_REF replace POSTFIX_OPERAND, and
+	// INC_MAP_REF and DEC_MAP_REF push the new value, so ++ and -- evaluate an
+	// array subscript once (issue #669).
+	private static final long serialVersionUID = 11L;
 
 	/** Address manager */
 	private final AddressManager addressManager = new AddressManager();
@@ -1078,7 +1081,8 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
-	 * Increments a stack-provided associative-array element reference.
+	 * Increments a stack-provided associative-array element reference and
+	 * pushes its new value.
 	 */
 	public void incMapRef() {
 		queue.add(new Tuple.NoOperandTuple(Opcode.INC_MAP_REF));
@@ -1097,7 +1101,8 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
-	 * Decrements a stack-provided associative-array element reference.
+	 * Decrements a stack-provided associative-array element reference and
+	 * pushes its new value.
 	 */
 	public void decMapRef() {
 		queue.add(new Tuple.NoOperandTuple(Opcode.DEC_MAP_REF));
@@ -1158,11 +1163,19 @@ public class AwkTuples implements Serializable {
 	}
 
 	/**
-	 * Converts to a number the value of the array element that a postfix
-	 * {@code ++} or {@code --} is about to change.
+	 * Increments a stack-provided associative-array element reference and
+	 * pushes its numeric value before the increment.
 	 */
-	public void postfixOperand() {
-		queue.add(new Tuple.NoOperandTuple(Opcode.POSTFIX_OPERAND));
+	public void postIncMapRef() {
+		queue.add(new Tuple.NoOperandTuple(Opcode.POSTINC_MAP_REF));
+	}
+
+	/**
+	 * Decrements a stack-provided associative-array element reference and
+	 * pushes its numeric value before the decrement.
+	 */
+	public void postDecMapRef() {
+		queue.add(new Tuple.NoOperandTuple(Opcode.POSTDEC_MAP_REF));
 	}
 
 	/**

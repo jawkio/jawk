@@ -1325,12 +1325,6 @@ public class AVM implements VariableManager, Closeable {
 					position.next();
 					break;
 				}
-				case POSTFIX_OPERAND: {
-					// stack[0] = array element about to be incremented or decremented
-					push(postfixOperand(pop()));
-					position.next();
-					break;
-				}
 				case GOTO: {
 					// arg[0] = address
 
@@ -1544,25 +1538,13 @@ public class AVM implements VariableManager, Closeable {
 					position.next();
 					break;
 				}
-				case INC_MAP_REF: {
+				case INC_MAP_REF:
+				case DEC_MAP_REF:
+				case POSTINC_MAP_REF:
+				case POSTDEC_MAP_REF: {
 					// stack[0] = array index
 					// stack[1] = associative array
-					Object key = pop();
-					checkScalar(key);
-					Map<Object, Object> aa = toMap(pop());
-					Object o = aa.get(key);
-					aa.put(key, JRT.inc(numberOrZero(o)));
-					position.next();
-					break;
-				}
-				case DEC_MAP_REF: {
-					// stack[0] = array index
-					// stack[1] = associative array
-					Object key = pop();
-					checkScalar(key);
-					Map<Object, Object> aa = toMap(pop());
-					Object o = aa.get(key);
-					aa.put(key, JRT.dec(numberOrZero(o)));
+					push(incDecMapElement(opcode));
 					position.next();
 					break;
 				}
@@ -3934,16 +3916,6 @@ public class AVM implements VariableManager, Closeable {
 	}
 
 	/**
-	 * The numeric value of the array element that a postfix {@code ++} or
-	 * {@code --} is about to change. An element that was never assigned
-	 * converts to zero as unary plus always converted it; any other value
-	 * must be a number under strict numbers.
-	 */
-	private Object postfixOperand(Object o) {
-		return numericValueOf(o == null || o instanceof UninitializedObject ? o : number(o));
-	}
-
-	/**
 	 * Coerces a scalar to its numeric value, keeping an already numeric
 	 * scalar unchanged so an exact integer is not rounded through a double.
 	 */
@@ -3954,30 +3926,46 @@ public class AVM implements VariableManager, Closeable {
 		return JRT.toDouble(o);
 	}
 
+	/**
+	 * Numerically increases an Awk variable by one.
+	 *
+	 * @return the numeric value of the variable before the increment
+	 */
 	private Object inc(long l, boolean isGlobal) {
-		Object o = resolveVariable(l, isGlobal, false);
-		if (o instanceof UninitializedObject) {
-			o = ZERO;
-			runtimeStack.setVariable(l, o, isGlobal);
-		}
-		Object updated = JRT.inc(number(o));
-		runtimeStack.setVariable(l, updated, isGlobal);
-		return o;
+		Object original = numericValueOf(numberOrZero(resolveVariable(l, isGlobal, false)));
+		runtimeStack.setVariable(l, JRT.inc(original), isGlobal);
+		return original;
 	}
 
 	/**
-	 * Numerically decreases an Awk variable by one; the result
-	 * is placed back into that variable.
+	 * Numerically decreases an Awk variable by one.
+	 *
+	 * @return the numeric value of the variable before the decrement
 	 */
 	private Object dec(long l, boolean isGlobal) {
-		Object o = resolveVariable(l, isGlobal, false);
-		if (o instanceof UninitializedObject) {
-			o = ZERO;
-			runtimeStack.setVariable(l, o, isGlobal);
-		}
-		Object updated = JRT.dec(number(o));
-		runtimeStack.setVariable(l, updated, isGlobal);
-		return o;
+		Object original = numericValueOf(numberOrZero(resolveVariable(l, isGlobal, false)));
+		runtimeStack.setVariable(l, JRT.dec(original), isGlobal);
+		return original;
+	}
+
+	/**
+	 * Increases or decreases by one the array element whose index and array
+	 * are on top of the operand stack, evaluated once.
+	 *
+	 * @param opcode {@code INC_MAP_REF}, {@code DEC_MAP_REF},
+	 *        {@code POSTINC_MAP_REF} or {@code POSTDEC_MAP_REF}
+	 * @return the new value for the prefix opcodes, the numeric value before
+	 *         the change for the postfix ones
+	 */
+	private Object incDecMapElement(Opcode opcode) {
+		Object key = pop();
+		checkScalar(key);
+		Map<Object, Object> aa = toMap(pop());
+		Object original = numericValueOf(numberOrZero(aa.get(key)));
+		boolean increment = opcode == Opcode.INC_MAP_REF || opcode == Opcode.POSTINC_MAP_REF;
+		Object updated = increment ? JRT.inc(original) : JRT.dec(original);
+		aa.put(key, updated);
+		return opcode == Opcode.INC_MAP_REF || opcode == Opcode.DEC_MAP_REF ? updated : original;
 	}
 
 	/** {@inheritDoc} */

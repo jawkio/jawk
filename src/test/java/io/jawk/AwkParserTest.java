@@ -481,6 +481,35 @@ public class AwkParserTest {
 	}
 
 	@Test
+	public void testParserExceptionReportsTheLineOfTheOffendingToken() throws Exception {
+		AwkTestSupport.TestResult result = AwkTestSupport.awkTest("a syntax error reports the line of its token")
+				.script("BEGIN {\n  x = 1\n  y = = 2\n}\n")
+				.expectThrow(ParserException.class)
+				.run();
+		result.assertExpected();
+		String message = result.thrownException().getMessage();
+		assertTrue(message, message.endsWith(":3)"));
+
+		result = AwkTestSupport.awkTest("a missing '}' reports the last line, after the blank lines")
+				.script("BEGIN {\n  x = 1\n\n# done\n")
+				.expectThrow(ParserException.class)
+				.run();
+		result.assertExpected();
+		message = result.thrownException().getMessage();
+		assertTrue(message, message.endsWith(":4)"));
+
+		result = AwkTestSupport.cliTest("a missing '}' at the end of an empty last source reports its line 1")
+				.file("t1.awk", "BEGIN {\n  x = 1\n  y = 2\n  z = 3\n")
+				.file("t2.awk", "")
+				.argument("-f", "{{t1.awk}}", "-f", "{{t2.awk}}")
+				.expectThrow(ParserException.class)
+				.run();
+		result.assertExpected();
+		message = result.thrownException().getMessage();
+		assertTrue(message, message.endsWith("t2.awk:1)"));
+	}
+
+	@Test
 	public void testIncludeDirective() throws Exception {
 		AwkTestSupport.cliTest("Include resolves relative to the main source and restores its namespace")
 				.file(

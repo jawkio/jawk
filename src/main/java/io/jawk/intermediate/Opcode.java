@@ -830,77 +830,75 @@ public enum Opcode {
 	POW,
 
 	/**
-	 * Increases the variable reference by one; pushes the result
-	 * onto the stack.
+	 * Increases the variable reference by one; pushes nothing.
 	 * <p>
 	 * Argument 1: offset of the particular variable into the variable manager<br/>
 	 * Argument 2: whether the variable is global or local
 	 * <p>
 	 * Stack before: ...<br/>
-	 * Stack after: x+1 ...
+	 * Stack after: ...
 	 */
 	INC,
 	/**
-	 * Decreases the variable reference by one; pushes the result
-	 * onto the stack.
+	 * Decreases the variable reference by one; pushes nothing.
 	 * <p>
 	 * Argument 1: offset of the particular variable into the variable manager<br/>
 	 * Argument 2: whether the variable is global or local
 	 * <p>
 	 * Stack before: ...<br/>
-	 * Stack after: x-1 ...
+	 * Stack after: ...
 	 */
 	DEC,
 	/**
-	 * Increases the array element reference by one; pushes the result
-	 * onto the stack.
+	 * Increases the array element reference by one; pushes nothing.
 	 * <p>
 	 * Argument 1: offset of the associative array into the variable manager<br/>
 	 * Argument 2: whether the associative array is global or local
 	 * <p>
 	 * Stack before: array-idx ...<br/>
-	 * Stack after: x+1 ...
+	 * Stack after: ...
 	 */
 	INC_ARRAY_REF,
 	/**
-	 * Decreases the array element reference by one; pushes the result
-	 * onto the stack.
+	 * Decreases the array element reference by one; pushes nothing.
 	 * <p>
 	 * Argument 1: offset of the associative array into the variable manager<br/>
 	 * Argument 2: whether the associative array is global or local
 	 * <p>
 	 * Stack before: array-idx ...<br/>
-	 * Stack after: x-1 ...
+	 * Stack after: ...
 	 */
 	DEC_ARRAY_REF,
 	/**
-	 * Increases the stack-provided array element reference by one.
+	 * Increases the stack-provided array element reference by one and pushes
+	 * the new value, for {@code ++a[k]}.
 	 * <p>
 	 * Stack before: array-idx associative-array ...<br/>
 	 * Stack after: x+1 ...
 	 */
 	INC_MAP_REF,
 	/**
-	 * Decreases the stack-provided array element reference by one.
+	 * Decreases the stack-provided array element reference by one and pushes
+	 * the new value, for {@code --a[k]}.
 	 * <p>
 	 * Stack before: array-idx associative-array ...<br/>
 	 * Stack after: x-1 ...
 	 */
 	DEC_MAP_REF,
 	/**
-	 * Increases the input field variable by one; pushes the result
-	 * onto the stack.
+	 * Increases the input field variable by one; pushes its numeric value
+	 * before the change, for {@code $n++}.
 	 * <p>
 	 * Stack before: field-idx ...<br/>
-	 * Stack after: x+1
+	 * Stack after: x ...
 	 */
 	INC_DOLLAR_REF,
 	/**
-	 * Decreases the input field variable by one; pushes the result
-	 * onto the stack.
+	 * Decreases the input field variable by one; pushes its numeric value
+	 * before the change, for {@code $n--}.
 	 * <p>
 	 * Stack before: field-idx ...<br/>
-	 * Stack after: x-1
+	 * Stack after: x ...
 	 */
 	DEC_DOLLAR_REF,
 
@@ -1471,26 +1469,28 @@ public enum Opcode {
 	ORS_OFFSET,
 
 	/**
-	 * Increases the variable reference by one; pushes the original value
-	 * onto the stack.
+	 * Increases the variable reference by one; replaces the value on top of
+	 * the stack with the numeric value of the variable before the increment
+	 * (0 if uninitialized).
 	 * <p>
 	 * Argument 1: offset of the particular variable into the variable manager<br/>
 	 * Argument 2: whether the variable is global or local
 	 * <p>
-	 * Stack before: ...<br/>
-	 * Stack after: x ... or 0 if uninitialized
+	 * Stack before: x ...<br/>
+	 * Stack after: x ... (as a number)
 	 */
 	POSTINC,
 
 	/**
-	 * Decreases the variable reference by one; pushes the original value
-	 * onto the stack.
+	 * Decreases the variable reference by one; replaces the value on top of
+	 * the stack with the numeric value of the variable before the decrement
+	 * (0 if uninitialized).
 	 * <p>
 	 * Argument 1: offset of the particular variable into the variable manager<br/>
 	 * Argument 2: whether the variable is global or local
 	 * <p>
-	 * Stack before: ...<br/>
-	 * Stack after: x ... or 0 if uninitialized
+	 * Stack before: x ...<br/>
+	 * Stack after: x ... (as a number)
 	 */
 	POSTDEC,
 
@@ -1707,14 +1707,24 @@ public enum Opcode {
 	EXEC_NEXT,
 
 	/**
-	 * Converts the top stack element, the value of an array element that a
-	 * postfix {@code ++} or {@code --} is about to change, to a number: an
-	 * element that was never assigned is zero, whatever the settings.
+	 * Increases the stack-provided array element reference by one and pushes
+	 * its numeric value before the increment, for {@code a[k]++}. An element
+	 * that was never assigned counts as zero.
 	 * <p>
-	 * Stack before: x ...<br/>
-	 * Stack after: x ... (as a number)
+	 * Stack before: array-idx associative-array ...<br/>
+	 * Stack after: x ...
 	 */
-	POSTFIX_OPERAND;
+	POSTINC_MAP_REF,
+
+	/**
+	 * Decreases the stack-provided array element reference by one and pushes
+	 * its numeric value before the decrement, for {@code a[k]--}. An element
+	 * that was never assigned counts as zero.
+	 * <p>
+	 * Stack before: array-idx associative-array ...<br/>
+	 * Stack after: x ...
+	 */
+	POSTDEC_MAP_REF;
 
 	private static final Opcode[] VALUES = values();
 

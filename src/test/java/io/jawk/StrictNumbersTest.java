@@ -587,6 +587,7 @@ public class StrictNumbersTest {
 		AwkNumberFormatException text = assertExpressionRefused("$4 * 8", "12 W");
 		assertEquals("\"12 W\" is not a number", text.getMessage());
 		assertTrue(AwkRuntimeException.class.isInstance(text));
+		assertEquals(1, text.getLineNumber());
 
 		AwkNumberFormatException empty = assertExpressionRefused("$2 * 8", "");
 		assertEquals("\"\" is not a number", empty.getMessage());
@@ -598,6 +599,14 @@ public class StrictNumbersTest {
 		AwkNumberFormatException located = assertScriptRefused("BEGIN { x = 1\n y = -\"abc\"; z = 3\n }", "abc");
 		assertEquals(2, located.getLineNumber());
 		assertEquals("\"abc\" is not a number", located.getMessage());
+
+		// The last operation of a line reports that line, not the next one
+		assertEquals(2, assertScriptRefused("BEGIN {\n y = \"abc\" + 1\n }", "abc").getLineNumber());
+		assertEquals(2, assertScriptRefused("BEGIN {\n y = \"abc\" + 1 }", "abc").getLineNumber());
+		assertEquals(3, assertScriptRefused("{\n x = $3\n x++\n }", NOT_A_NUMBER).getLineNumber());
+		// An operation spanning two lines reports the line where it ends
+		assertEquals(3, assertScriptRefused("BEGIN {\n y = substr(\"x\",\n \"abc\" + 1)\n }", "abc").getLineNumber());
+		assertEquals(3, assertScriptRefused("BEGIN {\n y = \"abc\" + \\\n 1\n }", "abc").getLineNumber());
 
 		AwkNumberFormatException inFunction = assertScriptRefused(
 				"function f(v) {\n w = v + 1; return w\n }\n { print f($3) }",

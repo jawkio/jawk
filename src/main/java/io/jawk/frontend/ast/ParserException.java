@@ -34,8 +34,7 @@ public class ParserException extends RuntimeException {
 	 *
 	 * @param msg Failure message
 	 * @param sourceDescription Human-readable source description
-	 * @param lineNumber 0-based or parser-reported line number where the error
-	 *        occurred
+	 * @param lineNumber 1-based line of the token where the parser stopped
 	 */
 	public ParserException(String msg, String sourceDescription, int lineNumber) {
 		super(msg + " (" + sourceDescription + ":" + lineNumber + ")");

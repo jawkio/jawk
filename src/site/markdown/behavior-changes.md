@@ -20,6 +20,27 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
+- `++$n` and `--$n` now evaluate to the updated field. They used to evaluate to the field whose
+  number was the old value: `++$2` on a `$2` holding `3` was `$3`, and `$0` when `$2` was empty
+  ([#667](https://github.com/jawkio/jawk/issues/667)).
+- `x++` and `x--` now evaluate to the numeric value of `x` before the change, as POSIX requires,
+  also on a special variable like `NR` or `FS`. When `x` held a text, they used to evaluate to
+  that text: `x = "3x"; y = x++` set `y` to `3x` instead of `3`
+  ([#668](https://github.com/jawkio/jawk/issues/668)).
+- `++` and `--` on an array element now evaluate its subscript once. `a[i++]++` used to
+  increment `i` twice, read `a[1]` and increment `a[2]`, and `b[f()]++` called `f()` twice.
+  `$n--` no longer leaves an extra value next to it either: `print "A", $1--, "B"` used to print
+  `8 8 B` instead of `A 8 B`, and `$(i++)--` incremented `i` twice. Programs compiled with `-K`
+  by earlier versions must be recompiled ([#669](https://github.com/jawkio/jawk/issues/669)).
+- A runtime error raised by an operation that ends its line (before a newline, `;`, `}`, a comment
+  or the end of the program) is now reported on that line, as in gawk, instead of the next one;
+  a one-line `eval()` expression reports line 1 instead of 2. An `if` or `while` now reports the
+  line of its condition and a `for` the line where its condition ends, instead of the line after
+  their body; a call, `print` or `printf` spread over several lines reports the line of the
+  function name or keyword, and a subscript spread over several lines the line of its `]`.
+  `AwkRuntimeException.getLineNumber()` and `AwkNumberFormatException.getLineNumber()` change
+  accordingly. A `ParserException` now reports the line of the token where parsing stopped,
+  which was often the line before it ([#670](https://github.com/jawkio/jawk/issues/670)).
 - New `AwkSettings.setStrictNumbers(true)` for Java embedders, off by default: arithmetic on a
   value that is not a number (`""`, `"N/A"`, `"12 W"`, a field beyond `NF`, a variable never
   assigned) throws the new `AwkNumberFormatException` instead of counting the value as zero or as

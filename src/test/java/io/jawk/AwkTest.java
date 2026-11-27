@@ -1138,6 +1138,146 @@ public class AwkTest {
 				.runAndAssert();
 	}
 
+	@Test
+	public void testOperationEndingItsLineReportsItsLine() throws Exception {
+		assertRuntimeExceptionLineNumber(
+				"an operation ending its line reports that line, not the next one",
+				4,
+				"Attempting to use a scalar as an array.",
+				"BEGIN {", // 1
+				"  x = 1", // 2
+				"  y = x + a", // 3
+				"  a[1] = 2", // 4
+				"}"); // 5
+		assertRuntimeExceptionLineNumber(
+				"an operation followed by '}' on its line reports that line",
+				3,
+				"Unclosed group",
+				"BEGIN {", // 1
+				"  r = \"(\"", // 2
+				"  y = \"a\" ~ r }"); // 3
+		assertRuntimeExceptionLineNumber(
+				"a one-line program without a final newline reports line 1",
+				1,
+				"Unclosed group",
+				"BEGIN { r = \"(\"; y = \"a\" ~ r }");
+	}
+
+	@Test
+	public void testPatternFollowedByBlankLinesReportsItsLine() throws Exception {
+		AwkTestSupport.TestResult result = AwkTestSupport.awkTest("a rule pattern reports its own line")
+				.script("BEGIN { r = \"(\" }\n\"a\" ~ r {\n\n  print\n}\n")
+				.stdin("a\n")
+				.expectThrow(AwkRuntimeException.class)
+				.run();
+		result.assertExpected();
+		assertEquals(2, ((AwkRuntimeException) result.thrownException()).getLineNumber());
+	}
+
+	@Test
+	public void testControlStatementReportsItsHeaderLine() throws Exception {
+		assertRuntimeExceptionLineNumber(
+				"if reports the line of its condition, not the end of its body",
+				3,
+				"Attempting to use an array in a scalar context.",
+				"BEGIN {", // 1
+				"  a[1] = 1", // 2
+				"  if (a) {", // 3
+				"    w = 1", // 4
+				"  }", // 5
+				"  w = 2", // 6
+				"}"); // 7
+		assertRuntimeExceptionLineNumber(
+				"while reports the line of its condition, not the end of its body",
+				3,
+				"Attempting to use an array in a scalar context.",
+				"BEGIN {", // 1
+				"  a[1] = 1", // 2
+				"  while (a) {", // 3
+				"    w = 1", // 4
+				"  }", // 5
+				"}"); // 6
+	}
+
+	@Test
+	public void testMultilineForAndPrintfReportGawkLines() throws Exception {
+		assertRuntimeExceptionLineNumber(
+				"for reports the line of its condition when its header spans lines",
+				3,
+				"Attempting to use an array in a scalar context.",
+				"function f(p,  i) {", // 1
+				"  for (i = 0;", // 2
+				"    p;", // 3
+				"    i++)", // 4
+				"    break", // 5
+				"  z = 1", // 6
+				"}", // 7
+				"BEGIN { a[1] = 1; f(a) }"); // 8
+		assertRuntimeExceptionLineNumber(
+				"printf spread over two lines reports the line of the keyword",
+				2,
+				"not enough arguments",
+				"BEGIN {", // 1
+				"  printf \"%d %d\",", // 2
+				"     1", // 3
+				"  y = 3", // 4
+				"}"); // 5
+	}
+
+	@Test
+	public void testMultilineCallAndSubscriptReportGawkLines() throws Exception {
+		assertRuntimeExceptionLineNumber(
+				"a call spread over two lines reports the line of the function name",
+				2,
+				"not enough arguments",
+				"BEGIN {", // 1
+				"  y = sprintf(\"%d %d\",", // 2
+				"    1)", // 3
+				"  w = 1", // 4
+				"}"); // 5
+		assertRuntimeExceptionLineNumber(
+				"an indirect call ending its line reports that line",
+				3,
+				"is not defined",
+				"BEGIN {", // 1
+				"  f = \"nope\"", // 2
+				"  y = @f()", // 3
+				"  w = 1", // 4
+				"}"); // 5
+		assertRuntimeExceptionLineNumber(
+				"a subscript spread over two lines reports the line where it ends",
+				4,
+				"Attempting to use a scalar as an array.",
+				"BEGIN {", // 1
+				"  a = 1", // 2
+				"  y = a[1,", // 3
+				"    2]", // 4
+				"  w = 1", // 5
+				"}"); // 6
+	}
+
+	@Test
+	public void testLineIsCountedInItsOwnSource() throws Exception {
+		AwkTestSupport.TestResult result = AwkTestSupport.cliTest("a second -f source counts its own lines")
+				.file("t1.awk", "BEGIN {\n  r = \"(\"\n}\n")
+				.file("t2.awk", "BEGIN {\n  y = \"a\" ~ r\n  w = 1\n}\n")
+				.argument("-f", "{{t1.awk}}", "-f", "{{t2.awk}}")
+				.expectThrow(AwkRuntimeException.class)
+				.run();
+		result.assertExpected();
+		assertEquals(2, ((AwkRuntimeException) result.thrownException()).getLineNumber());
+
+		result = AwkTestSupport.cliTest("an included file without a final newline counts its own lines")
+				.file("main.awk", "@include \"inc.awk\"\n\n\n{ print }\n")
+				.file("inc.awk", "BEGIN { r = \"(\" }\n\"a\" ~ r")
+				.argument("-f", "{{main.awk}}")
+				.stdin("a\n")
+				.expectThrow(AwkRuntimeException.class)
+				.run();
+		result.assertExpected();
+		assertEquals(2, ((AwkRuntimeException) result.thrownException()).getLineNumber());
+	}
+
 	private void assertRuntimeExceptionLineNumber(
 			String description,
 			int expectedLineNumber,

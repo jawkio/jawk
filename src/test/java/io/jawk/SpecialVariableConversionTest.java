@@ -22,6 +22,8 @@ package io.jawk;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import org.junit.Test;
 
 /**
@@ -88,6 +90,16 @@ public class SpecialVariableConversionTest {
 				.preassign("CONVFMT", "%.2f")
 				.stdin("a0.33b")
 				.expectLines("a", "b")
+				.runAndAssert();
+	}
+
+	@Test
+	public void preassignedBigNumbersKeepTheirText() throws Exception {
+		AwkTestSupport.awkTest("a BigDecimal or BigInteger preassigned to OFS or SUBSEP keeps its text")
+				.script("BEGIN { print \"a\", \"b\"; x[1, 2]; for (k in x) print k }")
+				.preassign("OFS", new BigDecimal("12.50"))
+				.preassign("SUBSEP", new BigInteger("123456789012345678901234567890"))
+				.expectLines("a12.50b", "11234567890123456789012345678902")
 				.runAndAssert();
 	}
 }

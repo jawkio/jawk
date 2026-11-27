@@ -373,6 +373,29 @@ public class JRTTest {
 	}
 
 	@Test
+	public void testSpecialVariablesHoldTheirDefaultsBeforeExecution() {
+		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
+		assertEquals(Awk.DEFAULT_FS, jrt.getFSVar());
+		assertEquals(Awk.DEFAULT_RS, jrt.getRSVar());
+		assertEquals(Awk.DEFAULT_OFS, jrt.getOFSVar());
+		assertEquals(Awk.DEFAULT_ORS, jrt.getORSVar());
+		assertEquals(Awk.DEFAULT_CONVFMT, jrt.getCONVFMTVar());
+		assertEquals(Awk.DEFAULT_OFMT, jrt.getOFMTVar());
+		assertEquals(Awk.DEFAULT_SUBSEP, jrt.getSUBSEPVar());
+	}
+
+	@Test
+	public void testAssignInitialVariablesAppliesConvfmtFirst() {
+		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
+		Map<String, Object> variables = new LinkedHashMap<>();
+		variables.put("OFS", Double.valueOf(1.0 / 3));
+		variables.put("CONVFMT", "%.2f");
+		jrt.assignInitialVariables(variables);
+		assertEquals("0.33", jrt.getOFSString());
+		assertEquals(Double.valueOf(1.0 / 3), jrt.getOFSVar());
+	}
+
+	@Test
 	public void testSplitSetsFieldZero() {
 		AssocArray aa = AssocArray.createHash();
 		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);

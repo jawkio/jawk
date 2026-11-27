@@ -286,6 +286,8 @@ public class AVM implements VariableManager, Closeable {
 		// settings variable the script never references (read through SYMTAB, or
 		// by an extension through getVariable()) is an AWK value too
 		baseInitialVariables.replaceAll((name, value) -> normalizeExternalVariableValue(value));
+		// a BigDecimal OFS keeps its text, as a numeric string
+		baseSpecialVariables.replaceAll((name, value) -> normalizeExternalVariableValue(value));
 	}
 
 	/**
@@ -956,6 +958,7 @@ public class AVM implements VariableManager, Closeable {
 			}
 
 			Map<String, Object> specialOverrides = JRT.copySpecialVariables(variableOverrides);
+			specialOverrides.replaceAll((name, value) -> normalizeExternalVariableValue(value));
 			if (specialOverrides.isEmpty()) {
 				executionSpecialVariables = baseSpecialVariables;
 			} else {

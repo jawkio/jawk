@@ -326,6 +326,13 @@ public class JRT {
 		this.convfmt = Awk.DEFAULT_CONVFMT;
 		this.ofmt = Awk.DEFAULT_OFMT;
 		this.subsep = Awk.DEFAULT_SUBSEP;
+		this.fsVar = this.fs;
+		this.rsVar = this.rs;
+		this.ofsVar = this.ofs;
+		this.orsVar = this.ors;
+		this.convfmtVar = this.convfmt;
+		this.ofmtVar = this.ofmt;
+		this.subsepVar = this.subsep;
 	}
 
 	/**
@@ -545,11 +552,10 @@ public class JRT {
 	 *        names and their values.
 	 */
 	public final void assignInitialVariables(Map<String, Object> initialVarMap) {
+		applySpecialVariables(initialVarMap);
 		for (Map.Entry<String, Object> var : initialVarMap.entrySet()) {
-			String name = var.getKey();
-			Object value = var.getValue();
-			if (!applySpecialVariable(name, value)) {
-				vm.assignVariable(name, value);
+			if (!isJrtManagedSpecialVariable(var.getKey())) {
+				vm.assignVariable(var.getKey(), var.getValue());
 			}
 		}
 	}

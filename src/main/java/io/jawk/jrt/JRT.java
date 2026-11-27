@@ -1747,19 +1747,23 @@ public class JRT {
 	}
 
 	/**
-	 * Normalizes a value assigned to a special variable stored as text: a
-	 * {@link BigDecimal} or a {@link BigInteger} becomes a numeric string that
-	 * keeps its digits, as the AVM does for any variable from the host.
+	 * Normalizes a value assigned to a special variable stored as text, as the
+	 * AVM does for any variable from the host: a {@link Boolean} becomes AWK's
+	 * 1 or 0, and a {@link BigDecimal} or a {@link BigInteger} a numeric string
+	 * that keeps its digits, whatever the locale.
 	 *
 	 * @param value assigned value
 	 * @return the value the variable holds
 	 */
-	private Object normalizeSpecialValue(Object value) {
+	private static Object normalizeSpecialValue(Object value) {
 		if (value == null) {
 			return "";
 		}
+		if (value instanceof Boolean) {
+			return new GawkBool((Boolean) value);
+		}
 		if (value instanceof BigDecimal || value instanceof BigInteger) {
-			return toInputScalar(value.toString());
+			return StrNum.ofJavaNumber((Number) value);
 		}
 		return value;
 	}

@@ -405,6 +405,22 @@ public class JRTTest {
 		assertEquals("12.50", jrt.getFSString());
 		assertEquals("123456789012345678901234567890", jrt.getSUBSEPString());
 		assertEquals(12.5, JRT.toDouble(jrt.getFSVar()), 0);
+
+		JRT french = new JRT(null, Locale.FRANCE, AwkSink.from(System.out, Locale.FRANCE), System.err);
+		french.setOFS(new BigDecimal("12.50"));
+		assertEquals("12.50", french.getOFSString());
+		assertEquals(12.5, JRT.toDouble(french.getOFSVar()), 0);
+	}
+
+	@Test
+	public void testSpecialVariableSettersTurnBooleansIntoNumbers() {
+		JRT jrt = new JRT(null, Locale.US, AwkSink.from(System.out, Locale.US), System.err);
+		jrt.setFS(Boolean.TRUE);
+		jrt.setOFS(Boolean.FALSE);
+		assertEquals("1", jrt.getFSString());
+		assertEquals("0", jrt.getOFSString());
+		assertTrue(jrt.toBoolean(jrt.getFSVar()));
+		assertFalse(jrt.toBoolean(jrt.getOFSVar()));
 	}
 
 	@Test

@@ -497,6 +497,16 @@ public class AwkParserTest {
 		result.assertExpected();
 		message = result.thrownException().getMessage();
 		assertTrue(message, message.endsWith(":4)"));
+
+		result = AwkTestSupport.cliTest("a missing '}' at the end of an empty last source reports its line 1")
+				.file("t1.awk", "BEGIN {\n  x = 1\n  y = 2\n  z = 3\n")
+				.file("t2.awk", "")
+				.argument("-f", "{{t1.awk}}", "-f", "{{t2.awk}}")
+				.expectThrow(ParserException.class)
+				.run();
+		result.assertExpected();
+		message = result.thrownException().getMessage();
+		assertTrue(message, message.endsWith("t2.awk:1)"));
 	}
 
 	@Test

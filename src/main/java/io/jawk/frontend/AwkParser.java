@@ -455,6 +455,8 @@ public class AwkParser {
 			} else {
 				return;
 			}
+			// a line counted in the source left behind means nothing in this one
+			tokenLine = 1;
 		}
 	}
 

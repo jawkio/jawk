@@ -5557,7 +5557,7 @@ public class AwkParser {
 			} else {
 				if (getAst1() instanceof ArrayReferenceAst) {
 					((ArrayReferenceAst) getAst1()).populateTargetValueTuples(tuples);
-					tuples.unaryPlus();
+					tuples.postfixOperand();
 				} else {
 					getAst1().populateTuples(tuples);
 				}
@@ -5600,7 +5600,7 @@ public class AwkParser {
 			}
 			if (getAst1() instanceof ArrayReferenceAst) {
 				((ArrayReferenceAst) getAst1()).populateTargetValueTuples(tuples);
-				tuples.unaryPlus();
+				tuples.postfixOperand();
 			} else {
 				getAst1().populateTuples(tuples);
 			}

@@ -56,7 +56,10 @@ public class AwkTuples implements Serializable {
 	// 9 = @JawkRawValue extension arguments are evaluated like other scalars
 	// (issue #649): older streams peek at them without assigning untyped
 	// variables, which is now @JawkIntrospect only.
-	private static final long serialVersionUID = 9L;
+	// 10 = POSTFIX_OPERAND replaces the UNARY_PLUS of a[k]++ and a[k]--, and
+	// arithmetic on a string literal that is not a number is no longer folded
+	// (issue #666): older streams would not follow strict numbers.
+	private static final long serialVersionUID = 10L;
 
 	/** Address manager */
 	private final AddressManager addressManager = new AddressManager();
@@ -1152,6 +1155,14 @@ public class AwkTuples implements Serializable {
 	 */
 	public void unaryPlus() {
 		queue.add(new Tuple.NoOperandTuple(Opcode.UNARY_PLUS));
+	}
+
+	/**
+	 * Converts to a number the value of the array element that a postfix
+	 * {@code ++} or {@code --} is about to change.
+	 */
+	public void postfixOperand() {
+		queue.add(new Tuple.NoOperandTuple(Opcode.POSTFIX_OPERAND));
 	}
 
 	/**
@@ -2473,6 +2484,22 @@ public class AwkTuples implements Serializable {
 		// folds that the runtime result would not have.
 		switch (opcode) {
 		case ADD:
+		case SUBTRACT:
+		case MULTIPLY:
+		case DIVIDE:
+		case MOD:
+		case POW:
+			// Arithmetic on a string literal that is not a number is left to
+			// the interpreter, which refuses it under strict numbers.
+			if (!JRT.isNumber(left) || !JRT.isNumber(right)) {
+				return null;
+			}
+			break;
+		default:
+			break;
+		}
+		switch (opcode) {
+		case ADD:
 			return JRT.add(left, right);
 		case SUBTRACT:
 			return JRT.subtract(left, right);
@@ -2508,6 +2535,10 @@ public class AwkTuples implements Serializable {
 	private Object foldUnary(Object literal, Tuple operation) {
 		Opcode opcode = operation.getOpcode();
 		if (opcode == null) {
+			return null;
+		}
+		if (!JRT.isNumber(literal)) {
+			// Left to the interpreter, which refuses it under strict numbers.
 			return null;
 		}
 		switch (opcode) {

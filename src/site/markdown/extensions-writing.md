@@ -66,6 +66,23 @@ An array passed to a plain scalar parameter (`Object`, `String`, `Object...` wit
 
 Use `@JawkRawValue` to receive Jawk's own representation instead.
 
+## Refuse Arguments That Are Not Numbers
+
+`JRT.toDouble()` and `JRT.toLong()` never fail: a text without any number converts to `0`, and `"12 W"` to `12`. Two static helpers tell a number from a text, with the grammar of the arithmetic operators:
+
+```java
+@JawkFunction("toMegabytes")
+public Object toMegabytes(Object bytes) {
+    JRT.requireNumber(bytes); // AwkNumberFormatException: "N/A" is not a number
+    return JRT.toDouble(bytes) / 1048576;
+}
+```
+
+- `JRT.isNumber(value)` is `true` for a Java number and for a text that is entirely a number once its blanks are trimmed (`"007"`, `" 7 "`, `"1e3"`, `"+inf"`), and `false` for any other text (`""`, `"N/A"`, `"12 W"`, `"0x1A"`) and for `null`.
+- `JRT.requireNumber(value)` throws an [`AwkNumberFormatException`](apidocs/io/jawk/jrt/AwkNumberFormatException.html) when `isNumber()` is `false`. The script stops with that exception, which reports the offending text and the line of the call.
+
+Both are independent of [`AwkSettings.setStrictNumbers()`](java-advanced.html#strict-numbers), which does not check the arguments of extension functions: a function that calls `requireNumber()` refuses a text whatever the setting. An unassigned variable reaches a plain parameter as `""`, and is refused as such.
+
 ## Declare Optional Arguments with @JawkOptional
 
 Mark trailing parameters with `@JawkOptional` when the AWK caller may omit them; the Java method receives `null` in their place. Optional parameters must be the last declared parameters and cannot be combined with varargs. Other parameter annotations compose naturally, so an optional array argument keeps its `@JawkAssocArray` marker:

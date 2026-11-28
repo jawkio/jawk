@@ -26,6 +26,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -49,6 +50,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.Test;
 import io.jawk.backend.AVM;
 import io.jawk.frontend.ast.ParserException;
@@ -1722,15 +1724,17 @@ public class AwkTest {
 
 	/**
 	 * Returns an environment variable of the process with a name usable in an
-	 * AWK string literal and a non-empty value.
+	 * AWK string literal and a non-empty value, and skips the test when the
+	 * process has none.
 	 */
 	private static Map.Entry<String, String> someEnvironmentVariable() {
-		return System.getenv()
+		Optional<Map.Entry<String, String>> variable = System.getenv()
 				.entrySet()
 				.stream()
 				.filter(e -> e.getKey().matches("[A-Za-z_][A-Za-z0-9_]*") && !e.getValue().isEmpty())
-				.findFirst()
-				.orElseThrow(() -> new AssertionError("no usable environment variable"));
+				.findFirst();
+		assumeTrue("no usable environment variable", variable.isPresent());
+		return variable.get();
 	}
 
 	@Test

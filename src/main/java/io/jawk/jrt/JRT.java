@@ -654,22 +654,6 @@ public class JRT {
 	}
 
 	/**
-	 * Called by AVM/compiled modules to assign local
-	 * environment variables to an associative array
-	 * (in this case, to ENVIRON).
-	 *
-	 * @param aa The associative array to populate with
-	 *        environment variables. The module asserts that
-	 *        the associative array is empty prior to population.
-	 */
-	public static void assignEnvironmentVariables(AssocArray aa) {
-		Map<String, String> env = System.getenv();
-		for (Map.Entry<String, String> var : env.entrySet()) {
-			aa.put(var.getKey(), new StrNum(var.getValue()));
-		}
-	}
-
-	/**
 	 * Creates an AWK-managed associative array and exposes it as a plain
 	 * {@link Map} for callers that do not need the concrete runtime type.
 	 *

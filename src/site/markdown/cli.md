@@ -171,6 +171,8 @@ $ jawk -S -f script.awk input.txt
 
 Sandbox mode disables `system()`, input and output redirection, command pipelines, `@include` source inclusion, and related features that are intentionally unsafe in a restricted host environment. Every redirection is rejected, whatever the target: the `/dev/stdin`, `/dev/stdout`, and `/dev/stderr` [special filenames](compatibility.html#special-filenames) are no more reachable from a sandboxed script than a regular file is.
 
+`ENVIRON` is empty in sandbox mode: a sandboxed script cannot read the environment variables of the process. As a consequence, `strftime()` and `mktime()` use the default time zone of the JVM, since no `TZ` is set in `ENVIRON`, unless the script assigns `ENVIRON["TZ"]` itself.
+
 ## See Also
 
 - [CLI Reference](cli-reference.html) for the full list of options and flags

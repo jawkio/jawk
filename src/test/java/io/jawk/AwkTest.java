@@ -1720,6 +1720,68 @@ public class AwkTest {
 				.runAndAssert();
 	}
 
+	/**
+	 * Returns an environment variable of the process with a name usable in an
+	 * AWK string literal and a non-empty value.
+	 */
+	private static Map.Entry<String, String> someEnvironmentVariable() {
+		return System.getenv()
+				.entrySet()
+				.stream()
+				.filter(e -> e.getKey().matches("[A-Za-z_][A-Za-z0-9_]*") && !e.getValue().isEmpty())
+				.findFirst()
+				.orElseThrow(() -> new AssertionError("no usable environment variable"));
+	}
+
+	@Test
+	public void sandboxEnvironIsEmpty() throws Exception {
+		String name = someEnvironmentVariable().getKey();
+		AwkTestSupport.awkTest("sandbox ENVIRON is empty")
+				.withAwk(new SandboxedAwk())
+				.script(
+						"BEGIN { n = 0; for (k in ENVIRON) n++; l = length(ENVIRON); print \"[\" ENVIRON[\"" + name
+								+ "\"] \"]\", n, l }")
+				.expect("[] 0 0\n")
+				.runAndAssert();
+	}
+
+	@Test
+	public void sandboxEvalEnvironIsEmpty() throws Exception {
+		String name = someEnvironmentVariable().getKey();
+		Awk awk = new SandboxedAwk();
+		assertEquals(0L, awk.eval("length(ENVIRON)"));
+		assertEquals("", awk.eval("ENVIRON[\"" + name + "\"]").toString());
+	}
+
+	@Test
+	public void sandboxEnvironIsTheHostValue() throws Exception {
+		AwkTestSupport.awkTest("sandbox ENVIRON is the map passed by the host")
+				.withAwk(new SandboxedAwk())
+				.preassign("ENVIRON", Collections.singletonMap("TZ", "UTC"))
+				.script("BEGIN { for (k in ENVIRON) print k \"=\" ENVIRON[k] }")
+				.expect("TZ=UTC\n")
+				.runAndAssert();
+	}
+
+	@Test
+	public void sandboxEvalEnvironIsTheHostValue() throws Exception {
+		AwkSettings settings = new AwkSettings();
+		settings.putVariable("ENVIRON", Collections.singletonMap("TZ", "UTC"));
+		Awk awk = new SandboxedAwk(settings);
+		assertEquals("UTC", awk.eval("ENVIRON[\"TZ\"]"));
+		assertEquals(1L, awk.eval("length(ENVIRON)"));
+	}
+
+	@Test
+	public void environHoldsTheProcessEnvironmentOutsideSandbox() throws Exception {
+		Map.Entry<String, String> variable = someEnvironmentVariable();
+		AwkTestSupport.awkTest("ENVIRON holds the environment of the process")
+				.script("BEGIN { printf \"%s\", ENVIRON[\"" + variable.getKey() + "\"] }")
+				.expect(variable.getValue())
+				.runAndAssert();
+		assertEquals(variable.getValue(), new Awk().eval("ENVIRON[\"" + variable.getKey() + "\"]"));
+	}
+
 	@Test
 	public void executePersistingGlobalsSharesUserGlobalsAcrossPrograms() throws Exception {
 		Awk awk = new Awk();

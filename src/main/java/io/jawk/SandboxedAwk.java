@@ -168,6 +168,12 @@ final class SandboxedCompiledAwkProgram extends AwkProgram {
 	}
 
 	@Override
+	public void environOffset(int offset) {
+		// no-op: do not populate ENVIRON with the environment of the process;
+		// it stays a plain global, empty unless the host passes a value.
+	}
+
+	@Override
 	public void argvOffset(int offset) {
 		// no-op: keep argvOffset at NULL_OFFSET; AVM.getARGV() returns a
 		// synthetic AssocArray when ARGV is not materialized.
@@ -225,6 +231,12 @@ final class SandboxedCompiledAwkExpression extends AwkExpression {
 	public void argcOffset(int offset) {
 		// no-op: keep argcOffset at NULL_OFFSET; AVM.getARGC() returns the
 		// command-line argument count when ARGC is not materialized.
+	}
+
+	@Override
+	public void environOffset(int offset) {
+		// no-op: do not populate ENVIRON with the environment of the process;
+		// it stays a plain global, empty unless the host passes a value.
 	}
 
 	@Override

@@ -99,16 +99,6 @@ public class SandboxedAwkTuples extends AwkTuples {
 	}
 
 	/**
-	 * In sandbox mode, ENVIRON is not populated with the environment of the
-	 * process, so that the script cannot read it. ENVIRON stays a plain
-	 * global: empty, or the value passed by the host.
-	 */
-	@Override
-	public void environOffset(int offset) {
-		// no-op: ENVIRON stays a plain global
-	}
-
-	/**
 	 * In sandbox mode, ARGV does not need to be materialized as a global
 	 * variable because the script cannot alter it. The runtime falls back
 	 * to a synthetic ARGV built from command-line arguments.

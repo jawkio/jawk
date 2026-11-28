@@ -1754,6 +1754,19 @@ public class AwkTest {
 	}
 
 	@Test
+	public void sandboxEnvironIsEmptyForProgramsCompiledOutsideSandbox() throws Exception {
+		// A program or an expression compiled by a plain Awk (or loaded with -L)
+		// references ENVIRON without the sandbox: the sandboxed runtime must
+		// still keep it empty.
+		String name = someEnvironmentVariable().getKey();
+		AwkProgram program = AWK.compile("BEGIN { n = 0; for (k in ENVIRON) n++; printf \"%d\", n }");
+		Awk sandboxAwk = new SandboxedAwk();
+		assertEquals("0", sandboxAwk.script(program).execute());
+		AwkExpression expression = AWK.compileExpression("ENVIRON[\"" + name + "\"]");
+		assertEquals("", sandboxAwk.eval(expression).toString());
+	}
+
+	@Test
 	public void sandboxEnvironIsTheHostValue() throws Exception {
 		AwkTestSupport.awkTest("sandbox ENVIRON is the map passed by the host")
 				.withAwk(new SandboxedAwk())

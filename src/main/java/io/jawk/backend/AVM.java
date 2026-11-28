@@ -3312,10 +3312,20 @@ public class AVM implements VariableManager, Closeable {
 
 	private void populateEnviron(long offset) {
 		environOffset = offset;
-		for (Map.Entry<String, String> var : System.getenv().entrySet()) {
+		for (Map.Entry<String, String> var : getEnvironment().entrySet()) {
 			assignArray(environOffset, var.getKey(), jrt.toInputScalar(var.getValue()), true);
 			pop(); // clean up the stack after the assignment
 		}
+	}
+
+	/**
+	 * Returns the environment variables added to {@code ENVIRON} when a
+	 * program references it.
+	 *
+	 * @return the environment of the process
+	 */
+	protected Map<String, String> getEnvironment() {
+		return System.getenv();
 	}
 
 	private void populateArgc(long offset) {

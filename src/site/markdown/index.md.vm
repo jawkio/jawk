@@ -111,7 +111,7 @@ Key Capabilities
 - Custom output through `AwkSink`, to collect what a script prints as Java values instead of text
 - Gawk builtins enabled by default: `asort()`, `asorti()`, `typeof()`, `isarray()`, `mkbool()`, `gensub()`, `patsplit()`, `strtonum()`, `systime()`, `mktime()`, `strftime()`, the gettext functions, and `PROCINFO["sorted_in"]`
 - Java extensions, loaded from the CLI or the Java API, to expose your own functions to a script
-- A sandboxed mode, in Java and on the CLI, that rejects `system()`, redirections, pipes, and `@include`
+- A sandboxed mode, in Java and on the CLI, that rejects `system()`, redirections, pipes, and `@include`, and hides the environment variables
 - Precompilation: `-K` writes a compiled program to a file, `-L` runs it later without parsing the source again
 
 Differences with Traditional AWK

@@ -20,6 +20,12 @@ released version automatically via .github/scripts/stamp-behavior-changes.sh.
 
 ## Unreleased
 
+- In sandbox mode (`SandboxedAwk` and `-S`), `ENVIRON` is now empty: a sandboxed script or
+  expression can no longer read the environment variables of the process, and `strftime()` and
+  `mktime()` use the default time zone unless `ENVIRON["TZ"]` is set. A host that passes its own
+  `ENVIRON` with `variable("ENVIRON", map)` or `AwkSettings.putVariable()` now gets exactly that
+  map; the environment used to be added to it. Without the sandbox, nothing changes. The unused
+  `JRT.assignEnvironmentVariables()` is removed ([#675](https://github.com/jawkio/jawk/issues/675)).
 - A number assigned to `FS`, `RS`, `OFS`, `ORS`, `SUBSEP`, `CONVFMT` or `OFMT` is now converted
   to text with `CONVFMT`, an integral value as an integer, as in gawk. It used to get Java's
   formatting: `OFS = 3; OFS++` set `OFS` to `4.0` and `OFS = 0.1 + 0.2` to

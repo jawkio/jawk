@@ -26,6 +26,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -49,6 +50,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.Test;
 import io.jawk.backend.AVM;
 import io.jawk.frontend.ast.ParserException;
@@ -1718,6 +1720,83 @@ public class AwkTest {
 				.script("BEGIN { print ARGV[0] }")
 				.expect("\n")
 				.runAndAssert();
+	}
+
+	/**
+	 * Returns an environment variable of the process with a name usable in an
+	 * AWK string literal and a non-empty value, and skips the test when the
+	 * process has none.
+	 */
+	private static Map.Entry<String, String> someEnvironmentVariable() {
+		Optional<Map.Entry<String, String>> variable = System.getenv()
+				.entrySet()
+				.stream()
+				.filter(e -> e.getKey().matches("[A-Za-z_][A-Za-z0-9_]*") && !e.getValue().isEmpty())
+				.findFirst();
+		assumeTrue("no usable environment variable", variable.isPresent());
+		return variable.get();
+	}
+
+	@Test
+	public void sandboxEnvironIsEmpty() throws Exception {
+		String name = someEnvironmentVariable().getKey();
+		AwkTestSupport.awkTest("sandbox ENVIRON is empty")
+				.withAwk(new SandboxedAwk())
+				.script(
+						"BEGIN { n = 0; for (k in ENVIRON) n++; l = length(ENVIRON); print \"[\" ENVIRON[\"" + name
+								+ "\"] \"]\", n, l }")
+				.expect("[] 0 0\n")
+				.runAndAssert();
+	}
+
+	@Test
+	public void sandboxEvalEnvironIsEmpty() throws Exception {
+		String name = someEnvironmentVariable().getKey();
+		Awk awk = new SandboxedAwk();
+		assertEquals(0L, awk.eval("length(ENVIRON)"));
+		assertEquals("", awk.eval("ENVIRON[\"" + name + "\"]").toString());
+	}
+
+	@Test
+	public void sandboxEnvironIsEmptyForProgramsCompiledOutsideSandbox() throws Exception {
+		// A program or an expression compiled by a plain Awk (or loaded with -L)
+		// references ENVIRON without the sandbox: the sandboxed runtime must
+		// still keep it empty.
+		String name = someEnvironmentVariable().getKey();
+		AwkProgram program = AWK.compile("BEGIN { n = 0; for (k in ENVIRON) n++; printf \"%d\", n }");
+		Awk sandboxAwk = new SandboxedAwk();
+		assertEquals("0", sandboxAwk.script(program).execute());
+		AwkExpression expression = AWK.compileExpression("ENVIRON[\"" + name + "\"]");
+		assertEquals("", sandboxAwk.eval(expression).toString());
+	}
+
+	@Test
+	public void sandboxEnvironIsTheHostValue() throws Exception {
+		AwkTestSupport.awkTest("sandbox ENVIRON is the map passed by the host")
+				.withAwk(new SandboxedAwk())
+				.preassign("ENVIRON", Collections.singletonMap("TZ", "UTC"))
+				.script("BEGIN { for (k in ENVIRON) print k \"=\" ENVIRON[k] }")
+				.expect("TZ=UTC\n")
+				.runAndAssert();
+	}
+
+	@Test
+	public void sandboxEvalEnvironIsTheHostValue() throws Exception {
+		AwkSettings settings = new AwkSettings();
+		settings.putVariable("ENVIRON", Collections.singletonMap("TZ", "UTC"));
+		Awk awk = new SandboxedAwk(settings);
+		assertEquals("UTC", awk.eval("ENVIRON[\"TZ\"]"));
+		assertEquals(1L, awk.eval("length(ENVIRON)"));
+	}
+
+	@Test
+	public void environHoldsTheProcessEnvironmentOutsideSandbox() throws Exception {
+		Map.Entry<String, String> variable = someEnvironmentVariable();
+		AwkTestSupport.awkTest("ENVIRON holds the environment of the process")
+				.script("BEGIN { printf \"%s\", ENVIRON[\"" + variable.getKey() + "\"] }")
+				.expect(variable.getValue())
+				.runAndAssert();
+		assertEquals(variable.getValue(), new Awk().eval("ENVIRON[\"" + variable.getKey() + "\"]"));
 	}
 
 	@Test

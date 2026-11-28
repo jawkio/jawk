@@ -22,6 +22,7 @@ package io.jawk.backend;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import java.util.Collections;
 import java.util.Map;
 import io.jawk.ext.JawkExtension;
 import io.jawk.jrt.AwkSink;
@@ -60,6 +61,18 @@ public class SandboxedAVM extends AVM {
 	protected JRT createJrt() {
 		AwkSettings s = getSettings();
 		return new SandboxedJRT(this, s.getLocale(), AwkSink.NOP_SINK, null);
+	}
+
+	/**
+	 * In sandbox mode, the script cannot read the environment of the process:
+	 * {@code ENVIRON} is empty, or holds only the value passed by the host,
+	 * whoever compiled the program.
+	 *
+	 * @return an empty map
+	 */
+	@Override
+	protected Map<String, String> getEnvironment() {
+		return Collections.emptyMap();
 	}
 
 }

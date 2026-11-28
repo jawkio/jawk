@@ -142,6 +142,16 @@ awk.script(program)
 
 Sandboxed compilation rejects `@include` so an untrusted script cannot select and execute source files from the host filesystem. Pass every trusted source explicitly to the host API instead.
 
+`ENVIRON` is empty in a `SandboxedAwk`, so that a script or an expression cannot read the environment variables of the host process. To give a sandboxed script some environment variables, `TZ` for `strftime()` and `mktime()` for example, pass your own `ENVIRON`: the script sees exactly that map.
+
+```java
+awk.script("BEGIN { print strftime(\"%H:%M\") }")
+        .variable("ENVIRON", Map.of("TZ", "UTC"))
+        .execute(System.out);
+```
+
+`AwkSettings.putVariable("ENVIRON", map)` does the same for every execution and for `eval()`.
+
 ## JSR 223 ScriptEngine
 
 Jawk also exposes a JSR 223 `ScriptEngine`:
